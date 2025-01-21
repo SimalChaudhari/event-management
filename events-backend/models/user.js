@@ -10,11 +10,10 @@ const User = sequelize.define('User', {
         primaryKey: true,
     },
     role: {
-        type: DataTypes.ENUM('Admin', 'User'),
+        type: DataTypes.ENUM('admin', 'user'), // Updated to lowercase for consistency with SQL
         allowNull: false,
-        defaultValue: 'User', // Defaults to 'User'
+        defaultValue: 'user', // Defaults to 'user'
     },
-
     firstName: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -37,27 +36,46 @@ const User = sequelize.define('User', {
     },
     mobile: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
     },
     address: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
     },
     city: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
+
     },
     state: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
+
     },
     postalCode: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
+
     },
-    gender: {
-        type: DataTypes.ENUM('Male', 'Female', 'Other'),
-        allowNull: false,
+    isMember: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
+    biometricEnabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
+    countryCurrency: {
+        type: DataTypes.STRING(10),
+        allowNull: true,
+    },
+    profilePicture: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+    },
+    linkedinProfile: {
+        type: DataTypes.TEXT,
+        allowNull: true,
     },
 
     resetToken: {
@@ -68,7 +86,6 @@ const User = sequelize.define('User', {
         type: DataTypes.DATE,
         allowNull: true,
     },
-
 },
     {
         scopes: {
@@ -76,6 +93,8 @@ const User = sequelize.define('User', {
                 attributes: { exclude: ['password'] },
             },
         },
+        freezeTableName: true, // Prevent pluralization
+        timestamps: true, // Automatically adds createdAt and updatedAt fields
     }
 );
 

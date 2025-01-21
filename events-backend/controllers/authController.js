@@ -11,8 +11,8 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     try {
-        const { emailOrMobile, password } = req.body;
-        const { user, token } = await loginUser(emailOrMobile, password);
+        const { email, password } = req.body;
+        const { user, token } = await loginUser(email, password);
         res.json({ message: 'Login successful', user, token });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -21,16 +21,16 @@ export const login = async (req, res) => {
 
 export const forgetPassword = async (req, res) => {
     try {
-        const { emailOrMobile } = req.body;
-        const resetToken = await forgetService(emailOrMobile);
-        console.log(resetToken)
-        res.json({ message: 'reset Otp generated' });
+        const { email } = req.body;
+        const resetToken = await forgetService(email);
+        console.log(resetToken);
+        res.json({ message: 'Reset OTP generated' });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
 };
 
-export const resetPassword  = async (req, res) => {
+export const resetPassword = async (req, res) => {
     try {
         const { resetToken, newPassword, confirmPassword } = req.body;
         if (newPassword !== confirmPassword) {
