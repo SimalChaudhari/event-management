@@ -1,5 +1,5 @@
 import * as React from 'react';
-const SignUp1 = React.lazy(() => import('./Demo/Authentication/SignUp/SignUp1'));
+// const SignUp1 = React.lazy(() => import('./Demo/Authentication/SignUp/SignUp1'));
 // const SignUp2 = React.lazy(() => import('./Demo/Authentication/SignUp/SignUp2'));
 const Signin1 = React.lazy(() => import('./Demo/Authentication/SignIn/SignIn1'));
 // const Signin2 = React.lazy(() => import('./Demo/Authentication/SignIn/SignIn2'));
@@ -12,7 +12,7 @@ const Error = React.lazy(() => import('./Demo/Maintenance/Error'));
 const OfflineUI = React.lazy(() => import('./Demo/Maintenance/OfflineUI'));
 const ComingSoon = React.lazy(() => import('./Demo/Maintenance/ComingSoon'));
 const route = [
-    { path: '/auth/signup-1', exact: true, name: 'Signup 1', component: SignUp1 },
+    // { path: '/auth/signup-1', exact: true, name: 'Signup 1', component: SignUp1 },
     // { path: '/auth/signup-2', exact: true, name: 'Signup 2', component: SignUp2 },
     { path: '/auth/signin-1', exact: true, name: 'Signin 1', component: Signin1 },
     // { path: '/auth/signin-2', exact: true, name: 'Signin 2', component: Signin2 },

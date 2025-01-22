@@ -1,61 +1,57 @@
-import * as React from 'react';
-import { lazy, Suspense } from 'react';
-import { Switch, Route, useLocation } from 'react-router-dom';
-import '../../node_modules/font-awesome/scss/font-awesome.scss';
+import React, { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Loader from './layout/Loader';
-import ScrollToTop from './layout/ScrollToTop';
 import routesOnePage from '../route';
 import routes from '../routes';
-import { Redirect } from 'react-router-dom';
 import Config from '../config';
-import { useDispatch, useSelector } from 'react-redux';
+
 const AdminLayout = lazy(() => import('./layout/AdminLayout'));
 
 const App = () => {
     const location = useLocation();
-    const dispatch = useDispatch();
-    // const { isAuthenticated, loading } = useSelector((state) => state.auth);
+    const { authenticated } = useSelector((state) => state.auth);
+    const defaultPath = useSelector((state) => state.able.defaultPath);
 
-    const [isAuthenticated,setIsAuthenticated] = React.useState(false)
-    const [loading,setLoading] = React.useState(false)
+    return (
+        <Suspense fallback={<Loader />}>
+            <Routes location={location} key={location.pathname}>
+                {/* Public Routes */}
+                {routesOnePage.map((route, index) =>
+                    route.component && (
+                        <Route
+                            key={index}
+                            path={route.path}
+                            element={
+                                authenticated ? (
+                                    <Navigate to={Config.defaultPath} replace />
+                                ) : (
+                                    <route.component />
+                                )
+                            }
+                        />
+                    )
+                )}
+                {/* Protected Routes */}
+                {authenticated ? (
+                    <Route path="/" element={<AdminLayout />}>
+                        {routes.map((route, index) => (
+                            <Route
+                                key={index}
+                                path={route.path}
+                                element={<route.component />}
+                            />
+                        ))}
+                    </Route>
+                ) : (
+                    <Route path="*" element={<Navigate to="/auth/signin-1" />} />
+                )}
 
-
-    // Verify token on app load
-    React.useEffect(() => {
-        // dispatch(verifyToken());
-    }, [dispatch]);
-
-    if (loading) {
-        return <Loader />; // Show loader while verifying token
-    }
-
-    return (<>
-        <ScrollToTop>
-            <Suspense fallback={<Loader />}>
-                <Route path={routesOnePage.map((x) => x.path)}>
-                    <Switch location={location} key={location.pathname}>
-                        {routesOnePage.map((route, index) => {
-                            return route.component ? (
-                                <Route key={index} path={route.path} exact={route.exact}
-                                    render={(props) => <route.component {...props} />} />) : null;
-                        })}
-                    </Switch>
-                </Route>
-                <Route path={routes.map((x) => x.path)}
-                    render={(props) =>
-                        isAuthenticated ? (
-                            <AdminLayout {...props} />
-                        ) : (
-                            <Redirect to="/auth/signup-1" />
-                        )
-                    }
-                />
-                <Route path={'/*'} exact>
-                    <Redirect to={Config.defaultPath} />
-                </Route>
-            </Suspense>
-        </ScrollToTop>
-        <div className="backdrop" />
-    </>);
+                {/* Default Redirect */}
+                <Route path="*" element={<Navigate to={Config.defaultPath} />} />
+            </Routes>
+        </Suspense>
+    );
 };
+
 export default App;

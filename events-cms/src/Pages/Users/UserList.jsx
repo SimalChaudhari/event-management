@@ -1,221 +1,156 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { Row, Col, Card, Table } from 'react-bootstrap';
-import avatar1 from '../../assets/images/user/avatar-1.jpg';
-import avatar2 from '../../assets/images/user/avatar-2.jpg';
-import avatar3 from '../../assets/images/user/avatar-3.jpg';
-import avatar4 from '../../assets/images/user/avatar-4.jpg';
-import avatar5 from '../../assets/images/user/avatar-5.jpg';
+import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
+import { userList } from '../../store/actions/userActions';
+import { DUMMY_PATH } from '../../configs/env';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
-const names = [
-    {
-        id: 1,
-        image: avatar1,
-        name: 'System Architect',
-        email: 'sa@domain.com',
-        position: 'Edinburgh',
-        office: 'Tiger Nixon',
-        age: 61,
-        date: '2011/04/25',
-        salary: '$320,800',
-        status: 1
-    },
-    {
-        id: 3,
-        image: avatar3,
-        name: 'Ashton Cox',
-        email: 'ac@domain.com',
-        position: 'Junior Technical Author',
-        office: 'San Francisco',
-        age: 66,
-        date: '2009/01/12',
-        salary: '$86,000',
-        status: 1
-    },
-    {
-        id: 4,
-        image: avatar2,
-        name: 'Cedric Kelly',
-        email: 'ck@domain.com',
-        position: 'Senior Javascript Developer',
-        office: 'Edinburgh',
-        age: 22,
-        date: '2012/03/29',
-        salary: '$433,060',
-        status: 0
-    },
-    {
-        id: 5,
-        image: avatar4,
-        name: 'Airi Satou',
-        email: 'as@domain.com',
-        position: 'Accountant',
-        office: 'Tokyo',
-        age: 33,
-        date: '2008/11/28',
-        salary: '$162,700',
-        status: 1
-    },
-    {
-        id: 6,
-        image: avatar5,
-        name: 'Brielle Williamson',
-        email: 'bw@domain.com',
-        position: 'Integration Specialist',
-        office: 'New York',
-        age: 61,
-        date: '2012/12/02',
-        salary: '$372,000',
-        status: 1
-    },
-    {
-        id: 7,
-        image: avatar3,
-        name: 'Herrod Chandler',
-        email: 'hc@domain.com',
-        position: 'Sales Assistant',
-        office: 'San Francisco',
-        age: 59,
-        date: '2012/08/06',
-        salary: '$137,500',
-        status: 0
-    },
-    {
-        id: 8,
-        image: avatar2,
-        name: 'Garrett Winters',
-        email: 'gw@domain.com',
-        position: 'Accountant',
-        office: 'Tokyo',
-        age: 63,
-        date: '2011/07/25',
-        salary: '$170,750',
-        status: 1
-    }
-];
-function atable() {
+
+function atable(data) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
-    // @ts-ignore
-    $(tableZero).DataTable({
-        data: names,
-        order: [[3, 'asc']],
-        columns: [
-            {
-                data: 'image',
-                render: function (data, type, row) {
-                    const html = '<div class="d-inline-block align-middle">' +
-                        '<img src=' +
-                        data +
-                        ' alt="user" class="img-radius align-top m-r-15" style="width:40px" />' +
-                        '<div class="d-inline-block">' +
-                        '<h6 class="m-b-0">' +
-                        row.name +
-                        '</h6>' +
-                        '<p class="m-b-0">' +
-                        row.email +
-                        '</p>' +
-                        '</div>' +
-                        '</div>';
-                    return html;
-                }
-            },
-            {
-                data: 'position',
-                render: function (data, type, row) {
-                    return data;
-                }
-            },
-            {
-                data: 'office',
-                render: function (data, type, row) {
-                    return data;
-                }
-            },
-            {
-                data: 'age',
-                render: function (data, type, row) {
-                    return data;
-                }
-            },
-            {
-                data: 'date',
-                render: function (data, type, row) {
-                    return data;
-                }
-            },
-            {
-                data: 'salary',
-                render: function (data, type, row) {
-                    return data;
-                }
-            },
-            {
-                data: 'status',
-                render: function (data, type, row) {
-                    let html;
-                    if (data === 1) {
-                        html =
-                            '<span class="badge badge-light-success">Active</span>' +
-                                '<div class="overlay-edit">' +
-                                '<button type="button" class="btn btn-icon btn-success"><i class="feather icon-check-circle"> <span class="sr-only"/> </i></button>' +
-                                '<button type="button" class="btn btn-icon btn-danger"><i class="feather icon-trash-2"><span class="sr-only"/></i></button>' +
-                                '</div>';
+
+    // Initialize DataTable if not already initialized
+    if (!$.fn.DataTable.isDataTable(tableZero)) {
+        $(tableZero).DataTable({
+            data: data,
+            order: [[1, 'asc']], // Order by Name (First Name) column
+            columns: [
+                {
+                    data: 'profilePicture',
+                    render: function (data, type, row) {
+                        // const imageUrl = row.profilePicture || DUMMY_PATH;
+                        const imageUrl = DUMMY_PATH;
+
+                        return `
+                            <div class="d-inline-block align-middle">
+                                <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                                  <div class="d-inline-block">
+                                    <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
+                                    <p class="m-b-0">${row.email}</p>
+                                </div>
+                            </div>
+                        `;
                     }
-                    else {
-                        html =
-                            '<span class="badge badge-light-danger">Inactive</span>' +
-                                '<div class="overlay-edit">' +
-                                '<button type="button" class="btn btn-icon btn-success"><i class="feather icon-check-circle"><span class="sr-only"/></i></button>' +
-                                '<button type="button" class="btn btn-icon btn-danger"><i class="feather icon-trash-2"><span class="sr-only"/></i></button>' +
-                                '</div>';
-                    }
-                    return html;
+                },
+                { data: 'mobile', title: 'Mobile' },
+                { data: 'address', title: 'Address' },
+                { data: 'city', title: 'City' },
+                { data: 'state', title: 'State' },
+                { data: 'postalCode', title: 'Postal Code' },
+                {
+                    data: 'isMember',
+                    render: function (data) {
+                        return data
+                            ? '<span class="badge badge-light-success">Yes</span>'
+                            : '<span class="badge badge-light-danger">No</span>';
+                    },
+                    title: 'Member'
+                },
+                {
+                    data: 'biometricEnabled',
+                    render: function (data) {
+                        return data
+                            ? '<span class="badge badge-light-success">Enabled</span>'
+                            : '<span class="badge badge-light-danger">Disabled</span>';
+                    },
+                    title: 'Biometric Enabled'
+                },
+                { data: 'countryCurrency', title: 'Currency' },
+                {
+                    data: 'linkedinProfile',
+                    render: function (data) {
+                        return `<a href="${data}" target="_blank">View Profile</a>`;
+                    },
+                    title: 'LinkedIn'
+                },
+                {
+                    data: null,
+                    render: function (data, type, row) {
+                        return `
+                            <div class="btn-group" role="group" aria-label="Actions">
+                                <button type="button" class="btn btn-primary btn-sm view-btn" data-id="${row.id}">View</button>
+                                <button type="button" class="btn btn-warning btn-sm edit-btn" data-id="${row.id}">Edit</button>
+                                <button type="button" class="btn btn-danger btn-sm delete-btn" data-id="${row.id}">Delete</button>
+                            </div>
+                        `;
+                    },
+                    title: 'Actions',
+                    orderable: false
                 }
-            }
-        ]
+            ]
+        });
+    // Attach event listeners for actions
+    $(document).on('click', '.view-btn', function () {
+        const userId = $(this).data('id');
+        alert(`View user with ID: ${userId}`);
+    });
+
+    $(document).on('click', '.edit-btn', function () {
+        const userId = $(this).data('id');
+        alert(`Edit user with ID: ${userId}`);
+    });
+
+    $(document).on('click', '.delete-btn', function () {
+        const userId = $(this).data('id');
+        if (window.confirm('Are you sure you want to delete this user?')) {
+            alert(`Delete user with ID: ${userId}`);
+        }
     });
 }
+}
+
 const UserList = () => {
+    // Fetch user data from Redux
+    const dispatch = useDispatch()
+    const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
+
     useEffect(() => {
-        atable();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (user.length) {
+            atable(user);
+        }
+    }, [user]);
+
+    useEffect(() => {
+
+        const FetchData = () => {
+            dispatch(userList())
+        }
+
+        FetchData()
+
     }, []);
-    return (<>
-            <Row>
-                <Col sm={12} className="btn-page">
-                    <Card className="user-profile-list">
-                        <Card.Body>
-                            <Table striped hover responsive id="data-table-zero">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Position</th>
-                                        <th>Office</th>
-                                        <th>Age</th>
-                                        <th>Date</th>
-                                        <th>Salary</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tfoot>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Position</th>
-                                        <th>Office</th>
-                                        <th>Age</th>
-                                        <th>Date</th>
-                                        <th>Salary</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </tfoot>
-                            </Table>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
-        </>);
+
+    return (
+        <Row>
+            <Col sm={12} className="btn-page">
+                <Card className="user-profile-list">
+                    <Card.Body>
+                        <Table striped hover responsive id="data-table-zero">
+                            <thead>
+                                <tr>
+                                    <th>Profile</th>
+                                    <th>Mobile</th>
+                                    <th>Address</th>
+                                    <th>City</th>
+                                    <th>State</th>
+                                    <th>Postal Code</th>
+                                    <th>Member</th>
+                                    <th>Biometric Enabled</th>
+                                    <th>Currency</th>
+                                    <th>LinkedIn</th>
+                                    <th>Actions</th>
+
+                                </tr>
+                            </thead>
+                        </Table>
+                    </Card.Body>
+                </Card>
+            </Col>
+        </Row>
+    );
 };
+
 export default UserList;
