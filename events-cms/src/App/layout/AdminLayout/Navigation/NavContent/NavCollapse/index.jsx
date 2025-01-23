@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import DEMO from '../../../../../../store/constant';
 import * as actionTypes from '../../../../../../store/actions';
-import { useSelector } from '../../../../../../store/reducer';
+// import { useSelector } from '../../../../../../store/reducer';
 import NavIcon from './../NavIcon';
 import NavBadge from './../NavBadge';
 import NavItem from '../NavItem';

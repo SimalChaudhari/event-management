@@ -8,21 +8,13 @@ import config from './config';
 import './assets/scss/style.scss';
 import store from './store/store';
 
-// Get the root element from the DOM
-const rootElement = document.getElementById('root');
-
-// Create the root using ReactDOM.createRoot
-const root = ReactDOM.createRoot(rootElement);
-
-// Render the application
+const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-    <React.StrictMode>
+  
         <Provider store={store}>
-            <BrowserRouter basename={config.basename}>
-                <App />
-            </BrowserRouter>
+        <App />
         </Provider>
-    </React.StrictMode>
+ 
 );
 
 // Service worker setup (optional)

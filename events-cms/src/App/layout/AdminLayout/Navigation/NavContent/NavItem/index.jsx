@@ -1,11 +1,11 @@
 import * as React from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { NavLink } from 'react-router-dom';
 import useWindowSize from '../../../../../../hooks/useWindowSize';
 import NavIcon from './../NavIcon';
 import NavBadge from './../NavBadge';
 import * as actionTypes from '../../../../../../store/actions';
-import { useSelector } from '../../../../../../store/reducer';
+// import { useSelector } from '../../../../../../store/reducer';
 const NavItem = (props) => {
     const { windowWidth } = useWindowSize();
     const dispatch = useDispatch();

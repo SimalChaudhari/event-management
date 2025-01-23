@@ -10,5 +10,5 @@ const reducer = combineReducers({
     auth: authReducer,
     user: userReducer
 });
-export const useSelector = createSelectorHook();
+// export const useSelector = createSelectorHook();
 export default reducer;

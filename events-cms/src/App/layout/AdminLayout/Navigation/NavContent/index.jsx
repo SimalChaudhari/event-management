@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import { Card } from 'react-bootstrap';
 import NavGroup from './NavGroup';
 import DEMO from '../../../../../store/constant';
 import * as actionTypes from '../../../../../store/actions';
-import { useSelector } from '../../../../../store/reducer';
+// import { useSelector } from '../../../../../store/reducer';
 const NavContent = (props) => {
     const dispatch = useDispatch();
     const layout = useSelector((state) => state.able.layout);

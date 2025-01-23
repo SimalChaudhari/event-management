@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import useWindowSize from '../../../../hooks/useWindowSize';
 import NavContent from './NavContent';
 import OutsideClick from './OutsideClick';
 import * as actionTypes from './../../../../store/actions';
 import navigation from '../../../../menu-items';
-import { useSelector } from '../../../../store/reducer';
+// import { useSelector } from '../../../../store/reducer';
 const Navigation = () => {
     const { windowWidth } = useWindowSize();
     const dispatch = useDispatch();

@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import DEMO from '../../../../../store/constant';
 import * as actionTypes from '../../../../../store/actions';
-import { useSelector } from '../../../../../store/reducer';
+// import { useSelector } from '../../../../../store/reducer';
 const Layout = () => {
     const dispatch = useDispatch();
     const layoutType = useSelector((state) => state.able.layoutType);

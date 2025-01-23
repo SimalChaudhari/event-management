@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import * as actionTypes from '../../../../../../store/actions';
-import { useSelector } from '../../../../../../store/reducer';
+// import { useSelector } from '../../../../../../store/reducer';
 const LayoutOptions = () => {
     const dispatch = useDispatch();
     const rtlLayout = useSelector((state) => state.able.rtlLayout);

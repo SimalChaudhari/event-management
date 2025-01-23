@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import useWindowSize from '../../../../hooks/useWindowSize';
 import NavLeft from './NavLeft';
 import NavRight from './NavRight';
 import DEMO from '../../../../store/constant';
 import * as actionTypes from '../../../../store/actions';
 import logo from '../../../../assets/images/logo.png';
-import { useSelector } from '../../../../store/reducer';
+// import { useSelector } from '../../../../store/reducer';
 const NavBar = () => {
     const dispatch = useDispatch();
     const { windowWidth } = useWindowSize();
