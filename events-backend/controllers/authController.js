@@ -2,7 +2,7 @@ import { registerUser, loginUser, forgetService, resetService, verifyUserOtp, re
 
 export const checkUserExists = async (req, res) => {
     try {
-        const { email } = req.body; // Get email from query parameters
+        const { email } = req.query; // Get email from query parameters
 
         if (!email) {
             return res.status(400).json({
