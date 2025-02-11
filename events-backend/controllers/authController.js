@@ -1,4 +1,38 @@
-import { registerUser, loginUser, forgetService, resetService, verifyUserOtp, resendUserOtp } from '../services/authService.js';
+import { registerUser, loginUser, forgetService, resetService, verifyUserOtp, resendUserOtp, checkUserExistsService } from '../services/authService.js';
+
+export const checkUserExists = async (req, res) => {
+    try {
+        const { email } = req.body; // Get email from query parameters
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide a valid email address.",
+            });
+        }
+
+        const user = await checkUserExistsService(email);
+
+        if (user) {
+            return res.status(200).json({
+                success: true,
+                message: "This email is already existing.",
+            });
+        } else {
+            return res.status(404).json({
+                success: false,
+                message: "No account found with this email. Please check and try again."
+            });
+        }
+    } catch (error) {
+        console.error("Error checking user:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error.",
+        });
+    }
+};
+
 
 export const register = async (req, res) => {
     try {

@@ -5,6 +5,21 @@ import { Op } from 'sequelize'; // Import Op from Sequelize
 import { sendEmail } from '../utils/transporter.js';
 // import sendEmail from '../utils/sendEmail.js';
 
+/**
+ * Check if a user exists in the database by email.
+ * @param {string} email - Email to check.
+ * @returns {object|null} - User object if exists, otherwise null.
+ */
+export const checkUserExistsService = async (email) => {
+    if (!email) {
+        throw new Error("Please enter email.");
+    }
+
+    const user = await User.findOne({ where: { email } });
+    return user; // Returns user object if found, otherwise null
+};
+
+
 export const registerUser = async (data) => {
     const existingUserByEmail = await User.findOne({ where: { email: data.email } });
     if (existingUserByEmail) {
@@ -34,7 +49,7 @@ export const verifyUserOtp = async (email, otp) => {
     // Find user by email
     const user = await User.findOne({ where: { email } });
     if (!user) {
-        throw new Error('User not found');
+        throw new Error('Email already exists');
     }
 
     // Check OTP validity
@@ -108,7 +123,17 @@ export const loginUser = async (email, password) => {
         expiresIn: '1h',
     });
 
-    return { user, token };
+    const userData = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        isVerify: user.isVerify,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+    };
+
+    return { user : userData, token };
 };
 
 export const forgetService = async (email) => {
