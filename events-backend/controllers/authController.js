@@ -1,11 +1,32 @@
-import { registerUser, loginUser, forgetService, resetService } from '../services/authService.js';
+import { registerUser, loginUser, forgetService, resetService, verifyUserOtp, resendUserOtp } from '../services/authService.js';
 
 export const register = async (req, res) => {
     try {
-        const user = await registerUser(req.body);
-        res.status(201).json({ message: 'User registered successfully', user });
+        await registerUser(req.body);
+        res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
+
     } catch (error) {
         res.status(400).json({ message: error.message });
+    }
+};
+
+export const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const result = await verifyUserOtp(email, otp);
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(400).json({ message: error.message });
+    }
+};
+
+export const resendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const result = await resendUserOtp(email);
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(400).json({ message: error.message });
     }
 };
 

@@ -86,6 +86,19 @@ const User = sequelize.define('User', {
         type: DataTypes.DATE,
         allowNull: true,
     },
+
+    isVerify: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+    },
+    otp: {
+        type: DataTypes.STRING,  // Store OTP code
+        allowNull: true,
+    },
+    otpExpiry: {
+        type: DataTypes.DATE,  // Expiration time of OTP
+        allowNull: true,
+    },
 },
     {
         scopes: {
