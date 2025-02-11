@@ -1,99 +1,170 @@
-import { registerUser, loginUser, forgetService, resetService, verifyUserOtp, resendUserOtp, checkUserExistsService } from '../services/authService.js';
+import {
+    registerUser,
+    loginUser,
+    forgetService,
+    resetService,
+    verifyUserOtp,
+    resendUserOtp,
+    checkUserExistsService
+} from '../services/authService.js';
 
+/**
+ * Check if the user exists by email.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const checkUserExists = async (req, res) => {
+    const { email } = req.query;
+
     try {
-        const { email } = req.query; // Get email from query parameters
-
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide a valid email address.",
-            });
-        }
-
         const user = await checkUserExistsService(email);
 
         if (user) {
             return res.status(200).json({
                 success: true,
-                message: "This email is already existing.",
-            });
-        } else {
-            return res.status(404).json({
-                success: false,
-                message: "No account found with this email. Please check and try again."
+                message: 'User exists.',
+                data: {
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                },
             });
         }
+
+        return res.status(404).json({
+            success: false,
+            message: 'User does not exist.',
+        });
+
     } catch (error) {
-        console.error("Error checking user:", error);
+        console.error('Error checking user:', error);
         return res.status(500).json({
             success: false,
-            message: "Internal server error.",
+            message: 'Internal server error.',
         });
     }
 };
 
-
+/**
+ * Register a new user.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const register = async (req, res) => {
     try {
         await registerUser(req.body);
-        res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
+        return res.status(201).json({
+            message: 'User registered successfully. Please verify your email.'
+        });
 
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
 
+/**
+ * Verify user OTP.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const verifyOtp = async (req, res) => {
     try {
         const { email, otp } = req.body;
         const result = await verifyUserOtp(email, otp);
         return res.status(200).json(result);
     } catch (error) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
 
+/**
+ * Resend user OTP.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const resendOtp = async (req, res) => {
     try {
         const { email } = req.body;
         const result = await resendUserOtp(email);
         return res.status(200).json(result);
     } catch (error) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
 
+/**
+ * Login user.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         const { user, token } = await loginUser(email, password);
-        res.json({ message: 'Login successful', user, token });
+        return res.status(200).json({
+            message: 'Login successful',
+            user,
+            token
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
 
+/**
+ * Generate OTP for forget password flow.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
 export const forgetPassword = async (req, res) => {
     try {
         const { email } = req.body;
         const resetToken = await forgetService(email);
         console.log(resetToken);
-        res.json({ message: 'Reset OTP generated' });
+        return res.status(200).json({
+            message: 'Reset OTP generated'
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
 
+/**
+ * Reset the user's password.
+ * @param {Object} req - The request object containing OTP, new password, and email.
+ * @param {Object} res - The response object to send the response.
+ * @returns {Object} - The response message indicating success or failure.
+ */
 export const resetPassword = async (req, res) => {
     try {
-        const { resetToken, newPassword, confirmPassword } = req.body;
-        if (newPassword !== confirmPassword) {
-            throw new Error('Passwords do not match');
-        }
-        await resetService(resetToken, newPassword);
-        res.json({ message: 'Password reset successfully' });
+        const { email, otp, newPassword } = req.body;
+
+        // Call the reset service with OTP and new password.
+        await resetService(email, otp, newPassword);
+
+        return res.status(200).json({
+            message: 'Password reset successfully'
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        return res.status(400).json({
+            message: error.message
+        });
     }
 };
