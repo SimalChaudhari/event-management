@@ -168,3 +168,30 @@ export const resetPassword = async (req, res) => {
         });
     }
 };
+
+
+/**
+ * Logout user by clearing the token from cookies or handling token invalidation.
+ * @param {Object} req - The request object.
+ * @param {Object} res - The response object.
+ * @returns {Object} - The response message.
+ */
+export const logout = async (req, res) => {
+    try {
+        // If using cookies to store JWT, clear it
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production", // Secure flag in production
+            sameSite: "Strict",
+        });
+
+        return res.status(200).json({
+            message: "Logout successful",
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Error during logout",
+        });
+    }
+};

@@ -7,6 +7,7 @@ import {
   verifyOtp,
   resendOtp,
   checkUserExists,
+  logout,
 } from '../controllers/authController.js';
 
 import {
@@ -46,5 +47,8 @@ router.post('/forget', validateForgetPassword, asyncHandler(forgetPassword));
 
 // Reset password
 router.post('/reset', validateResetPassword, asyncHandler(resetPassword));
+
+// Logout user
+router.post('/logout', asyncHandler(logout));
 
 export default router;
