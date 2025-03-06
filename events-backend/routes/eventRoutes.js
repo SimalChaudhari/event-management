@@ -13,8 +13,8 @@ const router = express.Router();
 // router.get('/events',authorizeRoles(['user', 'admin']), fetchAllEvents);
 router.get('/', fetchAllEvents);
 router.get('/:id', fetchEventById);
-router.post('/create',authorizeRoles(['admin']), createNewEvent);
-router.put('/update/:id', authorizeRoles(['admin']),modifyEvent);
+router.post('/create',authorizeRoles(['admin','user']), createNewEvent);
+router.put('/update/:id', authorizeRoles(['admin','user']),modifyEvent);
 router.delete('/delete/:id', removeEvent);
 
 // router.post('/events',authorizeRoles(['admin']), createNewEvent);

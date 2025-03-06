@@ -2,26 +2,26 @@ import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
-const EventRegistration = sequelize.define('EventRegistration', {
+const RegistraterEvents = sequelize.define('RegistraterEvents', {
     id: {
         type: DataTypes.UUID,
         defaultValue: uuidv4, // Automatically generates a UUID
         primaryKey: true,
     },
     userId: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
+        type: DataTypes.UUID,
+        allowNull: true,
         references: {
-            model: 'users', // Table name for the User model
+            model: 'User', // Table name for the User model
             key: 'id',
         },
         onDelete: 'CASCADE',
     },
     eventId: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true,
         references: {
-            model: 'events', // Table name for the Event model
+            model: 'Event', // Table name for the Event model
             key: 'id',
         },
         onDelete: 'CASCADE',
@@ -29,10 +29,12 @@ const EventRegistration = sequelize.define('EventRegistration', {
     role: {
         type: DataTypes.ENUM('Attendee', 'Exhibitor'),
         allowNull: true,
+        defaultValue: 'Attendee',
     },
     paymentStatus: {
         type: DataTypes.ENUM('Pending', 'Completed', 'Refunded'),
         allowNull: true,
+        defaultValue: 'Completed',
     },
     invoiceUrl: {
         type: DataTypes.TEXT,
@@ -50,4 +52,4 @@ const EventRegistration = sequelize.define('EventRegistration', {
     timestamps: false, // No automatic createdAt or updatedAt
 });
 
-export default EventRegistration;
+export default RegistraterEvents;

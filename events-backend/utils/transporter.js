@@ -28,7 +28,7 @@ export const sendSMS = async (to, body) => {
             from: process.env.TWILIO_PHONE_NUMBER,
             to,
         });
-    } catch (error) {
+    } catch (error) {   
         throw new Error('Failed to send SMS: ' + error.message);
     }
 };

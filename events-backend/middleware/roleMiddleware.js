@@ -35,3 +35,5 @@ export const authorizeRoles = (allowedRoles = []) => {
         }
     };
 };
+
+export const isAdmin = (role) => role === "admin";

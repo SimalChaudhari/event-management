@@ -7,6 +7,7 @@ const Event = sequelize.define('Event', {
     id: {
         type: DataTypes.UUID,
         defaultValue: uuidv4, // Automatically generates a UUID
+        allowNull: false,
         primaryKey: true,
     },
     name: {
@@ -51,6 +52,7 @@ const Event = sequelize.define('Event', {
         onDelete: 'SET NULL',
     },
 }, {
+    freezeTableName: true, // Prevent pluralization
     timestamps: true, // Automatically adds createdAt and updatedAt fields
 });
 
