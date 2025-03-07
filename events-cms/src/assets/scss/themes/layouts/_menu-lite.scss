@@ -376,7 +376,7 @@
             width: 350px;
             padding: 0;
             line-height: 1.4;
-            overflow: hidden;
+            // overflow: hidden;
 
             a {
                 color: $theme-font-color;
@@ -405,7 +405,7 @@
                 padding: 0;
                 position: relative;
                 height: 300px;
-
+                background-color: #fff;
                 img {
                     width: 40px;
                     margin-right: 20px;
@@ -469,7 +469,7 @@
         .profile-notification {
             padding: 0;
             line-height: 1.4;
-            overflow: hidden;
+            // overflow: hidden;
 
             .pro-head {
                 color: #fff;
@@ -500,6 +500,7 @@
                 padding: 20px 0;
                 margin-bottom: 0;
                 list-style: none;
+                background-color: #fff;
 
                 li {
                     margin: 0 10px;

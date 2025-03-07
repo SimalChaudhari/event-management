@@ -27,19 +27,39 @@ const chartData = {
                     title: 'Users',
                     type: 'item',
                     icon: 'feather icon-users',
-                    badge: {
-                        title: 'New',
-                        type: 'badge-warning'
-                    },
                     url: '/users'
 
                 },
                 {
                     id: 'events',
                     title: 'Events',
-                    type: 'item',
-                    icon: 'feather icon-activity',
-                    url: '/events'
+                    type: 'collapse',
+                    icon: 'feather icon-calendar',
+                    children: [
+                        {
+                            id: 'all-events',
+                            title: 'All Events',
+                            type: 'item',
+                            url: '/events',
+                            breadcrumbs: false
+                        },
+                        {
+                            id: 'upcoming-events',
+                            title: 'Upcoming Events',
+                            type: 'item',
+                            url: '/events/upcoming',
+                            badge: {
+                                title: 'NEW',
+                                type: 'badge-danger'
+                            }
+                        },
+                        {
+                            id: 'registered-events',
+                            title: 'Registered Events',
+                            type: 'item',
+                            url: '/events/registered'
+                        }
+                    ]
 
                 },
                 {

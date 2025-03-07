@@ -1,7 +1,9 @@
 import * as React from 'react';
 const DashboardDefault = React.lazy(() => import('./Demo/Dashboard/Default'));
-const EventsList = React.lazy(() => import('./Pages/Events/EventView.js'));
-const ExhibitorList = React.lazy(() => import('./Pages/Exhibitor/ExhibitorView.js'));
+const EventsList = React.lazy(() => import('./Pages/Events/all-events/EventView.jsx'));
+const UpcomingEvents = React.lazy(() => import('./Pages/Events/upcoming-events/UpcomingEvents.jsx'));
+const RegisteredEvents = React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx'));
+const ExhibitorList = React.lazy(() => import('./Pages/Exhibitor/ExhibitorView.jsx'));
 const ContentList = React.lazy(() => import('./Pages/Content/ContentView.js'));
 const NotificationList = React.lazy(() => import('./Pages/Notification/NotificationView.js'));
 const RewardsList = React.lazy(() => import('./Pages/Reports/Rewards/RewardsView.js'));
@@ -19,6 +21,8 @@ const routes = [
     { path: '/dashboard', exact: true, name: 'Analytics', component: DashboardDefault },
     { path: '/users', exact: true, name: 'Users List', component: UsersList },
     { path: '/events', exact: true, name: 'Events List', component: EventsList },
+    { path: '/events/upcoming', exact: true, name: 'Upcoming Events', component: UpcomingEvents },
+    { path: '/events/registered', exact: true, name: 'Registered Events', component: RegisteredEvents },
     { path: '/exhibitor', exact: true, name: 'Exhibitor List', component: ExhibitorList },
     { path: '/content', exact: true, name: 'Content List', component: ContentList },
     { path: '/notification', exact: true, name: 'Notification List', component: NotificationList },

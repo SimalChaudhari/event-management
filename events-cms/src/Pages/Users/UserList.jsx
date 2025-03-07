@@ -1,14 +1,19 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { Row, Col, Card, Table } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import Card from 'react-bootstrap/Card';
+import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { userList } from '../../store/actions/userActions';
 import { DUMMY_PATH } from '../../configs/env';
+
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data) {
+function atable(data, handleAddUser) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -19,7 +24,36 @@ function atable(data) {
 
     $(tableZero).DataTable({
         data: data,
-        order: [[1, 'asc']], // Order by Name (First Name) column
+        order: [[0, 'asc']], // Order by Name (First Name) column
+        searching: true, // Enable search
+        searchDelay: 500, // Delay in milliseconds
+        pageLength: 5, // Records per page
+        lengthMenu: [
+            [5, 10, 25, 50, -1],
+            [5, 10, 25, 50, 'All']
+        ], // Page length options
+        pagingType: 'full_numbers', // Type of pagination
+
+        // Add this dom configuration
+        dom:
+            "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end'f<'add-user-button ml-2'>>>" +
+            "<'row'<'col-sm-12'tr>>" +
+            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        // Add this initComplete function
+        initComplete: function (settings, json) {
+            $('.add-user-button').html(`
+                 <button class="btn btn-primary d-flex align-items-center ml-2" id="addUserBtn">
+                     <i class="feather icon-plus mr-1"></i>
+                     Add User
+                 </button>
+             `);
+
+            // Add click event listener
+            $('#addUserBtn').on('click', function () {
+                handleAddUser();
+            });
+        },
+
         columns: [
             {
                 data: 'profilePicture',
@@ -38,6 +72,7 @@ function atable(data) {
                         `;
                 }
             },
+            { data: 'role', title: 'role' },
             { data: 'mobile', title: 'Mobile' },
             { data: 'address', title: 'Address' },
             { data: 'city', title: 'City' },
@@ -46,9 +81,7 @@ function atable(data) {
             {
                 data: 'isMember',
                 render: function (data) {
-                    return data
-                        ? '<span class="badge badge-light-success">Yes</span>'
-                        : '<span class="badge badge-light-danger">No</span>';
+                    return data ? '<span class="badge badge-light-success">Yes</span>' : '<span class="badge badge-light-danger">No</span>';
                 },
                 title: 'Member'
             },
@@ -61,8 +94,7 @@ function atable(data) {
                 },
                 title: 'Biometric Enabled'
             },
-            { data: 'countryCurrency', title: 'Currency' },
-          
+
             {
                 data: null,
                 render: function (data, type, row) {
@@ -82,7 +114,6 @@ function atable(data) {
                         </button>
                     </div>
                 `;
-                
                 },
                 title: 'Actions',
                 orderable: false
@@ -108,17 +139,20 @@ function atable(data) {
     });
 }
 
-
 const UserList = () => {
     // Fetch user data from Redux
-    const dispatch = useDispatch()
+    const dispatch = useDispatch();
     const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
+
+    const handleAddUser = () => {
+        // setShowModal(true);
+    };
 
     useEffect(() => {
         if (user.length) {
-            atable(user);
+            atable(user, handleAddUser); // Pass handleAddUser to atable
         }
-    }, [user]);
+    }, [user, handleAddUser]); // Add handleAddUser to dependencies
 
     // Fetch data when the component mounts
     useEffect(() => {
@@ -130,7 +164,7 @@ const UserList = () => {
 
     // Log the user data whenever it updates
     useEffect(() => {
-        console.log("🚀 ~ Updated user data:", user);
+        console.log('🚀 ~ Updated user data:', user);
     }, [user]);
 
     return (
@@ -151,7 +185,6 @@ const UserList = () => {
                                     <th>Biometric Enabled</th>
                                     <th>Currency</th>
                                     <th>Actions</th>
-
                                 </tr>
                             </thead>
                         </Table>
@@ -163,3 +196,4 @@ const UserList = () => {
 };
 
 export default UserList;
+ 

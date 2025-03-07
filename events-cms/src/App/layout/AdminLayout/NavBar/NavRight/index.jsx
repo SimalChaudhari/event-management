@@ -4,7 +4,23 @@ import PerfectScrollbar from 'react-perfect-scrollbar';
 import DEMO from '../../../../../store/constant';
 import Avatar1 from '../../../../../assets/images/user/avatar-1.jpg';
 import Avatar2 from '../../../../../assets/images/user/avatar-2.jpg';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '../../../../../store/actions/authActions';
+import { useDispatch } from 'react-redux';
 const NavRight = (props) => {
+
+    const navigate = useNavigate();
+    const dispatch = useDispatch();
+
+    const handleLogout = async (e) => {
+        e.preventDefault();
+        const result = await dispatch(logout());
+        if (result.success) {
+            navigate('/auth/signin-1');
+        }
+    };
+
+
     return (<>
             <ul className="navbar-nav ml-auto">
                 <li>
@@ -108,7 +124,7 @@ const NavRight = (props) => {
                             <div className="pro-head bg-dark">
                                 <img src={Avatar1} className="img-radius" alt="User Profile"/>
                                 <span>John Doe</span>
-                                <a href={DEMO.BLANK_LINK} className="dud-logout" title="Logout">
+                                <a href={DEMO.BLANK_LINK} className="dud-logout" onClick={handleLogout} title="Logout">
                                     <i className="feather icon-log-out"/>
                                 </a>
                             </div>

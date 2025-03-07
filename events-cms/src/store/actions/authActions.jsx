@@ -27,7 +27,29 @@ export const login = (data) => async (dispatch) => {
     return false;
 };
 
+export const logout = () => async (dispatch) => {
+    try {
+        // Clear localStorage
+        localStorage.removeItem('userData');
+        localStorage.removeItem('token');
 
+        // Dispatch to match reducer case
+        dispatch({
+            type: "LOGOUT",
+            payload: {
+                authenticated: false,
+                authUser: '',
+            }
+        });
+
+        toast.success('Logged out successfully');
+        return { success: true };
+
+    } catch (error) {
+        toast.error('Error logging out');
+        return { success: false };
+    }
+};
 
 
 

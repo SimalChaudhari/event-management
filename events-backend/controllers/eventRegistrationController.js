@@ -7,9 +7,13 @@ export const createEventRegistration = async (req, res) => {
         const userId = req.user.id;
         const userRole = req.user.role;
         const eventId = req.params.id;
-        const { amount, name } = req.body; // Simple payment details
+        const { amount, name, cardNumber } = req.body;
 
-        const result = await registerForEvent(userId, eventId, userRole, { amount, name });
+        const result = await registerForEvent(userId, eventId, userRole, {
+            amount,
+            name,
+            cardNumber
+        });
         
         res.status(201).json({
             success: true,
