@@ -71,35 +71,37 @@ export const checkEventNameExists = async (name) => {
  * @param {String} location - Event location
  * @param {String} startDate - Event start date
  * @param {String} endDate - Event end date
+ * @param {String} startTime - Event start time
+ * @param {String} endTime - Event end time
  * @returns {Promise<Boolean>} - True if exists, false if not
  */
-export const checkEventDateLocationConflict = async (location, startDate, endDate) => {
+export const checkEventDateLocationConflict = async (location, startDate, endDate, startTime, endTime) => {
     const event = await Event.findOne({
         where: {
             location: {
-                [Op.iLike]: location // Case-insensitive location comparison
+                [Op.iLike]: location
             },
             [Op.or]: [
                 {
-                    // New event's start date falls within existing event's date range
-                    startDate: {
-                        [Op.between]: [startDate, endDate]
+                    // Same day, overlapping times
+                    [Op.and]: {
+                        startDate: startDate,
+                        startTime: {
+                            [Op.lt]: endTime
+                        },
+                        endTime: {
+                            [Op.gt]: startTime
+                        }
                     }
                 },
                 {
-                    // New event's end date falls within existing event's date range
-                    endDate: {
-                        [Op.between]: [startDate, endDate]
-                    }
-                },
-                {
-                    // Existing event falls completely within new event's date range
+                    // Different days, date range overlap
                     [Op.and]: {
                         startDate: {
-                            [Op.lte]: startDate
+                            [Op.lte]: endDate
                         },
                         endDate: {
-                            [Op.gte]: endDate
+                            [Op.gte]: startDate
                         }
                     }
                 }
@@ -126,26 +128,47 @@ export const createEvent = async (eventData) => {
  * @param {String} location - Event location
  * @param {String} startDate - Event start date
  * @param {String} endDate - Event end date
+ * @param {String} startTime - Event start time
+ * @param {String} endTime - Event end time
  * @param {String} excludeId - ID of event to exclude from check
  * @returns {Promise<Object|null>} - Returns conflicting event if found, null if no conflict
  */
-export const findConflictingEvent = async (location, startDate, endDate, excludeId = null) => {
+export const findConflictingEvent = async (location, startDate, endDate, startTime, endTime, excludeId = null) => {
     const whereClause = {
         location: {
-            [Op.iLike]: location // Case-insensitive location comparison
+            [Op.iLike]: location
         },
-        // Check for any date overlap
         [Op.and]: [
             {
-                startDate: { [Op.lte]: endDate }     // Event starts before or on the end date
-            },
-            {
-                endDate: { [Op.gte]: startDate }     // Event ends after or on the start date
+                [Op.or]: [
+                    {
+                        // Same day time overlap
+                        [Op.and]: {
+                            startDate: startDate,
+                            startTime: {
+                                [Op.lt]: endTime
+                            },
+                            endTime: {
+                                [Op.gt]: startTime
+                            }
+                        }
+                    },
+                    {
+                        // Different days overlap
+                        [Op.and]: {
+                            startDate: {
+                                [Op.lte]: endDate
+                            },
+                            endDate: {
+                                [Op.gte]: startDate
+                            }
+                        }
+                    }
+                ]
             }
         ]
     };
 
-    // If excludeId is provided, exclude that event from the check
     if (excludeId) {
         whereClause.id = { [Op.ne]: excludeId };
     }

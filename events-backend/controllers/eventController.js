@@ -102,6 +102,40 @@ export const createNewEvent = async (req, res) => {
     const userId = req.user.id; // Extracted from the token
     const eventData = { ...req.body, createdBy: userId }; // Add userId to event data
 
+    // Basic time format validation (HH:mm)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(eventData.startTime) || !timeRegex.test(eventData.endTime)) {
+      return res.status(400).json({
+        message: "Invalid time format. Please use HH:mm format (24-hour)"
+      });
+    }
+
+    // Check same day time validation
+    if (eventData.startDate === eventData.endDate) {
+      if (eventData.startTime >= eventData.endTime) {
+        return res.status(400).json({
+          message: "End time must be after start time on the same day"
+        });
+      }
+    }
+
+    // Check for date and location conflict including time
+    if (eventData.location) {
+      const dateLocationConflict = await checkEventDateLocationConflict(
+        eventData.location,
+        eventData.startDate,
+        eventData.endDate,
+        eventData.startTime,
+        eventData.endTime
+      );
+
+      if (dateLocationConflict) {
+        return res.status(400).json({
+          message: "Another event is already scheduled at this location during these dates and times"
+        });
+      }
+    }
+
     // Check if event name already exists
     const nameExists = await checkEventNameExists(eventData.name);
     if (nameExists) {
@@ -137,22 +171,6 @@ export const createNewEvent = async (req, res) => {
         return res.status(400).json({
           message:
             "For events starting today, end date must be at least tomorrow",
-        });
-      }
-    }
-
-    // Check for date and location conflict
-    if (eventData.location) {
-      const dateLocationConflict = await checkEventDateLocationConflict(
-        eventData.location,
-        eventData.startDate,
-        eventData.endDate
-      );
-
-      if (dateLocationConflict) {
-        return res.status(400).json({
-          message:
-            "Another event already booked at this location during these dates",
         });
       }
     }
@@ -209,6 +227,22 @@ export const modifyEvent = async (req, res) => {
         return res.status(400).json({
           message:
             "For events starting today, end date must be at least tomorrow",
+        });
+      }
+    }
+
+    // Time validation for updates
+    if (updatedData.startTime && updatedData.endTime) {
+      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(updatedData.startTime) || !timeRegex.test(updatedData.endTime)) {
+        return res.status(400).json({
+          message: "Invalid time format. Please use HH:mm format (24-hour)"
+        });
+      }
+
+      if (startDate === endDate && updatedData.startTime >= updatedData.endTime) {
+        return res.status(400).json({
+          message: "End time must be after start time on the same day"
         });
       }
     }

@@ -22,8 +22,16 @@ const Event = sequelize.define('Event', {
         type: DataTypes.DATEONLY, // DATE in SQL
         allowNull: false,
     },
+    startTime: {  // New field
+        type: DataTypes.TIME,
+        allowNull: false,
+    },
     endDate: {
         type: DataTypes.DATEONLY, // DATE in SQL
+        allowNull: false,
+    },
+    endTime: {  // New field
+        type: DataTypes.TIME,
         allowNull: false,
     },
     location: {
