@@ -20,7 +20,7 @@ const OtherSamplePage = React.lazy(() => import('./Demo/Other/SamplePage'));
 const routes = [
     { path: '/dashboard', exact: true, name: 'Analytics', component: DashboardDefault },
     { path: '/users', exact: true, name: 'Users List', component: UsersList },
-    { path: '/events', exact: true, name: 'Events List', component: EventsList },
+    { path: '/events/event-list', exact: true, name: 'Events List', component: EventsList },
     { path: '/events/upcoming', exact: true, name: 'Upcoming Events', component: UpcomingEvents },
     { path: '/events/registered', exact: true, name: 'Registered Events', component: RegisteredEvents },
     { path: '/exhibitor', exact: true, name: 'Exhibitor List', component: ExhibitorList },

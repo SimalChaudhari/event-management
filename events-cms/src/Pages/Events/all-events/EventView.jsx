@@ -8,9 +8,10 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { eventList } from '../../../store/actions/eventActions'; // You'll need to create this
-import { useNavigate, useLocation } from 'react-router-dom';
-import queryString from 'query-string'; // You might need to install this package
+import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
+import { useLocation } from 'react-router-dom';
 
+import '../../../assets/css/event.css';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
@@ -24,117 +25,28 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(data, handleAddEvent) {
+function atable(data, handleAddEvent,handleDelete) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        return $(tableZero).DataTable();
+        const existingTable = $(tableZero).DataTable();
+        existingTable.destroy();
     }
 
-    const table = $(tableZero).DataTable({
+    // Define table configuration
+    const tableConfig = {
         data: data,
-        order: [0,'asc'], // Disable initial sorting as we're pre-sorting the data
+        order: [0, 'asc'],
         searching: true,
         searchDelay: 500,
         pageLength: 5,
         lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]],
         pagingType: "full_numbers",
-
         dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
              "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
              "<'row'<'col-sm-12'tr>>" +
              "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-
-        initComplete: function(settings, json) {
-            const dateFilterHtml = `
-                <div class="date-filter-container d-flex align-items-center">
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">From:</label>
-                        <input 
-                            type="date" 
-                            id="startDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">To:</label>
-                        <input 
-                            type="date" 
-                            id="endDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div id="clearFilterBtn" class="filter-group" style="display: none;">
-                        <div class="btn btn-light">
-                            <i class="feather icon-x mr-1 mt-1"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            $('.date-filter-wrapper').html(dateFilterHtml);
-
-            // Add event listeners for date inputs
-            $('#startDateFilter, #endDateFilter').on('change', function() {
-                const startDate = $('#startDateFilter').val();
-                const endDate = $('#endDateFilter').val();
-
-                if (startDate && endDate) {
-                    if (new Date(endDate) < new Date(startDate)) {
-                        alert('End date cannot be earlier than start date');
-                        this.value = '';
-                        return;
-                    }
-
-                    // Filter the table
-                    table.draw();
-                    $('#clearFilterBtn').show();
-                }
-            });
-
-            // Add clear filter functionality
-            $('#clearFilterBtn').on('click', function() {
-                $('#startDateFilter').val('');
-                $('#endDateFilter').val('');
-                table.draw();
-                $(this).hide();
-            });
-
-            // Custom filter function
-            $.fn.dataTable.ext.search.push(
-                function(settings, data, dataIndex) {
-                    const startDate = $('#startDateFilter').val();
-                    const endDate = $('#endDateFilter').val();
-
-                    if (!startDate && !endDate) {
-                        return true;
-                    }
-
-                    const eventStartDate = new Date(data[5]); // Index 5 is the Start Date column
-                    
-                    if (startDate && endDate) {
-                        const filterStart = new Date(startDate);
-                        const filterEnd = new Date(endDate);
-                        return eventStartDate >= filterStart && eventStartDate <= filterEnd;
-                    }
-                    
-                    return true;
-                }
-            );
-
-            // Add button initialization
-            if (!$('#addEventBtn').length) {
-                $('.add-event-button').html(`
-                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addEventBtn ">
-                        <i class="feather icon-plus mr-1"></i>
-                        Add Event
-                    </button>
-                `);
-
-                $('#addEventBtn').on('click', handleAddEvent);
-            }
-        },
 
         columns: [
             {
@@ -287,52 +199,96 @@ function atable(data, handleAddEvent) {
                     `;
                 }
             }
-        ]
-    });
+        ],
 
-    return table;
+        initComplete: function(settings, json) {
+            const dateFilterHtml = `
+                <div class="date-filter-container d-flex align-items-center">
+                    <div class="filter-group mr-3">
+                        <label class="small mr-2">From:</label>
+                        <input 
+                            type="date" 
+                            id="startDateFilter" 
+                            class="form-control form-control-sm"
+                        >
+                    </div>
+                    <div class="filter-group mr-3">
+                        <label class="small mr-2">To:</label>
+                        <input 
+                            type="date" 
+                            id="endDateFilter" 
+                            class="form-control form-control-sm"
+                        >
+                    </div>
+                    <div id="clearFilterBtn" class="filter-group" style="display: none;">
+                        <button class="btn btn-light">
+                            <i class="feather icon-x"></i> Clear Filter
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            $('.date-filter-wrapper').html(dateFilterHtml);
+
+            // Add button initialization
+            if (!$('#addEventBtn').length) {
+                $('.add-event-button').html(`
+                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addEventBtn">
+                        <i class="feather icon-plus mr-1"></i>
+                        Add Event
+                    </button>
+                `);
+
+                $('#addEventBtn').on('click', handleAddEvent);
+            }
+
+            // Setup date filter after table is initialized
+            setupDateFilter(this.api());
+        }
+    };
+
+    // Initialize table with configuration
+    return $(tableZero).DataTable(tableConfig);
 }
 
 const EventView = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
     const [currentTable, setCurrentTable] = useState(null);
+    const location = useLocation();
 
     useEffect(() => {
         dispatch(eventList({}));
     }, [dispatch]);
 
     useEffect(() => {
-        if (events?.length && !currentTable) {
+        if (events?.length) {
             const table = atable(events, handleAddEvent);
             setCurrentTable(table);
-        } else if (events?.length && currentTable) {
-            currentTable.clear().rows.add(events).draw();
         }
 
         return () => {
             if (currentTable) {
+                resetFilters(currentTable);
                 currentTable.destroy();
                 setCurrentTable(null);
             }
         };
     }, [events]);
 
+    // Reset filters when location changes
+    useEffect(() => {
+        return () => {
+            if (currentTable) {
+                resetFilters(currentTable);
+            }
+        };
+    }, [location.pathname]);
+
     const handleAddEvent = React.useCallback(() => {
         // Add your modal logic here
     }, []);
 
-    useEffect(() => {
-        // Add styles when component mounts
-        const styleSheet = document.createElement("style");
-        styleSheet.innerText = styles;
-        document.head.appendChild(styleSheet);
-
-        // Cleanup styles when component unmounts
-        return () => {
-            document.head.removeChild(styleSheet);
-        };
-    }, []); // Empty dependency array means this runs once on mount
 
     return (
         <Row>
@@ -361,260 +317,5 @@ const EventView = () => {
     );
 };
 
-// Update CSS
-const styles = `
-    .badge-light-info {
-        background-color: rgba(3, 169, 244, 0.15);
-        color: #03a9f4;
-        font-weight: 500;
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-
-    .badge-light-warning {
-        background-color: rgba(255, 152, 0, 0.15);
-        color: #ff9800;
-        font-weight: 500;
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-
-    .badge-light-danger {
-        background-color: rgba(244, 67, 54, 0.15);
-        color: #f44336;
-        font-weight: 500;
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-
-    .event-list .dataTables_empty {
-        text-align: center;
-        padding: 40px 0;
-        color: #6c757d;
-        font-style: italic;
-    }
-
-    .event-time {
-        font-size: 0.875rem;
-        color: #6c757d;
-    }
-
-    .badge-light {
-        background-color: #f8f9fa;
-        color: #495057;
-        border: 1px solid #dee2e6;
-        font-size: 0.75rem;
-        padding: 3px 8px;
-        border-radius: 12px;
-    }
-
-    .duration-badge {
-        font-size: 0.75rem;
-        padding: 3px 8px;
-        border-radius: 12px;
-    }
-
-    .event-date-time {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .event-date {
-        font-weight: 500;
-        color: #495057;
-    }
-
-    .event-time-text {
-        font-size: 0.8125rem;
-        color: #6c757d;
-        margin-top: 2px;
-    }
-
-    .date-filter-container {
-        background: #f8f9fa;
-        padding: 12px 15px;
-        border-radius: 4px;
-        margin-bottom: 15px;
-    }
-
-    .filter-group {
-        display: flex;
-        align-items: center;
-    }
-
-    .filter-group input[type="date"] {
-        width: 140px;
-        height: 31px;
-        padding: 4px 8px;
-        font-size: 13px;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-    }
-
-    .filter-group label {
-        margin: 0;
-        white-space: nowrap;
-        color: #495057;
-        font-weight: 500;
-    }
-
-    #clearFilterBtn {
-        transition: all 0.3s ease;
-    }
-
-    #clearFilterBtn .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 12px;
-        height: 31px;
-        font-size: 13px;
-        border: 1px solid #dee2e6;
-    }
-
-    #clearFilterBtn .btn:hover {
-        background-color: #e9ecef;
-    }
-
-    .search-container {
-        flex: 1;
-        max-width: 300px;
-    }
-
-    .dataTables_filter input {
-        width: 100% !important;
-        min-width: 200px;
-    }
-
-    .add-event-button {
-        min-width: fit-content;
-        position: relative;
-        bottom: 4px;
-    }
-
-        @media (max-width: 650px) {
-        .add-event-button {
-            width: 100%;
-            margin-left: 0 !important;
-            padding-left: 15px !important;
-            position: static;  /* Remove position */
-            bottom: 0;        /* Remove bottom spacing */
-        }
-
-
-    #addEventBtn {
-        white-space: nowrap;
-
-    }
-
-    .dataTables_length select {
-        margin: 0 8px;
-    }
-
-    .dataTables_filter {
-        width: 100%;
-    }
-
-    .dataTables_filter label {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .dataTables_filter input {
-        width: 100% !important;
-        min-width: 200px;
-        margin-left: 0 !important;
-    }
-
-    @media (max-width: 480px) {
-        .dataTables_length,
-        .dataTables_filter,
-        .date-filter-container {
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .dataTables_length {
-            text-align: left;
-            padding-left: 0;
-        }
-
-        .search-container {
-            max-width: 100%;
-            margin-bottom: 10px;
-            padding-left: 0;
-        }
-
-        .dataTables_filter {
-            padding-left: 0;
-        }
-
-        .dataTables_filter label {
-            margin-left: 0;
-        }
-
-        .dataTables_length select,
-        .dataTables_filter input {
-            flex: 1;
-        }
-
-        .dataTables_wrapper .row:first-child > div {
-            padding-left: 15px !important;
-        }
-
-        .date-filter-container {
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .filter-group {
-            width: 100%;
-        }
-
-        .add-event-button {
-            width: 100%;
-            margin-left: 0 !important;
-            padding-left: 15px !important;
-        }
-
-        #addEventBtn {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .d-flex {
-            flex-wrap: wrap;
-        }
-
-        /* Ensure consistent left alignment */
-        .dataTables_wrapper .row > div {
-            padding-left: 15px;
-            padding-right: 15px;
-        }
-    }
-
-    .badge-light-secondary {
-        background-color: rgba(108, 117, 125, 0.15);
-        color: #6c757d;
-        font-weight: 500;
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-
-    .badge-light-success {
-        background-color: rgba(40, 167, 69, 0.15);
-        color: #28a745;
-        font-weight: 500;
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-`;
 
 export default EventView;

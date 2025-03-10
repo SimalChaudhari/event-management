@@ -40,7 +40,7 @@ const chartData = {
                             id: 'all-events',
                             title: 'All Events',
                             type: 'item',
-                            url: '/events',
+                            url: '/events/event-list',
                             breadcrumbs: false
                         },
                         {

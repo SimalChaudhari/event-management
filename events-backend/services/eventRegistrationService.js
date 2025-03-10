@@ -3,6 +3,7 @@ import RegistraterEvents from "../models/registraterEvents.js";
 import AppError from "../utils/AppError.js";
 import { isAdmin } from "../middleware/roleMiddleware.js";
 import User from "../models/user.js";
+import { getUserById, getUsers } from "./userService.js";
 
 export const registerForEvent = async (
   userId,
@@ -123,17 +124,57 @@ export const registerForEvent = async (
 export const getRegisterEvents = async (req) => {
   try {
     let registrations;
-    // If admin, get all registrations with user and event details
+    let users;
+    
+    // Get registrations
     if (isAdmin(req.user.role)) {
       registrations = await RegistraterEvents.findAll();
-    }
-    // If regular user, only get their registrations
-    else {
+      users = await getUsers();
+    } else {
       registrations = await RegistraterEvents.findAll({
         where: { userId: req.user.id },
       });
+      const user = await getUserById(req.user.id);
+      users = user ? [user] : [];
     }
-    return registrations;
+
+    // Get unique event IDs
+    const eventIds = [...new Set(registrations.map(reg => reg.eventId))];
+
+    // Fetch all events in one query
+    const events = await Event.findAll({
+      where: {
+        id: eventIds
+      }
+    });
+
+    // Create lookup objects
+    const usersMap = users.reduce((acc, user) => {
+      acc[user.id] = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role
+      };
+      return acc;
+    }, {});
+
+    const eventsMap = events.reduce((acc, event) => {
+      acc[event.id] = event;
+      return acc;
+    }, {});
+
+    // Combine registration data with user and event data
+    const registrationsWithDetails = registrations.map(registration => ({
+      ...registration.toJSON(),
+      user: usersMap[registration.userId],
+      event: eventsMap[registration.eventId]
+    }));
+
+    return registrationsWithDetails;
+
   } catch (error) {
     throw new AppError("SERVER_ERROR", "Unable to fetch registrations");
   }

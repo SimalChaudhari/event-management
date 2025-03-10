@@ -100,6 +100,7 @@ const User = sequelize.define('User', {
         allowNull: true,
     },
 },
+
     {
         scopes: {
             withoutPassword: {
