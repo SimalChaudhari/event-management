@@ -27,17 +27,22 @@ const formatTime = (time) => {
 
 function atable(registrations) {
     let tableZero = '#data-table-zero';
-    $.fn.dataTable.ext.errMode = 'throw';
 
+    // Clean up existing table
     if ($.fn.DataTable.isDataTable(tableZero)) {
         const existingTable = $(tableZero).DataTable();
         existingTable.destroy();
+        $(tableZero).empty();
     }
 
-    // Define table configuration
+    // Sort registrations by event start date
+    const sortedRegistrations = [...registrations].sort((a, b) => 
+        new Date(a.event.startDate) - new Date(b.event.startDate)
+    );
+
     const tableConfig = {
-        data: registrations,
-        order: [5, 'asc'],
+        data: sortedRegistrations,
+        order: [[5, 'asc']], // Sort by Event Schedule column by default
         searching: true,
         searchDelay: 500,
         pageLength: 5,
@@ -53,11 +58,40 @@ function atable(registrations) {
                 data: 'event.name',
                 title: 'Event Name',
                 render: function(data, type, row) {
+                    const eventDate = new Date(row.event.startDate);
+                    const today = new Date();
+                    const daysUntilEvent = Math.ceil(
+                        (eventDate - today) / (1000 * 60 * 60 * 24)
+                    );
+                    
+                    let badgeClass = 'badge-light-info';
+                    let statusText = '';
+                    
+                    if (daysUntilEvent < 0) {
+                        badgeClass = 'badge-light-secondary';
+                        statusText = `${Math.abs(daysUntilEvent)} days ago`;
+                    } else if (daysUntilEvent === 0) {
+                        badgeClass = 'badge-light-success';
+                        statusText = 'Today';
+                    } else if (daysUntilEvent === 1) {
+                        badgeClass = 'badge-light-danger';
+                        statusText = 'Tomorrow';
+                    } else if (daysUntilEvent <= 3) {
+                        badgeClass = 'badge-light-danger';
+                        statusText = `in ${daysUntilEvent} days`;
+                    } else if (daysUntilEvent <= 7) {
+                        badgeClass = 'badge-light-warning';
+                        statusText = `in ${daysUntilEvent} days`;
+                    } else {
+                        statusText = `in ${daysUntilEvent} days`;
+                    }
+
                     return `
                         <div class="d-inline-block align-middle">
                             <h6 class="m-b-0">${row.event.name}</h6>
                             <p class="m-b-0">
-                                <span class="badge badge-secondary">${row.event.type}</span>
+                                <span class="badge ${badgeClass}">${statusText}</span>
+                                <span class="badge badge-secondary ml-1">${row.event.type}</span>
                             </p>
                         </div>
                     `;
@@ -121,16 +155,30 @@ function atable(registrations) {
                 data: null,
                 title: 'Event Schedule',
                 render: function(data, type, row) {
+                    if (type === 'sort') {
+                        return row.event.startDate + ' ' + (row.event.startTime || '');
+                    }
+
                     const startDate = new Date(row.event.startDate);
                     const endDate = new Date(row.event.endDate);
-                    
-                    const formattedStartDate = startDate.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    
-                    const formattedEndDate = endDate.toLocaleDateString('en-GB', {
+                    const today = new Date();
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+
+                    let startDateDisplay;
+                    if (startDate.toDateString() === today.toDateString()) {
+                        startDateDisplay = 'Today';
+                    } else if (startDate.toDateString() === tomorrow.toDateString()) {
+                        startDateDisplay = 'Tomorrow';
+                    } else {
+                        startDateDisplay = startDate.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                    }
+
+                    const endDateDisplay = endDate.toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric'
@@ -144,9 +192,9 @@ function atable(registrations) {
                             <div class="schedule-time">
                                 <i class="feather icon-calendar text-primary"></i>
                                 <span class="date-range">
-                                    ${formattedStartDate} ${startTime ? `at ${startTime}` : ''} 
+                                    ${startDateDisplay} ${startTime ? `at ${startTime}` : ''} 
                                     <i class="feather icon-arrow-right mx-2"></i> 
-                                    ${formattedEndDate} ${endTime ? `at ${endTime}` : ''}
+                                    ${endDateDisplay} ${endTime ? `at ${endTime}` : ''}
                                 </span>
                             </div>
                             <div class="duration-badge mt-1">
@@ -219,21 +267,7 @@ function atable(registrations) {
         }
     };
 
-    // Initialize table with configuration
-    const table = $(tableZero).DataTable(tableConfig);
-
-    // Add event listeners for receipt and invoice downloads
-    $(tableZero).on('click', '.receipt-btn', function() {
-        const url = $(this).data('url');
-        if (url) window.open(url, '_blank');
-    });
-
-    $(tableZero).on('click', '.invoice-btn', function() {
-        const url = $(this).data('url');
-        if (url) window.open(url, '_blank');
-    });
-
-    return table;
+    return $(tableZero).DataTable(tableConfig);
 }
 
 const RegisteredEvents = () => {

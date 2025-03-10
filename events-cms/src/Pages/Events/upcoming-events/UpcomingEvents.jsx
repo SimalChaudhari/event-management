@@ -38,19 +38,21 @@ function atable(data, handleAddEvent, handleDelete) {
         $(tableZero).empty();
     }
 
-    // Remove or comment out this client-side filter since backend is handling it
-    /*
-    const upcomingEvents = data.filter(event => {
-        const eventDate = new Date(event.startDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return eventDate >= today;
-    });
-    */
+    // Filter and sort upcoming events
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcomingEvents = data
+        .filter(event => {
+            const eventDate = new Date(event.startDate);
+            eventDate.setHours(0, 0, 0, 0);
+            return eventDate >= today;
+        })
+        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate)); // Sort by date
 
     const tableConfig = {
-        data: data, // Use data directly instead of upcomingEvents
-        order: [0, 'asc'],
+        data: upcomingEvents,
+        order: [[5, 'asc']], // Sort by Start Date column by default
         searching: true,
         searchDelay: 500,
         pageLength: 5,
@@ -114,30 +116,37 @@ function atable(data, handleAddEvent, handleDelete) {
                 title: 'Event Name',
                 render: function(data, type, row) {
                     const eventDate = new Date(row.startDate);
+                    const today = new Date();
                     const daysUntilEvent = Math.ceil(
-                        (eventDate - new Date()) / (1000 * 60 * 60 * 24)
+                        (eventDate - today) / (1000 * 60 * 60 * 24)
                     );
                     
                     let badgeClass = 'badge-light-info';
-                    if (daysUntilEvent <= 7) {
-                        badgeClass = 'badge-light-warning';
-                    }
-                    if (daysUntilEvent <= 3) {
+                    let statusText = '';
+
+                    if (daysUntilEvent === 0) {
+                        badgeClass = 'badge-light-success';
+                        statusText = 'Today';
+                    } else if (daysUntilEvent === 1) {
                         badgeClass = 'badge-light-danger';
+                        statusText = 'Tomorrow';
+                    } else if (daysUntilEvent <= 3) {
+                        badgeClass = 'badge-light-danger';
+                        statusText = `in ${daysUntilEvent} days`;
+                    } else if (daysUntilEvent <= 7) {
+                        badgeClass = 'badge-light-warning';
+                        statusText = `in ${daysUntilEvent} days`;
+                    } else {
+                        statusText = `in ${daysUntilEvent} days`;
                     }
-                    
-                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     
                     return `
                         <div class="d-inline-block align-middle">
                             <h6 class="m-b-0">${row.name}</h6>
                             <p class="m-b-0">
                                 <span class="badge ${badgeClass}">
-                                    ${eventDate.getDate()} ${monthNames[eventDate.getMonth()]} ${eventDate.getFullYear()}
-                                    (in ${daysUntilEvent} days)
+                                    ${statusText}
                                 </span>
-                            
                             </p>
                         </div>
                     `;
@@ -165,16 +174,32 @@ function atable(data, handleAddEvent, handleDelete) {
                 data: null,
                 title: 'Start',
                 render: function(data, type, row) {
+                    if (type === 'sort') {
+                        return row.startDate + ' ' + (row.startTime || '');
+                    }
+
                     const date = new Date(row.startDate);
-                    const formattedDate = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
+                    const today = new Date();
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+
+                    let dateDisplay;
+                    if (date.toDateString() === today.toDateString()) {
+                        dateDisplay = 'Today';
+                    } else if (date.toDateString() === tomorrow.toDateString()) {
+                        dateDisplay = 'Tomorrow';
+                    } else {
+                        dateDisplay = date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                    }
+
                     const formattedTime = row.startTime ? formatTime(row.startTime) : '';
                     return `
                         <div class="event-date-time">
-                            <div class="event-date">${formattedDate}</div>
+                            <div class="event-date">${dateDisplay}</div>
                             ${formattedTime ? `<div class="event-time-text">${formattedTime}</div>` : ''}
                         </div>
                     `;
