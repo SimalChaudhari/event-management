@@ -1,13 +1,7 @@
 import React from 'react';
 import { Modal, Button } from 'react-bootstrap';
 
-const DeleteConfirmationModal = ({ 
-    show, 
-    onHide, 
-    onConfirm, 
-    title = 'Confirm Delete', 
-    isLoading = false 
-}) => {
+const DeleteConfirmationModal = ({ show, onHide, onConfirm, title = 'Confirm Delete', isLoading = false }) => {
     if (!show) return null;
 
     return (
@@ -27,16 +21,13 @@ const DeleteConfirmationModal = ({
             }}
             onClick={onHide}
         >
-            <div onClick={e => e.stopPropagation()}>
+            <div onClick={(e) => e.stopPropagation()}>
                 <Modal.Dialog>
                     <Modal.Header>
                         <Modal.Title>{title}</Modal.Title>
-                        <button 
-                            type="button" 
-                            className="btn-close" 
-                            onClick={onHide}
-                            aria-label="Close"
-                        />
+                        <button type="button" onClick={onHide} class="close" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </Modal.Header>
                     <Modal.Body>
                         Are you sure you want to delete?
@@ -44,18 +35,10 @@ const DeleteConfirmationModal = ({
                         <span className="text-danger">This action cannot be undone.</span>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button 
-                            variant="secondary" 
-                            onClick={onHide} 
-                            disabled={isLoading}
-                        >
+                        <Button variant="secondary" onClick={onHide} disabled={isLoading}>
                             Cancel
                         </Button>
-                        <Button 
-                            variant="danger" 
-                            onClick={onConfirm} 
-                            disabled={isLoading}
-                        >
+                        <Button variant="danger" onClick={onConfirm} disabled={isLoading}>
                             {isLoading ? 'Deleting...' : 'Delete'}
                         </Button>
                     </Modal.Footer>
