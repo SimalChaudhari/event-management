@@ -1,4 +1,4 @@
-import { getRegisterEvents, registerForEvent} from '../services/eventRegistrationService.js';
+import { getRegisterEvents, registerForEvent, deleteRegistration } from '../services/eventRegistrationService.js';
 import  {handleError } from '../utils/AppError.js';
 
 // Register for an event
@@ -35,6 +35,23 @@ export const getRegistrations = async (req, res) => {
             success: true,
             message: "Successfully fetched registrations",
             registrations: registrations
+        });
+    } catch (error) {
+        return handleError(error, req, res);
+    }
+};
+
+export const deleteEventRegistration = async (req, res) => {
+    try {
+        const registrationId = req.params.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        await deleteRegistration(registrationId, userId, userRole);
+        
+        res.status(200).json({
+            success: true,
+            message: 'Registration successfully deleted'
         });
     } catch (error) {
         return handleError(error, req, res);

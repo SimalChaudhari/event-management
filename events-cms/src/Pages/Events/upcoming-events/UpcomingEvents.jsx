@@ -7,10 +7,11 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { eventList } from '../../../store/actions/eventActions'; // You'll need to create this
+import { eventList, eventDelete } from '../../../store/actions/eventActions'; // You'll need to create this
 import '../../../assets/css/event.css';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import { useLocation } from 'react-router-dom';
+import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -25,13 +26,16 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(data, handleAddEvent) {
+function atable(data, handleAddEvent, handleDelete) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
     // First destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        return $(tableZero).DataTable();
+        const existingTable = $(tableZero).DataTable();
+        $(tableZero).off('click', '.delete-btn');
+        existingTable.destroy();
+        $(tableZero).empty();
     }
 
     // Remove or comment out this client-side filter since backend is handling it
@@ -44,7 +48,7 @@ function atable(data, handleAddEvent) {
     });
     */
 
-    const table = $(tableZero).DataTable({
+    const tableConfig = {
         data: data, // Use data directly instead of upcomingEvents
         order: [0, 'asc'],
         searching: true,
@@ -86,11 +90,24 @@ function atable(data, handleAddEvent) {
             
             $('.date-filter-wrapper').html(dateFilterHtml);
 
-            // Initialize the filter after table is created
-            const currentTable = $(tableZero).DataTable();
-            setupDateFilter(currentTable);
-        },
+            // Add delete button event listener
+            $(tableZero).on('click', '.delete-btn', function(e) {
+                e.preventDefault();
+                const eventId = $(this).data('id');
+                handleDelete(eventId);
+            });
 
+            // Setup date filter after table is initialized
+            setupDateFilter(this.api());
+        },
+        drawCallback: function(settings) {
+            // Reattach event listeners after table redraw
+            $(tableZero).find('.delete-btn').off('click').on('click', function(e) {
+                e.preventDefault();
+                const eventId = $(this).data('id');
+                handleDelete(eventId);
+            });
+        },
         columns: [
             {
                 data: 'name',
@@ -229,9 +246,9 @@ function atable(data, handleAddEvent) {
                 }
             }
         ]
-    });
+    };
 
-    return table;
+    return $(tableZero).DataTable(tableConfig);
 }
 
 const UpcomingEvents = () => {
@@ -240,23 +257,35 @@ const UpcomingEvents = () => {
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
 
+    // Add these states for delete modal
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const destroyTable = () => {
+        if (currentTable) {
+            $('#data-table-zero').off('click', '.delete-btn');
+            currentTable.destroy();
+            setCurrentTable(null);
+        }
+    };
+
+    const initializeTable = () => {
+        destroyTable();
+        if (Array.isArray(events) && events.length >= 0) {
+            const table = atable(events, handleAddEvent, handleDelete);
+            setCurrentTable(table);
+        }
+    };
+
     useEffect(() => {
         dispatch(eventList({}));
+        return () => destroyTable();
     }, [dispatch]);
 
     useEffect(() => {
-        if (events?.length) {
-            const table = atable(events, handleAddEvent);
-            setCurrentTable(table);
-        }
-
-        return () => {
-            if (currentTable) {
-                resetFilters(currentTable);
-                currentTable.destroy();
-                setCurrentTable(null);
-            }
-        };
+        initializeTable();
+        return () => destroyTable();
     }, [events]);
 
     useEffect(() => {
@@ -271,31 +300,68 @@ const UpcomingEvents = () => {
         // Add your modal logic here
     }, []);
 
-  
+    // Add delete handling functions
+    const handleDelete = (eventId) => {
+        setItemToDelete({ id: eventId });
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!itemToDelete) return;
+
+        setIsDeleting(true);
+        try {
+            await dispatch(eventDelete(itemToDelete.id));
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+            destroyTable();
+            await dispatch(eventList({}));
+        } catch (error) {
+            console.error('Delete failed:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleCloseModal = () => {
+        if (!isDeleting) {
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        }
+    };
+
     return (
-        <Row>
-            <Col sm={12} className="btn-page">
-                <Card className="event-list">
-                    <Card.Body>
-                        <Table striped hover responsive id="data-table-zero">
-                            <thead>
-                                <tr>
-                                    <th>Event Name</th>
-                                    <th>Type</th>
-                                    <th>Price</th>
-                                    <th>Location</th>
-                                    <th>Description</th>
-                                    <th>Start</th>
-                                    <th>End</th>
-                                    <th>Duration</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                        </Table>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+        <>
+            <DeleteConfirmationModal
+                show={showDeleteModal}
+                onHide={handleCloseModal}
+                onConfirm={handleConfirmDelete}
+                isLoading={isDeleting}
+            />
+            <Row>
+                <Col sm={12} className="btn-page">
+                    <Card className="event-list">
+                        <Card.Body>
+                            <Table striped hover responsive id="data-table-zero">
+                                <thead>
+                                    <tr>
+                                        <th>Event Name</th>
+                                        <th>Type</th>
+                                        <th>Price</th>
+                                        <th>Location</th>
+                                        <th>Description</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Duration</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </>
     );
 };
 

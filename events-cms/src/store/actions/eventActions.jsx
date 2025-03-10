@@ -41,22 +41,20 @@ export const participatedEvents = () => async (dispatch) => {
 
 // All Filter Delete Events
 
-export const eventDelete = (eventId) => async (dispatch) => {
+export const eventDelete = (id) => async (dispatch) => {
     try {
-        const response = await axiosInstance.delete(`/events/${eventId}`);
-        dispatch({ type: 'EVENT_DELETE_SUCCESS', payload: response.data });
-        return response.data;
+         await axiosInstance.delete(`/events/delete/${id}`);
+         return true;
     } catch (error) {
         console.error('Error deleting event:', error);
         throw error;
     }
 };
 
-export const registrationDelete = (registrationId) => async (dispatch) => {
+export const registrationDelete = (id) => async (dispatch) => {
     try {
-        const response = await axiosInstance.delete(`/register-events/${registrationId}`);
-        dispatch({ type: 'REGISTRATION_DELETE_SUCCESS', payload: response.data });
-        return response.data;
+       await axiosInstance.delete(`/register-events/delete/${id}`);
+         return true;
     } catch (error) {   
         console.error('Error deleting registration:', error);
         throw error;

@@ -179,3 +179,29 @@ export const getRegisterEvents = async (req) => {
     throw new AppError("SERVER_ERROR", "Unable to fetch registrations");
   }
 };
+
+export const deleteRegistration = async (registrationId, userId, userRole) => {
+    try {
+        const registration = await RegistraterEvents.findByPk(registrationId);
+
+        if (!registration) {
+            throw new AppError("NOT_FOUND", "Registration not found");
+        }
+
+        // Only allow admin or the registered user to delete
+        if (!isAdmin(userRole) && registration.userId !== userId) {
+            throw new AppError("FORBIDDEN", "You don't have permission to delete this registration");
+        }
+
+        // Check if event has already started
+        const event = await Event.findByPk(registration.eventId);
+        if (event && new Date(event.startDate) <= new Date()) {
+            throw new AppError("FORBIDDEN", "Cannot delete registration for an event that has already started");
+        }
+
+        await registration.destroy();
+        return true;
+    } catch (error) {
+        throw error;
+    }
+};
