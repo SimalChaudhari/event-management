@@ -9,11 +9,12 @@ import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { userList } from '../../store/actions/userActions';
 import { DUMMY_PATH } from '../../configs/env';
+import AddUserModal from './components/AddUserModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddUser) {
+function atable(data, handleAddUser, handleEditUser) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -128,7 +129,10 @@ function atable(data, handleAddUser) {
 
     $(document).on('click', '.edit-btn', function () {
         const userId = $(this).data('id');
-        alert(`Edit user with ID: ${userId}`);
+        const userData = data.find((user) => user.id === userId);
+        if (userData) {
+            handleEditUser(userData);
+        }
     });
 
     $(document).on('click', '.delete-btn', function () {
@@ -144,13 +148,28 @@ const UserList = () => {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
 
+    const [showModal, setShowModal] = React.useState(false);
+
+
+    const [editData, setEditData] = React.useState(null);
+
+    const handleCloseModal = () => {
+        setShowModal(false);
+    };
+
     const handleAddUser = () => {
-        // setShowModal(true);
+        setEditData(null);
+        setShowModal(true);
+    };
+
+    const handleEditUser = (userData) => {
+        setEditData(userData);
+        setShowModal(true);
     };
 
     useEffect(() => {
         if (user.length) {
-            atable(user, handleAddUser); // Pass handleAddUser to atable
+            atable(user, handleAddUser,handleEditUser); // Pass handleAddUser to atable
         }
     }, [user, handleAddUser]); // Add handleAddUser to dependencies
 
@@ -168,32 +187,34 @@ const UserList = () => {
     }, [user]);
 
     return (
-        <Row>
-            <Col sm={12} className="btn-page">
-                <Card className="user-profile-list">
-                    <Card.Body>
-                        <Table striped hover responsive id="data-table-zero">
-                            <thead>
-                                <tr>
-                                    <th>Profile</th>
-                                    <th>Mobile</th>
-                                    <th>Address</th>
-                                    <th>City</th>
-                                    <th>State</th>
-                                    <th>Postal Code</th>
-                                    <th>Member</th>
-                                    <th>Biometric Enabled</th>
-                                    <th>Currency</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                        </Table>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+        <>
+            <AddUserModal show={showModal} handleClose={handleCloseModal} editData={editData} />
+            <Row>
+                <Col sm={12} className="btn-page">
+                    <Card className="user-profile-list">
+                        <Card.Body>
+                            <Table striped hover responsive id="data-table-zero">
+                                <thead>
+                                    <tr>
+                                        <th>Profile</th>
+                                        <th>Mobile</th>
+                                        <th>Address</th>
+                                        <th>City</th>
+                                        <th>State</th>
+                                        <th>Postal Code</th>
+                                        <th>Member</th>
+                                        <th>Biometric Enabled</th>
+                                        <th>Currency</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </>
     );
 };
 
 export default UserList;
- 
