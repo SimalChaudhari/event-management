@@ -21,7 +21,8 @@ export const fetchAllEvents = async (req, res) => {
       startDateTo,
       minPrice,
       maxPrice,
-      keyword,    // New keyword parameter
+      location,
+      keyword, // New keyword parameter
       showUpcoming, // New query parameter
       ...otherFilters
     } = req.query;
@@ -54,22 +55,28 @@ export const fetchAllEvents = async (req, res) => {
       if (maxPrice) filters.price[Op.lte] = parseFloat(maxPrice);
     }
 
+    // Add location filter (case-insensitive match)
+    if (location) {
+      filters.location = {
+        [Op.iLike]: `%${location}%`,
+      };
+    }
     // Fetch events with filters
     const events = await getAllEvents(filters, keyword);
 
-      // Handle no matching events
-      if (events.length === 0) {
-        const message = keyword 
-            ? `No events found matching "${keyword}"` 
-            : 'No events found matching the specified filters';
-        return res.status(404).json({ message });
+    // Handle no matching events
+    if (events.length === 0) {
+      const message = keyword
+        ? `No events found matching "${keyword}"`
+        : "No events found matching the specified filters";
+      return res.status(404).json({ message });
     }
 
     // Return matched events with search metadata
     res.status(200).json({
-        total: events.length,
-        keyword: keyword || null,
-        events: events
+      total: events.length,
+      keyword: keyword || null,
+      events: events,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -100,13 +107,21 @@ export const fetchEventById = async (req, res) => {
 export const createNewEvent = async (req, res) => {
   try {
     const userId = req.user.id; // Extracted from the token
-    const eventData = { ...req.body, createdBy: userId }; // Add userId to event data
+    const eventImage = req.file;
+       
+    const eventData = { 
+      ...req.body, 
+      image: eventImage.path,
+      createdBy: userId }; // Add userId to event data
 
     // Basic time format validation (HH:mm)
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(eventData.startTime) || !timeRegex.test(eventData.endTime)) {
+    if (
+      !timeRegex.test(eventData.startTime) ||
+      !timeRegex.test(eventData.endTime)
+    ) {
       return res.status(400).json({
-        message: "Invalid time format. Please use HH:mm format (24-hour)"
+        message: "Invalid time format. Please use HH:mm format (24-hour)",
       });
     }
 
@@ -114,7 +129,7 @@ export const createNewEvent = async (req, res) => {
     if (eventData.startDate === eventData.endDate) {
       if (eventData.startTime >= eventData.endTime) {
         return res.status(400).json({
-          message: "End time must be after start time on the same day"
+          message: "End time must be after start time on the same day",
         });
       }
     }
@@ -131,7 +146,8 @@ export const createNewEvent = async (req, res) => {
 
       if (dateLocationConflict) {
         return res.status(400).json({
-          message: "Another event is already scheduled at this location during these dates and times"
+          message:
+            "Another event is already scheduled at this location during these dates and times",
         });
       }
     }
@@ -193,10 +209,14 @@ export const modifyEvent = async (req, res) => {
     const { id } = req.params;
     const updatedData = { ...req.body, createdBy: userId }; // Add userId to event data
 
+    if (req.file) {
+      updatedData.image = req.file.path;
+    }
+
     const existingEvent = await getEventById(id);
-        if (!existingEvent) {
-            return res.status(404).json({ message: 'Event not found' });
-        }
+    if (!existingEvent) {
+      return res.status(404).json({ message: "Event not found" });
+    }
     // Use existing dates if not provided in update
     const startDate = updatedData.startDate;
     const endDate = updatedData.endDate;
@@ -234,15 +254,21 @@ export const modifyEvent = async (req, res) => {
     // Time validation for updates
     if (updatedData.startTime && updatedData.endTime) {
       const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      if (!timeRegex.test(updatedData.startTime) || !timeRegex.test(updatedData.endTime)) {
+      if (
+        !timeRegex.test(updatedData.startTime) ||
+        !timeRegex.test(updatedData.endTime)
+      ) {
         return res.status(400).json({
-          message: "Invalid time format. Please use HH:mm format (24-hour)"
+          message: "Invalid time format. Please use HH:mm format (24-hour)",
         });
       }
 
-      if (startDate === endDate && updatedData.startTime >= updatedData.endTime) {
+      if (
+        startDate === endDate &&
+        updatedData.startTime >= updatedData.endTime
+      ) {
         return res.status(400).json({
-          message: "End time must be after start time on the same day"
+          message: "End time must be after start time on the same day",
         });
       }
     }
@@ -252,6 +278,8 @@ export const modifyEvent = async (req, res) => {
       location,
       startDate,
       endDate,
+      updatedData.startTime, // Ensure startTime is passed
+      updatedData.endTime,   // Ensure endTime is passed
       id
     );
     if (conflictingEvent) {
@@ -264,6 +292,7 @@ export const modifyEvent = async (req, res) => {
       .status(200)
       .json({ message: "Event updated successfully", event: updatedEvent });
   } catch (error) {
+    console.log(error.message,"%%%%%%%##########%%%%%%%%")
     res.status(500).json({ message: error.message });
   }
 };

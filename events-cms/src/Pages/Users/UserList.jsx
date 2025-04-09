@@ -5,18 +5,23 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import * as $ from 'jquery';
-import { userList } from '../../store/actions/userActions';
 import { DUMMY_PATH } from '../../configs/env';
 import AddUserModal from './components/AddUserModal';
+import { FetchUsers } from './fetchApi/FetchApi';
+import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import ViewUserModal from './components/ViewUserModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddUser, handleEditUser) {
+function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
+
+    // Preserve the current page
+    let currentPage = $(tableZero).DataTable().page();
 
     // Destroy the DataTable if it already exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
@@ -121,10 +126,17 @@ function atable(data, handleAddUser, handleEditUser) {
             }
         ]
     });
+
+      // Restore the page
+      $(tableZero).DataTable().page(currentPage).draw(false);
+
     // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
+    $(document).on('click', '.btn-icon', function () {
         const userId = $(this).data('id');
-        alert(`View user with ID: ${userId}`);
+        const userData = data.find((user) => user.id === userId);
+        if (userData) {
+          handleViewUser(userData);
+        }
     });
 
     $(document).on('click', '.edit-btn', function () {
@@ -137,25 +149,34 @@ function atable(data, handleAddUser, handleEditUser) {
 
     $(document).on('click', '.delete-btn', function () {
         const userId = $(this).data('id');
-        if (window.confirm('Are you sure you want to delete this user?')) {
-            alert(`Delete user with ID: ${userId}`);
-        }
+        handleDeleteUser(userId);
     });
 }
 
 const UserList = () => {
-    // Fetch user data from Redux
-    const dispatch = useDispatch();
+    const { fetchData, deleteUserData } = FetchUsers(); // Destructure fetchData from the custom hook
+
     const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
-
     const [showModal, setShowModal] = React.useState(false);
-
+    const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
 
     const [editData, setEditData] = React.useState(null);
+
+    const [viewData, setViewData] = React.useState(null); // State for user data to view
+
+    const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+    const [userIdToDelete, setUserIdToDelete] = React.useState(null);
+    const [isLoading, setIsLoading] = React.useState(false);
 
     const handleCloseModal = () => {
         setShowModal(false);
     };
+
+    const handleViewUser = (userData) => {
+        setViewData(userData);
+        setShowViewModal(true);
+      };
+    
 
     const handleAddUser = () => {
         setEditData(null);
@@ -167,28 +188,47 @@ const UserList = () => {
         setShowModal(true);
     };
 
+    const handleDeleteUser = (userId) => {
+        setUserIdToDelete(userId);
+        setShowConfirmModal(true);
+    };
+
+    const confirmDeleteUser = async () => {
+        setIsLoading(true);
+        if (userIdToDelete) {
+            try {
+                await deleteUserData(userIdToDelete); // Await the delete operation
+                setShowConfirmModal(false);
+                fetchData(); // Refresh the user list after successful deletion
+            } catch (error) {
+                console.error('Error deleting user:', error);
+            }
+        }
+        setIsLoading(false);
+    };
+
     useEffect(() => {
         if (user.length) {
-            atable(user, handleAddUser,handleEditUser); // Pass handleAddUser to atable
+            atable(user, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser); // Pass handleAddUser to atable
         }
     }, [user, handleAddUser]); // Add handleAddUser to dependencies
 
     // Fetch data when the component mounts
     useEffect(() => {
-        const FetchData = async () => {
-            await dispatch(userList()); // Fetch user data
-        };
-        FetchData();
-    }, [dispatch]); // Only runs once when the component mounts
-
-    // Log the user data whenever it updates
-    useEffect(() => {
-        console.log('🚀 ~ Updated user data:', user);
-    }, [user]);
+        fetchData();
+    }, []); // Only runs once when the component mounts
 
     return (
         <>
             <AddUserModal show={showModal} handleClose={handleCloseModal} editData={editData} />
+            <ViewUserModal show={showViewModal} handleClose={() => setShowViewModal(false)} userData={viewData} />
+   
+            <DeleteConfirmationModal
+                show={showConfirmModal}
+                onHide={() => setShowConfirmModal(false)}
+                onConfirm={confirmDeleteUser}
+                isLoading={isLoading}
+            />
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="user-profile-list">

@@ -64,8 +64,6 @@ export const checkEventNameExists = async (name) => {
 };
 
 
-// ... existing code ...
-
 /**
  * Check if event exists with same date and location
  * @param {String} location - Event location

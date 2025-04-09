@@ -11,7 +11,7 @@ import {
 } from '../controllers/authController.js';
 
 import {
-  validateRegistration,
+  // validateRegistration,
   validateLogin,
   validateForgetPassword,
   validateResetPassword,
@@ -21,14 +21,17 @@ import {
 } from '../middleware/validationMiddleware.js';
 import asyncHandler from '../utils/asyncHandler.js'; // Utility for handling async functions
 import { rateLimiter } from '../middleware/rateLimiter.js'; // Optional: Rate limiting for security
+import upload from '../config/multer.js';
 
 const router = express.Router();
 
 // Apply rate limiting to all auth routes (optional but recommended)
 router.use(rateLimiter);
-
 // Register a new user
-router.post('/register', validateRegistration, asyncHandler(register));
+router.post('/register', 
+  // validateRegistration,
+  upload.single('profilePicture'), // Use multer middleware
+  asyncHandler(register));
 
 // Check if a user exists by email
 router.get('/check-user', validateCheckUserExists, asyncHandler(checkUserExists));

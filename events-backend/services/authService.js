@@ -24,6 +24,7 @@ export const checkUserExistsService = async (email) => {
  * @returns {object} - The created user.
  */
 export const registerUser = async (data) => {
+    console.log(data)
     const existingUserByEmail = await User.findOne({ where: { email: data.email } });
 
     if (existingUserByEmail) {

@@ -12,6 +12,8 @@ import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import { useLocation } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
+import AddEventModal from './components/AddEventModal';
+import ViewEventModal from './components/ViewEventModal';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
@@ -24,30 +26,34 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(data, handleAddEvent, handleDelete) {
+function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
-    
+
+    // Preserve the current page
+    let currentPage = $(tableZero).DataTable().page();
+
     // Clean up existing table and event listeners
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        const existingTable = $(tableZero).DataTable();
-        $(tableZero).off('click', '.delete-btn');
-        existingTable.destroy();
-        $(tableZero).empty();
+        $(tableZero).DataTable().clear().destroy();
     }
 
-    const tableConfig = {
+    $(tableZero).DataTable({
         data: data || [],
         order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
         pageLength: 5,
-        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]],
-        pagingType: "full_numbers",
-        dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
-             "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
-             "<'row'<'col-sm-12'tr>>" +
-             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        lengthMenu: [
+            [5, 10, 25, 50, -1],
+            [5, 10, 25, 50, 'All']
+        ],
+        pagingType: 'full_numbers',
+        dom:
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
+            "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
+            "<'row'<'col-sm-12'tr>>" +
+            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
             {
                 data: 'name',
@@ -197,7 +203,7 @@ function atable(data, handleAddEvent, handleDelete) {
                 }
             }
         ],
-        initComplete: function(settings, json) {
+        initComplete: function (settings, json) {
             const dateFilterHtml = `
                 <div class="date-filter-container d-flex align-items-center">
                     <div class="filter-group mr-3">
@@ -225,6 +231,8 @@ function atable(data, handleAddEvent, handleDelete) {
             `;
 
             $('.date-filter-wrapper').html(dateFilterHtml);
+                  // Setup date filter after table is initialized
+                  setupDateFilter(this.api());
 
             // Add button initialization
             if (!$('#addEventBtn').length) {
@@ -237,39 +245,57 @@ function atable(data, handleAddEvent, handleDelete) {
 
                 $('#addEventBtn').on('click', handleAddEvent);
             }
-
-            // Add delete button event listener
-            $(tableZero).on('click', '.delete-btn', function(e) {
-                e.preventDefault();
-                const eventId = $(this).data('id');
-                handleDelete(eventId);
-            });
-
-            // Setup date filter after table is initialized
-            setupDateFilter(this.api());
         },
-        drawCallback: function(settings) {
-            // Reattach event listeners after table redraw
-            $(tableZero).find('.delete-btn').off('click').on('click', function(e) {
-                e.preventDefault();
-                const eventId = $(this).data('id');
-                handleDelete(eventId);
-            });
-        }
-    };
+    })
+       
+  // Restore the page
+  $(tableZero).DataTable().page(currentPage).draw(false);
 
-    return $(tableZero).DataTable(tableConfig);
+  // Attach event listeners for actions
+  $(document).on('click', '.btn-icon', function () {
+      const eventId = $(this).data('id');
+      const dataEvent = data.find((user) => user.id === eventId);
+      if (dataEvent) {
+        handleView(dataEvent);
+      }
+  });
+
+  $(document).on('click', '.edit-btn', function () {
+      const eventId = $(this).data('id');
+      const dataEvent = data.find((user) => user.id === eventId);
+      if (dataEvent) {
+          handleEdit(dataEvent);
+      }
+  });
+
+  $(document).on('click', '.delete-btn', function () {
+      const eventId = $(this).data('id');
+      handleDelete(eventId);
+  });
 }
+
 
 const EventView = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
-   
+    const [showModal, setShowModal] = React.useState(false);
+
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
+    const [editData, setEditData] = React.useState(null);
+
+    const [viewData, setViewData] = React.useState(null); // State for user data to view
+    const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+
+    const handleView = (data) => {
+        setViewData(data);
+        setShowViewModal(true);
+    };
 
     const destroyTable = () => {
         if (currentTable) {
@@ -282,7 +308,7 @@ const EventView = () => {
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
-            const table = atable(events, handleAddEvent, handleDelete);
+            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView);
             setCurrentTable(table);
         }
     };
@@ -305,9 +331,15 @@ const EventView = () => {
         };
     }, [location.pathname]);
 
-    const handleAddEvent = React.useCallback(() => {
-        // Your add event logic
-    }, []);
+    const handleAddEvent = () => {
+        setEditData(null);
+        setShowModal(true);
+    };
+
+    const handleEdit = (data) => {
+        setEditData(data);
+        setShowModal(true);
+    };
 
     const handleDelete = (eventId) => {
         setItemToDelete({ id: eventId });
@@ -331,18 +363,25 @@ const EventView = () => {
         }
     };
 
-    const handleCloseModal = () => {
+    const handleClose = () => {
         if (!isDeleting) {
             setShowDeleteModal(false);
             setItemToDelete(null);
         }
     };
 
+    const handleCloseModal = () => {
+        setShowModal(false);
+    };
+    
     return (
         <>
+            <AddEventModal show={showModal} handleClose={handleCloseModal} editData={editData} />
+            <ViewEventModal show={showViewModal} handleClose={() => setShowViewModal(false)} eventData={viewData} />
+
             <DeleteConfirmationModal
                 show={showDeleteModal}
-                onHide={handleCloseModal}
+                onHide={handleClose}
                 onConfirm={handleConfirmDelete}
                 isLoading={isDeleting}
             />

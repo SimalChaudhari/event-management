@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_URL } from './env';
 
 const axiosInstance = axios.create({
-  baseURL: API_URL, // Set the base URL for all requests
+  baseURL: `${API_URL}/api`, // Set the base URL for all requests
 });
 
 // Request Interceptor

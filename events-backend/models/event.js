@@ -23,7 +23,7 @@ const Event = sequelize.define('Event', {
         allowNull: false,
     },
     startTime: {  // New field
-        type: DataTypes.TIME,
+        type: DataTypes.STRING(255),
         allowNull: false,
     },
     endDate: {
@@ -31,10 +31,14 @@ const Event = sequelize.define('Event', {
         allowNull: false,
     },
     endTime: {  // New field
-        type: DataTypes.TIME,
+        type: DataTypes.STRING(255),
         allowNull: false,
     },
     location: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+    },
+    image: {
         type: DataTypes.STRING(255),
         allowNull: true,
     },

@@ -35,9 +35,9 @@ export const createUser = (data) => async (dispatch) => {
     return false; // Return false for any errors
 };
 
-export const editUser = (userId, userData) => async (dispatch) => {
+export const editUser = (id, data) => async (dispatch) => {
     try {
-        const response = await axiosInstance.patch(`/users/update/${userId}`, userData);
+        const response = await axiosInstance.put(`/users/update/${id}`, data);
 
         // Check if the response is successful
         if (response && response.status >= 200 && response.status < 300) {
@@ -52,9 +52,9 @@ export const editUser = (userId, userData) => async (dispatch) => {
     return false; // Return false for any errors or unsuccessful attempts
 };
 
-export const deleteUser = (userId) => async (dispatch) => {
+export const deleteUser = (id) => async (dispatch) => {
     try {
-        const response = await axiosInstance.delete(`/users/delete/${userId}`);
+        const response = await axiosInstance.delete(`/users/delete/${id}`);
         // Check if the response is successful
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'User deleted successfully!');

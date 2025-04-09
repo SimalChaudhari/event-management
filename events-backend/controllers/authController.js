@@ -55,7 +55,16 @@ export const checkUserExists = async (req, res) => {
  */
 export const register = async (req, res) => {
     try {
-        await registerUser(req.body);
+         // Access the uploaded file via req.file
+         const profileImage = req.file;
+       
+         // Inclde the file path or other file details in the user data
+         const userData = {
+             ...req.body,
+             profilePicture: profileImage.path // or any other relevant file info
+         };
+ 
+        await registerUser(userData);
         return res.status(201).json({
             message: 'User registered successfully. Please verify your email.'
         });
