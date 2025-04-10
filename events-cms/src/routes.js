@@ -31,6 +31,7 @@ const routes = [
     { path: '/tourism', exact: true, name: 'Tourism List', component: TourismList },
     { path: '/profile', exact: true, name: 'Profile List', component: ProfileList },
 
+    // sanple page
     { path: '/sample-page', exact: true, name: 'Sample Page', component: OtherSamplePage }
 ];
 export default routes;

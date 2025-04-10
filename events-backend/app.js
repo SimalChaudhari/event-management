@@ -4,6 +4,8 @@ import cors from 'cors'; // Import the cors middleware
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
+import cartRoutes from './routes/cartRoutes.js';
+
 import eventRegistrationRoutes from './routes/eventRegistrationRoutes.js';
 import dotenv from 'dotenv';
 
@@ -24,6 +26,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/cart', cartRoutes);
 app.use('/api/register-events', eventRegistrationRoutes);
 
 
