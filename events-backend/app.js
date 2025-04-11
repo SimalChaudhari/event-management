@@ -5,6 +5,8 @@ import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
+import withdrawalRoutes from './routes/withdrawalRoutes.js';
+
 
 import eventRegistrationRoutes from './routes/eventRegistrationRoutes.js';
 import dotenv from 'dotenv';
@@ -28,6 +30,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/register-events', eventRegistrationRoutes);
+app.use('/api/withdraw', withdrawalRoutes);
+
 
 
 const PORT = process.env.PORT || 5000;
