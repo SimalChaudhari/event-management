@@ -22,7 +22,6 @@ import {
 import asyncHandler from '../utils/asyncHandler.js'; // Utility for handling async functions
 import { rateLimiter } from '../middleware/rateLimiter.js'; // Optional: Rate limiting for security
 import upload from '../config/multer.js';
-
 const router = express.Router();
 
 // Apply rate limiting to all auth routes (optional but recommended)
@@ -55,3 +54,4 @@ router.post('/reset', validateResetPassword, asyncHandler(resetPassword));
 router.post('/logout', asyncHandler(logout));
 
 export default router;
+

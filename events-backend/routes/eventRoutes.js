@@ -7,15 +7,15 @@ import {
     removeEvent,
 } from '../controllers/eventController.js';
 import { authorizeRoles } from '../middleware/roleMiddleware.js';
-import upload from '../config/multer.js';
+import { uploadevent } from '../utils/multerConfig.js';
 
 const router = express.Router();
 
 // router.get('/events',authorizeRoles(['user', 'admin']), fetchAllEvents);
 router.get('/', fetchAllEvents);
 router.get('/:id', fetchEventById);
-router.post('/create',authorizeRoles(['admin','user']),  upload.single('image'),createNewEvent);
-router.put('/update/:id', authorizeRoles(['admin','user']), upload.single('image'),modifyEvent);
+router.post('/create',authorizeRoles(['admin','user']),  uploadevent.single('image'),createNewEvent);
+router.put('/update/:id', authorizeRoles(['admin','user']), uploadevent.single('image'),modifyEvent);
 router.delete('/delete/:id', removeEvent);
 
 // router.post('/events',authorizeRoles(['admin']), createNewEvent);
