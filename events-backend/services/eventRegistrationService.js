@@ -9,6 +9,7 @@ export const registerForEvent = async (
   userId,
   eventId,
   userRole,
+  registrationRole,
   paymentDetails
 ) => {
   // Admin check
@@ -45,8 +46,40 @@ export const registerForEvent = async (
     );
   }
 
+   // If user is an Exhibitor, only require the registration code
+   if (registrationRole === 'Exhibitor') {
+    if (!paymentDetails.registerCode) {
+      throw new AppError("PAYMENT_REQUIRED", "Registration code is required for exhibitors");
+    }
+
+    // Create registration without payment details
+    const registration = await RegistraterEvents.create({
+      userId,
+      eventId,
+      registeredAt: new Date(),
+      paymentStatus: "Completed", // Set as Free since no payment is required
+      amount: 0, // No amount for free registration
+      currency: event.currency,
+      registerCode: paymentDetails.registerCode, // Store the registration code
+      role:registrationRole
+    });
+
+    return {
+      registration: {
+        id: registration.id,
+        eventId: registration.eventId,
+        registeredAt: registration.registeredAt,
+        paymentStatus: registration.paymentStatus,
+        amount: registration.amount,
+        currency: registration.currency,
+        registerCode: registration.registerCode // Include the registration code in the response
+      },
+      paymentDetails: null, // No payment details for free registration
+    };
+  }
+
   // Validate payment details if event is paid
-  if (event.price > 0) {
+  if (registrationRole !== "Exhibitor" && event.price > 0) {
     // Validate required payment fields
     const requiredFields = ["amount", "name", "cardNumber"];
     const missingFields = requiredFields.filter(
@@ -90,13 +123,6 @@ export const registerForEvent = async (
     paymentDate: event.price > 0 ? new Date() : null,
   });
 
-  // Get user details for email
-  const user = await User.findByPk(userId);
-
-  // Send emails if it's a paid event
-  if (event.price > 0) {
-    console.log(user, event, registration);
-  }
 
   return {
     registration: {
@@ -107,17 +133,14 @@ export const registerForEvent = async (
       amount: registration.amount,
       currency: registration.currency,
     },
-    paymentDetails:
-      event.price > 0
-        ? {
-            amount: event.price,
-            currency: event.currency,
-            status: "Completed",
-            payerName: paymentDetails.name,
-            cardLastFour: registration.cardLastFour,
-            paymentDate: registration.paymentDate,
-          }
-        : null,
+    paymentDetails: {
+      amount: event.price,
+      currency: event.currency,
+      status: "Completed",
+      payerName: paymentDetails.name,
+      cardLastFour: registration.cardLastFour,
+      paymentDate: registration.paymentDate,
+    },
   };
 };
 
@@ -180,28 +203,3 @@ export const getRegisterEvents = async (req) => {
   }
 };
 
-export const deleteRegistration = async (registrationId, userId, userRole) => {
-    try {
-        const registration = await RegistraterEvents.findByPk(registrationId);
-
-        if (!registration) {
-            throw new AppError("NOT_FOUND", "Registration not found");
-        }
-
-        // Only allow admin or the registered user to delete
-        if (!isAdmin(userRole) && registration.userId !== userId) {
-            throw new AppError("FORBIDDEN", "You don't have permission to delete this registration");
-        }
-
-        // Check if event has already started
-        const event = await Event.findByPk(registration.eventId);
-        if (event && new Date(event.startDate) <= new Date()) {
-            throw new AppError("FORBIDDEN", "Cannot delete registration for an event that has already started");
-        }
-
-        await registration.destroy();
-        return true;
-    } catch (error) {
-        throw error;
-    }
-};
