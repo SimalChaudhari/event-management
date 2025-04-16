@@ -11,7 +11,7 @@ import { EventDto, EventType } from './event.dto';
 import { Event } from './event.entity';
 import { Between, Not } from 'typeorm';
 import { Speaker } from 'speaker/speaker.entity';
-import { EventSpeaker } from './event-speaker.entity';
+import { EventResponse, EventSpeaker } from './event-speaker.entity';
 
 @Injectable()
 export class EventService {
@@ -44,7 +44,6 @@ export class EventService {
       );
     }
 
-  
     if (eventDto.location) {
       const conflictingEvents = await this.eventRepository.find({
         where: {
@@ -66,20 +65,29 @@ export class EventService {
     }
 
     const event = await this.eventRepository.create(eventDto);
+    // Save the event to the database
+    const savedEvent = await this.eventRepository.save(event);
 
-    // Handle speaker associations
-    // if (eventDto.speakerIds) {
-    //     const speakerIdsArray = eventDto.speakerIds.split(','); // Split the string into an array
-    //     const speakers = await this.speakerRepository.findByIds(speakerIdsArray);
-    //     await Promise.all(speakers.map(async (speaker) => {
-    //         const eventSpeaker = new EventSpeaker();
-    //         eventSpeaker.event = event;
-    //         eventSpeaker.speaker = speaker;
-    //         await this.eventSpeakerRepository.save(eventSpeaker);
-    //     }));
-    // }
+    if (eventDto.speakerIds) {
+      const speakerIdsArray = eventDto.speakerIds.split(','); // Split the string into an array
+      await Promise.all(
+          speakerIdsArray.map(async (speakerId) => {
+              const eventExists = await this.eventRepository.findOne({ where: { id: savedEvent.id } });
+              const speakerExists = await this.speakerRepository.findOne({ where: { id: speakerId } });
 
-    return await this.eventRepository.save(event);
+              if (!eventExists || !speakerExists) {
+                  throw new BadRequestException('Invalid event or speaker ID');
+              }
+
+              const eventSpeaker = new EventSpeaker();
+              eventSpeaker.eventId = savedEvent.id; // Ensure the event ID is set
+              eventSpeaker.speakerId = speakerId; // Set the speaker ID
+              await this.eventSpeakerRepository.save(eventSpeaker);
+          }),
+      );
+  }
+
+    return savedEvent
   }
 
   async getAllEvents(filters: {
@@ -91,7 +99,10 @@ export class EventService {
     location?: string;
     upcoming?: boolean; // New filter for upcoming events
   }) {
-    const queryBuilder = this.eventRepository.createQueryBuilder('event');
+    const queryBuilder = this.eventRepository.createQueryBuilder('event')
+    .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
+    .leftJoinAndSelect('eventSpeaker.speaker', 'speaker'); // Join with Speaker entity
+
 
     if (filters.keyword) {
       queryBuilder.where(
@@ -132,14 +143,81 @@ export class EventService {
       queryBuilder.andWhere('event.startDate >= :today', { today: today });
     }
 
-    return await queryBuilder.getMany();
-  }
+    const events = await queryBuilder.getMany();
 
-  async getEventById(id: string): Promise<Event> {
-    const event = await this.eventRepository.findOne({ where: { id } });
+    // Map the response to include only necessary details
+    return events.map(event => {
+        // Get the first speaker if available
+        const speakersData = event.eventSpeakers.map(eventSpeaker => ({
+          id: eventSpeaker.speaker.id,
+          name: eventSpeaker.speaker.name,
+          companyName: eventSpeaker.speaker.companyName,
+          position: eventSpeaker.speaker.position
+      }));
+
+        return {
+            id: event.id,
+            name: event.name,
+            description: event.description,
+            startDate: event.startDate,
+            startTime: event.startTime,
+            endDate: event.endDate,
+            endTime: event.endTime,
+            location: event.location,
+            country: event.country,
+            image: event.image,
+            type: event.type,
+            price: event.price,
+            currency: event.currency,
+            createdAt:event.createdAt,
+            updatedAt:event.updatedAt,
+            speakersData
+        };
+    });
+}
+
+  // async getEventById(id: string): Promise<Event> {
+  //   const event = await this.eventRepository.findOne({ where: { id } });
+  //   if (!event) throw new NotFoundException('Event not found');
+  //   return event;
+  // }
+
+  async getEventById(id: string): Promise<EventResponse> {
+    const event = await this.eventRepository.createQueryBuilder('event')
+        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
+        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker') // Join with Speaker entity
+        .where('event.id = :id', { id })
+        .getOne();
+
     if (!event) throw new NotFoundException('Event not found');
-    return event;
-  }
+
+    const speakers = event.eventSpeakers.map(eventSpeaker => ({
+      id: eventSpeaker.speaker.id,
+      name: eventSpeaker.speaker.name,
+      companyName: eventSpeaker.speaker.companyName,
+      position: eventSpeaker.speaker.position
+  }));
+
+    return {
+        id: event.id,
+        name: event.name,
+        description: event.description,
+        startDate: event.startDate,
+        startTime: event.startTime,
+        endDate: event.endDate,
+        endTime: event.endTime,
+        location: event.location,
+        country: event.country,
+        image: event.image,
+        type: event.type,
+        price: event.price,
+        currency: event.currency,
+        createdAt:event.createdAt,
+        updatedAt:event.updatedAt,
+        speakers // Return the array of speakers
+    };
+}
+
 
   async updateEvent(
     id: string,

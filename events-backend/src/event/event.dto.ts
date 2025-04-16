@@ -65,5 +65,5 @@ export class EventDto {
     currency?: string;
     
     @IsOptional()
-    speakerIds?: string; // Keep this as a string for comma-separated values
+    speakerIds?: string; 
 }

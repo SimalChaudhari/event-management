@@ -30,7 +30,6 @@ export class Speaker {
 
     @UpdateDateColumn()
     updatedAt!: Date;
-
     
     @OneToMany(() => EventSpeaker, (eventSpeaker) => eventSpeaker.speaker)
     eventSpeakers!: EventSpeaker[];
