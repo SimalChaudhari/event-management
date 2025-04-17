@@ -13,7 +13,7 @@ import { Roles } from 'jwt/roles.decorator';
 import { UserRole } from 'user/users.entity';
 
 @Controller('api/events')
-@UseGuards(JwtAuthGuard, RolesGuard)
+// @UseGuards(JwtAuthGuard, RolesGuard)
 export class EventController {
     constructor(private readonly eventService: EventService) {}
 
