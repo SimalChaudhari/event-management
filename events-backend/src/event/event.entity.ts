@@ -1,6 +1,8 @@
 // src/entities/event.entity.ts
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { EventSpeaker } from './event-speaker.entity';
+import { Cart } from 'cart/cart.entity';
+import { OrderItemEntity } from 'order/event.item.entity';
 
 export enum EventType {
     Physical = 'Physical',
@@ -57,4 +59,12 @@ export class Event {
     
     @OneToMany(() => EventSpeaker, (eventSpeaker) => eventSpeaker.event)
     eventSpeakers!: EventSpeaker[];
+
+    @OneToMany(() => Cart, (cart) => cart.event) // Define the relationship
+    carts!: Cart[]; // Carts associated with the event
+    eventOrders: any;
+
+    @OneToMany(() => OrderItemEntity, (order) => order.event)
+    orderItem?: OrderItemEntity[];
+  
 }

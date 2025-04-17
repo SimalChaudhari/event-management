@@ -8,6 +8,8 @@ import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/users.module';
 import { EventModule } from 'event/event.module';
 import { SpeakerModule } from 'speaker/speaker.module';
+import { CartModule } from 'cart/cart.module';
+import { RegisterEventModule } from 'registerEvent/registerEvent.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // Load environment variables
@@ -26,7 +28,7 @@ import { SpeakerModule } from 'speaker/speaker.module';
     
   AuthModule,
   UserModule,
-  EventModule, SpeakerModule
+  EventModule, SpeakerModule,CartModule,RegisterEventModule
   ],
   controllers: [AppController],
   providers: [AppService],

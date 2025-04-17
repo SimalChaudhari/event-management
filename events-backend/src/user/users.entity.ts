@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Order } from 'order/order.entity';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 
 export enum UserRole {
     Admin = 'admin',
@@ -74,10 +75,16 @@ export class UserEntity {
     @Column({ nullable: true, type: 'timestamp' })
     otpExpiry?: Date; // Updated field
 
+    @Column({ nullable: true })
+    refreshToken?: string; // Add this field
+
     @CreateDateColumn({ type: 'timestamp' })
     createdAt!: Date;
 
     @UpdateDateColumn({ type: 'timestamp' })
     updatedAt!: Date;
+
+    @OneToMany(() => Order, (order) => order.user)
+    orders?: Order[];
 
 }

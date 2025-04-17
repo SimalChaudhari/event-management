@@ -1,3 +1,7 @@
+
+import { User } from 'users/users.entity';
+import { File as MulterFile } from 'multer';
+
 declare namespace Express {
     export interface Request {
         user?: {
@@ -10,3 +14,16 @@ declare namespace Express {
         }
     }
 } 
+
+
+declare global {
+    namespace Express {
+
+        interface Request {
+            user?: User; // Add the user property with the appropriate type
+        }
+    interface Multer {
+            File: MulterFile;
+          }
+    }
+}

@@ -35,13 +35,41 @@ export class AuthService {
     );
   }
 
-  private generateToken(user: UserEntity): string {
+  private generateAccessToken(user: UserEntity): string {
     try {
-      return this.jwtService.sign({
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-      });
+      return this.jwtService.sign(
+        {
+          sub: user.id,
+          id: user.id,
+          firstName: user.firstName, // Include firstName
+          lastName: user.lastName, // Include firstName
+          email: user.email,
+          role: user.role,
+          // type: 'access' // Add a type claim
+        },
+        { expiresIn: '15d', secret: process.env.JWT_SECRET } // Use a specific secret for access tokens
+  
+      ); // Access token expires in 15 minutes
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  private generateRefreshToken(user: UserEntity): string {
+    try {
+      return this.jwtService.sign(
+        {
+          sub: user.id,
+          id: user.id,
+          firstName: user.firstName, // Include firstName
+          lastName: user.lastName, // Include firstName
+          email: user.email,
+          role: user.role,
+          // type: 'refresh' // Add a type claim
+        },
+        { expiresIn: '15d', secret: process.env.REFRESH_TOKEN_SECRET } // Use a specific secret for refresh tokens
+ 
+      ); // Refresh token expires in 7 days
     } catch (error) {
       this.handleError(error);
     }
@@ -52,9 +80,7 @@ export class AuthService {
   }
 
   // Register a new user
-  async register(
-    userDto: UserDto,
-  ): Promise<{ message: string }> {
+  async register(userDto: UserDto): Promise<{ message: string }> {
     try {
       const existingUser = await this.userRepository.findOne({
         where: [{ email: userDto.email }],
@@ -91,7 +117,8 @@ export class AuthService {
       await this.emailService.sendOTP(userDto.email, otp);
 
       return {
-        message: 'Registration successful. Please verify your email with the OTP sent.', // Return only the message
+        message:
+          'Registration successful. Please verify your email with the OTP sent.', // Return only the message
       };
     } catch (error) {
       this.handleError(error);
@@ -99,9 +126,9 @@ export class AuthService {
   }
 
   // Login a user
-  async login(
-    userDto: UserDto,
-  ): Promise<{ message: string; user: Partial<UserEntity>; token: string }> {
+  async login(userDto: UserDto): Promise<{ message: string;  user: Partial<UserEntity> ;accessToken: string; refreshToken: string }> {
+ 
+    
     try {
       const user = await this.userRepository.findOne({
         where: { email: userDto.email },
@@ -129,7 +156,12 @@ export class AuthService {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      const token = this.generateToken(user);
+      const accessToken = this.generateAccessToken(user);
+      const refreshToken = this.generateRefreshToken(user);
+
+             // Save the refresh token in the database
+      user.refreshToken = refreshToken;
+      await this.userRepository.save(user);
 
       // Only return specific user fields
       const sanitizedUser = {
@@ -139,18 +171,46 @@ export class AuthService {
         email: user.email,
         mobile: user.mobile,
         isVerify: user.isVerify,
-
       };
 
       return {
         message: 'Login successful',
         user: sanitizedUser,
-        token: token,
+        accessToken,
+        refreshToken 
       };
     } catch (error) {
       this.handleError(error);
     }
   }
+
+// events-backend/src/auth/auth.service.ts
+
+async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+  try {
+      // Decode the refresh token to get the user ID
+      const payload = this.jwtService.verify(oldRefreshToken, { secret: process.env.REFRESH_TOKEN_SECRET });
+
+      // Find the user by ID and verify the refresh token
+      const user = await this.userRepository.findOne({ where: { id: payload.sub, refreshToken: oldRefreshToken } });
+
+      if (!user) {
+          throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Generate new tokens
+      const newAccessToken = this.generateAccessToken(user);
+      const newRefreshToken = this.generateRefreshToken(user);
+
+      // Update the refresh token in the database
+      user.refreshToken = newRefreshToken;
+      await this.userRepository.save(user);
+
+      return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+  } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+  }
+}
 
   // Verify OTP
   async verifyOtp(email: string, otp: string): Promise<{ message: string }> {
@@ -208,68 +268,72 @@ export class AuthService {
     }
   }
 
+  async resetOtp(
+    email: string,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email },
+      });
 
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
 
-async resetOtp(email: string): Promise<{ success: boolean; message: string }> {
-  try {
+      // Check if the account is already verified
+      if (user.isVerify) {
+        return {
+          success: false,
+          message: 'Account is already verified. No need to reset OTP.',
+        };
+      }
+
+      // Generate a new OTP
+      const otp = this.generateOTP();
+      user.otp = otp; // Store new OTP in user entity
+      user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // Set new OTP expiry time
+
+      await this.userRepository.save(user); // Save user with new OTP
+
+      // Send new OTP via email
+      await this.emailService.sendOTP(user.email, otp);
+
+      return {
+        success: true,
+        message: 'New OTP has been sent to your email.',
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async checkUserExists(email: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: Partial<UserEntity>;
+  }> {
     const user = await this.userRepository.findOne({
       where: { email },
     });
 
-    if (!user) {
-      throw new BadRequestException('User not found');
-    }
-
-    // Check if the account is already verified
-    if (user.isVerify) {
+    if (user) {
+      return {
+        success: true,
+        message: 'User exists.',
+        data: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+    } else {
       return {
         success: false,
-        message: 'Account is already verified. No need to reset OTP.',
+        message: 'User does not exist.',
       };
     }
-
-    // Generate a new OTP
-    const otp = this.generateOTP();
-    user.otp = otp; // Store new OTP in user entity
-    user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // Set new OTP expiry time
-
-    await this.userRepository.save(user); // Save user with new OTP
-
-    // Send new OTP via email
-    await this.emailService.sendOTP(user.email, otp);
-
-    return {
-      success: true,
-      message: 'New OTP has been sent to your email.',
-    };
-  } catch (error) {
-    this.handleError(error);
   }
-}
-
-async checkUserExists(email: string): Promise<{ success: boolean; message: string; data?:Partial<UserEntity> }> {
-  const user = await this.userRepository.findOne({
-    where: { email },
-  });
-
-  if (user) {
-    return {
-      success: true,
-      message: "User exists.",
-      data: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-    };
-  } else {
-    return {
-      success: false,
-      message: "User does not exist.",
-    };
-  }
-}
   async verifyOtpAndResetPassword(
     email: string,
     otp: string,

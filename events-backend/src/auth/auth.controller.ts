@@ -53,12 +53,39 @@ export class AuthController {
     @Res() response: Response,
     @Body() loginDto: UserDto,
   ) {
-    const result = await this.authService.login(loginDto);
-    return response.status(HttpStatus.OK).json({
-      message: result.message,
-      user: result.user,
-      token: result.token,
-    });
+    try {
+      const result = await this.authService.login(loginDto);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Login successful. Welcome back!',
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: 'Login failed. Please check your credentials and try again.',
+      });
+    }
+  }
+  
+  @Post('refresh-token')
+  async refreshToken(@Body('refreshToken') refreshToken: string, @Res() response: Response) {
+    try {
+      const tokens = await this.authService.refreshToken(refreshToken);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Token refreshed successfully.',
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+    } catch (error) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: 'Invalid refresh token. Please log in again.',
+      });
+    }
   }
 
 

@@ -16,6 +16,10 @@ export class JwtAuthGuard implements CanActivate {
 
         try {
             const decoded = this.jwtService.verify(token,{ secret: process.env.JWT_SECRET });
+              // Ensure the token is an access token by checking specific claims
+              if (!decoded || !decoded.sub || !decoded.email) {
+                throw new UnauthorizedException('Invalid access token');
+            }
             request.user = decoded;
             return true;
         } catch {
