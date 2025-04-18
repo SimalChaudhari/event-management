@@ -12,6 +12,8 @@ import { Event } from './event.entity';
 import { Between, Not } from 'typeorm';
 import { Speaker } from 'speaker/speaker.entity';
 import { EventSpeaker } from './event-speaker.entity';
+import path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class EventService {
@@ -156,6 +158,13 @@ export class EventService {
     
 }
 
+async getEventEntityById(id: string): Promise<Event> {
+  const event = await this.eventRepository.findOne({ where: { id } });
+  if (!event) throw new NotFoundException('Event not found!');
+  return event;
+}
+
+
   async getEventById(id: string) {
     const event = await this.eventRepository.createQueryBuilder('event')
         .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
@@ -163,7 +172,7 @@ export class EventService {
         .where('event.id = :id', { id })
         .getOne();
 
-    if (!event) throw new NotFoundException('Event not found');
+    if (!event) throw new NotFoundException('Event not found!');
 
     const { eventSpeakers, ...eventData } = event;
 
@@ -180,7 +189,7 @@ export class EventService {
     eventDto: Partial<EventDto>,
   ): Promise<Partial<Event>> {
     const event = await this.eventRepository.findOne({ where: { id } });
-    if (!event) throw new NotFoundException('Event not found');
+    if (!event) throw new NotFoundException('Event are not found!!');
 
     const existingEvent = await this.eventRepository.findOne({
       where: { name: eventDto.name, id: Not(id) },
@@ -244,6 +253,16 @@ export class EventService {
   async deleteEvent(id: string) {
     const event = await this.eventRepository.findOne({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
+
+          // Delete profile picture from filesystem if exists
+  if (event.image) {
+    const filePath = path.resolve(event.image);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+
     await this.eventRepository.remove(event);
     return { message: 'Event deleted successfully' };
   }
