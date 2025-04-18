@@ -10,7 +10,7 @@ import { EventModule } from 'event/event.module';
 import { SpeakerModule } from 'speaker/speaker.module';
 import { CartModule } from 'cart/cart.module';
 import { RegisterEventModule } from 'registerEvent/registerEvent.module';
-import { ServeStaticModule } from '@nestjs/serve-static';
+
 import { join } from 'path';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
@@ -27,10 +27,6 @@ console.log(join(__dirname, '..', 'uploads'))
       //     rejectUnauthorized: false,
       //   },
       // },
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
-      serveRoot: '/uploads',
     }),
     AuthModule,
     UserModule,

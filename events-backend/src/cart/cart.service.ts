@@ -24,37 +24,48 @@ export class CartService {
         return await this.cartRepository.save(cartEntry);
     }
 
-    async getAllCarts() {
-        const carts = await this.cartRepository.createQueryBuilder('cart')
-            .leftJoinAndSelect('cart.event', 'event') // Join with Event entity
-            .getMany();
+    async getUserCarts(userId: string) {
+        const carts = await this.cartRepository.find({ where: { userId } });
     
-        // Map over the carts to exclude userId and eventId
-        return carts.map(({ userId, eventId, ...cartDetails }) => ({
-            ...cartDetails, // Include all other cart details
-        }));
+        const enrichedCarts = await Promise.all(
+            carts.map(async (cart) => {
+                const event = await this.eventService.getEventById(cart.eventId);
+                const { userId, eventId, ...cartDetails } = cart;
+    
+                return {
+                    ...cartDetails,
+                    event,
+                };
+            })
+        );
+    
+        return enrichedCarts;
     }
+    
 
-    async getCartById(id: string) {
-        const cart = await this.cartRepository.findOne({ where: { id } });
+    async getCartById(id: string, userId: string) {
+        const cart = await this.cartRepository.findOne({ where: { id, userId } }); // Restrict by userId
         if (!cart) throw new NotFoundException('Cart not found');
+    
         const event = await this.eventService.getEventById(cart.eventId);
-        const { userId, eventId, ...cartDetails } = cart; // Destructure to exclude userId and eventId
-
-        
+        const { userId: _, eventId, ...cartDetails } = cart;
+    
         return {
             ...cartDetails,
-            event, // Include event details in the response
+            event,
         };
     }
+    
 
-    async deleteCart(id: string) {
-        const cart = await this.cartRepository.findOne({ where: { id } });
-        if (!cart) throw new NotFoundException('Cart not found');
+    async deleteCart(id: string, userId: string) {
+        const cart = await this.cartRepository.findOne({ where: { id, userId } }); // Only find if user is the owner
+        if (!cart) throw new NotFoundException('Cart not found or you are not authorized to delete this item');
+    
         await this.cartRepository.remove(cart);
         return {
             success: true,
             message: 'Cart item deleted successfully',
         };
     }
+    
 }
