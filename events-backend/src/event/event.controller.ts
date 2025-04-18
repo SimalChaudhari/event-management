@@ -34,13 +34,12 @@ export class EventController {
         @Res() response: Response
     ) {
         if (file) {
-            eventDto.image = file.path; // Store the file path in the event DTO
+            eventDto.image  = `uploads/event/${file.filename}`;
         }
-        const event = await this.eventService.createEvent(eventDto);
+         await this.eventService.createEvent(eventDto);
         return response.status(201).json({
             success: true,
             message: 'Event created successfully',
-            data: event,
         });
     }
 
@@ -83,7 +82,7 @@ export class EventController {
         @Res() response: Response
     ) {
         if (file) {
-            eventDto.image = file.path; // Store the file path in the update data
+            eventDto.image  = `uploads/event/${file.filename}`;
         }
         const updatedEvent = await this.eventService.updateEvent(id, eventDto);
         return response.status(200).json({

@@ -74,7 +74,8 @@ export class UserController {
       @Res() response: Response
     ) {
       if (file) {
-        updateData.profilePicture = file.path; // Store the file path in the update data
+        updateData.profilePicture = `uploads/images/${file.filename}`;
+
       }
       const result = await this.userService.update(id, updateData);
       return response.status(HttpStatus.OK).json({

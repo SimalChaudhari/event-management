@@ -28,9 +28,6 @@ export class CartController {
             });
         }
 
-       
-
-
         if (!cartDto.eventId) {
             return response.status(400).json({
                 success: false,
