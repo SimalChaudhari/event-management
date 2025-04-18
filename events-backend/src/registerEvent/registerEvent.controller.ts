@@ -19,13 +19,16 @@ export class RegisterEventController {
   }
   
   @Get('all')
-  async getAll() {
-    return this.registerEventService.findAll();
+  async getAll(@Req() req: Request) {
+    const userId = req.user.id;
+    return this.registerEventService.findAll(userId);
   }
   
   @Get(':id')
-  async getById(@Param('id') id: string) {
-    return this.registerEventService.findOne(id);
+  async getById(@Param('id') id: string, @Req() req: Request) {
+    const userId = req.user.id;
+    return this.registerEventService.findOne(id, userId);
   }
+  
 
 }

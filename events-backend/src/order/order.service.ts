@@ -1,5 +1,5 @@
 // events-backend/src/order/order.service.ts
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository } from 'typeorm';
 import { Order } from './order.entity';
@@ -8,6 +8,7 @@ import { UserEntity } from 'user/users.entity'; // Ensure this import is correct
 import { OrderItemEntity } from './event.item.entity';
 import { Event } from 'event/event.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { Cart } from 'cart/cart.entity';
 
 
 @Injectable()
@@ -20,6 +21,9 @@ export class OrderService {
 
         @InjectRepository(Event)
         private eventRepository: Repository<Event>,
+
+        @InjectRepository(Cart)
+        private cartRepository: Repository<Cart>,
 
         @InjectRepository(OrderItemEntity)
         private readonly orderItemRepository: Repository<OrderItemEntity>,
@@ -66,6 +70,24 @@ export class OrderService {
     
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
+
+           // Validate each event
+    for (const eventItem of event) {
+        const eventData = await this.eventRepository.findOne({ where: { id: eventItem.eventId } });
+        if (!eventData) {
+            throw new NotFoundException(`Event with ID ${eventItem.eventId} not found`);
+        }
+
+        // Check if this event is in the user's cart
+        const cartItem = await this.cartRepository.findOne({
+            where: { userId, eventId: eventItem.eventId },
+        });
+
+        if (!cartItem) {
+            throw new NotFoundException(`Event ID ${eventItem.eventId} is not in your cart`);
+        }
+    }
+    
     
         const orderNo = await this.generateUniqueOrderNumber();
     
@@ -130,54 +152,19 @@ export class OrderService {
         };
     }
     
-    
 
-    // async addItemToOrder(createEventOrderDto: CreateEventOrderDto): Promise<OrderItemEntity[]> {
-    //     const { orderId, event } = createEventOrderDto;
-
-    //     // Find the order by orderId and load relations for User and Address
-    //     const order = await this.orderRepository.findOne({
-    //         where: { id: orderId },
-    //         relations: ['user'],
-    //     });
-
-    //     if (!order) {
-    //         throw new NotFoundException('Order not found');
-    //     }
-
-    //     const savedOrderItems: OrderItemEntity[] = [];
-
-    //     // Loop through each product in the list and add them to the order
-    //     for (const productOrder of event) {
-    //         const { eventId } = productOrder;
-
-    //         // Find the product by eventId
-    //         const event = await this.eventRepository.findOne({ where: { id: eventId } });
-    //         if (!event) {
-    //             throw new NotFoundException(`event with ID ${eventId} not found`);
-    //         }
-
-    //         await this.eventRepository.save(event);  
-    //         // Create and save each OrderItem
-    //         const orderItem = this.orderItemRepository.create({
-    //             order,
-    //             event
-    //         });
-    //         const savedOrderItem = await this.orderItemRepository.save(orderItem);
-    //         savedOrderItems.push(savedOrderItem);
-    //     }
-     
-    //     return savedOrderItems;
-    // }
-
-
-    async getOrderById(orderId: string): Promise<any> {
+    async getOrderById(orderId: string, userId: string): Promise<any> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
             relations: ['user', 'orderItems', 'orderItems.event'],
         });
-    
+
+
         if (!order) throw new NotFoundException('Order not found');
+    
+        if (order.user.id !== userId) {
+            throw new ForbiddenException('You are not allowed to view this order');
+        }
     
         const orderItems = order.orderItems.map(item => ({
             id: item.id,
@@ -201,11 +188,11 @@ export class OrderService {
             orderItems,
         };
     }
-
-    async getAllOrders(): Promise<any[]> {
+    
+    async getAllOrders(userId: string): Promise<any[]> {
         const orders = await this.orderRepository.find({
+            where: { user: { id: userId } },
             relations: ['user', 'orderItems', 'orderItems.event'],
-            // order: { createdAt: 'DESC' }, // Optional: recent first
         });
     
         return orders.map(order => ({
@@ -228,19 +215,20 @@ export class OrderService {
             })),
         }));
     }
+    async deleteOrder(orderId: string, userId: string): Promise<void> {
+        const order = await this.orderRepository.findOne({
+            where: { id: orderId },
+            relations: ['user'],
+        });
     
+        if (!order) throw new NotFoundException('Order not found');
     
-
-    async updateOrder(id: string, orderData: Partial<Order>): Promise<Order> {
-        const order = await this.getOrderById(id);
-        Object.assign(order, orderData);
-        return await this.orderRepository.save(order);
-    }
-
-    async deleteOrder(id: string): Promise<void> {
-        const order = await this.getOrderById(id);
+        if (order.user.id !== userId) {
+            throw new ForbiddenException('You are not allowed to delete this order');
+        }
+    
         await this.orderRepository.remove(order);
     }
-
+        
 
 }

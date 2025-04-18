@@ -66,6 +66,7 @@ export class Event {
     carts!: Cart[]; // Carts associated with the event
     eventOrders: any;
 
+    
     @OneToMany(() => OrderItemEntity, (order) => order.event)
     orderItem?: OrderItemEntity[];
   

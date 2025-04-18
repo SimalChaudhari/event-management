@@ -76,6 +76,7 @@ export class CartController {
         const carts = await this.cartService.getUserCarts(userId);
         return response.status(200).json({
             success: true,
+            length: carts.length, // 👈 Add total cart items
             message: 'Carts retrieved successfully',
             data: carts,
         });

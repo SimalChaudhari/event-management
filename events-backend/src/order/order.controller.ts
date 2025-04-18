@@ -22,23 +22,23 @@ export class OrderController {
         return this.orderService.createOrderWithItems(userId, dto);
     }
     
-
-
-    // @Post('add-items')
-    // async addItemsToOrder(@Body() createEventOrderDto: CreateEventOrderDto): Promise<OrderItemEntity[]> {
-
-    //     return this.orderService.addItemToOrder(createEventOrderDto);
-    // }
-
     @Get()
-    async getAllOrders() {
-        return this.orderService.getAllOrders();
+    async getAllOrders(@Req() req: Request, @Res() response: Response) {
+        const userId = req.user.id;
+        const orders = await this.orderService.getAllOrders(userId);
+    
+        return response.status(200).json({
+            success: true,
+            message: 'Orders retrieved successfully',
+            length: orders.length, // 👈 total number of orders
+            data: orders,
+        });
     }
     
-
     @Get(':id')
-    async getOrderById(@Param('id') id: string, @Res() response: Response) {
-        const order = await this.orderService.getOrderById(id);
+    async getOrderById(@Param('id') id: string, @Req() req: Request, @Res() response: Response) {
+        const userId = req.user.id;
+        const order = await this.orderService.getOrderById(id, userId);
         return response.status(200).json({
             success: true,
             message: 'Order retrieved successfully',
@@ -46,22 +46,14 @@ export class OrderController {
         });
     }
 
-    @Put('update/:id')
-    async updateOrder(@Param('id') id: string, @Body() orderData: Partial<Order>, @Res() response: Response) {
-        const updatedOrder = await this.orderService.updateOrder(id, orderData);
-        return response.status(200).json({
-            success: true,
-            message: 'Order updated successfully',
-            data: updatedOrder,
-        });
-    }
-
     @Delete('delete/:id')
-    async deleteOrder(@Param('id') id: string, @Res() response: Response) {
-        await this.orderService.deleteOrder(id);
+    async deleteOrder(@Param('id') id: string, @Req() req: Request, @Res() response: Response) {
+        const userId = req.user.id;
+        await this.orderService.deleteOrder(id, userId);
         return response.status(200).json({
             success: true,
             message: 'Order deleted successfully',
         });
     }
+    
 }
