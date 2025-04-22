@@ -1,8 +1,11 @@
 //users.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { UserEntity } from './users.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
+
 
 @Injectable()
 export class UserService {
@@ -33,21 +36,42 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
+      // Delete profile picture from filesystem if exists
+  if (user.profilePicture) {
+    const filePath = path.resolve(user.profilePicture);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
     await this.userRepository.remove(user); 
     return { message: 'User deleted successfully' };
   }
 
-// src/user/users.service.ts
+
+
+
 async update(
   id: string,
   updateData: Partial<UserEntity>,
 ): Promise<Partial<UserEntity>> {
+
   const user = await this.userRepository.findOne({
     where: { id },
   });
   if (!user) {
     throw new NotFoundException('User not found or has been deleted');
   }
+
+    // Check if email is being updated and already exists for another user
+    if (updateData.email) {
+      const existingUser = await this.userRepository.findOne({
+        where: { email: updateData.email, id: Not(id) },
+      });
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
+    }
 
   // Remove sensitive fields from updateData
   const {

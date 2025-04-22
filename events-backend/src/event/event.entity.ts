@@ -56,6 +56,8 @@ export class Event {
 
     @UpdateDateColumn()
     updatedAt!: Date;
+
+    
     
     @OneToMany(() => EventSpeaker, (eventSpeaker) => eventSpeaker.event)
     eventSpeakers!: EventSpeaker[];
@@ -64,6 +66,7 @@ export class Event {
     carts!: Cart[]; // Carts associated with the event
     eventOrders: any;
 
+    
     @OneToMany(() => OrderItemEntity, (order) => order.event)
     orderItem?: OrderItemEntity[];
   

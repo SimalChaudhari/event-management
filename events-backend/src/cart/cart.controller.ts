@@ -28,9 +28,6 @@ export class CartController {
             });
         }
 
-       
-
-
         if (!cartDto.eventId) {
             return response.status(400).json({
                 success: false,
@@ -74,28 +71,34 @@ export class CartController {
     }
 
     @Get()
-    async getAllCarts(@Res() response: Response) {
-        const carts = await this.cartService.getAllCarts();
+    async getAllCarts(@Res() response: Response, @Request() req: any) {
+        const userId = req.user.id; // Get the current logged-in user's ID
+        const carts = await this.cartService.getUserCarts(userId);
         return response.status(200).json({
             success: true,
+            length: carts.length, // 👈 Add total cart items
             message: 'Carts retrieved successfully',
             data: carts,
         });
     }
 
     @Get(':id')
-    async getCartById(@Param('id') id: string, @Res() response: Response) {
-        const cart = await this.cartService.getCartById(id);
+    async getCartById(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
+        const userId = req.user.id;
+        const cart = await this.cartService.getCartById(id, userId);
         return response.status(200).json({
             success: true,
             message: 'Cart retrieved successfully',
             data: cart,
         });
     }
+    
 
     @Delete(':id')
-    async deleteCart(@Param('id') id: string, @Res() response: Response) {
-        const result = await this.cartService.deleteCart(id);
+    async deleteCart(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
+        const userId = req.user.id;
+        const result = await this.cartService.deleteCart(id, userId);
         return response.status(200).json(result);
     }
+    
 }

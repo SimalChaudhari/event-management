@@ -28,7 +28,7 @@ export class AuthController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (file) {
-      userDto.profilePicture = file.path; // Store the file path in the DTO
+      userDto.profilePicture = `uploads/images/${file.filename}`;
     }
     const result = await this.authService.register(userDto);
     return response.status(HttpStatus.OK).json({

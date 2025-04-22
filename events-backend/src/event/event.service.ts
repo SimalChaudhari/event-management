@@ -11,7 +11,9 @@ import { EventDto, EventType } from './event.dto';
 import { Event } from './event.entity';
 import { Between, Not } from 'typeorm';
 import { Speaker } from 'speaker/speaker.entity';
-import { EventResponse, EventSpeaker } from './event-speaker.entity';
+import { EventSpeaker } from './event-speaker.entity';
+import path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class EventService {
@@ -145,77 +147,40 @@ export class EventService {
 
     const events = await queryBuilder.getMany();
 
-    // Map the response to include only necessary details
     return events.map(event => {
-        // Get the first speaker if available
-        const speakersData = event.eventSpeakers.map(eventSpeaker => ({
-          id: eventSpeaker.speaker.id,
-          name: eventSpeaker.speaker.name,
-          companyName: eventSpeaker.speaker.companyName,
-          position: eventSpeaker.speaker.position
-      }));
-
-        return {
-            id: event.id,
-            name: event.name,
-            description: event.description,
-            startDate: event.startDate,
-            startTime: event.startTime,
-            endDate: event.endDate,
-            endTime: event.endTime,
-            location: event.location,
-            country: event.country,
-            image: event.image,
-            type: event.type,
-            price: event.price,
-            currency: event.currency,
-            createdAt:event.createdAt,
-            updatedAt:event.updatedAt,
-            speakersData
-        };
+      const { eventSpeakers, ...eventData } = event;
+    
+      return {
+        ...eventData,
+        speakersData: eventSpeakers.map(es => es.speaker),
+      };
     });
+    
 }
 
-  // async getEventById(id: string): Promise<Event> {
-  //   const event = await this.eventRepository.findOne({ where: { id } });
-  //   if (!event) throw new NotFoundException('Event not found');
-  //   return event;
-  // }
+async getEventEntityById(id: string): Promise<Event> {
+  const event = await this.eventRepository.findOne({ where: { id } });
+  if (!event) throw new NotFoundException('Event not found!');
+  return event;
+}
 
-  async getEventById(id: string): Promise<EventResponse> {
+
+  async getEventById(id: string) {
     const event = await this.eventRepository.createQueryBuilder('event')
         .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
         .leftJoinAndSelect('eventSpeaker.speaker', 'speaker') // Join with Speaker entity
         .where('event.id = :id', { id })
         .getOne();
 
-    if (!event) throw new NotFoundException('Event not found');
+    if (!event) throw new NotFoundException('Event not found!');
 
-    const speakers = event.eventSpeakers.map(eventSpeaker => ({
-      id: eventSpeaker.speaker.id,
-      name: eventSpeaker.speaker.name,
-      companyName: eventSpeaker.speaker.companyName,
-      position: eventSpeaker.speaker.position
-  }));
+    const { eventSpeakers, ...eventData } = event;
 
     return {
-        id: event.id,
-        name: event.name,
-        description: event.description,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        endDate: event.endDate,
-        endTime: event.endTime,
-        location: event.location,
-        country: event.country,
-        image: event.image,
-        type: event.type,
-        price: event.price,
-        currency: event.currency,
-        createdAt:event.createdAt,
-        updatedAt:event.updatedAt,
-        speakers // Return the array of speakers
+      ...eventData,
+      speakers: eventSpeakers.map(es => es.speaker),
     };
+    
 }
 
 
@@ -224,7 +189,7 @@ export class EventService {
     eventDto: Partial<EventDto>,
   ): Promise<Partial<Event>> {
     const event = await this.eventRepository.findOne({ where: { id } });
-    if (!event) throw new NotFoundException('Event not found');
+    if (!event) throw new NotFoundException('Event are not found!!');
 
     const existingEvent = await this.eventRepository.findOne({
       where: { name: eventDto.name, id: Not(id) },
@@ -279,23 +244,6 @@ export class EventService {
         );
     }
 
-    // Handle speaker associations
-    // if (eventDto.speakerIds) {
-    //   // Clear existing associations
-    //   await this.eventSpeakerRepository.delete({ event: { id } });
-
-    //   const speakers = await this.speakerRepository.findByIds(
-    //     eventDto.speakerIds,
-    //   );
-    //   await Promise.all(
-    //     speakers.map(async (speaker) => {
-    //       const eventSpeaker = new EventSpeaker();
-    //       eventSpeaker.event = event;
-    //       eventSpeaker.speaker = speaker;
-    //       await this.eventSpeakerRepository.save(eventSpeaker);
-    //     }),
-    //   );
-    // }
 
     Object.assign(event, eventDto);
     const updatedEvent = await this.eventRepository.save(event);
@@ -305,6 +253,16 @@ export class EventService {
   async deleteEvent(id: string) {
     const event = await this.eventRepository.findOne({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
+
+          // Delete profile picture from filesystem if exists
+  if (event.image) {
+    const filePath = path.resolve(event.image);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+
     await this.eventRepository.remove(event);
     return { message: 'Event deleted successfully' };
   }
