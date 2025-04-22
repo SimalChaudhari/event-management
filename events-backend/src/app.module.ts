@@ -10,6 +10,7 @@ import { EventModule } from 'event/event.module';
 import { SpeakerModule } from 'speaker/speaker.module';
 import { CartModule } from 'cart/cart.module';
 import { RegisterEventModule } from 'registerEvent/registerEvent.module';
+import { CountriesModule } from './countries/countries.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 console.log(join(__dirname, '..', 'uploads'))
@@ -34,7 +35,7 @@ console.log(join(__dirname, '..', 'uploads'))
     }),
     AuthModule,
     UserModule,
-    EventModule, SpeakerModule, CartModule, RegisterEventModule
+    EventModule, SpeakerModule, CartModule, RegisterEventModule, CountriesModule
   ],
   controllers: [AppController],
   providers: [AppService],
