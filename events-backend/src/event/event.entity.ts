@@ -37,7 +37,7 @@ export class Event {
     location?: string;
 
     @Column({ type: 'varchar', nullable: true })
-    venues?: string;
+    venue?: string;
     
     @Column({ type: 'varchar', nullable: true })
     country?: string;

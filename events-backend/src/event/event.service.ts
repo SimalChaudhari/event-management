@@ -99,7 +99,7 @@ export class EventService {
     type?: EventType;
     price?: number;
     location?: string;
-    venues?: string;
+    venue?: string;
     upcoming?: boolean; // New filter for upcoming events
   }) {
     const queryBuilder = this.eventRepository.createQueryBuilder('event')
@@ -109,10 +109,11 @@ export class EventService {
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase();
       queryBuilder.where(
-        'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword',
+        'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword',
         { keyword: `%${keyword}%` },
       );
     }
+    
     
 
     if (filters.startDate) {
@@ -141,9 +142,9 @@ export class EventService {
       });
     }
 
-    if (filters.venues) {
-      queryBuilder.andWhere('event.venues = :venues', {
-        venues: filters.venues,
+    if (filters.venue) {
+      queryBuilder.andWhere('event.venue = :venue', {
+        venue: filters.venue,
       });
     }
     // Filter for upcoming events
