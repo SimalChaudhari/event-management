@@ -37,6 +37,9 @@ export class Event {
     location?: string;
 
     @Column({ type: 'varchar', nullable: true })
+    venues?: string;
+    
+    @Column({ type: 'varchar', nullable: true })
     country?: string;
 
     @Column({ type: 'varchar', nullable: true })

@@ -47,6 +47,10 @@ export class EventDto {
 
     @IsOptional()
     @IsString()
+    venues?: string;
+
+    @IsOptional()
+    @IsString()
     country?: string;
 
     @IsOptional()

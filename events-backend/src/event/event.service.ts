@@ -99,19 +99,21 @@ export class EventService {
     type?: EventType;
     price?: number;
     location?: string;
+    venues?: string;
     upcoming?: boolean; // New filter for upcoming events
   }) {
     const queryBuilder = this.eventRepository.createQueryBuilder('event')
     .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
     .leftJoinAndSelect('eventSpeaker.speaker', 'speaker'); // Join with Speaker entity
 
-
     if (filters.keyword) {
+      const keyword = filters.keyword.toLowerCase();
       queryBuilder.where(
-        'event.name LIKE :keyword OR event.description LIKE :keyword',
-        { keyword: `%${filters.keyword}%` },
+        'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword',
+        { keyword: `%${keyword}%` },
       );
     }
+    
 
     if (filters.startDate) {
       queryBuilder.andWhere('event.startDate >= :startDate', {
@@ -139,6 +141,11 @@ export class EventService {
       });
     }
 
+    if (filters.venues) {
+      queryBuilder.andWhere('event.venues = :venues', {
+        venues: filters.venues,
+      });
+    }
     // Filter for upcoming events
     if (filters.upcoming) {
       const today = new Date();
