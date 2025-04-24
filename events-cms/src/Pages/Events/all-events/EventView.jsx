@@ -14,6 +14,7 @@ import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import AddEventModal from './components/AddEventModal';
 import ViewEventModal from './components/ViewEventModal';
+import { API_URL, DUMMY_PATH } from '../../../configs/env';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
@@ -59,6 +60,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                 data: 'name',
                 title: 'Event Name',
                 render: function (data, type, row) {
+                    const imageUrl = DUMMY_PATH;
                     const eventDate = new Date(row.startDate);
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
@@ -89,14 +91,17 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
 
                     return `
                         <div class="d-inline-block align-middle">
-                            <h6 class="m-b-0">${row.name}</h6>
+                         <img src="${row.image ? `${API_URL}/${row.image}` : imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                              <div class="d-inline-block">
                             <p class="m-b-0">
-                                <span class="badge ${badgeClass}">
-                                    ${eventDate.getDate()} ${monthNames[eventDate.getMonth()]} ${eventDate.getFullYear()}
-                                    <span class="ml-1">${statusText}</span>
-                                </span>
+                                 <h6>${row.name}</h6>
+                                    <span class="badge ${badgeClass}">
+                                       ${eventDate.getDate()} ${monthNames[eventDate.getMonth()]} ${eventDate.getFullYear()}
+                                        <span class="ml-1">${statusText}</span>
+                                    </span>
                             </p>
-                        </div>
+                               </div>
+                        </div>   
                     `;
                 }
             },
@@ -108,14 +113,21 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                     return `${row.currency} ${parseFloat(data).toFixed(2)}`;
                 }
             },
-            { data: 'location', title: 'Location' },
             {
-                data: 'description',
-                title: 'Description',
-                render: function (data) {
-                    return `<div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${data}
-                    </div>`;
+                data: 'location',
+                title: 'Location / Venue / Country',
+                render: function (data, type, row) {
+                    return `
+                        <div class="d-inline-block align-middle">
+                            <h6 class="m-b-5">${row.location || 'N/A'}</h6>
+                            <p class="m-b-0">
+                                <span class="badge badge-success">
+                                    <i class="feather icon-map-pin mr-1"></i>
+                                    ${row.venue || 'N/A'}, ${row.country || 'N/A'}
+                                </span>
+                            </p>
+                        </div>
+                    `;
                 }
             },
             {
@@ -231,8 +243,8 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
             `;
 
             $('.date-filter-wrapper').html(dateFilterHtml);
-                  // Setup date filter after table is initialized
-                  setupDateFilter(this.api());
+            // Setup date filter after table is initialized
+            setupDateFilter(this.api());
 
             // Add button initialization
             if (!$('#addEventBtn').length) {
@@ -245,35 +257,34 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
 
                 $('#addEventBtn').on('click', handleAddEvent);
             }
-        },
-    })
-       
-  // Restore the page
-  $(tableZero).DataTable().page(currentPage).draw(false);
+        }
+    });
 
-  // Attach event listeners for actions
-  $(document).on('click', '.btn-icon', function () {
-      const eventId = $(this).data('id');
-      const dataEvent = data.find((user) => user.id === eventId);
-      if (dataEvent) {
-        handleView(dataEvent);
-      }
-  });
+    // Restore the page
+    $(tableZero).DataTable().page(currentPage).draw(false);
 
-  $(document).on('click', '.edit-btn', function () {
-      const eventId = $(this).data('id');
-      const dataEvent = data.find((user) => user.id === eventId);
-      if (dataEvent) {
-          handleEdit(dataEvent);
-      }
-  });
+    // Attach event listeners for actions
+    $(document).on('click', '.btn-icon', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((user) => user.id === eventId);
+        if (dataEvent) {
+            handleView(dataEvent);
+        }
+    });
 
-  $(document).on('click', '.delete-btn', function () {
-      const eventId = $(this).data('id');
-      handleDelete(eventId);
-  });
+    $(document).on('click', '.edit-btn', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((user) => user.id === eventId);
+        if (dataEvent) {
+            handleEdit(dataEvent);
+        }
+    });
+
+    $(document).on('click', '.delete-btn', function () {
+        const eventId = $(this).data('id');
+        handleDelete(eventId);
+    });
 }
-
 
 const EventView = () => {
     const dispatch = useDispatch();
@@ -373,18 +384,13 @@ const EventView = () => {
     const handleCloseModal = () => {
         setShowModal(false);
     };
-    
+
     return (
         <>
             <AddEventModal show={showModal} handleClose={handleCloseModal} editData={editData} />
             <ViewEventModal show={showViewModal} handleClose={() => setShowViewModal(false)} eventData={viewData} />
 
-            <DeleteConfirmationModal
-                show={showDeleteModal}
-                onHide={handleClose}
-                onConfirm={handleConfirmDelete}
-                isLoading={isDeleting}
-            />
+            <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">
@@ -396,7 +402,6 @@ const EventView = () => {
                                         <th>Type</th>
                                         <th>Price</th>
                                         <th>Location</th>
-                                        <th>Description</th>
                                         <th>Start</th>
                                         <th>End</th>
                                         <th>Duration</th>

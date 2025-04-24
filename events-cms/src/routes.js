@@ -12,10 +12,6 @@ const TourismList = React.lazy(() => import('./Pages/Settings/Tourism/TourismVie
 const ProfileList = React.lazy(() => import('./Pages/Settings/Profile/Profile.js'));
 const UsersList = React.lazy(() => import('./Pages/Users/UserList.jsx'));
 
-
-
-
-
 const OtherSamplePage = React.lazy(() => import('./Demo/Other/SamplePage'));
 const routes = [
     { path: '/dashboard', exact: true, name: 'Analytics', component: DashboardDefault },

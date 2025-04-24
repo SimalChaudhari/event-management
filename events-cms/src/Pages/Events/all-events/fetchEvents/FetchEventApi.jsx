@@ -1,5 +1,5 @@
 import { useDispatch } from 'react-redux';
-import { eventList,eventDelete } from '../../../../store/actions/eventActions';
+import { eventList,eventDelete, upcomingEventList } from '../../../../store/actions/eventActions';
 
 
 export const FetchEventData = () => {
@@ -7,6 +7,8 @@ export const FetchEventData = () => {
 
   const fetchEvent = async () => {
     await dispatch(eventList());
+    await dispatch(upcomingEventList());
+
   };
 
   const deleteEventData = async (id) => {

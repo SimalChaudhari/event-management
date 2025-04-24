@@ -1,9 +1,11 @@
-import { EVENT_LIST, PARTICIPATED_EVENTS } from "../constants/actionTypes";
+import { EVENT_LIST, PARTICIPATED_EVENTS,UPCOMING_EVENT_LIST } from "../constants/actionTypes";
 
 const initialState = {
     event: [],
     eventByID: '',
-    participatedEvents: []
+    participatedEvents: []  ,
+    upcomingEvents: []
+ 
 };
 const eventReducer = (state = initialState, { type, payload } = {}) => {
     switch (type) {
@@ -16,6 +18,11 @@ const eventReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 participatedEvents: payload
+            };
+        case UPCOMING_EVENT_LIST:
+            return {
+                ...state,
+                upcomingEvents: payload
             };
         default:
             return state;

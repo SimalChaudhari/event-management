@@ -7,7 +7,7 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector } from 'react-redux';
 import * as $ from 'jquery';
-import { DUMMY_PATH } from '../../configs/env';
+import {  API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import AddUserModal from './components/AddUserModal';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
@@ -65,11 +65,11 @@ function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleView
                 data: 'profilePicture',
                 render: function (data, type, row) {
                     // const imageUrl = row.profilePicture || DUMMY_PATH;
-                    const imageUrl = DUMMY_PATH;
+                    const imageUrl = DUMMY_PATH_USER;
 
                     return `
                             <div class="d-inline-block align-middle">
-                                <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                                <img src="${row.profilePicture ? `${API_URL}/${row.profilePicture}` : imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
                                   <div class="d-inline-block">
                                     <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
                                     <p class="m-b-0">${row.email}</p>
@@ -209,7 +209,7 @@ const UserList = () => {
 
     useEffect(() => {
         if (user.length) {
-            atable(user, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser); // Pass handleAddUser to atable
+            atable(user.data, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser); // Pass handleAddUser to atable
         }
     }, [user, handleAddUser]); // Add handleAddUser to dependencies
 

@@ -5,6 +5,11 @@ export enum Type {
   Exhibitor = 'Exhibitor',
 }
 
+export enum Status {
+  // Pending = 'Pending',
+  Sucesss = 'Sucesss',
+  Withdraw = 'Withdraw',
+}
 
 export class CreateRegisterEventDto {
   @IsUUID()
@@ -23,5 +28,9 @@ export class CreateRegisterEventDto {
   @IsOptional()
   @IsUUID()
   orderId?: string;
+
+  @IsOptional()
+  @IsEnum(Status)
+  status: Status = Status.Sucesss;
 
 }

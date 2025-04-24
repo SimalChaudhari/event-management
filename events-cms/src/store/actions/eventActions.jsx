@@ -1,6 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import {  EVENT_LIST, PARTICIPATED_EVENTS } from "../constants/actionTypes";
+import {  EVENT_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from "../constants/actionTypes";
 
 export const eventList = () => async (dispatch) => {
     try {
@@ -17,6 +17,23 @@ export const eventList = () => async (dispatch) => {
     }
     return false; // Return false for any errors
 };
+
+export const upcomingEventList = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/events?upcoming=true');
+        dispatch({
+            type: UPCOMING_EVENT_LIST,
+            payload: response.data, // Assuming response contains the customers data
+        });
+        return true;
+    } catch (error) {
+        // Check if error response exists and handle error message
+        const errorMessage = error?.response?.data?.message || 'An unexpected error occurred. Please try again.';
+        toast.error(errorMessage);
+    }
+    return false; // Return false for any errors
+};
+
 
 export const createEvent = (data) => async (dispatch) => {
     try {
@@ -58,7 +75,7 @@ export const editEvent = (id, data) => async (dispatch) => {
 
 export const participatedEvents = () => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/register-events/get');
+        const response = await axiosInstance.get('/register-events/all');
         dispatch({
             type: PARTICIPATED_EVENTS,
             payload: response.data,
@@ -71,6 +88,7 @@ export const participatedEvents = () => async (dispatch) => {
     }
     return false; // Return false for any errors
 };
+
 
 
 

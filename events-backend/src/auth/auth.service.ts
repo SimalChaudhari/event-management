@@ -370,4 +370,55 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       this.handleError(error);
     }
   }
+
+  // admin
+  async adminLogin(userDto: UserDto): Promise<{ message: string; user: Partial<UserEntity>; accessToken: string; refreshToken: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email: userDto.email },
+      });
+  
+      if (!user || user.role !== 'admin') {  // Check if user is an admin
+        throw new UnauthorizedException('Invalid admin credentials');
+      }
+      if (!user.isVerify) {
+        throw new UnauthorizedException('User is not verified. Please verify your email.');
+      }
+  
+      if (!userDto.password) {
+        throw new BadRequestException('Password is required');
+      }
+  
+      const isPasswordValid = await bcrypt.compare(userDto.password, user.password);
+  
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+  
+      const accessToken = this.generateAccessToken(user);
+      const refreshToken = this.generateRefreshToken(user);
+  
+      user.refreshToken = refreshToken;
+      await this.userRepository.save(user);
+  
+      const sanitizedUser = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        mobile: user.mobile,
+        isVerify: user.isVerify,
+      };
+  
+      return {
+        message: 'Admin login successful',
+        user: sanitizedUser,
+        accessToken,
+        refreshToken
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+  
 }

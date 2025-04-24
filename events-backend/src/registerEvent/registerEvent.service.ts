@@ -65,59 +65,79 @@ export class RegisterEventService {
     return await this.registerEventRepository.save(registerEvent);
   }
 
-  async findAll(userId: string) {
-    const registerEvents = await this.registerEventRepository.find({
-      where: { user: { id: userId } },
-      relations: [
-        'user',
-        'event',
-        'event.eventSpeakers',
-        'event.eventSpeakers.speaker',
-        'order',
-      ],
-    });
-
-    if (!registerEvents || registerEvents.length === 0) {
-      throw new NotFoundException('No registered events found for this user');
+  async findAll(userId: string, role: string) {
+    let registerEvents;
+  
+    if (role === 'admin') {
+      // 🧑‍💼 Admin can see all register events
+      registerEvents = await this.registerEventRepository.find({
+        relations: [
+          'user',
+          'event',
+          'event.eventSpeakers',
+          'event.eventSpeakers.speaker',
+          'order',
+        ],
+      });
+    } else {
+      // 👤 Normal user can only see their own registered events
+      registerEvents = await this.registerEventRepository.find({
+        where: { user: { id: userId } },
+        relations: [
+          'user',
+          'event',
+          'event.eventSpeakers',
+          'event.eventSpeakers.speaker',
+          'order',
+        ],
+      });
     }
-
+  
+    if (!registerEvents || registerEvents.length === 0) {
+      throw new NotFoundException('No registered events found');
+    }
+  
     const cleanedData = registerEvents.map((registerEvent) => {
       const speakers =
         registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
-
+  
       const { eventSpeakers, ...restEvent } = registerEvent.event || {};
       const event = {
         ...restEvent,
         speakers,
       };
-
+  
       const { firstName, lastName, email, mobile } = registerEvent.user || {};
       const cleanedUser = { firstName, lastName, email, mobile };
-
+  
       const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
-
+  
       return {
         ...cleanRegisterEvent,
         event,
         user: cleanedUser,
       };
     });
-
+  
     return {
       success: true,
-      message: 'All registered events fetched successfully',
-      count: cleanedData.length, // 👈 add total count
+      message:
+        role === 'admin'
+          ? 'All registered events fetched for admin'
+          : 'Your registered events fetched successfully',
+      count: cleanedData.length,
       data: cleanedData,
     };
   }
+  
 
-  async findOne(id: string, userId: string) {
+  async findOne(id: string, userId: string,role:string) {
     // Query to find the specific register event, ensuring it belongs to the current user
     const registerEvent = await this.registerEventRepository.findOne({
-      where: {
-        id, // Event ID
-        user: { id: userId }, // Ensures the event belongs to the authenticated user
-      },
+      where:
+      role === 'admin'
+        ? { id } // 🧑‍💼 Admin can fetch any
+        : { id, user: { id: userId } }, // 👤 User can fetch only their own
       relations: [
         'user',
         'event',

@@ -255,8 +255,32 @@ async getEventEntityById(id: string): Promise<Event> {
 
     Object.assign(event, eventDto);
     const updatedEvent = await this.eventRepository.save(event);
-    return updatedEvent;
-  }
+// First, delete all existing speaker associations
+await this.eventSpeakerRepository.delete({ eventId: id });
+
+// Then create new associations if speakerIds are provided
+if (eventDto.speakerIds) {
+  const speakerIdsArray = eventDto.speakerIds.split(',');
+  await Promise.all(
+    speakerIdsArray.map(async (speakerId) => {
+      const speakerExists = await this.speakerRepository.findOne({ 
+        where: { id: speakerId } 
+      });
+
+      if (!speakerExists) {
+        throw new BadRequestException('Invalid speaker ID');
+      }
+
+      const eventSpeaker = new EventSpeaker();
+      eventSpeaker.eventId = id;
+      eventSpeaker.speakerId = speakerId;
+      await this.eventSpeakerRepository.save(eventSpeaker);
+    })
+  );
+}
+
+return updatedEvent;
+}
 
   async deleteEvent(id: string) {
     const event = await this.eventRepository.findOne({ where: { id } });

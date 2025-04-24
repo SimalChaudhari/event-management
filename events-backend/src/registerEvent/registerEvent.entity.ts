@@ -1,7 +1,15 @@
 import { Event } from 'event/event.entity';
 import { Order } from 'order/order.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { UserEntity } from 'user/users.entity';
+import { Status } from './registerEvent.dto';
 
 @Entity('registerEvents')
 export class RegisterEvent {
@@ -26,7 +34,11 @@ export class RegisterEvent {
   @JoinColumn({ name: 'orderId' })
   order?: Order;
 
-  @Column({ type: 'enum', enum: ['Attendee', 'Exhibitor'], default: 'Attendee' })
+  @Column({
+    type: 'enum',
+    enum: ['Attendee', 'Exhibitor'],
+    default: 'Attendee',
+  })
   type?: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -35,9 +47,13 @@ export class RegisterEvent {
   @Column({ type: 'uuid', nullable: true })
   orderId?: string;
 
+  @Column({ 
+    type: 'enum', 
+    enum: Status, 
+    default: Status.Sucesss 
+  })
+  status?: Status;
+
   @CreateDateColumn()
   createdAt!: Date;
-
-
 }
-

@@ -1,5 +1,16 @@
 // src/auth/auth.controller.ts
-import { Controller, Post, Body, Res, HttpStatus, HttpCode, UseInterceptors, UploadedFile, Query, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  HttpStatus,
+  HttpCode,
+  UseInterceptors,
+  UploadedFile,
+  Query,
+  Get,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserDto } from './../user/users.dto';
 import { Response } from 'express';
@@ -13,18 +24,20 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @UseInterceptors(FileInterceptor('profilePicture', {
-    storage: diskStorage({
-      destination: './uploads/images', // Directory to save the uploaded files
-      filename: (req, file, cb) => {
-        const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
-        cb(null, uniqueSuffix);
-      },
+  @UseInterceptors(
+    FileInterceptor('profilePicture', {
+      storage: diskStorage({
+        destination: './uploads/images', // Directory to save the uploaded files
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
+          cb(null, uniqueSuffix);
+        },
+      }),
     }),
-  }))
+  )
   async register(
-    @Res() response: Response, 
-    @Body() userDto: UserDto, 
+    @Res() response: Response,
+    @Body() userDto: UserDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (file) {
@@ -32,9 +45,8 @@ export class AuthController {
     }
     const result = await this.authService.register(userDto);
     return response.status(HttpStatus.OK).json({
-      message: result.message
+      message: result.message,
     });
-  
   }
 
   @Post('verify-otp')
@@ -49,10 +61,7 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(
-    @Res() response: Response,
-    @Body() loginDto: UserDto,
-  ) {
+  async login(@Res() response: Response, @Body() loginDto: UserDto) {
     try {
       const result = await this.authService.login(loginDto);
       return response.status(HttpStatus.OK).json({
@@ -69,9 +78,32 @@ export class AuthController {
       });
     }
   }
-  
+
+  @Post('admin')
+  async adminLogin(@Res() response: Response, @Body() loginDto: UserDto) {
+    try {
+      const result = await this.authService.adminLogin(loginDto); // Call the admin login method
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Admin login successful. Welcome back!',
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message:
+          'Admin login failed. Please check your credentials and try again.',
+      });
+    }
+  }
+
   @Post('refresh-token')
-  async refreshToken(@Body('refreshToken') refreshToken: string, @Res() response: Response) {
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Res() response: Response,
+  ) {
     try {
       const tokens = await this.authService.refreshToken(refreshToken);
       return response.status(HttpStatus.OK).json({
@@ -88,12 +120,8 @@ export class AuthController {
     }
   }
 
-
   @Post('resend-otp')
-  async resetOtp(
-    @Body() body: { email: string },
-    @Res() response: Response,
-  ) {
+  async resetOtp(@Body() body: { email: string }, @Res() response: Response) {
     if (!body.email) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
@@ -107,17 +135,12 @@ export class AuthController {
 
   @Post('forgot')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(
-    @Body('email') email: string
-  ) {
+  async forgotPassword(@Body('email') email: string) {
     return this.authService.forgotPassword(email);
   }
 
   @Get('check-user')
-  async checkUser(
-    @Query('email') email: string,
-    @Res() response: Response,
-  ) {
+  async checkUser(@Query('email') email: string, @Res() response: Response) {
     if (!email) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
@@ -132,12 +155,12 @@ export class AuthController {
   @Post('reset')
   @HttpCode(HttpStatus.OK)
   async resetPassword(
-    @Body() body: { email: string; otp: string; newPassword: string }
+    @Body() body: { email: string; otp: string; newPassword: string },
   ) {
     return this.authService.verifyOtpAndResetPassword(
       body.email,
       body.otp,
-      body.newPassword
+      body.newPassword,
     );
   }
 }
