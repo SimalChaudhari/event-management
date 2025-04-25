@@ -1,6 +1,6 @@
 //users.service.ts
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserEntity } from './users.entity';
+import { UserEntity, UserRole } from './users.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import * as fs from 'fs';
@@ -14,8 +14,9 @@ export class UserService {
     private userRepository: Repository<UserEntity>,
   ) {}
 
-  async getAll(): Promise<Partial<UserEntity>[]> {
-    const users = await this.userRepository.find();
+  async getAll(role?: UserRole): Promise<Partial<UserEntity>[]> {
+    const where = role ? { role } : {};
+    const users = await this.userRepository.find({ where });
     return users.map(({ password, ...rest }) => rest);
   }
   async getById(id: string): Promise<Partial<UserEntity>> {

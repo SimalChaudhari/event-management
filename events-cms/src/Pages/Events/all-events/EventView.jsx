@@ -58,7 +58,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
         columns: [
             {
                 data: 'name',
-                title: 'Event Name',
+              
                 render: function (data, type, row) {
                     const imageUrl = DUMMY_PATH;
                     const eventDate = new Date(row.startDate);
@@ -104,8 +104,21 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                         </div>   
                     `;
                 }
+            },    
+            {
+                data: 'type',
+                title: 'User Type',
+                render: function (data, type, row) {
+                    let bgColor = '';
+                    if (row.type?.toLowerCase() === 'physical') {
+                        bgColor = 'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                    } else if (row.type?.toLowerCase() === 'virtual') {
+                        bgColor = 'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                    }
+                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${row.type || 'N/A'}</span></div>`;
+                }
             },
-            { data: 'type', title: 'Type' },
+
             {
                 data: 'price',
                 title: 'Price',
@@ -398,7 +411,7 @@ const EventView = () => {
                             <Table striped hover responsive id="data-table-zero">
                                 <thead>
                                     <tr>
-                                        <th>Event Name</th>
+                                        <th>Event Name / Image / Date</th>
                                         <th>Type</th>
                                         <th>Price</th>
                                         <th>Location</th>

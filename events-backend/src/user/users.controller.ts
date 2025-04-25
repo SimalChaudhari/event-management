@@ -34,7 +34,7 @@ export class UserController {
   @Get('')
   @Roles(UserRole.Admin)
   async getAllUsers(@Res() response: Response) {
-    const users = await this.userService.getAll();
+    const users = await this.userService.getAll(UserRole.User);
     return response.status(HttpStatus.OK).json({
       message: 'User details retrieved successfully',
       length: users.length,

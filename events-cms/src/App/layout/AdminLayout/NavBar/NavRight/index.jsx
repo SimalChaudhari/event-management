@@ -2,16 +2,25 @@ import * as React from 'react';
 import { Dropdown } from 'react-bootstrap';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import DEMO from '../../../../../store/constant';
-import Avatar1 from '../../../../../assets/images/user/avatar-1.jpg';
+import avatar5 from '../../../../../assets/images/user/avatar-5.jpg';
 import Avatar2 from '../../../../../assets/images/user/avatar-2.jpg';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../../../../store/actions/authActions';
-import { useDispatch } from 'react-redux';
-const NavRight = (props) => {
+import { useDispatch, useSelector } from 'react-redux';
+import { API_URL } from '../../../../../configs/env';
 
+
+const NavRight = (props) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const user = useSelector((state) => state.auth.authUser);
+    const profilePicPath = user.profilePicture ? `${API_URL}/${user.profilePicture}` : avatar5;
+    const fullName = `${user.firstName} ${user.lastName}`;
 
+
+    // Add state to control dropdown visibility
+    const [showDropdown, setShowDropdown] = React.useState(false);
+    
     const handleLogout = async (e) => {
         e.preventDefault();
         const result = await dispatch(logout());
@@ -19,134 +28,59 @@ const NavRight = (props) => {
             navigate('/auth/signin-1');
         }
     };
+    const handleProfile = async (e,tab) => {
+        e.preventDefault();
+        setShowDropdown(false); // Close dropdown
+        if (tab) {
+            navigate(`/profile?tab=${tab}`);
+        } else {
+            navigate('/profile');
+        }
+    };
 
-
-    return (<>
+    const handleSettings = async (e,tab) => {
+        e.preventDefault();
+        setShowDropdown(false); // Close dropdown
+        if (tab) {
+            navigate(`/profile?tab=${tab}`);
+        } else {
+            navigate('/profile');
+        }
+    };
+    return (
+        <>
             <ul className="navbar-nav ml-auto">
                 <li>
-                    <Dropdown drop={!props.rtlLayout ? 'left' : 'right'} className="dropdown" alignRight={!props.rtlLayout}>
+                    <Dropdown 
+                    drop={!props.rtlLayout ? 'left' : 'right'}
+                     className="dropdown" 
+                     alignRight={!props.rtlLayout}
+                     show={showDropdown}
+                     onToggle={(isOpen) => setShowDropdown(isOpen)}
+                     >
                         <Dropdown.Toggle variant={'link'} id="dropdown-basic">
-                            <i className="feather icon-bell icon"/>
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu alignRight className="notification">
-                            <div className="noti-head bg-dark">
-                                <h6 className="d-inline-block m-b-0">Notifications</h6>
-                                <div className="float-right">
-                                    <a href={DEMO.BLANK_LINK} className="m-r-10">
-                                        mark as read
-                                    </a>
-                                    <a href={DEMO.BLANK_LINK}>clear all</a>
-                                </div>
-                            </div>
-                            <div style={{ height: '300px' }}>
-                                <PerfectScrollbar>
-                                    <ul className="noti-body">
-                                        <li className="n-title">
-                                            <p className="m-b-0">NEW</p>
-                                        </li>
-                                        <li className="notification">
-                                            <div className="media">
-                                                <img className="img-radius" src={Avatar1} alt="Generic placeholder"/>
-                                                <div className="media-body">
-                                                    <p>
-                                                        <strong>John Doe</strong>
-                                                        <span className="n-time text-muted">
-                                                            <i className="icon feather icon-clock m-r-10"/>5 min
-                                                        </span>
-                                                    </p>
-                                                    <p>New ticket Added</p>
-                                                </div>
-                                            </div>
-                                        </li>
-                                        <li className="n-title">
-                                            <p className="m-b-0">EARLIER</p>
-                                        </li>
-                                        <li className="notification">
-                                            <div className="media">
-                                                <img className="img-radius" src={Avatar2} alt="Generic placeholder"/>
-                                                <div className="media-body">
-                                                    <p>
-                                                        <strong>Joseph William</strong>
-                                                        <span className="n-time text-muted">
-                                                            <i className="icon feather icon-clock m-r-10"/>
-                                                            10 min
-                                                        </span>
-                                                    </p>
-                                                    <p>Prchace New Theme and make payment</p>
-                                                </div>
-                                            </div>
-                                        </li>
-                                        <li className="notification">
-                                            <div className="media">
-                                                <img className="img-radius" src={Avatar1} alt="Generic placeholder"/>
-                                                <div className="media-body">
-                                                    <p>
-                                                        <strong>Sara Soudein</strong>
-                                                        <span className="n-time text-muted">
-                                                            <i className="icon feather icon-clock m-r-10"/>
-                                                            12 min
-                                                        </span>
-                                                    </p>
-                                                    <p>currently login</p>
-                                                </div>
-                                            </div>
-                                        </li>
-                                        <li className="notification">
-                                            <div className="media">
-                                                <img className="img-radius" src={Avatar2} alt="Generic placeholder"/>
-                                                <div className="media-body">
-                                                    <p>
-                                                        <strong>Joseph William</strong>
-                                                        <span className="n-time text-muted">
-                                                            <i className="icon feather icon-clock m-r-10"/>
-                                                            30 min
-                                                        </span>
-                                                    </p>
-                                                    <p>Prchace New Theme and make payment</p>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    </ul>
-                                </PerfectScrollbar>
-                            </div>
-                            <div className="noti-footer">
-                                <a href={DEMO.BLANK_LINK}>show all</a>
-                            </div>
-                        </Dropdown.Menu>
-                    </Dropdown>
-                </li>
-                <li>
-                    <Dropdown drop={!props.rtlLayout ? 'left' : 'right'} className="dropdown" alignRight={!props.rtlLayout}>
-                        <Dropdown.Toggle variant={'link'} id="dropdown-basic">
-                            <i className="icon feather icon-user"/>
+                            <i className="icon feather icon-user" />
                         </Dropdown.Toggle>
                         <Dropdown.Menu alignRight className="profile-notification">
                             <div className="pro-head bg-dark">
-                                <img src={Avatar1} className="img-radius" alt="User Profile"/>
-                                <span>John Doe</span>
-                                <a href={DEMO.BLANK_LINK} className="dud-logout" onClick={handleLogout} title="Logout">
-                                    <i className="feather icon-log-out"/>
-                                </a>
+                                <img src={profilePicPath} className="img-radius" alt="User Profile" />
+                                <span>{fullName}</span>
                             </div>
                             <ul className="pro-body">
                                 <li>
-                                    <a href={DEMO.BLANK_LINK} className="dropdown-item">
-                                        <i className="feather icon-settings"/> Settings
+                                    <a href={DEMO.BLANK_LINK} className="dropdown-item" onClick={(e) => handleSettings(e, 'settings')}>
+                                        <i className="feather icon-settings" /> Settings
                                     </a>
                                 </li>
                                 <li>
-                                    <a href={DEMO.BLANK_LINK} className="dropdown-item">
-                                        <i className="feather icon-user"/> Profile
+                                    <a href={DEMO.BLANK_LINK} className="dropdown-item"  onClick={(e) => handleProfile(e, 'profile')}>
+                                        <i className="feather icon-user" /> Profile
                                     </a>
                                 </li>
+
                                 <li>
-                                    <a href={DEMO.BLANK_LINK} className="dropdown-item">
-                                        <i className="feather icon-mail"/> My Messages
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href={DEMO.BLANK_LINK} className="dropdown-item">
-                                        <i className="feather icon-lock"/> Lock Screen
+                                    <a className="dropdown-item" onClick={handleLogout}>
+                                        <i className="feather icon-log-out" /> Logout
                                     </a>
                                 </li>
                             </ul>
@@ -154,6 +88,7 @@ const NavRight = (props) => {
                     </Dropdown>
                 </li>
             </ul>
-        </>);
+        </>
+    );
 };
 export default NavRight;

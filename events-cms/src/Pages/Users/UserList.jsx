@@ -78,7 +78,7 @@ function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleView
                         `;
                 }
             },
-            { data: 'role', title: 'role' },
+    
             { data: 'mobile', title: 'Mobile' },
             { data: 'address', title: 'Address' },
             { data: 'city', title: 'City' },
@@ -236,7 +236,7 @@ const UserList = () => {
                             <Table striped hover responsive id="data-table-zero">
                                 <thead>
                                     <tr>
-                                        <th>Profile</th>
+                                        <th>Name/ Email / Profile</th>
                                         <th>Mobile</th>
                                         <th>Address</th>
                                         <th>City</th>
@@ -244,7 +244,6 @@ const UserList = () => {
                                         <th>Postal Code</th>
                                         <th>Member</th>
                                         <th>Biometric Enabled</th>
-                                        <th>Currency</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

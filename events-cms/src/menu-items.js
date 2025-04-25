@@ -67,7 +67,7 @@ const chartData = {
                     id: 'order ',
                     title: 'Orders ',
                     type: 'item',
-                    icon: 'feather icon-help-circle',
+                    icon: 'feather icon-shopping-cart',
                     url: '/order'
 
 
@@ -131,7 +131,7 @@ const chartData = {
                     id: 'profile',
                     title: 'Profile',
                     type: 'item',
-                    icon: 'feather icon-gitlab',
+                    icon: 'feather icon-user',
                     url: '/profile'
 
                 }

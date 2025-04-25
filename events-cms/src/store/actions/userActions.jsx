@@ -42,7 +42,7 @@ export const editUser = (id, data) => async (dispatch) => {
         // Check if the response is successful
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'User updated successfully!');
-            return true; // Indicate successful update
+            return response.data; // Return the entire response data
         }
     } catch (error) {
         // Handle errors appropriately

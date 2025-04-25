@@ -83,13 +83,18 @@ function atable(registrations, handleView) {
                 data: 'user',
                 title: 'User Type',
                 render: function (data, type, row) {
-                    console.log(data);
-                    return `<div class="text-wrap" style="max-width: 200px;">${row.type}</div>`;
+                    let bgColor = '';
+                    if (row.type?.toLowerCase() === 'exhibitor') {
+                        bgColor = 'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                    } else if (row.type?.toLowerCase() === 'attendee') {
+                        bgColor = 'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                    }
+                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${row.type || 'N/A'}</span></div>`;
                 }
             },
             {
                 data: 'event.name',
-                title: 'Event Name',
+            
                 render: function (data, type, row) {
                     const eventDate = new Date(row.event.startDate);
                     const today = new Date();
@@ -131,7 +136,6 @@ function atable(registrations, handleView) {
 
             {
                 data: 'location',
-                title: 'Location / Venue / Country',
                 render: function (data, type, row) {
                     return `
                         <div class="d-inline-block align-middle">
@@ -204,11 +208,17 @@ function atable(registrations, handleView) {
                 data: 'status',
                 title: 'Status',
                 render: function (data, type, row) {
-                    return `<div class="text-wrap" style="max-width: 200px;">
-                    ${row.status === 'Sucesss' 
-                        ? '<span class="badge badge-success"><i class="feather icon-check mr-1"></i>Success</span>' 
-                        : '<span class="badge badge-danger"><i class="feather icon-x mr-1"></i>Withdraw</span>'}
-                    </div>`;
+                    let statusClass = 'badge-light-warning';
+
+                    if (data === 'Sucesss') {
+                        statusClass = 'badge-light-success';
+                    } else if (data === 'Withdraw') {
+                        statusClass = 'badge-light-danger';
+                    } else if (data === 'Pending') {
+                        statusClass = 'badge-light-warning';
+                    }
+
+                    return `<span class="badge ${statusClass}">${data}</span>`;
                 }
             },
             {
@@ -357,8 +367,8 @@ const RegisteredEvents = () => {
                                 <tr>
                                     <th>Registered By</th>
                                     <th>User Type</th>
-                                    <th>Event Name</th>
-                                    <th>Location</th>
+                                    <th>Event Name / Date / Type</th>
+                                    <th>Location / Venue / Country</th>
                                     <th>Event Schedule</th>
                                     <th>Status</th>
                                     <th>Actions</th>

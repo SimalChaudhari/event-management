@@ -8,7 +8,7 @@ const NotificationList = React.lazy(() => import('./Pages/Notification/Notificat
 const RewardsList = React.lazy(() => import('./Pages/Reports/Rewards/RewardsView.js'));
 const AnalyticsList = React.lazy(() => import('./Pages/Reports/Analytics/AnalyticsView.js'));
 const TourismList = React.lazy(() => import('./Pages/Settings/Tourism/TourismView.js'));
-const ProfileList = React.lazy(() => import('./Pages/Settings/Profile/Profile.js'));
+const ProfileList = React.lazy(() => import('./Pages/Settings/Profile/Profile.jsx'));
 const UsersList = React.lazy(() => import('./Pages/Users/UserList.jsx'));
 
 const OtherSamplePage = React.lazy(() => import('./Demo/Other/SamplePage'));

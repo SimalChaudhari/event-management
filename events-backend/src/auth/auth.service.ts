@@ -399,20 +399,13 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       const refreshToken = this.generateRefreshToken(user);
   
       user.refreshToken = refreshToken;
-      await this.userRepository.save(user);
+      const savedUser = await this.userRepository.save(user);
   
-      const sanitizedUser = {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        mobile: user.mobile,
-        isVerify: user.isVerify,
-      };
+   
   
       return {
         message: 'Admin login successful',
-        user: sanitizedUser,
+        user: savedUser,
         accessToken,
         refreshToken
       };
