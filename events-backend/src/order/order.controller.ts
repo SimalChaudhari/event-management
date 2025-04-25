@@ -25,12 +25,15 @@ export class OrderController {
     @Get()
     async getAllOrders(@Req() req: Request, @Res() response: Response) {
         const userId = req.user.id;
-        const orders = await this.orderService.getAllOrders(userId);
+        const role = req.user.role;
+        const orders = await this.orderService.getAllOrders(userId,role);
     
         return response.status(200).json({
             success: true,
-            message: 'Orders retrieved successfully',
-            length: orders.length, // 👈 total number of orders
+            message: role === 'admin' 
+                ? 'All orders retrieved successfully' 
+                : 'Your orders retrieved successfully',
+            count: orders.length,
             data: orders,
         });
     }
@@ -38,18 +41,20 @@ export class OrderController {
     @Get(':id')
     async getOrderById(@Param('id') id: string, @Req() req: Request, @Res() response: Response) {
         const userId = req.user.id;
-        const order = await this.orderService.getOrderById(id, userId);
+        const role = req.user.role;
+        const order = await this.orderService.getOrderById(id, userId, role);
         return response.status(200).json({
             success: true,
             message: 'Order retrieved successfully',
             data: order,
         });
     }
-
+    
     @Delete('delete/:id')
     async deleteOrder(@Param('id') id: string, @Req() req: Request, @Res() response: Response) {
         const userId = req.user.id;
-        await this.orderService.deleteOrder(id, userId);
+        const role = req.user.role;
+        await this.orderService.deleteOrder(id, userId, role);
         return response.status(200).json({
             success: true,
             message: 'Order deleted successfully',

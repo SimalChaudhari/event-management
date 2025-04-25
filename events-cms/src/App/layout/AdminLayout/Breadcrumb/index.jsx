@@ -1,12 +1,15 @@
 import * as React from 'react';
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import config from '../../../../config';
 import navigation from '../../../../menu-items';
 import DEMO from '../../../../store/constant';
 const Breadcrumb = (props) => {
     const [main, setMain] = useState();
     const [item, setItem] = useState();
+    const location = useLocation();
+    const navigate = useNavigate();
+    
     const getCollapse = useCallback((item) => {
         if (item.children) {
             item.children.filter((collapse) => {
@@ -14,7 +17,7 @@ const Breadcrumb = (props) => {
                     getCollapse(collapse);
                 }
                 else if (collapse.type && collapse.type === 'item') {
-                    if (document.location.pathname === config.basename + collapse.url) {
+                    if (location.pathname === config.basename + collapse.url) {
                         setItem(collapse);
                         setMain(item);
                     }
@@ -22,7 +25,8 @@ const Breadcrumb = (props) => {
                 return false;
             });
         }
-    }, []);
+    }, [location.pathname]);
+
     useEffect(() => {
         navigation.items.map((item, index) => {
             if (item.type && item.type === 'group') {
@@ -31,13 +35,30 @@ const Breadcrumb = (props) => {
             return false;
         });
     }, [props, getCollapse]);
+    
     let main_, item_;
     let breadcrumb = '';
     let title = 'Welcome';
+
+        // Handler for when main collapse item is clicked
+        const handleMainClick = () => {
+            if (main && main.children && main.children.length > 0) {
+                // Navigate to the first child URL by default
+                const firstChildUrl = main.children[0].url;
+                if (firstChildUrl) {
+                    navigate(firstChildUrl);
+                }
+            }
+        };
+
     if (main && main.type === 'collapse') {
-        main_ = (<li className="breadcrumb-item">
-                <a href={DEMO.BLANK_LINK}>{main.title}</a>
-            </li>);
+        main_ = (
+            <li className="breadcrumb-item">
+                <a onClick={handleMainClick} style={{cursor: 'pointer'}}>
+                    {main.title}
+                </a>
+            </li>
+        );
     }
     if (item && item.type === 'item') {
         title = item.title;
@@ -54,7 +75,7 @@ const Breadcrumb = (props) => {
                                 </div>
                                 <ul className="breadcrumb">
                                     <li className="breadcrumb-item">
-                                        <Link to="/">
+                                        <Link to="/dashboard">
                                             <i className="feather icon-home"/>
                                         </Link>
                                     </li>

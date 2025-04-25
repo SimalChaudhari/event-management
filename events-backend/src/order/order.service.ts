@@ -153,7 +153,7 @@ export class OrderService {
     }
     
 
-    async getOrderById(orderId: string, userId: string): Promise<any> {
+    async getOrderById(orderId: string, userId: string,role:string): Promise<any> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
             relations: ['user', 'orderItems', 'orderItems.event'],
@@ -162,9 +162,10 @@ export class OrderService {
 
         if (!order) throw new NotFoundException('Order not found');
     
-        if (order.user.id !== userId) {
-            throw new ForbiddenException('You are not allowed to view this order');
-        }
+        // Only check permission if not admin
+    if (role !== 'admin' && order.user.id !== userId) {
+        throw new ForbiddenException('You are not allowed to view this order');
+    }
     
         const orderItems = order.orderItems.map(item => ({
             id: item.id,
@@ -189,11 +190,25 @@ export class OrderService {
         };
     }
     
-    async getAllOrders(userId: string): Promise<any[]> {
-        const orders = await this.orderRepository.find({
+    async getAllOrders(userId: string,role:string): Promise<any[]> {
+        let orders;
+
+        if (role === 'admin') {
+            // 🧑‍💼 Admin can see all orders
+            orders = await this.orderRepository.find({
+                relations: ['user', 'orderItems', 'orderItems.event'],
+            });
+        } else {
+
+          orders = await this.orderRepository.find({
             where: { user: { id: userId } },
             relations: ['user', 'orderItems', 'orderItems.event'],
         });
+        }
+        if (!orders || orders.length === 0) {
+            throw new NotFoundException('No orders found');
+        }
+    
     
         return orders.map(order => ({
             id: order.id,
@@ -215,7 +230,7 @@ export class OrderService {
             })),
         }));
     }
-    async deleteOrder(orderId: string, userId: string): Promise<void> {
+    async deleteOrder(orderId: string, userId: string,role:string): Promise<void> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
             relations: ['user'],
@@ -223,9 +238,11 @@ export class OrderService {
     
         if (!order) throw new NotFoundException('Order not found');
     
-        if (order.user.id !== userId) {
-            throw new ForbiddenException('You are not allowed to delete this order');
-        }
+     // Only check permission if not admin
+     if (role !== 'admin' && order.user.id !== userId) {
+        throw new ForbiddenException('You are not allowed to delete this order');
+    }
+
     
         await this.orderRepository.remove(order);
     }

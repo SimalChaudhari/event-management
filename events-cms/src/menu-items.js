@@ -1,10 +1,10 @@
 const chartData = {
     items: [
         {
-            id: 'navigation',
-            title: 'Navigation',
+            id: 'dashboard',
+            title: 'Dashboard',
             type: 'group',
-            icon: 'icon-navigation',
+            icon: 'icon-dashboard',
             children: [
                 {
                     id: 'dashboard',
@@ -41,7 +41,7 @@ const chartData = {
                             title: 'All Events',
                             type: 'item',
                             url: '/events/event-list',
-                            breadcrumbs: false
+                           
                         },
                         {
                             id: 'upcoming-events',
@@ -62,20 +62,13 @@ const chartData = {
                     ]
 
                 },
+            
                 {
-                    id: 'exhibitor ',
-                    title: 'Exhibitor ',
-                    type: 'item',
-                    icon: 'feather icon-user-check',
-                    url: '/exhibitor'
-
-                },
-                {
-                    id: 'content ',
-                    title: 'Content ',
+                    id: 'order ',
+                    title: 'Orders ',
                     type: 'item',
                     icon: 'feather icon-help-circle',
-                    url: '/content'
+                    url: '/order'
 
 
                 },
