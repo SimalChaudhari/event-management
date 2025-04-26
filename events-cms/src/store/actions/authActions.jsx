@@ -49,8 +49,28 @@ export const logout = () => async (dispatch) => {
         toast.error('Error logging out');
         return { success: false };
     }
+
+
+    
 };
 
+export const changePassword = (data) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.post('auth/change-password', data);
+        
+        if (response.data.success) {
+            toast.success(response.data.message);
+            return { success: true };
+        } else {
+            toast.error(response.data.message);
+            return { success: false };
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'An unexpected error occurred. Please try again.';
+        toast.error(errorMessage);
+    }
+    return false;
+};
 
 
 

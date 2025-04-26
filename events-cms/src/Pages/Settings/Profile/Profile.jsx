@@ -8,6 +8,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { editUser } from '../../../store/actions/userActions';
 import { AUTH_DATA } from '../../../store/constants/actionTypes';
 import { useLocation } from 'react-router-dom';
+import { changePassword } from '../../../store/actions/authActions';
+import { Formik, Form, Field, ErrorMessage } from 'formik';
+import * as Yup from 'yup';
+import { toast } from 'react-toastify';
 
 const Profile = () => {
     const dispatch = useDispatch();
@@ -26,6 +30,7 @@ const Profile = () => {
     const biometricToggleRef = useRef(null);
     const currencyRef = useRef(null);
 
+
     const [data, setData] = useState({
         activeProfileTab: 'profile',
         isPersonalEdit: false,
@@ -40,7 +45,6 @@ const Profile = () => {
     const profilePanActiveClass = 'tab-pane fade show active';
 
     const fullName = `${user.firstName} ${user.lastName}`;
-    const fullAddress = `${user.address}, ${user.city}, ${user.state} ${user.postalCode}`;
     const profilePicPath = user.profilePicture ? `${API_URL}/${user.profilePicture}` : avatar5;
 
     const location = useLocation();
@@ -53,17 +57,29 @@ const Profile = () => {
         if (tabParam === 'settings') {
             setData((prevData) => ({
                 ...prevData,
-                activeProfileTab: 'settings'
+                activeProfileTab: 'settings',
+                isPersonalEdit: false,
+                isContactEdit: false,
+                isOtherEdit: false,
+                isPasswordEdit: false
             }));
         } else if (tabParam === 'profile') {
             setData((prevData) => ({
                 ...prevData,
-                activeProfileTab: 'profile'
+                activeProfileTab: 'profile',
+                isPersonalEdit: false,
+                isContactEdit: false,
+                isOtherEdit: false,
+                isPasswordEdit: false
             }));
         } else {
             setData((prevData) => ({
                 ...prevData,
-                activeProfileTab: 'profile'
+                activeProfileTab: 'profile',
+                isPersonalEdit: false,
+                isContactEdit: false,
+                isOtherEdit: false,
+                isPasswordEdit: false
             }));
         }
     }, [location]);
@@ -72,10 +88,8 @@ const Profile = () => {
     const updateUserState = (updatedData) => {
         // Get the current user data from localStorage
         const userData = JSON.parse(localStorage.getItem('userData'));
-
         // Create updated user object by merging current user with updated fields
         const updatedUser = { ...user, ...updatedData };
-
         // Update localStorage
         localStorage.setItem(
             'userData',
@@ -161,6 +175,22 @@ const Profile = () => {
             }
         }
     };
+
+    // Password change validation schema
+    const passwordChangeSchema = Yup.object().shape({
+        currentPassword: Yup.string()
+            .required('Current password is required'),
+        newPassword: Yup.string()
+            .required('New password is required')
+            .min(8, 'Password must be at least 8 characters')
+            .matches(
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+                'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+            ),
+        confirmPassword: Yup.string()
+            .required('Confirm password is required')
+            .oneOf([Yup.ref('newPassword'), null], 'Passwords must match')
+    });
 
     return (
         <>
@@ -276,7 +306,14 @@ const Profile = () => {
                                         <a
                                             className={data.activeProfileTab === 'profile' ? profileTabActiveClass : profileTabClass}
                                             onClick={() => {
-                                                setData({ ...data, activeProfileTab: 'profile' });
+                                                setData({
+                                                    ...data,
+                                                    activeProfileTab: 'profile',
+                                                    isPersonalEdit: false,
+                                                    isContactEdit: false,
+                                                    isOtherEdit: false,
+                                                    isPasswordEdit: false
+                                                });
                                             }}
                                             id="profile-tab"
                                             href={DEMO.BLANK_LINK}
@@ -289,7 +326,14 @@ const Profile = () => {
                                         <a
                                             className={data.activeProfileTab === 'settings' ? profileTabActiveClass : profileTabClass}
                                             onClick={() => {
-                                                setData({ ...data, activeProfileTab: 'settings' });
+                                                setData({
+                                                    ...data,
+                                                    activeProfileTab: 'settings',
+                                                    isPersonalEdit: false,
+                                                    isContactEdit: false,
+                                                    isOtherEdit: false,
+                                                    isPasswordEdit: false
+                                                });
                                             }}
                                             id="settings-tab"
                                             href={DEMO.BLANK_LINK}
@@ -606,151 +650,160 @@ const Profile = () => {
                                     <i className={data.isPasswordEdit ? 'feather icon-x' : 'feather icon-edit'} />
                                 </button>
                             </Card.Body>
-                            <Card.Body
-                                className={
-                                    data.isPasswordEdit ? 'border-top pro-det-edit collapse' : 'border-top pro-det-edit collapse show'
-                                }
-                            >
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label font-weight-bolder">Current Password</label>
-                                    <Col sm={9}>
-                                        <div className="position-relative">
-                                            <span className="d-inline-block text-truncate" style={{ maxWidth: '90%' }} id="password-masked">
-                                                ••••••••
-                                            </span>
-                                            <span className="d-none text-truncate" style={{ maxWidth: '90%' }} id="password-text">
-                                                mypassword123
-                                            </span>
-                                            <button
-                                                className="btn btn-sm position-absolute"
-                                                style={{ right: '5px', top: '-5px' }}
-                                                title="Show Password"
-                                                onClick={() => {
-                                                    const maskedElement = document.getElementById('password-masked');
-                                                    const textElement = document.getElementById('password-text');
-                                                    if (maskedElement.classList.contains('d-inline-block')) {
-                                                        maskedElement.classList.replace('d-inline-block', 'd-none');
-                                                        textElement.classList.replace('d-none', 'd-inline-block');
-                                                    } else {
-                                                        textElement.classList.replace('d-inline-block', 'd-none');
-                                                        maskedElement.classList.replace('d-none', 'd-inline-block');
-                                                    }
-                                                }}
-                                            >
-                                                <i className="feather icon-eye" />
-                                            </button>
-                                        </div>
-                                    </Col>
-                                </Row>
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label font-weight-bolder">Status</label>
-                                    <Col sm={9}>
-                                        <span className="badge badge-light-success p-2">Password Protected</span>
-                                        <hr className="mt-2 mb-2" />
-                                        <p className="text-muted small">Last changed 30 days ago</p>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                            <Card.Body
-                                className={
-                                    data.isPasswordEdit ? 'border-top pro-det-edit collapse show' : 'border-top pro-det-edit collapse'
-                                }
-                            >
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label font-weight-bolder">Current Password</label>
-                                    <Col sm={9}>
-                                        <div className="input-group">
-                                            <input
-                                                type="password"
-                                                className="form-control"
-                                                placeholder="Current Password"
-                                                id="current-password"
-                                            />
-                                            <div className="input-group-append">
-                                                <button
-                                                    className="btn btn-outline-secondary"
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const input = document.getElementById('current-password');
-                                                        if (input.type === 'password') {
-                                                            input.type = 'text';
-                                                        } else {
-                                                            input.type = 'password';
-                                                        }
-                                                    }}
-                                                >
-                                                    <i className="feather icon-eye" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                </Row>
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label font-weight-bolder">New Password</label>
-                                    <Col sm={9}>
-                                        <div className="input-group">
-                                            <input type="password" className="form-control" placeholder="New Password" id="new-password" />
-                                            <div className="input-group-append">
-                                                <button
-                                                    className="btn btn-outline-secondary"
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const input = document.getElementById('new-password');
-                                                        if (input.type === 'password') {
-                                                            input.type = 'text';
-                                                        } else {
-                                                            input.type = 'password';
-                                                        }
-                                                    }}
-                                                >
-                                                    <i className="feather icon-eye" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                </Row>
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label font-weight-bolder">Confirm Password</label>
-                                    <Col sm={9}>
-                                        <div className="input-group">
-                                            <input
-                                                type="password"
-                                                className="form-control"
-                                                placeholder="Confirm New Password"
-                                                id="confirm-password"
-                                            />
-                                            <div className="input-group-append">
-                                                <button
-                                                    className="btn btn-outline-secondary"
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const input = document.getElementById('confirm-password');
-                                                        if (input.type === 'password') {
-                                                            input.type = 'text';
-                                                        } else {
-                                                            input.type = 'password';
-                                                        }
-                                                    }}
-                                                >
-                                                    <i className="feather icon-eye" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                </Row>
-                                <Row className="form-group">
-                                    <label className="col-sm-3 col-form-label" />
-                                    <Col sm={9}>
-                                        <button
-                                            type="submit"
-                                            className="btn btn-primary"
-                                            onClick={() => setData({ ...data, isPasswordEdit: !data.isPasswordEdit })}
-                                        >
-                                            Change Password
-                                        </button>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
+                            {data.isPasswordEdit && (
+                                <Card.Body className="border-top pro-det-edit">
+                                    <Formik
+                                        initialValues={{
+                                            currentPassword: '',
+                                            newPassword: '',
+                                            confirmPassword: ''
+                                        }}
+                                        validationSchema={passwordChangeSchema}
+                                        onSubmit={async (values, { resetForm }) => {
+                                            try {
+                                                const result = await dispatch(changePassword(values));
+                                                if (result.success) {
+                                                    resetForm();
+                                                    setData({ ...data, isPasswordEdit: false });
+                                                }
+                                            } catch (error) {
+                                                toast.error('Failed to change password');
+                                            }
+                                        }}
+                                    >
+                                        {({ values, errors, touched, handleChange, handleBlur, isSubmitting, setFieldValue }) => (
+                                            <Form>
+                                                <Row className="form-group">
+                                                    <label className="col-sm-3 col-form-label font-weight-bolder">Current Password</label>
+                                                    <Col sm={9}>
+                                                        <div className="input-group">
+                                                            <Field
+                                                                type="password"
+                                                                name="currentPassword"
+                                                                className={`form-control ${errors.currentPassword && touched.currentPassword ? 'is-invalid' : ''}`}
+                                                                placeholder="Current Password"
+                                                                id="current-password"
+                                                            />
+                                                            <div className="input-group-append">
+                                                                <button
+                                                                    className="btn btn-outline-secondary"
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const input = document.getElementById('current-password');
+                                                                        if (input.type === 'password') {
+                                                                            input.type = 'text';
+                                                                        } else {
+                                                                            input.type = 'password';
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <i className="feather icon-eye" />
+                                                                </button>
+                                                            </div>
+                                                            <ErrorMessage
+                                                                name="currentPassword"
+                                                                component="div"
+                                                                className="invalid-feedback"
+                                                            />
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                                <Row className="form-group">
+                                                    <label className="col-sm-3 col-form-label font-weight-bolder">New Password</label>
+                                                    <Col sm={9}>
+                                                        <div className="input-group">
+                                                            <Field
+                                                                type="password"
+                                                                name="newPassword"
+                                                                className={`form-control ${errors.newPassword && touched.newPassword ? 'is-invalid' : ''}`}
+                                                                placeholder="New Password"
+                                                                id="new-password"
+                                                            />
+                                                            <div className="input-group-append">
+                                                                <button
+                                                                    className="btn btn-outline-secondary"
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const input = document.getElementById('new-password');
+                                                                        if (input.type === 'password') {
+                                                                            input.type = 'text';
+                                                                        } else {
+                                                                            input.type = 'password';
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <i className="feather icon-eye" />
+                                                                </button>
+                                                            </div>
+                                                            <ErrorMessage
+                                                                name="newPassword"
+                                                                component="div"
+                                                                className="invalid-feedback"
+                                                            />
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                                <Row className="form-group">
+                                                    <label className="col-sm-3 col-form-label font-weight-bolder">Confirm Password</label>
+                                                    <Col sm={9}>
+                                                        <div className="input-group">
+                                                            <Field
+                                                                type="password"
+                                                                name="confirmPassword"
+                                                                className={`form-control ${errors.confirmPassword && touched.confirmPassword ? 'is-invalid' : ''}`}
+                                                                placeholder="Confirm New Password"
+                                                                id="confirm-password"
+                                                            />
+                                                            <div className="input-group-append">
+                                                                <button
+                                                                    className="btn btn-outline-secondary"
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const input = document.getElementById('confirm-password');
+                                                                        if (input.type === 'password') {
+                                                                            input.type = 'text';
+                                                                        } else {
+                                                                            input.type = 'password';
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <i className="feather icon-eye" />
+                                                                </button>
+                                                            </div>
+                                                            <ErrorMessage
+                                                                name="confirmPassword"
+                                                                component="div"
+                                                                className="invalid-feedback"
+                                                            />
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                                <Row className="form-group">
+                                                    <label className="col-sm-3 col-form-label" />
+                                                    <Col sm={9}>
+                                                        <button
+                                                            type="submit"
+                                                            className="btn btn-primary"
+                                                            disabled={isSubmitting}
+                                                        >
+                                                            {isSubmitting ? 'Changing Password...' : 'Change Password'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-light ml-2"
+                                                            onClick={() => {
+                                                                setData({ ...data, isPasswordEdit: false });
+                                                            }}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </Col>
+                                                </Row>
+                                            </Form>
+                                        )}
+                                    </Formik>
+                                </Card.Body>
+                            )}
                         </Card>
                     </div>
                 </Col>

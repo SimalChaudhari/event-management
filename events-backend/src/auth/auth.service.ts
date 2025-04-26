@@ -413,5 +413,47 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       this.handleError(error);
     }
   }
+
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (newPassword !== confirmPassword) {
+        throw new BadRequestException('New password and confirm password do not match');
+      }
+  
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+  
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+  
+      // Verify current password
+      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+  
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      
+      // Update password
+      user.password = hashedPassword;
+      await this.userRepository.save(user);
+  
+      return { 
+        success: true,
+        message: 'Password changed successfully' 
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
   
 }

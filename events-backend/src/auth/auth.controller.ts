@@ -10,6 +10,8 @@ import {
   UploadedFile,
   Query,
   Get,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserDto } from './../user/users.dto';
@@ -18,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
 @Controller('api/auth')
 export class AuthController {
@@ -162,5 +165,35 @@ export class AuthController {
       body.otp,
       body.newPassword,
     );
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard) // Use the JwtAuthGuard to protect this endpoint
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() req: Request, // Get the request object to access the user from JWT
+    @Body()body: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    },
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = (req as any).user.id; // Get the user ID from the JWT token
+      const result = await this.authService.changePassword(
+        userId,
+        body.currentPassword,
+        body.newPassword,
+        body.confirmPassword,
+      );
+
+      return response.status(HttpStatus.OK).json(result);
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
   }
 }
