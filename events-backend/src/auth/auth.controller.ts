@@ -196,4 +196,37 @@ export class AuthController {
       });
     }
   }
+
+  @Post('signout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async signout(
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = (req as any).user.id;
+      // Extract token from authorization header
+     // Extract token from authorization header
+const authHeader = (req.headers as any).authorization;
+const token = authHeader?.split(' ')[1]; // Get the token part after "Bearer "
+      
+      if (!token) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'No token provided',
+        });
+      }
+      
+      const result = await this.authService.signout(userId, token);
+      
+      return response.status(HttpStatus.OK).json(result);
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
 }

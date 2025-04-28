@@ -4,6 +4,7 @@ import {
   BadRequestException,
   UnauthorizedException,
   InternalServerErrorException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +14,9 @@ import { UserRole } from './../user/users.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from 'service/email.service';
+import { Cache } from 'cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+
 
 @Injectable()
 export class AuthService {
@@ -21,6 +25,7 @@ export class AuthService {
     private userRepository: Repository<UserEntity>,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   private handleError(error: any): never {
@@ -454,6 +459,49 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
     } catch (error) {
       this.handleError(error);
     }
+  }
+
+
+  async signout(userId: string, token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+  
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+  
+      // Extract token info to get expiration time
+      const decodedToken = this.jwtService.decode(token);
+      if (decodedToken && typeof decodedToken === 'object') {
+        const exp = decodedToken.exp as number;
+        
+        // Calculate how long until token expires (in seconds)
+        const ttl = exp - Math.floor(Date.now() / 1000);
+        
+        if (ttl > 0) {
+          // Add token to blacklist with TTL equal to remaining time until expiration
+          await this.cacheManager.set(`blacklisted_${token}`, true, ttl * 1000);
+        }
+      }
+  
+      // Clear refresh token
+      user.refreshToken = null as any;
+      await this.userRepository.save(user);
+  
+      return {
+        success: true,
+        message: 'Logged out successfully',
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+  
+  // Add a method to check if a token is blacklisted
+  async isTokenBlacklisted(token: string): Promise<boolean> {
+    return !!(await this.cacheManager.get(`blacklisted_${token}`));
   }
   
 }
