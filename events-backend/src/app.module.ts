@@ -15,6 +15,7 @@ import { join } from 'path';
 
 import { CacheModule } from '@nestjs/cache-manager';
 import { TokenBlacklistMiddleware } from 'middleware/tokenBlacklistMiddleware';
+import { WithdrawalModule } from 'withdrawal/withdrawal.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -33,7 +34,7 @@ console.log(join(__dirname, '..', 'uploads'))
     }),
     AuthModule,
     UserModule,
-    EventModule, SpeakerModule, CartModule, RegisterEventModule, CountriesModule,
+    EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

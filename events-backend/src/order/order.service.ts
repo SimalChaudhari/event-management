@@ -120,6 +120,7 @@ export class OrderService {
             savedOrderItems.push({
                 id: savedItem.id,
                 event: eventData,
+                status:savedItem.status,
                 createdAt: savedItem.createdAt,
             });
 
@@ -131,7 +132,16 @@ export class OrderService {
                 orderId: savedOrder.id,
             });
 
-       await this.registerEventRepository.save(registerEvent);
+      const res =  await this.registerEventRepository.save(registerEvent);
+      if(res){
+        for (const eventItem of event) {
+            await this.cartRepository.delete({
+              userId,
+              eventId: eventItem.eventId,
+            });
+          }
+          
+      }
         }
     
         return {
@@ -170,6 +180,7 @@ export class OrderService {
         const orderItems = order.orderItems.map(item => ({
             id: item.id,
             event: item.event,
+            status:item.status,
             createdAt: item.createdAt,
         }));
     
@@ -226,6 +237,7 @@ export class OrderService {
             orderItems: order.orderItems.map(item => ({
                 id: item.id,
                 event: item.event,
+                status:item.status,
                 createdAt: item.createdAt,
             })),
         }));

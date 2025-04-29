@@ -5,6 +5,7 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne } from 'ty
 import { UserEntity } from 'user/users.entity';
 import { OrderStatus } from './order.dto';
 import { OrderItemEntity } from './event.item.entity';
+import { Withdrawal } from 'withdrawal/withdrawal.entity';
 
 @Entity('orders')
 export class Order {
@@ -29,6 +30,9 @@ export class Order {
 
     @OneToMany(() => OrderItemEntity, (orderItem) => orderItem.order) // Add relation to OrderItemEntity
     orderItems!: OrderItemEntity[];
+
+    @OneToMany(() => Withdrawal, (withdrawal) => withdrawal.order)
+    withdrawals?: Withdrawal[];
     
 
 
