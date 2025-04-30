@@ -123,7 +123,7 @@ function atable(data, handleDelete, handleView) {
                 }
             },
 
-            {
+             {
                 data: 'orderItems',
                 title: 'Events',
                 render: function (data, type, row) {
@@ -141,7 +141,7 @@ function atable(data, handleDelete, handleView) {
                 }
             },
             {
-                data: 'status',
+                data: 'status', 
                 title: 'Status',
                 render: function (data, type, row) {
                     let statusClass = 'badge-light-warning';

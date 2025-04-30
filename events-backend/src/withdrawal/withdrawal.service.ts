@@ -204,8 +204,8 @@ export class WithdrawalService {
       }
       // After deleting orderItems and registrations, delete the entire order
       await this.orderRepo.update(order.id, { 
-        isDeleted: true,
-        status: OrderStatus.Cancelled,
+        isDeleted: true
+   
        });
      
     }
