@@ -39,10 +39,8 @@ export class CreateOrderWithItemsDto {
     @IsEnum(OrderStatus)
     status?: OrderStatus;
 
-    @ValidateNested({ each: true })
-    @Type(() => EventOrderDto)
-    @ArrayMinSize(1)
-    event!: EventOrderDto[];
+    @IsNotEmpty()
+    eventId!: string;
 }
 
 

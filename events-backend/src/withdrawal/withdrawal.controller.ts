@@ -13,6 +13,9 @@ import {
   Req,
   UseGuards,
   Request,
+  Patch,
+  ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -21,6 +24,7 @@ import * as path from 'path';
 import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from './create-withdrawal.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { WithdrawalStatus } from './withdrawal.entity';
 
 @Controller('api/withdrawal')
 @UseGuards(JwtAuthGuard)
@@ -100,4 +104,35 @@ export class WithdrawalController {
       data: withdrawal,
     };
   }
+
+
+  // allow only the admin to change the status 
+
+  @Patch('manage/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateWithdrawalStatus(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body('status') status: string,
+    @Request() req: any,
+  ) {
+    const user = req.user;
+  
+    if (user.role !== process.env.ADMIN) {
+      throw new NotFoundException('You are not authorized to change status');
+    }
+  
+    // Validate status
+    if (!Object.values(WithdrawalStatus).includes(status as WithdrawalStatus)) {
+      throw new BadRequestException('Invalid status value');
+    }
+  
+    const updatedWithdrawal = await this.withdrawalService.updateStatus(id, status as WithdrawalStatus);
+  
+    return {
+      status: 'success',
+      message: `Withdrawal status updated to '${status}'`,
+      data: updatedWithdrawal,
+    };
+  }
+  
 }

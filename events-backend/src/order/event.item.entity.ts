@@ -22,6 +22,9 @@ export class OrderItemEntity {
 
     @Column({ type: 'enum', enum: OrderNoStatus, default: OrderNoStatus.Pending })
     status!: OrderNoStatus;
+
+    @Column({ default: false })
+    isDeleted!: boolean;
     
     @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     createdAt?: Date;

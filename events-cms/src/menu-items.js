@@ -68,45 +68,37 @@ const chartData = {
                     title: 'Orders ',
                     type: 'item',
                     icon: 'feather icon-shopping-cart',
+                    badge: {
+                        title: 'New',
+                        type: 'badge-success'
+                    },
                     url: '/order'
 
 
                 },
                 {
-                    id: 'notification ',
-                    title: 'Notification ',
+                    id: 'withrawal ',
+                    title: 'Withdrawal Requests',
                     type: 'item',
-                    icon: 'feather icon-book',
-                    badge: {
-                        title: 'New',
-                        type: 'badge-success'
-                    },
-                    url: '/notification'
+                    icon: 'feather icon-credit-card',
+                    url: '/withrawal'
                 },
 
             ]
         },
         {
-            id: 'system-reports',
-            title: 'System & Reports',
+            id: 'reports',
+            title: 'Reports',
             type: 'group',
             icon: 'icon-ui',
             children: [
+    
                 {
-                    id: 'points-rewards-system',
-                    title: 'Points & Rewards',
+                    id: 'reports',
+                    title: 'Reports',
                     type: 'item',
-                    icon: 'feather icon-box',
-                    url: '/rewards'
-
-
-                },
-                {
-                    id: 'analytics-reports',
-                    title: 'Analytics & Reports',
-                    type: 'item',
-                    icon: 'feather icon-gitlab',
-                    url: '/analytics'
+                    icon: 'feather icon-bar-chart',
+                    url: '/reports'
 
 
                 }
@@ -119,14 +111,6 @@ const chartData = {
             type: 'group',
             icon: 'icon-ui',
             children: [
-                {
-                    id: 'tourism-transport',
-                    title: 'Tourism & Transport ',
-                    type: 'item',
-                    icon: 'feather icon-box',
-                    url: '/tourism'
-
-                },
                 {
                     id: 'profile',
                     title: 'Profile',

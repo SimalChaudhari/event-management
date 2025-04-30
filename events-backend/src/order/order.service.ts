@@ -66,101 +66,95 @@ export class OrderService {
     }
 
     async createOrderWithItems(userId: string, dto: CreateOrderWithItemsDto): Promise<any> {
-        const { paymentMethod, price, status = OrderStatus.Pending, event } = dto;
-    
+        const { paymentMethod, price, status = OrderStatus.Pending, eventId } = dto;
+
+        // 1. Split the eventId string into an array
+        const eventIds = eventId.split(',').map((id) => id.trim());
+        
+        // 2. Validate user
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
-
-           // Validate each event
-    for (const eventItem of event) {
-        const eventData = await this.eventRepository.findOne({ where: { id: eventItem.eventId } });
-        if (!eventData) {
-            throw new NotFoundException(`Event with ID ${eventItem.eventId} not found`);
-        }
-
-        // Check if this event is in the user's cart
-        const cartItem = await this.cartRepository.findOne({
-            where: { userId, eventId: eventItem.eventId },
-        });
-
-        if (!cartItem) {
-            throw new NotFoundException(`Event ID ${eventItem.eventId} is not in your cart`);
-        }
-    }
-    
-    
-        const orderNo = await this.generateUniqueOrderNumber();
-    
-        const order = this.orderRepository.create({
-            orderNo,
-            user,
-            paymentMethod,
-            price,
-            status,
-        });
-    
-        const savedOrder = await this.orderRepository.save(order);
-    
-        const savedOrderItems: any[] = [];
-    
-        for (const eventItem of event) {
-            const eventData = await this.eventRepository.findOne({ where: { id: eventItem.eventId } });
-            if (!eventData) {
-                throw new NotFoundException(`Event with ID ${eventItem.eventId} not found`);
-            }
-    
-            const orderItem = this.orderItemRepository.create({
-                order: savedOrder,
-                event: eventData,
-            });
-    
-            const savedItem = await this.orderItemRepository.save(orderItem);
-    
-            // Include only required fields
-            savedOrderItems.push({
-                id: savedItem.id,
-                event: eventData,
-                status:savedItem.status,
-                createdAt: savedItem.createdAt,
-            });
-
-            // save data in register event table 
-            const registerEvent = this.registerEventRepository.create({
-                userId: userId,
-                eventId: eventItem.eventId,
-                type: "Attendee",
-                orderId: savedOrder.id,
-            });
-
-      const res =  await this.registerEventRepository.save(registerEvent);
-      if(res){
-        for (const eventItem of event) {
-            await this.cartRepository.delete({
-              userId,
-              eventId: eventItem.eventId,
-            });
+        
+        // 3. Validate all eventIds and cart items FIRST
+        const validatedEvents = [];
+        
+        for (const id of eventIds) {
+          const eventData = await this.eventRepository.findOne({ where: { id } });
+          if (!eventData) {
+            throw new NotFoundException(`Event with ID ${id} not found`);
           }
-          
-      }
+        
+          const cartItem = await this.cartRepository.findOne({
+            where: { userId, eventId: id },
+          });
+        
+          if (!cartItem) {
+            throw new NotFoundException(`Event ID ${id} is not in your cart`);
+          }
+        
+          validatedEvents.push(eventData); // save for next step
         }
-    
+        
+        // 4. If all validations passed, now create order
+        const orderNo = await this.generateUniqueOrderNumber();
+        
+        const order = this.orderRepository.create({
+          orderNo,
+          user,
+          paymentMethod,
+          price,
+          status,
+        });
+        
+        const savedOrder = await this.orderRepository.save(order);
+        
+        // 5. Now create order items and register events
+        const savedOrderItems: any[] = [];
+        
+        for (const eventData of validatedEvents) {
+          const orderItem = this.orderItemRepository.create({
+            order: savedOrder,
+            event: eventData,
+          });
+        
+          const savedItem = await this.orderItemRepository.save(orderItem);
+        
+          savedOrderItems.push({
+            id: savedItem.id,
+            event: eventData,
+            status: savedItem.status,
+            createdAt: savedItem.createdAt,
+          });
+        
+          const registerEvent = this.registerEventRepository.create({
+            userId,
+            eventId: eventData.id,
+            type: "Attendee",
+            orderId: savedOrder.id,
+          });
+        
+          await this.registerEventRepository.save(registerEvent);
+          await this.cartRepository.delete({ userId, eventId: eventData.id });
+        }
+        
+      
         return {
-            id: savedOrder.id,
-            orderNo: savedOrder.orderNo,
-            paymentMethod: savedOrder.paymentMethod,
-            price: savedOrder.price,
-            status: savedOrder.status,
-            user: {
-                id: user.id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                mobile: user.mobile,
-
-            },
-            orderItems: savedOrderItems,
+          id: savedOrder.id,
+          orderNo: savedOrder.orderNo,
+          paymentMethod: savedOrder.paymentMethod,
+          price: savedOrder.price,
+          status: savedOrder.status,
+          user: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            mobile: user.mobile,
+          },
+          orderItems: savedOrderItems,
         };
-    }
+      }
+      
     
 
     async getOrderById(orderId: string, userId: string,role:string): Promise<any> {

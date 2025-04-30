@@ -27,6 +27,8 @@ export class Order {
     @Column({ type: 'enum', enum: OrderStatus, nullable: true })
     status?: OrderStatus;
 
+    @Column({ default: false })
+    isDeleted!: boolean;
 
     @OneToMany(() => OrderItemEntity, (orderItem) => orderItem.order) // Add relation to OrderItemEntity
     orderItems!: OrderItemEntity[];
