@@ -9,6 +9,7 @@ import { RegisterEvent } from './registerEvent.entity';
 import { CreateRegisterEventDto } from './registerEvent.dto';
 import { Event } from 'event/event.entity';
 import { Order } from 'order/order.entity';
+import { getEventColor } from 'utils/event-color.util';
 
 @Injectable()
 export class RegisterEventService {
@@ -104,6 +105,7 @@ export class RegisterEventService {
       const { eventSpeakers, ...restEvent } = registerEvent.event || {};
       const event = {
         ...restEvent,
+        color: getEventColor(registerEvent.event?.type),
         speakers,
       };
   
@@ -161,6 +163,7 @@ export class RegisterEventService {
     // ✅ Replace with clean speakers
     const event = {
       ...restEvent,
+      color: getEventColor(registerEvent.event?.type),
       speakers,
     };
 

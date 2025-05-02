@@ -9,6 +9,7 @@ import { OrderItemEntity } from './event.item.entity';
 import { Event } from 'event/event.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { Cart } from 'cart/cart.entity';
+import { getEventColor } from 'utils/event-color.util';
 
 
 @Injectable()
@@ -173,7 +174,10 @@ export class OrderService {
     
         const orderItems = order.orderItems.map(item => ({
             id: item.id,
-            event: item.event,
+            event: {
+              ...item.event,
+                color: getEventColor(item.event.type), 
+             },
             status:item.status,
             createdAt: item.createdAt,
         }));
@@ -230,7 +234,10 @@ export class OrderService {
             },
             orderItems: order.orderItems.map(item => ({
                 id: item.id,
-                event: item.event,
+                event: {
+                  ...item.event,
+                    color: getEventColor(item.event.type), 
+                 },
                 status:item.status,
                 createdAt: item.createdAt,
             })),

@@ -12,6 +12,7 @@ import { UserEntity } from 'user/users.entity';
 import { OrderItemEntity, OrderNoStatus } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { OrderStatus } from 'order/order.dto';
+import { getEventColor } from 'utils/event-color.util';
 
 @Injectable()
 export class WithdrawalService {
@@ -31,7 +32,7 @@ export class WithdrawalService {
 
     @InjectRepository(OrderItemEntity)
     private readonly orderItemRepository: Repository<OrderItemEntity>,
-  ) {}
+  ) { }
 
   async create(dto: CreateWithdrawalDto, userId: string): Promise<any> {
     if (!dto.order_id) {
@@ -84,6 +85,15 @@ export class WithdrawalService {
       withdrawal.order.orderItems = withdrawal.order.orderItems.filter(
         (item) => item.event?.id === withdrawal.event?.id,
       );
+    }
+
+    if (withdrawal.order?.orderItems?.length) {
+      withdrawal.order.orderItems.forEach((item) => {
+        if (item.event) {
+          const color = getEventColor(item.event.type);
+          (item.event as any).color = color; // 👈 cast to 'any' to bypass TS check
+        }
+      });
     }
 
     // Destructure the user information and create a new object with only the necessary fields
@@ -177,40 +187,40 @@ export class WithdrawalService {
     withdrawal.status = status; // Now type matches
     const updated = await this.withdrawalRepo.save(withdrawal);
 
-  // ✅ If status is APPROVED, delete only the matching orderItem(s)
-  if (status === WithdrawalStatus.APPROVED && withdrawal.order && withdrawal.event) {
-    const order = withdrawal.order;
-    const eventID = withdrawal.event.id
+    // ✅ If status is APPROVED, delete only the matching orderItem(s)
+    if (status === WithdrawalStatus.APPROVED && withdrawal.order && withdrawal.event) {
+      const order = withdrawal.order;
+      const eventID = withdrawal.event.id
 
-          // Find matching orderItem(s) with the event ID in the withdrawal
-    const matchingOrderItems = order.orderItems.filter(
-      (item) => item.event && item.event.id === eventID // Check if event.id matches
-    );
+      // Find matching orderItem(s) with the event ID in the withdrawal
+      const matchingOrderItems = order.orderItems.filter(
+        (item) => item.event && item.event.id === eventID // Check if event.id matches
+      );
 
-    // If matching orderItems are found, delete them
-    if (matchingOrderItems.length > 0) {
-      for (const item of matchingOrderItems) {
-        // Delete the orderItem from the repository
-        await this.orderItemRepository.update(item.id, { 
-          isDeleted: true,
-          status: OrderNoStatus.Cancelled,
+      // If matching orderItems are found, delete them
+      if (matchingOrderItems.length > 0) {
+        for (const item of matchingOrderItems) {
+          // Delete the orderItem from the repository
+          await this.orderItemRepository.update(item.id, {
+            isDeleted: true,
+            status: OrderNoStatus.Cancelled,
+          });
+
+          // Delete the registration from the registerEventRepo (assuming it links users to events)
+          await this.registerEventRepository.delete({
+            eventId: item.event.id,
+            userId: order.user.id,
+          });
+        }
+        // After deleting orderItems and registrations, delete the entire order
+        await this.orderRepo.update(order.id, {
+          isDeleted: true
+
         });
 
-        // Delete the registration from the registerEventRepo (assuming it links users to events)
-        await this.registerEventRepository.delete({
-          eventId: item.event.id,
-          userId: order.user.id,
-        });
       }
-      // After deleting orderItems and registrations, delete the entire order
-      await this.orderRepo.update(order.id, { 
-        isDeleted: true
-   
-       });
-     
     }
-  }
 
-  return this.filterOrderItemsByEvent(updated);
-}
+    return this.filterOrderItemsByEvent(updated);
+  }
 }

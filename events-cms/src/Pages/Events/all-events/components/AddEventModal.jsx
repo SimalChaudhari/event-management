@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Row, Col } from 'react-bootstrap';
+import { Modal, Button, Row, Col, Card } from 'react-bootstrap';
 import Select from 'react-select';
 import { useDispatch } from 'react-redux';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
 import { createEvent, editEvent } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
+import L from 'leaflet'; // Import Leaflet for custom markers
+import LocationMarker from './LocationMarker';
+
 
 function AddEventModal({ show, handleClose, editData }) {
     const dispatch = useDispatch();
     const { fetchEvent } = FetchEventData();
+    const [tempLatLng, setTempLatLng] = useState(null);
+    const [display, setDisplay] = useState(null)
 
     const [speakerList, setSpeakerList] = useState([]);
     const [countryList, setCountryList] = useState([]);
@@ -27,8 +35,34 @@ function AddEventModal({ show, handleClose, editData }) {
         type: 'Physical',
         price: '',
         currency: '',
-        speakerIds: []
+        speakerIds: [],
+        latitude: '', // Added latitude
+        longitude: '' // Added longitude
     });
+    const [showMapModal, setShowMapModal] = useState(false); // For showing the map modal
+
+    // Fetch user's current location
+    const getCurrentLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const { latitude, longitude } = position.coords;
+                setFormData((prev) => ({
+                    ...prev,
+                    latitude: latitude,
+                    longitude: longitude
+                }));
+            }, (error) => {
+                console.error("Error fetching geolocation: ", error);
+                alert('Unable to fetch your location');
+            });
+        } else {
+            alert('Geolocation is not supported by your browser');
+        }
+    };
+
+    useEffect(() => {
+        getCurrentLocation(); // Automatically fetch current location when the component mounts
+    }, []);
 
     const resetFormData = () => {
         setFormData({
@@ -45,7 +79,9 @@ function AddEventModal({ show, handleClose, editData }) {
             type: 'Physical',
             price: '',
             currency: '',
-            speakerIds: []
+            speakerIds: [],
+            latitude: '', // Added latitude
+            longitude: '' // Added longitude
         });
     };
 
@@ -83,14 +119,14 @@ function AddEventModal({ show, handleClose, editData }) {
         if (editData) {
             // Check for both possible speaker data formats
             let speakerIds = [];
-            
+
             // Check if speakers data exists in either format
             if (editData.speakers) {
                 speakerIds = editData.speakers.map(speaker => speaker.id);
             } else if (editData.speakersData) {
                 speakerIds = editData.speakersData.map(speaker => speaker.id);
             }
-            
+
             // Set form data with the extracted speaker IDs
             setFormData({
                 name: '',
@@ -101,6 +137,8 @@ function AddEventModal({ show, handleClose, editData }) {
                 endTime: '',
                 location: '',
                 venue: '',
+                latitude: '',
+                longitude: '',
                 country: '',
                 image: null,
                 type: 'Physical',
@@ -109,6 +147,7 @@ function AddEventModal({ show, handleClose, editData }) {
                 ...editData,
                 speakerIds: speakerIds,
                 image: editData.image ? `${API_URL}/${editData.image.replace(/\\/g, '/')}` : null
+
             });
         } else {
             resetFormData();
@@ -145,7 +184,7 @@ function AddEventModal({ show, handleClose, editData }) {
             startTime: formattedStartTime,
             endTime: formattedEndTime
         };
-        
+
         // Remove speakersData property if it exists
         if (dataToSend.speakersData) {
             delete dataToSend.speakersData;
@@ -154,10 +193,10 @@ function AddEventModal({ show, handleClose, editData }) {
         Object.keys(dataToSend).forEach((key) => {
             if (key === 'speakerIds') {
                 // Make sure speakerIds is an array before joining
-                const speakersArray = Array.isArray(dataToSend.speakerIds) 
-                    ? dataToSend.speakerIds 
+                const speakersArray = Array.isArray(dataToSend.speakerIds)
+                    ? dataToSend.speakerIds
                     : [];
-                    
+
                 // Convert to comma-separated string - this is what the backend expects
                 formDataToSend.append('speakerIds', speakersArray.join(','));
             } else if (key === 'image') {
@@ -199,8 +238,54 @@ function AddEventModal({ show, handleClose, editData }) {
 
     const selectedSpeakerOptions = speakerOptions.filter((option) => formData.speakerIds.includes(option.value));
 
+    // Component for the map, allowing the user to select a location
+    const LocationMap = () => {
+
+        const fetchAddressFromCoordinates = async (lat, lng) => {
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+                );
+                const data = await response.json();
+                setDisplay(data.display_name)
+                return data.address;
+            } catch (error) {
+                console.error("Reverse geocoding error:", error);
+                return "";
+            }
+        };
+
+        const map = useMapEvents({
+            click: async (event) => {
+                const { lat, lng } = event.latlng;
+                const address = await fetchAddressFromCoordinates(lat, lng);
+                setFormData(prev => ({
+                    ...prev,
+                    latitude: lat,
+                    longitude: lng,
+                    location: address?.city || address?.town || address?.village || ''
+                }));
+                setTempLatLng({ latitude: lat, longitude: lng, address });
+            }
+        });
+
+        return (
+            <>
+                <LocationMarker
+                    latitude={formData.latitude}
+                    longitude={formData.longitude}
+                    location={display ? display : formData?.venue}
+                />
+
+
+            </>
+        );
+    };
+
+
     return (
         <Modal show={show} onHide={handleClose} size="lg">
+
             <form onSubmit={handleSubmit}>
                 <Modal.Header>
                     <Modal.Title as="h5">{editData ? 'Edit Event' : 'Add Event'}</Modal.Title>
@@ -300,6 +385,43 @@ function AddEventModal({ show, handleClose, editData }) {
                                 />
                             </div>
                         </Col>
+
+                        {/* Add Latitude and Longitude fields */}
+                        <Col sm={6}>
+                            <div className="form-group fill">
+                                <label className="floating-label" htmlFor="latitude">
+                                    Latitude
+                                </label>
+                                <input
+                                    type="number"
+                                    // step="any"
+                                    className="form-control"
+                                    name="latitude"
+                                    value={formData.latitude}
+                                    onClick={() => setShowMapModal(true)}
+                                    onChange={handleChange}
+                                    placeholder="Latitude"
+                                />
+                            </div>
+                        </Col>
+                        <Col sm={6}>
+                            <div className="form-group fill">
+                                <label className="floating-label" htmlFor="longitude">
+                                    Longitude
+                                </label>
+                                <input
+                                    type="number"
+                                    // step="any"
+                                    className="form-control"
+                                    name="longitude"
+                                    value={formData.longitude}
+                                    onClick={() => setShowMapModal(true)}
+                                    onChange={handleChange}
+                                    placeholder="Longitude"
+                                />
+                            </div>
+                        </Col>
+
                         <Col sm={4}>
                             <div className="form-group fill">
                                 <label className="floating-label" htmlFor="location">
@@ -446,6 +568,110 @@ function AddEventModal({ show, handleClose, editData }) {
                     </Button>
                 </Modal.Footer>
             </form>
+
+            {/* Map Modal */}
+            <Modal show={showMapModal} onHide={() => setShowMapModal(false)} size="xl">
+                <Modal.Header>
+                    <Modal.Title>Select Location on the Map</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <MapContainer center={[formData.latitude || 51.505, formData.longitude || -0.09]} zoom={13} style={{ width: '100%', height: '400px' }}>
+                        <TileLayer
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <LocationMap />
+                    </MapContainer>
+                </Modal.Body>
+
+                {tempLatLng && (
+                    <div className="p-4">
+                        <Card className="mb-3">
+                            <Card.Body>
+                                <Card.Title>Coordinates Information</Card.Title>
+                                <hr />
+                                <Row>
+                                    <Col xs={6} md={3}>
+                                        <Card.Text className="mb-2">
+                                            <strong>Latitude:</strong><br />
+                                            {tempLatLng.latitude || 'Not Available'}
+                                        </Card.Text>
+                                    </Col>
+                                    <Col xs={6} md={3}>
+                                        <Card.Text className="mb-2">
+                                            <strong>Longitude:</strong><br />
+                                            {tempLatLng.longitude || 'Not Available'}
+                                        </Card.Text>
+                                    </Col>
+
+                                </Row>
+                            </Card.Body>
+                        </Card>
+
+                        <Card className="mb-3">
+                            <Card.Body>
+                                <Card.Title>Address Information</Card.Title>
+                                <hr />
+                                {tempLatLng.address ? (
+                                    <div>
+
+                                        <p className="mb-2">
+                                            <strong>City/Town/Village:</strong> {tempLatLng.address.town || tempLatLng.address.village || null}
+                                        </p>
+
+
+                                        <p className="mb-2">
+                                            <strong>State:</strong> {tempLatLng.address.state || null}
+                                        </p>
+
+
+                                        <p className="mb-2">
+                                            <strong>District:</strong> {tempLatLng.address.state_district || tempLatLng.address.district || null}
+                                        </p>
+
+
+                                        <p className="mb-2">
+                                            <strong>Country:</strong> {tempLatLng.address.country || null}
+                                        </p>
+
+                                    </div>
+                                ) : (
+                                    <p>Fetching address...</p>
+                                )}
+                            </Card.Body>
+                        </Card>
+
+
+                        <div className="mt-8 text-center">
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        latitude: tempLatLng.latitude,
+                                        longitude: tempLatLng.longitude,
+                                        location: [
+                                            tempLatLng.address.state,
+                                            tempLatLng.address.state_district || tempLatLng.address.district,
+                                        ].filter(Boolean).join(', '),
+                                        venue: tempLatLng.address.town || tempLatLng.address.village,
+                                        country: tempLatLng.address.country,
+                                    }));
+
+                                    setShowMapModal(false);
+                                    setTempLatLng(null);
+                                }}
+                                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
+                            >
+                                Save Location
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowMapModal(false)}>Close</Button>
+                </Modal.Footer>
+            </Modal>
         </Modal>
     );
 }

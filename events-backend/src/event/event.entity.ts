@@ -38,7 +38,13 @@ export class Event {
 
     @Column({ type: 'varchar', nullable: true })
     venue?: string;
-    
+
+    @Column('float', { nullable: true })
+    latitude?: number; // Latitude of the venue
+
+    @Column('float', { nullable: true })
+    longitude?: number; // Longitude of the venue
+
     @Column({ type: 'varchar', nullable: true })
     country?: string;
 
@@ -60,8 +66,8 @@ export class Event {
     @UpdateDateColumn()
     updatedAt!: Date;
 
-    
-    
+
+
     @OneToMany(() => EventSpeaker, (eventSpeaker) => eventSpeaker.event)
     eventSpeakers!: EventSpeaker[];
 
@@ -69,8 +75,8 @@ export class Event {
     carts!: Cart[]; // Carts associated with the event
     eventOrders: any;
 
-    
+
     @OneToMany(() => OrderItemEntity, (order) => order.event)
     orderItem?: OrderItemEntity[];
-  
+
 }

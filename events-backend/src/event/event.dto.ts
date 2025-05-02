@@ -50,6 +50,12 @@ export class EventDto {
     venue?: string;
 
     @IsOptional()
+    latitude?: number; // Latitude of the venue
+
+    @IsOptional()
+    longitude?: number; // Longitude of the venue
+
+    @IsOptional()
     @IsString()
     country?: string;
 
@@ -70,4 +76,6 @@ export class EventDto {
     
     @IsOptional()
     speakerIds?: string; 
+
+
 }

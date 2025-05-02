@@ -136,7 +136,7 @@ export class AuthController {
     return response.status(HttpStatus.OK).json(result);
   }
 
-  @Post('forgot')
+  @Post('forget')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body('email') email: string) {
     return this.authService.forgotPassword(email);

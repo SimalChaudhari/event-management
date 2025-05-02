@@ -14,6 +14,7 @@ import { Speaker } from 'speaker/speaker.entity';
 import { EventSpeaker } from './event-speaker.entity';
 import path from 'path';
 import * as fs from 'fs';
+import { getEventColor } from 'utils/event-color.util';
 
 @Injectable()
 export class EventService {
@@ -24,7 +25,7 @@ export class EventService {
     private eventSpeakerRepository: Repository<EventSpeaker>,
     @InjectRepository(Speaker) // Inject the Speaker repository if needed
     private speakerRepository: Repository<Speaker>,
-  ) {}
+  ) { }
 
   async createEvent(eventDto: EventDto) {
     const existingEvent = await this.eventRepository.findOne({
@@ -66,6 +67,14 @@ export class EventService {
         );
     }
 
+    if (eventDto.latitude && (eventDto.latitude < -90 || eventDto.latitude > 90)) {
+      throw new BadRequestException('Invalid latitude value');
+    }
+    if (eventDto.longitude && (eventDto.longitude < -180 || eventDto.longitude > 180)) {
+      throw new BadRequestException('Invalid longitude value');
+    }
+
+
     const event = await this.eventRepository.create(eventDto);
     // Save the event to the database
     const savedEvent = await this.eventRepository.save(event);
@@ -73,21 +82,21 @@ export class EventService {
     if (eventDto.speakerIds) {
       const speakerIdsArray = eventDto.speakerIds.split(','); // Split the string into an array
       await Promise.all(
-          speakerIdsArray.map(async (speakerId) => {
-              const eventExists = await this.eventRepository.findOne({ where: { id: savedEvent.id } });
-              const speakerExists = await this.speakerRepository.findOne({ where: { id: speakerId } });
+        speakerIdsArray.map(async (speakerId) => {
+          const eventExists = await this.eventRepository.findOne({ where: { id: savedEvent.id } });
+          const speakerExists = await this.speakerRepository.findOne({ where: { id: speakerId } });
 
-              if (!eventExists || !speakerExists) {
-                  throw new BadRequestException('Invalid event or speaker ID');
-              }
+          if (!eventExists || !speakerExists) {
+            throw new BadRequestException('Invalid event or speaker ID');
+          }
 
-              const eventSpeaker = new EventSpeaker();
-              eventSpeaker.eventId = savedEvent.id; // Ensure the event ID is set
-              eventSpeaker.speakerId = speakerId; // Set the speaker ID
-              await this.eventSpeakerRepository.save(eventSpeaker);
-          }),
+          const eventSpeaker = new EventSpeaker();
+          eventSpeaker.eventId = savedEvent.id; // Ensure the event ID is set
+          eventSpeaker.speakerId = speakerId; // Set the speaker ID
+          await this.eventSpeakerRepository.save(eventSpeaker);
+        }),
       );
-  }
+    }
 
     return savedEvent
   }
@@ -103,8 +112,8 @@ export class EventService {
     upcoming?: boolean; // New filter for upcoming events
   }) {
     const queryBuilder = this.eventRepository.createQueryBuilder('event')
-    .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
-    .leftJoinAndSelect('eventSpeaker.speaker', 'speaker'); // Join with Speaker entity
+      .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
+      .leftJoinAndSelect('eventSpeaker.speaker', 'speaker'); // Join with Speaker entity
 
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase();
@@ -113,8 +122,8 @@ export class EventService {
         { keyword: `%${keyword}%` },
       );
     }
-    
-    
+
+
 
     if (filters.startDate) {
       queryBuilder.andWhere('event.startDate >= :startDate', {
@@ -157,28 +166,29 @@ export class EventService {
 
     return events.map(event => {
       const { eventSpeakers, ...eventData } = event;
-    
+
       return {
         ...eventData,
+        color: getEventColor(event.type),
         speakersData: eventSpeakers.map(es => es.speaker),
       };
     });
-    
-}
 
-async getEventEntityById(id: string): Promise<Event> {
-  const event = await this.eventRepository.findOne({ where: { id } });
-  if (!event) throw new NotFoundException('Event not found!');
-  return event;
-}
+  }
+
+  async getEventEntityById(id: string): Promise<Event> {
+    const event = await this.eventRepository.findOne({ where: { id } });
+    if (!event) throw new NotFoundException('Event not found!');
+    return event;
+  }
 
 
   async getEventById(id: string) {
     const event = await this.eventRepository.createQueryBuilder('event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
-        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker') // Join with Speaker entity
-        .where('event.id = :id', { id })
-        .getOne();
+      .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker') // Join with EventSpeaker
+      .leftJoinAndSelect('eventSpeaker.speaker', 'speaker') // Join with Speaker entity
+      .where('event.id = :id', { id })
+      .getOne();
 
     if (!event) throw new NotFoundException('Event not found!');
 
@@ -186,10 +196,11 @@ async getEventEntityById(id: string): Promise<Event> {
 
     return {
       ...eventData,
+      color: getEventColor(event.type),
       speakers: eventSpeakers.map(es => es.speaker),
     };
-    
-}
+
+  }
 
 
   async updateEvent(
@@ -252,47 +263,54 @@ async getEventEntityById(id: string): Promise<Event> {
         );
     }
 
+    if (eventDto.latitude && (eventDto.latitude < -90 || eventDto.latitude > 90)) {
+      throw new BadRequestException('Invalid latitude value');
+    }
+    if (eventDto.longitude && (eventDto.longitude < -180 || eventDto.longitude > 180)) {
+      throw new BadRequestException('Invalid longitude value');
+    }
+
 
     Object.assign(event, eventDto);
     const updatedEvent = await this.eventRepository.save(event);
-// First, delete all existing speaker associations
-await this.eventSpeakerRepository.delete({ eventId: id });
+    // First, delete all existing speaker associations
+    await this.eventSpeakerRepository.delete({ eventId: id });
 
-// Then create new associations if speakerIds are provided
-if (eventDto.speakerIds) {
-  const speakerIdsArray = eventDto.speakerIds.split(',');
-  await Promise.all(
-    speakerIdsArray.map(async (speakerId) => {
-      const speakerExists = await this.speakerRepository.findOne({ 
-        where: { id: speakerId } 
-      });
+    // Then create new associations if speakerIds are provided
+    if (eventDto.speakerIds) {
+      const speakerIdsArray = eventDto.speakerIds.split(',');
+      await Promise.all(
+        speakerIdsArray.map(async (speakerId) => {
+          const speakerExists = await this.speakerRepository.findOne({
+            where: { id: speakerId }
+          });
 
-      if (!speakerExists) {
-        throw new BadRequestException('Invalid speaker ID');
-      }
+          if (!speakerExists) {
+            throw new BadRequestException('Invalid speaker ID');
+          }
 
-      const eventSpeaker = new EventSpeaker();
-      eventSpeaker.eventId = id;
-      eventSpeaker.speakerId = speakerId;
-      await this.eventSpeakerRepository.save(eventSpeaker);
-    })
-  );
-}
+          const eventSpeaker = new EventSpeaker();
+          eventSpeaker.eventId = id;
+          eventSpeaker.speakerId = speakerId;
+          await this.eventSpeakerRepository.save(eventSpeaker);
+        })
+      );
+    }
 
-return updatedEvent;
-}
+    return updatedEvent;
+  }
 
   async deleteEvent(id: string) {
     const event = await this.eventRepository.findOne({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
 
-          // Delete profile picture from filesystem if exists
-  if (event.image) {
-    const filePath = path.resolve(event.image);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Delete profile picture from filesystem if exists
+    if (event.image) {
+      const filePath = path.resolve(event.image);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
-  }
 
 
     await this.eventRepository.remove(event);
