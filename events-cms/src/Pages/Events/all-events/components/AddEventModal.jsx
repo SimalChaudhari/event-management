@@ -11,13 +11,15 @@ import 'leaflet/dist/leaflet.css';
 
 import L from 'leaflet'; // Import Leaflet for custom markers
 import LocationMarker from './LocationMarker';
-
+import SpeakerFormSidebar from './SpeakerFormSidebar';
+import SpeakerFormModal from './SpeakerFormSidebar';
+import { addSpeaker } from '../../../../store/actions/speakerActions';
 
 function AddEventModal({ show, handleClose, editData }) {
     const dispatch = useDispatch();
     const { fetchEvent } = FetchEventData();
     const [tempLatLng, setTempLatLng] = useState(null);
-    const [display, setDisplay] = useState(null)
+    const [display, setDisplay] = useState(null);
 
     const [speakerList, setSpeakerList] = useState([]);
     const [countryList, setCountryList] = useState([]);
@@ -44,17 +46,20 @@ function AddEventModal({ show, handleClose, editData }) {
     // Fetch user's current location
     const getCurrentLocation = () => {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const { latitude, longitude } = position.coords;
-                setFormData((prev) => ({
-                    ...prev,
-                    latitude: latitude,
-                    longitude: longitude
-                }));
-            }, (error) => {
-                console.error("Error fetching geolocation: ", error);
-                alert('Unable to fetch your location');
-            });
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setFormData((prev) => ({
+                        ...prev,
+                        latitude: latitude,
+                        longitude: longitude
+                    }));
+                },
+                (error) => {
+                    console.error('Error fetching geolocation: ', error);
+                    alert('Unable to fetch your location');
+                }
+            );
         } else {
             alert('Geolocation is not supported by your browser');
         }
@@ -100,18 +105,19 @@ function AddEventModal({ show, handleClose, editData }) {
         fetchCountry();
     }, []);
 
+    const fetchSpeakers = async () => {
+        try {
+            const response = await axiosInstance.get('speakers/get');
+            if (response.data.success) {
+                setSpeakerList(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching speakers:', error);
+        }
+    };
+
     // Load speakers from API
     useEffect(() => {
-        const fetchSpeakers = async () => {
-            try {
-                const response = await axiosInstance.get('speakers/get');
-                if (response.data.success) {
-                    setSpeakerList(response.data.data);
-                }
-            } catch (error) {
-                console.error('Error fetching speakers:', error);
-            }
-        };
         fetchSpeakers();
     }, []);
 
@@ -122,9 +128,9 @@ function AddEventModal({ show, handleClose, editData }) {
 
             // Check if speakers data exists in either format
             if (editData.speakers) {
-                speakerIds = editData.speakers.map(speaker => speaker.id);
+                speakerIds = editData.speakers.map((speaker) => speaker.id);
             } else if (editData.speakersData) {
-                speakerIds = editData.speakersData.map(speaker => speaker.id);
+                speakerIds = editData.speakersData.map((speaker) => speaker.id);
             }
 
             // Set form data with the extracted speaker IDs
@@ -147,7 +153,6 @@ function AddEventModal({ show, handleClose, editData }) {
                 ...editData,
                 speakerIds: speakerIds,
                 image: editData.image ? `${API_URL}/${editData.image.replace(/\\/g, '/')}` : null
-
             });
         } else {
             resetFormData();
@@ -193,9 +198,7 @@ function AddEventModal({ show, handleClose, editData }) {
         Object.keys(dataToSend).forEach((key) => {
             if (key === 'speakerIds') {
                 // Make sure speakerIds is an array before joining
-                const speakersArray = Array.isArray(dataToSend.speakerIds)
-                    ? dataToSend.speakerIds
-                    : [];
+                const speakersArray = Array.isArray(dataToSend.speakerIds) ? dataToSend.speakerIds : [];
 
                 // Convert to comma-separated string - this is what the backend expects
                 formDataToSend.append('speakerIds', speakersArray.join(','));
@@ -238,20 +241,61 @@ function AddEventModal({ show, handleClose, editData }) {
 
     const selectedSpeakerOptions = speakerOptions.filter((option) => formData.speakerIds.includes(option.value));
 
+    const [selectedSpeakers, setSelectedSpeakers] = useState([]);
+    const [showSidebar, setShowSidebar] = useState(false);
+    const [newSpeaker, setNewSpeaker] = useState({
+        name: '',
+        companyName: '',
+        position: '',
+        mobile: '',
+        email: '',
+        location: '',
+        description: '',
+        speakerProfile: null
+    });
+
+    const handleInputChange = (e) => {
+        const { name, value, files } = e.target;
+        setNewSpeaker((prev) => ({
+            ...prev,
+            [name]: files ? files[0] : value
+        }));
+    };
+
+    const handleAddSpeaker = async () => {
+        const formDataToSend = new FormData();
+
+        Object.keys(newSpeaker).forEach((key) => {
+            if (key === 'speakerProfile' && newSpeaker[key]) {
+                formDataToSend.append(key, newSpeaker[key]);
+            } else {
+                formDataToSend.append(key, newSpeaker[key]);
+            }
+        });
+
+        try {
+            const success = await dispatch(addSpeaker(formDataToSend));
+            if (success) {
+                fetchSpeakers();
+                setNewSpeaker('');
+                setShowSidebar(false);
+            }
+        } catch (error) {
+            console.error('Error adding speaker:', error);
+        }
+    };
+
     // Component for the map, allowing the user to select a location
     const LocationMap = () => {
-
         const fetchAddressFromCoordinates = async (lat, lng) => {
             try {
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-                );
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                 const data = await response.json();
-                setDisplay(data.display_name)
+                setDisplay(data.display_name);
                 return data.address;
             } catch (error) {
-                console.error("Reverse geocoding error:", error);
-                return "";
+                console.error('Reverse geocoding error:', error);
+                return '';
             }
         };
 
@@ -259,7 +303,7 @@ function AddEventModal({ show, handleClose, editData }) {
             click: async (event) => {
                 const { lat, lng } = event.latlng;
                 const address = await fetchAddressFromCoordinates(lat, lng);
-                setFormData(prev => ({
+                setFormData((prev) => ({
                     ...prev,
                     latitude: lat,
                     longitude: lng,
@@ -276,16 +320,12 @@ function AddEventModal({ show, handleClose, editData }) {
                     longitude={formData.longitude}
                     location={display ? display : formData?.venue}
                 />
-
-
             </>
         );
     };
 
-
     return (
         <Modal show={show} onHide={handleClose} size="lg">
-
             <form onSubmit={handleSubmit}>
                 <Modal.Header>
                     <Modal.Title as="h5">{editData ? 'Edit Event' : 'Add Event'}</Modal.Title>
@@ -505,27 +545,45 @@ function AddEventModal({ show, handleClose, editData }) {
                         </Col>
 
                         <Col sm={12}>
-                            <div className="form-group">
-                                <label>Select Speakers</label>
-                                <Select
-                                    isMulti
-                                    options={speakerOptions}
-                                    value={selectedSpeakerOptions}
-                                    onChange={handleSpeakerSelect}
-                                    placeholder="Choose speakers..."
-                                    styles={{
-                                        control: (base) => ({
-                                            ...base,
-                                            zIndex: 9999 // Ensures the select dropdown stays on top
-                                        }),
-                                        menu: (base) => ({
-                                            ...base,
-                                            zIndex: 9999 // Ensures the dropdown menu has a higher z-index
-                                        })
-                                        // You can also adjust other parts like dropdown indicator, if needed
-                                    }}
-                                />
+                            <div className="form-group d-flex align-items-center">
+                                <div style={{ flex: 1 }}>
+                                    <label>Select Speakers</label>
+
+                                    <Select
+                                        isMulti
+                                        options={speakerOptions}
+                                        value={selectedSpeakerOptions}
+                                        onChange={handleSpeakerSelect}
+                                        placeholder="Choose speakers..."
+                                        styles={{
+                                            control: (base) => ({
+                                                ...base,
+                                                zIndex: 9999 // Ensures the select dropdown stays on top
+                                            }),
+                                            menu: (base) => ({
+                                                ...base,
+                                                zIndex: 9999 // Ensures the dropdown menu has a higher z-index
+                                            })
+                                            // You can also adjust other parts like dropdown indicator, if needed
+                                        }}
+                                    />
+                                </div>
+                                <Button
+                                    variant="primary"
+                                    style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
+                                    onClick={() => setShowSidebar(true)}
+                                >
+                                    Add Speaker
+                                </Button>
                             </div>
+
+                            <SpeakerFormModal
+                                show={showSidebar}
+                                onClose={() => setShowSidebar(false)}
+                                onChange={handleInputChange}
+                                onSubmit={handleAddSpeaker}
+                                formData={newSpeaker}
+                            />
                         </Col>
                         <Col sm={12}>
                             <div className="form-group fill">
@@ -575,10 +633,12 @@ function AddEventModal({ show, handleClose, editData }) {
                     <Modal.Title>Select Location on the Map</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <MapContainer center={[formData.latitude || 51.505, formData.longitude || -0.09]} zoom={13} style={{ width: '100%', height: '400px' }}>
-                        <TileLayer
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
+                    <MapContainer
+                        center={[formData.latitude || 51.505, formData.longitude || -0.09]}
+                        zoom={13}
+                        style={{ width: '100%', height: '400px' }}
+                    >
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                         <LocationMap />
                     </MapContainer>
                 </Modal.Body>
@@ -592,17 +652,18 @@ function AddEventModal({ show, handleClose, editData }) {
                                 <Row>
                                     <Col xs={6} md={3}>
                                         <Card.Text className="mb-2">
-                                            <strong>Latitude:</strong><br />
+                                            <strong>Latitude:</strong>
+                                            <br />
                                             {tempLatLng.latitude || 'Not Available'}
                                         </Card.Text>
                                     </Col>
                                     <Col xs={6} md={3}>
                                         <Card.Text className="mb-2">
-                                            <strong>Longitude:</strong><br />
+                                            <strong>Longitude:</strong>
+                                            <br />
                                             {tempLatLng.longitude || 'Not Available'}
                                         </Card.Text>
                                     </Col>
-
                                 </Row>
                             </Card.Body>
                         </Card>
@@ -613,33 +674,29 @@ function AddEventModal({ show, handleClose, editData }) {
                                 <hr />
                                 {tempLatLng.address ? (
                                     <div>
-
                                         <p className="mb-2">
-                                            <strong>City/Town/Village:</strong> {tempLatLng.address.town || tempLatLng.address.village || null}
+                                            <strong>City/Town/Village:</strong>{' '}
+                                            {tempLatLng.address.town || tempLatLng.address.village || null}
                                         </p>
-
 
                                         <p className="mb-2">
                                             <strong>State:</strong> {tempLatLng.address.state || null}
                                         </p>
 
-
                                         <p className="mb-2">
-                                            <strong>District:</strong> {tempLatLng.address.state_district || tempLatLng.address.district || null}
+                                            <strong>District:</strong>{' '}
+                                            {tempLatLng.address.state_district || tempLatLng.address.district || null}
                                         </p>
-
 
                                         <p className="mb-2">
                                             <strong>Country:</strong> {tempLatLng.address.country || null}
                                         </p>
-
                                     </div>
                                 ) : (
                                     <p>Fetching address...</p>
                                 )}
                             </Card.Body>
                         </Card>
-
 
                         <div className="mt-8 text-center">
                             <Button
@@ -651,10 +708,12 @@ function AddEventModal({ show, handleClose, editData }) {
                                         longitude: tempLatLng.longitude,
                                         location: [
                                             tempLatLng.address.state,
-                                            tempLatLng.address.state_district || tempLatLng.address.district,
-                                        ].filter(Boolean).join(', '),
+                                            tempLatLng.address.state_district || tempLatLng.address.district
+                                        ]
+                                            .filter(Boolean)
+                                            .join(', '),
                                         venue: tempLatLng.address.town || tempLatLng.address.village,
-                                        country: tempLatLng.address.country,
+                                        country: tempLatLng.address.country
                                     }));
 
                                     setShowMapModal(false);
@@ -669,7 +728,9 @@ function AddEventModal({ show, handleClose, editData }) {
                 )}
 
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowMapModal(false)}>Close</Button>
+                    <Button variant="secondary" onClick={() => setShowMapModal(false)}>
+                        Close
+                    </Button>
                 </Modal.Footer>
             </Modal>
         </Modal>

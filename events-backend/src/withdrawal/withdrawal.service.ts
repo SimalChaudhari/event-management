@@ -2,9 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
 import { Withdrawal, WithdrawalStatus } from './withdrawal.entity';
-
 import { Order } from '../order/order.entity';
 import { CreateWithdrawalDto } from './create-withdrawal.dto';
 import { Event } from 'event/event.entity';
@@ -13,7 +11,7 @@ import { OrderItemEntity, OrderNoStatus } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { OrderStatus } from 'order/order.dto';
 import { getEventColor } from 'utils/event-color.util';
-
+  
 @Injectable()
 export class WithdrawalService {
   constructor(
