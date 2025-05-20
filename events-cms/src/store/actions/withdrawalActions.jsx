@@ -18,6 +18,20 @@ export const WithdrawalList = () => async (dispatch) => {
     return false; // Return false for any errors
 };
 
+export const updateWithdrawalStatus = (id, status) => async (dispatch) => {
+    try {
+       await axiosInstance.put(`/withdrawal/manage/${id}`, { status });
+        // Refresh the withdrawal list after status update
+        dispatch(WithdrawalList());
+        // toast.success('Status updated successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update status';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
 
 
 

@@ -5,15 +5,7 @@ import { API_URL } from '../../../configs/env';
 function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
     if (!withdrawalData) return null;
 
-    const {
-        reason,
-        comment,
-        status,
-        request_at,
-        reviewed_at,
-        document,
-        order,
-    } = withdrawalData;
+    const { reason, comment, status, request_at, reviewed_at, document, order } = withdrawalData;
 
     const user = order?.user;
 
@@ -38,20 +30,36 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                                         maxHeight: '200px',
                                         objectFit: 'cover',
                                         borderRadius: '10%',
-                                        border: '3px solid #4680ff',
+                                        border: '3px solid #4680ff'
                                     }}
                                 />
                             )}
                         </Col>
                         <Col md={8}>
-                            <p className="mb-2"><strong>Name:</strong> {event.name}</p>
-                            <p className="mb-2"><strong>Date:</strong> {event.startDate} {event.startTime} to {event.endDate} {event.endTime}</p>
-                            <p className="mb-2"><strong>Type:</strong> {event.type || 'N/A'}</p>
-                            <p className="mb-2"><strong>Description:</strong> {event.description}</p>
-                            <p className="mb-2"><strong>Location:</strong> {event.location || 'N/A'}</p>
-                            <p className="mb-2"><strong>Venue:</strong> {event.venue || 'N/A'}</p>
-                            <p className="mb-2"><strong>Country:</strong> {event.country || 'N/A'}</p>
-                            <p className="mb-2"><strong>Price:</strong> {event.price} {event.currency}</p>
+                            <p className="mb-2">
+                                <strong>Name:</strong> {event.name}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Date:</strong> {event.startDate} {event.startTime} to {event.endDate} {event.endTime}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Type:</strong> {event.type || 'N/A'}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Description:</strong> {event.description}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Location:</strong> {event.location || 'N/A'}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Venue:</strong> {event.venue || 'N/A'}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Country:</strong> {event.country || 'N/A'}
+                            </p>
+                            <p className="mb-2">
+                                <strong>Price:</strong> {event.price} {event.currency}
+                            </p>
                         </Col>
                     </Row>
                 </Card.Body>
@@ -67,7 +75,6 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
 
             <Modal.Body style={{ backgroundColor: '#f8f9fa', padding: 20 }}>
                 <Container>
-
                     {/* User & Request Details */}
                     <Card className="mb-3">
                         <Card.Body>
@@ -75,19 +82,41 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                             <hr />
                             <Row>
                                 <Col md={6}>
-                                    <p><strong>User:</strong> {user?.firstName} {user?.lastName}</p>
-                                    <p><strong>Mobile:</strong> {user?.mobile}</p>
-                                    <p><strong>Email:</strong> {user?.email}</p>
-                                    <p><strong>Reason:</strong> {reason}</p>
-                                    <p><strong>Comment:</strong> {comment}</p>
+                                    <p>
+                                        <strong>User:</strong> {user?.firstName} {user?.lastName}
+                                    </p>
+                                    <p>
+                                        <strong>Mobile:</strong> {user?.mobile}
+                                    </p>
+                                    <p>
+                                        <strong>Email:</strong> {user?.email}
+                                    </p>
+                                    <p>
+                                        <strong>Reason:</strong> {reason}
+                                    </p>
+                                    <p>
+                                        <strong>Comment:</strong> {comment}
+                                    </p>
                                 </Col>
                                 <Col md={6}>
-                                    <p><strong>Status:</strong> {status}</p>
-                                    <p><strong>Requested At:</strong> {new Date(request_at).toLocaleString()}</p>
-                                    <p><strong>Reviewed At:</strong> {reviewed_at ? new Date(reviewed_at).toLocaleString() : 'Pending'}</p>
-                                    <p><strong>Order No:</strong> {order?.orderNo}</p>
-                                    <p><strong>Payment Method:</strong> {order?.paymentMethod}</p>
-                                    <p><strong>Total Price:</strong> ${parseFloat(order?.price).toFixed(2)}</p>
+                                    <p>
+                                        <strong>Status:</strong> {status}
+                                    </p>
+                                    <p>
+                                        <strong>Requested At:</strong> {new Date(request_at).toLocaleString()}
+                                    </p>
+                                    <p>
+                                        <strong>Reviewed At:</strong> {reviewed_at ? new Date(reviewed_at).toLocaleString() : 'Pending'}
+                                    </p>
+                                    <p>
+                                        <strong>Order No:</strong> {order?.orderNo}
+                                    </p>
+                                    <p>
+                                        <strong>Payment Method:</strong> {order?.paymentMethod}
+                                    </p>
+                                    <p>
+                                        <strong>Total Price:</strong> ${parseFloat(order?.price).toFixed(2)}
+                                    </p>
                                 </Col>
                             </Row>
                         </Card.Body>
@@ -99,7 +128,23 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                             <Card.Body>
                                 <Card.Title>Attached Document</Card.Title>
                                 <hr />
-                                <Image src={`/${document}`} fluid rounded alt="Withdrawal Document" />
+                                {document.endsWith('.pdf') ? (
+                                    <embed
+                                        // src={`/${document}`}
+                                        src={`${API_URL}/${document}`}
+                                        type="application/pdf"
+                                        width="100%"
+                                        height="600px"
+                                    />
+                                ) : (
+                                    <Image
+                                        // src={`/${document}`}
+                                        src={`${API_URL}/${document}`}
+                                        fluid
+                                        rounded
+                                        alt="Withdrawal Document"
+                                    />
+                                )}
                             </Card.Body>
                         </Card>
                     )}
@@ -114,7 +159,6 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                             </Card.Body>
                         </Card>
                     )}
-
                 </Container>
             </Modal.Body>
 

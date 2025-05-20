@@ -14,6 +14,7 @@ import {
   UseGuards,
   Request,
   Patch,
+  Put,
   ParseUUIDPipe,
   BadRequestException,
 } from '@nestjs/common';
@@ -108,7 +109,7 @@ export class WithdrawalController {
 
   // allow only the admin to change the status 
 
-  @Patch('manage/:id')
+  @Put('manage/:id')
   @HttpCode(HttpStatus.OK)
   async updateWithdrawalStatus(
     @Param('id', new ParseUUIDPipe()) id: string,
