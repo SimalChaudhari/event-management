@@ -1,5 +1,4 @@
 // API Configuration
-export const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 
 export const API_TIMEOUT = 30000; // 30 seconds
@@ -7,6 +6,29 @@ export const API_RETRY = {
     attempts: 3,
     delay: 1000 // 1 second
 };
+
+// API Configuration
+export const API_CONFIG = {
+    // Development
+    development: {  // Changed from DEVELOPMENT to development
+        BASE_URL: 'http://localhost:5000',
+        TIMEOUT: 15000,
+        RETRY_ATTEMPTS: 5,
+        RETRY_DELAY: 2000
+    },
+    // Production
+    production: {   // Changed from PRODUCTION to production
+        BASE_URL: 'http://events.isca.org.sg:5000',
+        TIMEOUT: 20000,
+        RETRY_ATTEMPTS: 3,
+        RETRY_DELAY: 3000
+    }
+};
+
+// Current environment
+const ENV = process.env.NODE_ENV?.toLowerCase() || 'development';  // Added toLowerCase()
+export const API_URL = API_CONFIG[ENV]?.BASE_URL || API_CONFIG.development.BASE_URL;  // Added fallback
+
 
 // Error Messages
 export const ERROR_MESSAGES = {
