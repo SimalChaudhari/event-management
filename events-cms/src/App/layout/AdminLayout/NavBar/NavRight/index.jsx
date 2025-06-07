@@ -25,7 +25,7 @@ const NavRight = (props) => {
         e.preventDefault();
         const result = await dispatch(logout());
         if (result.success) {
-            navigate('/auth/signin-1');
+            navigate('/auth/signin');
         }
     };
     const handleProfile = async (e,tab) => {

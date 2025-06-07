@@ -1,60 +1,141 @@
 import axios from 'axios';
-import { API_URL } from './env';
+import { toast } from 'react-toastify';
+import {
+    API_URL,
+    API_TIMEOUT,
+    API_RETRY,
+    ERROR_MESSAGES,
+    CACHE_CONFIG,
+    FEATURES
+} from './env';
+ 
+let isRefreshing = false;
+let failedQueue = [];
 
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+/**
+ * Creates and configures an axios instance with interceptors and error handling
+ */
 const axiosInstance = axios.create({
-  baseURL: `${API_URL}/api`, // Set the base URL for all requests
+    baseURL: `${API_URL}/api`,
+    timeout: API_TIMEOUT,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    },
+    // withCredentials: true
 });
-
-// Request Interceptor
+ 
+/**
+ * Request Interceptor
+ * Handles request configuration and authentication
+ */
 axiosInstance.interceptors.request.use(
-  (config) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Set the Authorization header with Bearer token
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      // Dynamically set Content-Type based on the request data type
-      if (config.data instanceof FormData) {
-        config.headers['Content-Type'] = 'multipart/form-data';
-      } else {
-        config.headers['Content-Type'] = 'application/json';
-      }
-
-      return config; // Return the updated config
-    } catch (error) {
-      console.error('Error in request interceptor:', error);
-      return Promise.reject(error); // Reject the promise on error
+    (config) => {
+        try {
+            const token = localStorage.getItem(CACHE_CONFIG.TOKEN_KEY);
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            return config;
+        } catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-  },
-  (error) => {
-    console.error('Request Interceptor Error:', error);
-    return Promise.reject(error); // Handle request errors gracefully
-  }
 );
-
-// Response Interceptor
+ 
+/**
+ * Response Interceptor
+ * Handles response processing and error handling
+ */
 axiosInstance.interceptors.response.use(
-  (response) => {
-    // Simply return the response if no error occurs
-    return response;
-  },
-  (error) => {
-    // Log the error for debugging
-    console.error('Response Interceptor Error:', error);
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
 
-    // Example: Handle 401 Unauthorized globally
-    if (error.response && error.response.status === 401) {
-      console.warn('Unauthorized access - Redirecting to login.');
-      // You could redirect to login or clear user session here
-      localStorage.removeItem('token'); // Clear token from localStorage
-      window.location.href = '/login'; // Redirect to login page
+        // Don't handle refresh token for login requests
+        if (originalRequest.url.includes('auth/admin')) {
+            return Promise.reject(error);
+        }
+
+        if (!error.response) {
+            if (error.message?.includes('Network Error')) {
+                toast.error(ERROR_MESSAGES.NETWORK_ERROR);
+            }
+            return Promise.reject(error);
+        }
+
+        // Handle token expiration
+        if (error.response.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+            
+            try {
+                const refreshToken = localStorage.getItem(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                if (!refreshToken) {
+                    throw new Error('No refresh token available');
+                }
+
+                const response = await axios.post(`${API_URL}/api/auth/refresh-token`, {
+                    refreshToken: refreshToken
+                });
+
+                const { accessToken, newRefreshToken } = response.data;
+
+                localStorage.setItem(CACHE_CONFIG.TOKEN_KEY, accessToken);
+                localStorage.setItem(CACHE_CONFIG.REFRESH_TOKEN_KEY, newRefreshToken);
+
+                originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                return axiosInstance(originalRequest);
+            } catch (refreshError) {
+                // Only redirect to login if it's not a login request
+                if (!originalRequest.url.includes('auth/admin')) {
+                    localStorage.removeItem(CACHE_CONFIG.TOKEN_KEY);
+                    localStorage.removeItem(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                    localStorage.removeItem('userData');
+                    window.location.href = '/auth/signin';
+                }
+                return Promise.reject(refreshError);
+            }
+        }
+
+        // Handle other error cases
+        switch (error.response.status) {
+            case 403:
+                toast.error(ERROR_MESSAGES.FORBIDDEN);
+                break;
+            case 404:
+                toast.error(ERROR_MESSAGES.NOT_FOUND);
+                break;
+            case 500:
+                toast.error(ERROR_MESSAGES.SERVER_ERROR);
+                break;
+            default:
+                const errorMessage = error.response?.data?.message || ERROR_MESSAGES.UNKNOWN_ERROR;
+                toast.error(errorMessage);
+        }
+
+        return Promise.reject(error);
     }
-
-    // Reject the promise with the error object
-    return Promise.reject(error);
-  }
 );
-
+ 
+// Add global error handler
+window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason?.isAxiosError && !event.reason.response) {
+        toast.error(ERROR_MESSAGES.NETWORK_ERROR);
+    }
+});
+ 
 export default axiosInstance;

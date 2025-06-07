@@ -1,15 +1,22 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, BrowserRouter } from 'react-router-dom';
-import {  useSelector } from 'react-redux';
+import {  useSelector, useDispatch } from 'react-redux';
 import Loader from './layout/Loader';
 import routesOnePage from '../route';
 import routes from '../routes';
 import Config from '../config';
+import { checkAuthStatus } from '../store/actions/authActions';
 
 const AdminLayout = lazy(() => import('./layout/AdminLayout'));
 
 const App = () => {
     const { authenticated } = useSelector((state) => state.auth);
+    const dispatch = useDispatch();
+
+    useEffect(() => {
+        dispatch(checkAuthStatus());
+    }, [dispatch]);
+
     return (
         <BrowserRouter basename={Config.basename}>
             <Suspense fallback={<Loader />}>
@@ -42,7 +49,7 @@ const App = () => {
                             ))}
                         </Route>
                     ) : (
-                        <Route path="*" element={<Navigate to="/auth/signin-1" />} />
+                        <Route path="*" element={<Navigate to="/auth/signin" />} />
                     )}
 
                     {/* Default Redirect */}

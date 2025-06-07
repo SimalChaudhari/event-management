@@ -17,7 +17,6 @@ import { EmailService } from 'service/email.service';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -52,8 +51,7 @@ export class AuthService {
           role: user.role,
           // type: 'access' // Add a type claim
         },
-        { expiresIn: '15d', secret: process.env.JWT_SECRET } // Use a specific secret for access tokens
-  
+        { expiresIn: '10d', secret: process.env.JWT_SECRET }, // Use a specific secret for access tokens
       ); // Access token expires in 15 minutes
     } catch (error) {
       this.handleError(error);
@@ -72,8 +70,7 @@ export class AuthService {
           role: user.role,
           // type: 'refresh' // Add a type claim
         },
-        { expiresIn: '15d', secret: process.env.REFRESH_TOKEN_SECRET } // Use a specific secret for refresh tokens
- 
+        { expiresIn: '30d', secret: process.env.REFRESH_TOKEN_SECRET }, // Use a specific secret for refresh tokens
       ); // Refresh token expires in 7 days
     } catch (error) {
       this.handleError(error);
@@ -131,9 +128,12 @@ export class AuthService {
   }
 
   // Login a user
-  async login(userDto: UserDto): Promise<{ message: string;  user: Partial<UserEntity> ;accessToken: string; refreshToken: string }> {
- 
-    
+  async login(userDto: UserDto): Promise<{
+    message: string;
+    user: Partial<UserEntity>;
+    accessToken: string;
+    refreshToken: string;
+  }> {
     try {
       const user = await this.userRepository.findOne({
         where: { email: userDto.email },
@@ -164,7 +164,7 @@ export class AuthService {
       const accessToken = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken(user);
 
-             // Save the refresh token in the database
+      // Save the refresh token in the database
       user.refreshToken = refreshToken;
       await this.userRepository.save(user);
 
@@ -182,25 +182,31 @@ export class AuthService {
         message: 'Login successful',
         user: sanitizedUser,
         accessToken,
-        refreshToken 
+        refreshToken,
       };
     } catch (error) {
       this.handleError(error);
     }
   }
 
-// events-backend/src/auth/auth.service.ts
+  // events-backend/src/auth/auth.service.ts
 
-async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-  try {
+  async refreshToken(
+    oldRefreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    try {
       // Decode the refresh token to get the user ID
-      const payload = this.jwtService.verify(oldRefreshToken, { secret: process.env.REFRESH_TOKEN_SECRET });
+      const payload = this.jwtService.verify(oldRefreshToken, {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+      });
 
       // Find the user by ID and verify the refresh token
-      const user = await this.userRepository.findOne({ where: { id: payload.sub, refreshToken: oldRefreshToken } });
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub, refreshToken: oldRefreshToken },
+      });
 
       if (!user) {
-          throw new UnauthorizedException('Invalid refresh token');
+        throw new UnauthorizedException('Invalid refresh token');
       }
 
       // Generate new tokens
@@ -212,10 +218,10 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       await this.userRepository.save(user);
 
       return { accessToken: newAccessToken, refreshToken: newRefreshToken };
-  } catch (error) {
+    } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
-}
 
   // Verify OTP
   async verifyOtp(email: string, otp: string): Promise<{ message: string }> {
@@ -246,6 +252,38 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
 
   // Forget Password
 
+  async adminForgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email, role: UserRole.Admin },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Admin not found');
+      }
+
+      // Generate OTP
+      const otp = this.generateOTP();
+
+      // Save OTP and expiry time (5 minutes)
+      user.otp = otp;
+      user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+      await this.userRepository.save(user);
+
+      // Send OTP via email
+      try {
+        await this.emailService.sendOTP(email, otp);
+        return { message: 'OTP has been sent to your email' };
+      } catch (emailError) {
+        throw new BadRequestException(
+          'Failed to send OTP. Please try again later.',
+        );
+      }
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
       const user = await this.userRepository.findOne({
@@ -264,10 +302,14 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
       await this.userRepository.save(user);
 
-      // Send OTP via email
-      await this.emailService.sendOTP(email, otp);
-
-      return { message: 'OTP has been sent to your email' };
+      try {
+        await this.emailService.sendOTP(email, otp);
+        return { message: 'OTP has been sent to your email' };
+      } catch (emailError) {
+        throw new BadRequestException(
+          'Failed to send OTP. Please try again later.',
+        );
+      }
     } catch (error) {
       this.handleError(error);
     }
@@ -377,48 +419,56 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
   }
 
   // admin
-  async adminLogin(userDto: UserDto): Promise<{ message: string; user: Partial<UserEntity>; accessToken: string; refreshToken: string }> {
+  async adminLogin(userDto: UserDto): Promise<{
+    message: string;
+    user: Partial<UserEntity>;
+    accessToken: string;
+    refreshToken: string;
+  }> {
     try {
       const user = await this.userRepository.findOne({
         where: { email: userDto.email },
       });
-  
-      if (!user || user.role !== 'admin') {  // Check if user is an admin
+
+      if (!user || user.role !== 'admin') {
+        // Check if user is an admin
         throw new UnauthorizedException('Invalid admin credentials');
       }
       if (!user.isVerify) {
-        throw new UnauthorizedException('User is not verified. Please verify your email.');
+        throw new UnauthorizedException(
+          'User is not verified. Please verify your email.',
+        );
       }
-  
+
       if (!userDto.password) {
         throw new BadRequestException('Password is required');
       }
-  
-      const isPasswordValid = await bcrypt.compare(userDto.password, user.password);
-  
+
+      const isPasswordValid = await bcrypt.compare(
+        userDto.password,
+        user.password,
+      );
+
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
       }
-  
+
       const accessToken = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken(user);
-  
+
       user.refreshToken = refreshToken;
       const savedUser = await this.userRepository.save(user);
-  
-   
-  
+
       return {
         message: 'Admin login successful',
         user: savedUser,
         accessToken,
-        refreshToken
+        refreshToken,
       };
     } catch (error) {
       this.handleError(error);
     }
   }
-
 
   async changePassword(
     userId: string,
@@ -428,68 +478,75 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
   ): Promise<{ success: boolean; message: string }> {
     try {
       if (newPassword !== confirmPassword) {
-        throw new BadRequestException('New password and confirm password do not match');
+        throw new BadRequestException(
+          'New password and confirm password do not match',
+        );
       }
-  
+
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
-  
+
       if (!user) {
         throw new BadRequestException('User not found');
       }
-  
+
       // Verify current password
-      const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password,
+      );
       if (!isPasswordValid) {
         throw new BadRequestException('Current password is incorrect');
       }
-  
+
       // Hash new password
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      
+
       // Update password
       user.password = hashedPassword;
       await this.userRepository.save(user);
-  
-      return { 
+
+      return {
         success: true,
-        message: 'Password changed successfully' 
+        message: 'Password changed successfully',
       };
     } catch (error) {
       this.handleError(error);
     }
   }
 
-
-  async signout(userId: string, token: string): Promise<{ success: boolean; message: string }> {
+  async signout(
+    userId: string,
+    token: string,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
-  
+
       if (!user) {
         throw new BadRequestException('User not found');
       }
-  
+
       // Extract token info to get expiration time
       const decodedToken = this.jwtService.decode(token);
       if (decodedToken && typeof decodedToken === 'object') {
         const exp = decodedToken.exp as number;
-        
+
         // Calculate how long until token expires (in seconds)
         const ttl = exp - Math.floor(Date.now() / 1000);
-        
+
         if (ttl > 0) {
           // Add token to blacklist with TTL equal to remaining time until expiration
           await this.cacheManager.set(`blacklisted_${token}`, true, ttl * 1000);
         }
       }
-  
+
       // Clear refresh token
       user.refreshToken = null as any;
       await this.userRepository.save(user);
-  
+
       return {
         success: true,
         message: 'Logged out successfully',
@@ -498,10 +555,9 @@ async refreshToken(oldRefreshToken: string): Promise<{ accessToken: string; refr
       this.handleError(error);
     }
   }
-  
+
   // Add a method to check if a token is blacklisted
   async isTokenBlacklisted(token: string): Promise<boolean> {
     return !!(await this.cacheManager.get(`blacklisted_${token}`));
   }
-  
 }

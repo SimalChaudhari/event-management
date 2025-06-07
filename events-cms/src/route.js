@@ -1,20 +1,87 @@
 import * as React from 'react';
-const Signin1 = React.lazy(() => import('./Demo/Authentication/SignIn/SignIn1'));
-const ResetPassword1 = React.lazy(() => import('./Demo/Authentication/ResetPassword/ResetPassword1'));
-const ChangePassword = React.lazy(() => import('./Demo/Authentication/ChangePassword'));
-const ProfileSettings = React.lazy(() => import('./Demo/Authentication/ProfileSettings'));
-const TabsAuth = React.lazy(() => import('./Demo/Authentication/TabsAuth'));
-const Error = React.lazy(() => import('./Demo/Maintenance/Error'));
-const OfflineUI = React.lazy(() => import('./Demo/Maintenance/OfflineUI'));
-const ComingSoon = React.lazy(() => import('./Demo/Maintenance/ComingSoon'));
-const route = [
-    { path: '/auth/signin-1', exact: true, name: 'Signin 1', component: Signin1 },
-    { path: '/auth/reset-password-1', exact: true, name: 'Reset Password 1', component: ResetPassword1 },
-    { path: '/auth/change-password', exact: true, name: 'Change Password', component: ChangePassword },
-    { path: '/auth/profile-settings', exact: true, name: 'Profile Settings', component: ProfileSettings },
-    { path: '/auth/tabs-auth', exact: true, name: 'Tabs Authentication', component: TabsAuth },
-    { path: '/maintenance/error', exact: true, name: 'Error', component: Error },
-    { path: '/maintenance/coming-soon', exact: true, name: 'Coming Soon', component: ComingSoon },
-    { path: '/maintenance/offline-ui', exact: true, name: 'Offline UI', component: OfflineUI }
+
+/**
+ * @typedef {Object} RouteConfig
+ * @property {string} path - The URL path for the route
+ * @property {boolean} exact - Whether the route should match exactly
+ * @property {string} name - Display name of the route
+ * @property {React.LazyExoticComponent} component - Lazy loaded component
+ */
+
+/**
+ * Authentication related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const authComponents = {
+  Signin: React.lazy(() => import('./Pages/Authentication/SignIn/SignIn')),
+  ResetPassword: React.lazy(() => import('./Pages/Authentication/ResetPassword/ResetPassword')),
+  ChangePassword: React.lazy(() => import('./Pages/Authentication/ChangePassword'))
+};
+
+/**
+ * Maintenance related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const maintenanceComponents = {
+  Error: React.lazy(() => import('./Demo/Maintenance/Error')),
+  OfflineUI: React.lazy(() => import('./Demo/Maintenance/OfflineUI')),
+  ComingSoon: React.lazy(() => import('./Demo/Maintenance/ComingSoon'))
+};
+
+/**
+ * Authentication routes configuration
+ * @type {RouteConfig[]}
+ */
+const authRoutes = [
+  {
+    path: '/auth/signin',
+    exact: true,
+    name: 'Signin',
+    component: authComponents.Signin
+  },
+  {
+    path: '/auth/reset-password',
+    exact: true,
+    name: 'Reset Password',
+    component: authComponents.ResetPassword
+  },
+  {
+    path: '/auth/change-password',
+    exact: true,
+    name: 'Change Password',
+    component: authComponents.ChangePassword
+  }
 ];
-export default route;
+
+/**
+ * Maintenance routes configuration
+ * @type {RouteConfig[]}
+ */
+const maintenanceRoutes = [
+  {
+    path: '/maintenance/error',
+    exact: true,
+    name: 'Error',
+    component: maintenanceComponents.Error
+  },
+  {
+    path: '/maintenance/coming-soon',
+    exact: true,
+    name: 'Coming Soon',
+    component: maintenanceComponents.ComingSoon
+  },
+  {
+    path: '/maintenance/offline-ui',
+    exact: true,
+    name: 'Offline UI',
+    component: maintenanceComponents.OfflineUI
+  }
+];
+
+/**
+ * Combined routes configuration
+ * @type {RouteConfig[]}
+ */
+const routes = [...authRoutes, ...maintenanceRoutes];
+
+export default routes;

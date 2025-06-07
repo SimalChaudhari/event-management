@@ -97,7 +97,7 @@ export class AuthController {
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
         message:
-          'Admin login failed. Please check your credentials and try again.',
+          'Login failed. Please check your credentials and try again.',
       });
     }
   }
@@ -136,6 +136,12 @@ export class AuthController {
     return response.status(HttpStatus.OK).json(result);
   }
 
+  @Post('admin/forget')
+  @HttpCode(HttpStatus.OK)
+  async adminForgotPassword(@Body('email') email: string) {
+    return this.authService.adminForgotPassword(email);
+  }
+
   @Post('forget')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body('email') email: string) {
@@ -172,7 +178,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Req() req: Request, // Get the request object to access the user from JWT
-    @Body()body: {
+    @Body()
+    body: {
       currentPassword: string;
       newPassword: string;
       confirmPassword: string;
@@ -200,26 +207,23 @@ export class AuthController {
   @Post('signout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async signout(
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
+  async signout(@Req() req: Request, @Res() response: Response) {
     try {
       const userId = (req as any).user.id;
       // Extract token from authorization header
-     // Extract token from authorization header
-const authHeader = (req.headers as any).authorization;
-const token = authHeader?.split(' ')[1]; // Get the token part after "Bearer "
-      
+      // Extract token from authorization header
+      const authHeader = (req.headers as any).authorization;
+      const token = authHeader?.split(' ')[1]; // Get the token part after "Bearer "
+
       if (!token) {
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
           message: 'No token provided',
         });
       }
-      
+
       const result = await this.authService.signout(userId, token);
-      
+
       return response.status(HttpStatus.OK).json(result);
     } catch (error: any) {
       return response.status(HttpStatus.BAD_REQUEST).json({
@@ -228,5 +232,4 @@ const token = authHeader?.split(' ')[1]; // Get the token part after "Bearer "
       });
     }
   }
-
 }

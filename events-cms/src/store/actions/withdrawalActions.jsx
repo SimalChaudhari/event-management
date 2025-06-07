@@ -12,7 +12,7 @@ export const WithdrawalList = () => async (dispatch) => {
         return true;
     } catch (error) {
         // Check if error response exists and handle error message
-        const errorMessage = error?.response?.data?.message || 'An unexpected error occurred. Please try again.';
+        const errorMessage = error?.response?.data?.message ;
         toast.error(errorMessage);
     }
     return false; // Return false for any errors

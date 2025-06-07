@@ -57,7 +57,7 @@ function AddEventModal({ show, handleClose, editData }) {
                 },
                 (error) => {
                     console.error('Error fetching geolocation: ', error);
-                    alert('Unable to fetch your location');
+                    // alert('Unable to fetch your location');
                 }
             );
         } else {

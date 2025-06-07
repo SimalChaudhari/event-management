@@ -1,9 +1,9 @@
 import { AUTH_DATA } from "../constants/actionTypes";
 
 const initialState = {
-  authenticated: !!localStorage.getItem("token"), // Check token presence
-  authUser: JSON.parse(localStorage.getItem("userData"))?.user || null, // Use user data consistently
-  loading: false
+  authenticated: false,
+  authUser: null,
+  loading: true  // Add loading state
 };
 
 const authReducer = (state = initialState, { type, payload } = {}) => {
@@ -12,15 +12,21 @@ const authReducer = (state = initialState, { type, payload } = {}) => {
       return {
         ...state,
         authenticated: true,
-        authUser: payload.user, // Ensure consistency with user structure
+        authUser: payload.user,
+        loading: false
       };
 
     case "LOGOUT":
       return {
-        authenticated: false,
-        authUser: '',
+        ...initialState,
+        loading: false
       };
 
+    case "SET_LOADING":
+      return {
+        ...state,
+        loading: payload
+      };
 
     default:
       return state;

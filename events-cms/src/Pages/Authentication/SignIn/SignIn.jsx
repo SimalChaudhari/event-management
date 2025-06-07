@@ -8,32 +8,37 @@ import logoDark from '../../../assets/images/logo-dark.png';
 import { login } from '../../../store/actions/authActions';
 import { toast } from 'react-toastify';
 
-const SignUp1 = () => {
+const SignIn = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
+    // Reset form function
+    const resetForm = () => {
+        setEmail('');
+        setPassword('');
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-    
+
         try {
-            const data = { email, password }; // Create a single object for data
-            const response = await dispatch(login(data)); // Pass `data` directly
+            const data = { email, password };
+            const response = await dispatch(login(data));
             if (response.success) {
-                 navigate('/dashboard'); // Redirect to the dashboard or home page
+                navigate('/dashboard');
             } else {
-                console.log('Invalid credentials, please try again.');
+                resetForm();
             }
         } catch (error) {
-            console.log('An error occurred. Please try again later.');
+            resetForm();
         } finally {
             setLoading(false);
         }
     };
-    
 
     return (
         <>
@@ -70,26 +75,14 @@ const SignUp1 = () => {
                                             />
                                         </div>
 
-                                        <Form.Group className="text-left">
-                                            <Form.Check
-                                                custom
-                                                type="checkbox"
-                                                id="save-credentials"
-                                                label={'Save credentials'}
-                                            />
-                                        </Form.Group>
-
-                                        <button
-                                            className="btn btn-block btn-primary mb-4"
-                                            type="submit"
-                                            disabled={loading}
-                                        >
+                                      
+                                        <button className="btn btn-block btn-primary mb-4" type="submit" disabled={loading}>
                                             {loading ? 'Signing in...' : 'Signin'}
                                         </button>
                                     </form>
                                     <p className="mb-2 text-muted">
                                         Forgot password?{' '}
-                                        <NavLink to="/auth/reset-password-1" className="f-w-400">
+                                        <NavLink to="/auth/reset-password" className="f-w-400">
                                             Reset
                                         </NavLink>
                                     </p>
@@ -103,4 +96,4 @@ const SignUp1 = () => {
     );
 };
 
-export default SignUp1;
+export default SignIn;
