@@ -1,8 +1,8 @@
 {
-    "name": "able-pro-react-hook-js",
-    "version": "16.13.1",
+    "name": "evential-cms",
+    "version": "1.0.0",
     "private": true,
-    "homepage": "/dashboard",
+    "homepage": "/",
     "dependencies": {
         "@ckeditor/ckeditor5-build-balloon": "^32.0.0",
         "@ckeditor/ckeditor5-build-classic": "^32.0.0",

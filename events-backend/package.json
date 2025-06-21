@@ -1,7 +1,8 @@
 {
-  "name": "b2b-vendor-app",
+  "name": "evential",
   "version": "0.0.1",
-  "description": "B2B Vendor Application with Authentication",
+  "description": "Evential Backend",    
+  "author": "simal chaudhari",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
