@@ -16,6 +16,7 @@ import { join } from 'path';
 import { CacheModule } from '@nestjs/cache-manager';
 import { TokenBlacklistMiddleware } from 'middleware/tokenBlacklistMiddleware';
 import { WithdrawalModule } from 'withdrawal/withdrawal.module';
+import { SettingModule } from 'settings/setting.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -33,6 +34,7 @@ console.log(join(__dirname, '..', 'uploads'))
       // },
     }),
     AuthModule,
+    SettingModule,
     UserModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,
     CacheModule.register({

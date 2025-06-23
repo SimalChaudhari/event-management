@@ -89,7 +89,9 @@ export class AuthService {
       });
 
       if (existingUser) {
-        throw new BadRequestException('Email already exists');
+        throw new BadRequestException(
+          'Email address already taken. Try logging in or using another email.',
+        );
       }
       if (!userDto.password) {
         throw new BadRequestException('Password is required');
@@ -103,6 +105,7 @@ export class AuthService {
         ...userDto,
         password: hashedPassword,
         role: userDto.role || UserRole.User, // Set default role if not provide
+        acceptTerms: Boolean(userDto.acceptTerms), 
       });
 
       await this.userRepository.save(newUser); // Save the new user
@@ -120,7 +123,7 @@ export class AuthService {
 
       return {
         message:
-          'Registration successful. Please verify your email with the OTP sent.', // Return only the message
+          "We've sent an account activation email to your inbox. Please check your email and follow the activation link to get started. Once your account is activated, you can proceed to the login page.", // Return only the message
       };
     } catch (error) {
       this.handleError(error);
@@ -140,7 +143,9 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new UnauthorizedException(
+          'Email or password not recognized. Create an account to get started.',
+        );
       }
       if (!user.isVerify) {
         throw new UnauthorizedException(
@@ -158,7 +163,9 @@ export class AuthService {
       );
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new UnauthorizedException(
+          'The email or password you entered is incorrect. Please try again.',
+        );
       }
 
       const accessToken = this.generateAccessToken(user);
@@ -185,7 +192,7 @@ export class AuthService {
         refreshToken,
       };
     } catch (error) {
-      this.handleError(error);
+      return this.handleError(error);
     }
   }
 

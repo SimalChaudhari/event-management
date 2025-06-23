@@ -92,6 +92,11 @@ export class UserDto {
   @IsOptional()
   otpExpiry?: Date; // Updated field
 
+   // Optional field for Terms & Conditions acceptance
+   @IsOptional()
+   @IsBoolean()
+   acceptTerms?: boolean;
+
   @IsOptional()
   createdAt?: Date;
 

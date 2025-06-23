@@ -12,6 +12,8 @@ import {
   Get,
   UseGuards,
   Req,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserDto } from './../user/users.dto';
@@ -41,7 +43,7 @@ export class AuthController {
   async register(
     @Res() response: Response,
     @Body() userDto: UserDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
       userDto.profilePicture = `uploads/images/${file.filename}`;
@@ -74,10 +76,19 @@ export class AuthController {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
-    } catch (error) {
-      return response.status(HttpStatus.UNAUTHORIZED).json({
+    } catch (error: any) {
+      // Get the appropriate status code based on error type
+      let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+      
+      if (error instanceof UnauthorizedException) {
+        statusCode = HttpStatus.UNAUTHORIZED;
+      } else if (error instanceof BadRequestException) {
+        statusCode = HttpStatus.BAD_REQUEST;
+      }
+  
+      return response.status(statusCode).json({
         success: false,
-        message: 'Login failed. Please check your credentials and try again.',
+        message: error.message, // Use the actual error message from service
       });
     }
   }
