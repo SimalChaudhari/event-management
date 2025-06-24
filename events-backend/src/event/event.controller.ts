@@ -13,8 +13,10 @@ import {
   UploadedFile,
   UseGuards,
   NotFoundException,
+  UploadedFiles,
+
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { EventService } from './event.service';
 import { EventDto, EventType } from './event.dto';
@@ -35,29 +37,98 @@ export class EventController {
   @Post('create')
   @Roles(UserRole.Admin)
   @UseInterceptors(
-    FileInterceptor('image', {
+    FileFieldsInterceptor([
+      { name: 'images', maxCount: 10 },
+      { name: 'documents', maxCount: 5 },
+    ], {
       storage: diskStorage({
-        destination: './uploads/event', // Directory to save the uploaded files
+        destination: (req, file, cb) => {
+          if (file.fieldname === 'images') {
+            cb(null, './uploads/event/images');
+          } else if (file.fieldname === 'documents') {
+            cb(null, './uploads/event/documents');
+          } else {
+            cb(null, './uploads/event/images'); // Default
+          }
+        },
         filename: (req, file, cb) => {
-          const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
         },
       }),
+      fileFilter: (req, file, cb) => {
+        if (file.fieldname === 'images' && file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
+          cb(null, true);
+        } else {
+          cb(new Error('Invalid file type for field'), false);
+        }
+      },
     }),
   )
   async createEvent(
     @Body() eventDto: EventDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[] },
     @Res() response: Response,
   ) {
-    if (file) {
-      eventDto.image = `uploads/event/${file.filename}`;
+    try {
+      if (files.images && files.images.length > 0) {
+        eventDto.images = files.images.map(
+          (img) => `uploads/event/images/${img.filename}`,
+        );
+      }
+
+      if (files.documents && files.documents.length > 0) {
+        eventDto.documents = files.documents.map(
+          (doc) => `uploads/event/documents/${doc.filename}`,
+        );
+      }
+
+      await this.eventService.createEvent(eventDto);
+
+      return response.status(201).json({
+        success: true,
+        message: 'Event created successfully',
+      });
+    } catch (error) {
+      console.log(error);
+      // Clean up uploaded files if error occurs
+      if (files.images && files.images.length > 0) {
+        files.images.forEach((file) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'images',
+            file.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
+      if (files.documents && files.documents.length > 0) {
+        files.documents.forEach((file) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'documents',
+            file.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
+
+      throw error;
     }
-    await this.eventService.createEvent(eventDto);
-    return response.status(201).json({
-      success: true,
-      message: 'Event created successfully',
-    });
   }
 
   @Get()
@@ -95,72 +166,155 @@ export class EventController {
   @Put('update/:id')
   @Roles(UserRole.Admin)
   @UseInterceptors(
-    FileInterceptor('image', {
+    FileFieldsInterceptor([
+      { name: 'images', maxCount: 10 },
+      { name: 'documents', maxCount: 5 },
+    ], {
       storage: diskStorage({
-        destination: './uploads/event',
+        destination: (req, file, cb) => {
+          if (file.fieldname === 'images') {
+            cb(null, './uploads/event/images');
+          } else if (file.fieldname === 'documents') {
+            cb(null, './uploads/event/documents');
+          } else {
+            cb(null, './uploads/event/images'); // Default
+          }
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
         },
       }),
+      fileFilter: (req, file, cb) => {
+        if (file.fieldname === 'images' && file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
+          cb(null, true);
+        } else {
+          cb(new Error('Invalid file type for field'), false);
+        }
+      },
     }),
   )
   async updateEvent(
     @Param('id') id: string,
     @Body() eventDto: EventDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[] },
     @Res() response: Response,
   ) {
     // First get the event
-    const existingEvent = await this.eventService.getEventEntityById(id).catch(err => null);
-  
-    // If event not found, delete the just-uploaded image
+    const existingEvent = await this.eventService
+      .getEventEntityById(id)
+      .catch((err) => null);
+
+    // If event not found, delete the just-uploaded files
     if (!existingEvent) {
-      if (file) {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
+      if (files.images) {
+        files.images.forEach((img) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'images',
+            img.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
+      if (files.documents) {
+        files.documents.forEach((doc) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'documents',
+            doc.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
       }
       throw new NotFoundException('Event not found');
     }
-  
-    if (file) {
-      // Delete old file if it exists
-      if (existingEvent.image) {
-        const oldPath = path.join(__dirname, '..', '..', existingEvent.image);
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
-      }
-      eventDto.image = `uploads/event/${file.filename}`;
-    }
-  
+
     try {
-        const updatedEvent = await this.eventService.updateEvent(id, eventDto);
-    
-        // ✅ Delete old image only after successful validation & update
-        if (file && existingEvent.image) {
-          const oldPath = path.join(__dirname, '..', '..', existingEvent.image);
-          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      if (files.images && files.images.length > 0) {
+        // Delete old images if they exist
+        if (existingEvent.images && existingEvent.images.length > 0) {
+          existingEvent.images.forEach((oldImg) => {
+            const oldPath = path.join(__dirname, '..', '..', oldImg);
+            if (fs.existsSync(oldPath)) {
+              fs.unlinkSync(oldPath);
+            }
+          });
         }
-    
-        return response.status(200).json({
-          success: true,
-          message: 'Event updated successfully',
-          data: updatedEvent,
-        });
-      } catch (error) {
-        // ❌ If any error occurs, delete the newly uploaded file
-        if (file) {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', file.filename);
-          if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-        }
-        throw error; // Re-throw the error for global handler or client
+        eventDto.images = files.images.map(
+          (img) => `uploads/event/images/${img.filename}`,
+        );
       }
+
+      if (files.documents && files.documents.length > 0) {
+        // Delete old documents if they exist
+        if (existingEvent.documents && existingEvent.documents.length > 0) {
+          existingEvent.documents.forEach((oldDoc) => {
+            const oldPath = path.join(__dirname, '..', '..', oldDoc);
+            if (fs.existsSync(oldPath)) {
+              fs.unlinkSync(oldPath);
+            }
+          });
+        }
+        eventDto.documents = files.documents.map(
+          (doc) => `uploads/event/documents/${doc.filename}`,
+        );
+      }
+
+      const updatedEvent = await this.eventService.updateEvent(id, eventDto);
+
+      return response.status(200).json({
+        success: true,
+        message: 'Event updated successfully',
+        data: updatedEvent,
+      });
+    } catch (error) {
+      // Clean up uploaded files if error occurs
+      if (files.images) {
+        files.images.forEach((img) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'images',
+            img.filename,
+          );
+          if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+        });
+      }
+      if (files.documents) {
+        files.documents.forEach((doc) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'documents',
+            doc.filename,
+          );
+          if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+        });
+      }
+      throw error;
     }
-  
-  
+  }
 
   @Delete('delete/:id')
   @Roles(UserRole.Admin)

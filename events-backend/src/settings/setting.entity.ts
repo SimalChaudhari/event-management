@@ -49,3 +49,19 @@ export class Banner {
     @UpdateDateColumn()
     updatedAt!: Date;
 }
+
+@Entity('banner_events')
+export class BannerEvent {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column('simple-array')
+    imageUrls!: string[]; // Array of image URLs
+
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @UpdateDateColumn()
+    updatedAt!: Date;
+
+}

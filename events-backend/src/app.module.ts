@@ -17,6 +17,8 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { TokenBlacklistMiddleware } from 'middleware/tokenBlacklistMiddleware';
 import { WithdrawalModule } from 'withdrawal/withdrawal.module';
 import { SettingModule } from 'settings/setting.module';
+import { FavoriteEventModule } from 'favorite-event/favorite-event.module';
+import { FeedbackModule } from 'feedback/feedback.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -36,7 +38,7 @@ console.log(join(__dirname, '..', 'uploads'))
     AuthModule,
     SettingModule,
     UserModule,
-    EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,
+    EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

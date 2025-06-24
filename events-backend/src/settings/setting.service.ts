@@ -3,8 +3,8 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {  Banner, PrivacyPolicy, TermsConditions } from './setting.entity';
-import { CreateBannerDto, CreatePrivacyPolicyDto, CreateTermsConditionsDto,} from './setting.dto';
+import {  Banner, BannerEvent, PrivacyPolicy, TermsConditions } from './setting.entity';
+import { CreateBannerDto, CreateBannerEventDto, CreatePrivacyPolicyDto, CreateTermsConditionsDto,} from './setting.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -209,6 +209,145 @@ export class BannerService {
             // Remove the image at the specified index
             banner.imageUrls.splice(index, 1);
             const result = await this.bannerRepository.save(banner);
+
+            // Delete the file from upload folder
+            await this.deleteFileFromFolder(imageUrlToDelete);
+            
+            return { message: 'Banner image deleted successfully', data: result };
+        } catch (error: any) {
+            if (error instanceof NotFoundException || error instanceof BadRequestException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error deleting banner image', error.message);
+        }
+    }
+
+    // Helper method to delete a single file from folder
+    private async deleteFileFromFolder(imageUrl: string): Promise<void> {
+        try {
+            const filePath = path.join(process.cwd(), imageUrl);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log(`File deleted: ${filePath}`);
+            }
+        } catch (error) {
+            console.error(`Error deleting file ${imageUrl}:`, error);
+        }
+    }
+
+    // Helper method to delete multiple files from folder
+    private async deleteFilesFromFolder(imageUrls: string[]): Promise<void> {
+        try {
+            for (const imageUrl of imageUrls) {
+                await this.deleteFileFromFolder(imageUrl);
+            }
+        } catch (error) {
+            console.error('Error deleting files:', error);
+        }
+    }
+}
+
+// Banner Event
+
+@Injectable()
+export class BannerEventService {
+    constructor(
+        @InjectRepository(BannerEvent)
+        private bannerEventRepository: Repository<BannerEvent>
+    ) { }
+
+    async getOrShow(): Promise<BannerEvent | null> {
+        try {
+            const [bannerEvent] = await this.bannerEventRepository.find({
+                take: 1,
+                order: { id: 'ASC' }
+            });
+
+            return bannerEvent || null;
+        } catch (error: any) {
+            throw new InternalServerErrorException('Error retrieving banner events', error.message);
+        }
+    }
+
+    async createOrUpdate(createBannerEventDto: CreateBannerEventDto): Promise<{ message: string; data: BannerEvent }> {
+        try {
+            const [bannerEvent] = await this.bannerEventRepository.find({
+                take: 1,
+                order: { id: 'ASC' }
+            });
+
+            if (bannerEvent) {
+                // Delete previous files from upload folder
+                await this.deleteFilesFromFolder(bannerEvent.imageUrls);
+                
+                // Update existing banner
+                const updatedBannerEvent = this.bannerEventRepository.merge(bannerEvent, createBannerEventDto);
+                const result = await this.bannerEventRepository.save(updatedBannerEvent);
+                return { message: 'Banner events updated successfully', data: result };
+            } else {
+                // Create new banner if none exists
+                const newBannerEvent = this.bannerEventRepository.create(createBannerEventDto);
+                const result = await this.bannerEventRepository.save(newBannerEvent);
+                return { message: 'Banner events created successfully', data: result };
+            }
+        } catch (error: any) {
+            throw new InternalServerErrorException('Error creating or updating banners', error.message);
+        }
+    }
+
+    async deleteImage(imageUrl: string): Promise<{ message: string; data: Banner }> {
+        try {
+            const [bannerEvent] = await this.bannerEventRepository.find({
+                take: 1,
+                order: { id: 'ASC' }
+            });
+
+            if (!bannerEvent) {
+                throw new NotFoundException('No banner events found');
+            }
+
+            const updatedImageUrls = bannerEvent.imageUrls.filter(url => url !== imageUrl);
+            
+            if (updatedImageUrls.length === bannerEvent.imageUrls.length) {
+                throw new NotFoundException('Image not found in banner events');
+            }
+
+            // Delete the specific file from upload folder
+            await this.deleteFileFromFolder(imageUrl);
+
+            bannerEvent.imageUrls = updatedImageUrls;
+            const result = await this.bannerEventRepository.save(bannerEvent);
+            
+            return { message: 'Banner image deleted successfully', data: result };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error deleting banner image', error.message);
+        }
+    }
+
+    async deleteImageByIndex(index: number): Promise<{ message: string; data: Banner }> {
+        try {
+            const [bannerEvent] = await this.bannerEventRepository.find({
+                take: 1,
+                order: { id: 'ASC' }
+            });
+
+            if (!bannerEvent) {
+                throw new NotFoundException('No banner events found');
+            }
+
+            if (index < 0 || index >= bannerEvent.imageUrls.length) {
+                throw new BadRequestException('Invalid image index');
+            }
+
+            // Get the image URL to delete from folder
+            const imageUrlToDelete = bannerEvent.imageUrls[index];
+
+            // Remove the image at the specified index
+            bannerEvent.imageUrls.splice(index, 1);
+            const result = await this.bannerEventRepository.save(bannerEvent);
 
             // Delete the file from upload folder
             await this.deleteFileFromFolder(imageUrlToDelete);

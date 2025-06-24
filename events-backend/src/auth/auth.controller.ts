@@ -23,10 +23,16 @@ import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { SocialAuthService } from './social-auth.service';
+import { GoogleLoginDto, FacebookLoginDto, AppleLoginDto, LinkedInLoginDto } from '../user/users.dto';
+import { html } from 'Data/Data';
 
 @Controller('api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly socialAuthService: SocialAuthService,
+  ) {}
 
   @Post('register')
   @UseInterceptors(
@@ -238,6 +244,89 @@ export class AuthController {
       return response.status(HttpStatus.OK).json(result);
     } catch (error: any) {
       return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+// Google Popup Page
+  @Get('google-popup')
+  async googlePopupPage(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  }
+
+  @Post('google')
+  async googleLogin(@Body() googleLoginDto: GoogleLoginDto, @Res() response: Response) {
+    try {
+      const result = await this.socialAuthService.googleLogin(googleLoginDto.idToken);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('facebook')
+  async facebookLogin(@Body() facebookLoginDto: FacebookLoginDto, @Res() response: Response) {
+    try {
+      const result = await this.socialAuthService.facebookLogin(facebookLoginDto.accessToken);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('apple')
+  async appleLogin(@Body() appleLoginDto: AppleLoginDto, @Res() response: Response) {
+    try {
+      const result = await this.socialAuthService.appleLogin(appleLoginDto.identityToken);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('linkedin')
+  async linkedinLogin(@Body() linkedinLoginDto: LinkedInLoginDto, @Res() response: Response) {
+    try {
+      const result = await this.socialAuthService.linkedinLogin(linkedinLoginDto.accessToken);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
         message: error.message,
       });

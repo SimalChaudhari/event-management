@@ -304,14 +304,25 @@ export class EventService {
     const event = await this.eventRepository.findOne({ where: { id } });
     if (!event) throw new NotFoundException('Event not found');
 
-    // Delete profile picture from filesystem if exists
-    if (event.image) {
-      const filePath = path.resolve(event.image);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    // Delete multiple images if they exist
+    if (event.images && event.images.length > 0) {
+      event.images.forEach(imagePath => {
+        const filePath = path.resolve(imagePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
     }
 
+    // Delete multiple documents if they exist
+    if (event.documents && event.documents.length > 0) {
+      event.documents.forEach(docPath => {
+        const filePath = path.resolve(docPath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
 
     await this.eventRepository.remove(event);
     return { message: 'Event deleted successfully' };

@@ -30,3 +30,12 @@ export class CreateBannerDto {
     @IsString({ each: true })
     readonly imageUrls!: string[];
 }
+export class CreateBannerEventDto {
+    @IsString()
+    readonly id?: string;
+
+    @IsArray()
+    @IsString({ each: true })
+    readonly imageUrls!: string[];
+}
+

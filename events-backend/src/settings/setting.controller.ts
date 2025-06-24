@@ -15,13 +15,15 @@ import {
   PrivacyPolicyService,
   TermsConditionsService,
   BannerService,
+  BannerEventService,
 } from './setting.service';
 import {
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
   CreateBannerDto,
+  CreateBannerEventDto,
 } from './setting.dto';
-import { PrivacyPolicy, TermsConditions, Banner } from './setting.entity';
+import { PrivacyPolicy, TermsConditions, Banner, BannerEvent } from './setting.entity';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
@@ -117,5 +119,54 @@ export class BannerController {
   async deleteImageByIndex(@Param('index') index: string): Promise<{ message: string; data: Banner }> {
     const imageIndex = parseInt(index);
     return this.bannerService.deleteImageByIndex(imageIndex);
+  }
+}
+
+
+
+@Controller('banner-events')
+export class BannerEventController {
+  constructor(private readonly bannerEventService: BannerEventService) { }
+
+  @Get()
+  async getOrShow(): Promise<BannerEvent | { message: string }> {
+    const bannerEvent = await this.bannerEventService.getOrShow();
+    if (!bannerEvent) {
+      return { message: 'No banner events found' };
+    }
+    return bannerEvent;
+  }
+
+  @Post()
+  @UseInterceptors(
+    FilesInterceptor('images', 10, { // Allow up to 10 images
+      storage: diskStorage({
+        destination: './uploads/banner-events',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+    }),
+  )
+  async createOrUpdate(
+    @UploadedFiles() files: Express.Multer.File[],
+  ): Promise<{ message: string; data: BannerEvent }> {
+    const imageUrls = files.map(file => `uploads/banner-events/${file.filename}`);
+    const createBannerEventDto: CreateBannerEventDto = {
+      imageUrls: imageUrls
+    };
+    return this.bannerEventService.createOrUpdate(createBannerEventDto);
+  }
+
+  @Delete('image')
+  async deleteImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
+    return this.bannerEventService.deleteImage(imageUrl);
+  }
+
+  @Delete('image/:index')
+  async deleteImageByIndex(@Param('index') index: string): Promise<{ message: string; data: BannerEvent }> {
+    const imageIndex = parseInt(index);
+    return this.bannerEventService.deleteImageByIndex(imageIndex);
   }
 }

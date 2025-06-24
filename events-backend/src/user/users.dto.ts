@@ -9,7 +9,7 @@ import {
   IsEnum,
   MinLength,
 } from 'class-validator';
-import { UserRole } from './users.entity';
+import { AuthProvider, UserRole } from './users.entity';
 
 
 export class UserDto {
@@ -102,4 +102,43 @@ export class UserDto {
 
   @IsOptional()
   updatedAt?: Date;
+}
+
+
+export class SocialLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  accessToken!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  provider!: AuthProvider;
+
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
+}
+
+export class GoogleLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  idToken!: string; // Google ID token
+}
+
+export class FacebookLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  accessToken!: string;
+}
+
+export class AppleLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  identityToken!: string; // Apple ID token
+}
+
+export class LinkedInLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  accessToken!: string;
 }

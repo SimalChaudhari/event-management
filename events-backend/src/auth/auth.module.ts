@@ -7,6 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import * as dotenv from 'dotenv';
 import { UserEntity } from './../user/users.entity';
 import { EmailService } from './../service/email.service';
+import { SocialAuthService } from './social-auth.service';
 
 
 dotenv.config(); // Load environment variables
@@ -18,8 +19,8 @@ dotenv.config(); // Load environment variables
   }),
 
 ],
-  providers: [AuthService,EmailService],
+  providers: [AuthService,SocialAuthService,EmailService],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService,SocialAuthService],
 })
 export class AuthModule {}

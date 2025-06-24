@@ -59,9 +59,13 @@ export class EventDto {
     @IsString()
     country?: string;
 
+    // Multiple images support
     @IsOptional()
-    @IsString()
-    image?: string;
+    images?: string[];
+
+    // Multiple PDF documents support
+    @IsOptional()
+    documents?: string[];
 
     @IsOptional()
     @IsEnum(EventType)

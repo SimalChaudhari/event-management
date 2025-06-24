@@ -1,3 +1,4 @@
+import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Order } from 'order/order.entity';
 import {
   Entity,
@@ -11,6 +12,13 @@ import {
 export enum UserRole {
   Admin = 'admin',
   User = 'user',
+}
+export enum AuthProvider {
+  LOCAL = 'local',
+  GOOGLE = 'google',
+  FACEBOOK = 'facebook',
+  APPLE = 'apple',
+  LINKEDIN = 'linkedin',
 }
 
 @Entity('users')
@@ -89,6 +97,22 @@ export class UserEntity {
   @Column({ nullable: true, default: false })
   acceptTerms!: boolean;
 
+  // Social Login Fields
+  @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.LOCAL })
+  authProvider!: AuthProvider;
+
+  @Column({ nullable: true })
+  socialId?: string; // ID from social provider
+
+  @Column({ nullable: true })
+  socialAccessToken?: string; // Access token from social provider
+
+  @Column({ nullable: true })
+  socialRefreshToken?: string; // Refresh token from social provider
+
+  @Column({ nullable: true })
+  socialTokenExpiry?: Date; // Token expiry from social provider
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
 
@@ -97,4 +121,7 @@ export class UserEntity {
 
   @OneToMany(() => Order, (order) => order.user)
   orders?: Order[];
+
+  @OneToMany(() => FavoriteEvent, (favoriteEvent) => favoriteEvent.user)
+  favoriteEvents?: FavoriteEvent[];
 }

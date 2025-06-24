@@ -3,6 +3,8 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateCol
 import { EventSpeaker } from './event-speaker.entity';
 import { Cart } from 'cart/cart.entity';
 import { OrderItemEntity } from 'order/event.item.entity';
+import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
+import { Feedback } from 'feedback/feedback.entity';
 
 export enum EventType {
     Physical = 'Physical',
@@ -48,8 +50,15 @@ export class Event {
     @Column({ type: 'varchar', nullable: true })
     country?: string;
 
-    @Column({ type: 'varchar', nullable: true })
-    image?: string;
+
+    // Multiple images support
+    @Column('simple-array', { nullable: true })
+    images?: string[];
+
+    // Multiple PDF documents support
+    @Column('simple-array', { nullable: true })
+    documents?: string[];
+
 
     @Column({ type: 'enum', enum: EventType, nullable: true })
     type?: EventType;
@@ -79,4 +88,9 @@ export class Event {
     @OneToMany(() => OrderItemEntity, (order) => order.event)
     orderItem?: OrderItemEntity[];
 
+    @OneToMany(() => FavoriteEvent, (favoriteEvent) => favoriteEvent.event)
+    favoriteEvents?: FavoriteEvent[];
+
+    @OneToMany(() => Feedback, (feedback) => feedback.event)
+    feedbacks?: Feedback[];
 }
