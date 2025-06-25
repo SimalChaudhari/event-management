@@ -19,6 +19,7 @@ import { WithdrawalModule } from 'withdrawal/withdrawal.module';
 import { SettingModule } from 'settings/setting.module';
 import { FavoriteEventModule } from 'favorite-event/favorite-event.module';
 import { FeedbackModule } from 'feedback/feedback.module';
+import { CouponModule } from 'coupon/coupon.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -38,7 +39,7 @@ console.log(join(__dirname, '..', 'uploads'))
     AuthModule,
     SettingModule,
     UserModule,
-    EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,
+    EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

@@ -1,4 +1,3 @@
-
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
 import { Order } from './order.entity';
 import { Event } from 'event/event.entity';
@@ -22,6 +21,9 @@ export class OrderItemEntity {
 
     @Column({ type: 'enum', enum: OrderNoStatus, default: OrderNoStatus.Pending })
     status!: OrderNoStatus;
+
+    @Column({ type: 'varchar', nullable: true })
+    invoiceNumber?: string;
 
     @Column({ default: false })
     isDeleted!: boolean;

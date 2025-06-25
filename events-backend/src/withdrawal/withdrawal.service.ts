@@ -9,7 +9,6 @@ import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { OrderItemEntity, OrderNoStatus } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
-import { OrderStatus } from 'order/order.dto';
 import { getEventColor } from 'utils/event-color.util';
   
 @Injectable()

@@ -1,5 +1,5 @@
 // events-backend/src/order/order.service.ts
-import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository } from 'typeorm';
 import { Order } from './order.entity';
@@ -10,6 +10,9 @@ import { Event } from 'event/event.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { Cart } from 'cart/cart.entity';
 import { getEventColor } from 'utils/event-color.util';
+import { CouponService } from 'coupon/coupon.service';
+import { OrderNoStatus } from './order.dto';
+import { Not, IsNull } from 'typeorm';
 
 
 @Injectable()
@@ -30,6 +33,7 @@ export class OrderService {
         private readonly orderItemRepository: Repository<OrderItemEntity>,
         @InjectRepository(RegisterEvent)
         private readonly registerEventRepository: Repository<RegisterEvent>,
+        private readonly couponService: CouponService,
     
 
     ) {}
@@ -67,7 +71,7 @@ export class OrderService {
     }
 
     async createOrderWithItems(userId: string, dto: CreateOrderWithItemsDto): Promise<any> {
-        const { paymentMethod, price, status = OrderStatus.Pending, eventId } = dto;
+        const { paymentMethod, price, eventId, couponCode } = dto;
 
         // 1. Split the eventId string into an array
         const eventIds = eventId.split(',').map((id) => id.trim());
@@ -77,7 +81,8 @@ export class OrderService {
         if (!user) throw new NotFoundException('User not found');
         
         // 3. Validate all eventIds and cart items FIRST
-        const validatedEvents = [];
+        const validatedEvents: Event[] = [];
+        let totalPrice = 0;
         
         for (const id of eventIds) {
           const eventData = await this.eventRepository.findOne({ where: { id } });
@@ -94,67 +99,107 @@ export class OrderService {
           }
         
           validatedEvents.push(eventData); // save for next step
+          totalPrice += Number(eventData.price) || 0; // Add event price
+        }
+
+        // 4. Handle coupon logic
+        let discount = 0;
+        let couponData = null;
+
+        if (couponCode) {
+          try {
+            const couponResult = await this.couponService.validateAndApplyCoupon(
+              couponCode, 
+              userId, 
+              totalPrice
+            );
+            discount = couponResult.discount;
+            couponData = couponResult.coupon;
+          } catch (error: any) {
+            throw new NotFoundException(`Coupon error: ${error.message}`);
+          }
+        }
+
+        const finalPrice = totalPrice - discount;
+
+        // 5. Check if price matches
+        if (Number(price) !== finalPrice) {
+          throw new NotFoundException(`Price mismatch! Actual price after coupon is ${finalPrice}, but received ${price}`);
         }
         
-        // 4. If all validations passed, now create order
-        const orderNo = await this.generateUniqueOrderNumber();
-        
-        const order = this.orderRepository.create({
-          orderNo,
-          user,
-          paymentMethod,
-          price,
-          status,
+        // 6. Use transaction to ensure data consistency
+        return await this.orderRepository.manager.transaction(async (transactionalEntityManager) => {
+            const orderNo = await this.generateUniqueOrderNumber();
+            
+            const order = transactionalEntityManager.create(Order, {
+              orderNo,
+              user,
+              paymentMethod,
+              price: finalPrice, // Use final price after discount
+              status : OrderStatus.Completed,
+              discount,
+              originalPrice: totalPrice,
+            });
+            
+            const savedOrder = await transactionalEntityManager.save(Order, order);
+            
+            // 7. Now create order items and register events
+            const savedOrderItems: any[] = [];
+            
+            for (const eventData of validatedEvents) {
+              const orderItem = transactionalEntityManager.create(OrderItemEntity, {
+                order: savedOrder,
+                event: eventData,
+              });
+            
+              const savedItem = await transactionalEntityManager.save(OrderItemEntity, orderItem);
+            
+              savedOrderItems.push({
+                id: savedItem.id,
+                event: eventData,
+                status: savedItem.status,
+                createdAt: savedItem.createdAt,
+              });
+            
+              const registerEvent = transactionalEntityManager.create(RegisterEvent, {
+                userId,
+                eventId: eventData.id,
+                type: "Attendee",
+                orderId: savedOrder.id,
+              });
+            
+              await transactionalEntityManager.save(RegisterEvent, registerEvent);
+            }
+
+            // 8. Record coupon usage if coupon was applied
+            if (couponData) {
+              await this.couponService.recordCouponUsage(userId, couponData.id, savedOrder.id);
+            }
+
+            // 9. Delete cart items ONLY after everything is successful
+            for (const eventData of validatedEvents) {
+              await transactionalEntityManager.delete(Cart, { userId, eventId: eventData.id });
+            }
+            
+            return {
+              id: savedOrder.id,
+              orderNo: savedOrder.orderNo,
+              paymentMethod: savedOrder.paymentMethod,
+              price: savedOrder.price,
+              status: savedOrder.status,
+              discount: savedOrder.discount,
+              originalPrice: savedOrder.originalPrice,
+              user: {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                mobile: user.mobile,
+              },
+              orderItems: savedOrderItems,
+            };
         });
-        
-        const savedOrder = await this.orderRepository.save(order);
-        
-        // 5. Now create order items and register events
-        const savedOrderItems: any[] = [];
-        
-        for (const eventData of validatedEvents) {
-          const orderItem = this.orderItemRepository.create({
-            order: savedOrder,
-            event: eventData,
-          });
-        
-          const savedItem = await this.orderItemRepository.save(orderItem);
-        
-          savedOrderItems.push({
-            id: savedItem.id,
-            event: eventData,
-            status: savedItem.status,
-            createdAt: savedItem.createdAt,
-          });
-        
-          const registerEvent = this.registerEventRepository.create({
-            userId,
-            eventId: eventData.id,
-            type: "Attendee",
-            orderId: savedOrder.id,
-          });
-        
-          await this.registerEventRepository.save(registerEvent);
-          await this.cartRepository.delete({ userId, eventId: eventData.id });
-        }
-        
-      
-        return {
-          id: savedOrder.id,
-          orderNo: savedOrder.orderNo,
-          paymentMethod: savedOrder.paymentMethod,
-          price: savedOrder.price,
-          status: savedOrder.status,
-          user: {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            mobile: user.mobile,
-          },
-          orderItems: savedOrderItems,
-        };
-      }
+    }
       
     
 
@@ -179,6 +224,7 @@ export class OrderService {
                 color: getEventColor(item.event.type), 
              },
             status:item.status,
+            invoiceNumber: item.invoiceNumber || null,
             createdAt: item.createdAt,
         }));
     
@@ -186,8 +232,10 @@ export class OrderService {
             id: order.id,
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
-            price: order.price,
+            price: Number(order.price),
             status: order.status,
+            discount: Number(order.discount),
+            originalPrice: Number(order.originalPrice),
             user: {
                 id: order.user.id,
                 firstName: order.user.firstName,
@@ -223,8 +271,10 @@ export class OrderService {
             id: order.id,
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
-            price: order.price,
+            price: Number(order.price),
             status: order.status,
+            discount: Number(order.discount),
+            originalPrice: Number(order.originalPrice),
             user: {
                 id: order.user.id,
                 firstName: order.user.firstName,
@@ -239,6 +289,7 @@ export class OrderService {
                     color: getEventColor(item.event.type), 
                  },
                 status:item.status,
+                invoiceNumber: item.invoiceNumber || null,
                 createdAt: item.createdAt,
             })),
         }));
@@ -260,5 +311,81 @@ export class OrderService {
         await this.orderRepository.remove(order);
     }
         
+    private async generateInvoiceNumber(): Promise<string> {
+        try {
+            const currentYear = new Date().getFullYear();
+            const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            
+            // Get the highest invoice number for current year and month
+            const lastInvoice = await this.orderItemRepository.find({
+                where: { 
+                    invoiceNumber: Like(`INV-${currentYear}${currentMonth}%`)
+                },
+                select: ['invoiceNumber'],
+                order: { invoiceNumber: 'DESC' },
+                take: 1,
+            });
 
+            let nextInvoiceNo: string;
+
+            if (lastInvoice.length > 0 && lastInvoice[0].invoiceNumber) {
+                const lastSequentialNumber = parseInt(lastInvoice[0].invoiceNumber.slice(12), 10);
+                const nextSequentialNumber = lastSequentialNumber + 1;
+                nextInvoiceNo = `INV-${currentYear}${currentMonth}-${nextSequentialNumber.toString().padStart(4, '0')}`;
+            } else {
+                nextInvoiceNo = `INV-${currentYear}${currentMonth}-0001`;
+            }
+
+            return nextInvoiceNo;
+        } catch (error) {
+            throw new InternalServerErrorException('Error generating invoice number');
+        }
+    }
+
+    async updateOrderItemStatus(
+        orderItemId: string, 
+        status: OrderNoStatus, 
+        userId: string, 
+        role: string
+    ): Promise<any> {
+        // Only admin can update order item status
+        if (role !== 'admin') {
+            throw new ForbiddenException('Only admin can update order item status');
+        }
+
+        const orderItem = await this.orderItemRepository.findOne({
+            where: { id: orderItemId },
+            relations: ['order', 'event'],
+        });
+
+        if (!orderItem) {
+            throw new NotFoundException('Order item not found');
+        }
+
+        // Update status
+        orderItem.status = status;
+
+        // Generate invoice number only when status is changed to Completed
+        if (status === OrderNoStatus.Completed && !orderItem.invoiceNumber) {
+            orderItem.invoiceNumber = await this.generateInvoiceNumber();
+        }
+
+        const updatedOrderItem = await this.orderItemRepository.save(orderItem);
+
+        return {
+            id: updatedOrderItem.id,
+            status: updatedOrderItem.status,
+            invoiceNumber: updatedOrderItem.invoiceNumber,
+            event: {
+                id: updatedOrderItem.event.id,
+                name: updatedOrderItem.event.name,
+                price: updatedOrderItem.event.price,
+            },
+            order: {
+                id: updatedOrderItem.order.id,
+                orderNo: updatedOrderItem.order.orderNo,
+            },
+            updatedAt: new Date(),
+        };
+    }
 }

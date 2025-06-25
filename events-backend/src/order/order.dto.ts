@@ -8,18 +8,39 @@ export enum OrderStatus {
     Cancelled = 'Cancelled',
 }
 
+export enum PaymentMethod {
+    Cash = 'Cash',
+    BankTransfer = 'Bank Transfer',
+    CreditCard = 'Credit Card',
+    PayPal = 'PayPal',
+}
+
+export enum OrderNoStatus {
+    Pending = 'Pending',
+    Completed = 'Completed',
+    Cancelled = 'Cancelled',
+}
+
 export class OrderDto {
     @IsOptional()
     @IsString()
     orderNo?: string;
 
     @IsNotEmpty()
-    @IsString()
-    paymentMethod!: string;
+    @IsEnum(PaymentMethod)
+    paymentMethod!: PaymentMethod;
 
     @IsNotEmpty()
     @IsNumber()
     price!: number;
+
+    @IsOptional()
+    @IsNumber()
+    discount?: number;
+
+    @IsOptional()
+    @IsNumber()
+    originalPrice?: number; 
 
     @IsOptional()
     @IsEnum(OrderStatus)
@@ -29,11 +50,20 @@ export class OrderDto {
 
 export class CreateOrderWithItemsDto {
     @IsNotEmpty()
-    paymentMethod!: string;
+    @IsEnum(PaymentMethod)
+    paymentMethod!: PaymentMethod;
 
     @IsNotEmpty()
     @IsNumber()
     price!: number;
+
+    @IsOptional()
+    @IsNumber()
+    discount?: number;
+
+    @IsOptional()
+    @IsNumber()
+    originalPrice?: number; 
 
     @IsOptional()
     @IsEnum(OrderStatus)
@@ -41,6 +71,10 @@ export class CreateOrderWithItemsDto {
 
     @IsNotEmpty()
     eventId!: string;
+
+    @IsOptional()
+    @IsString()
+    couponCode?: string;
 }
 
 
@@ -60,4 +94,14 @@ export class CreateEventOrderDto {
     @Type(() => EventOrderDto)
     @ArrayMinSize(1) // Ensure there's at least one item
     event!: EventOrderDto[];
+}
+
+export class UpdateOrderItemStatusDto {
+    @IsNotEmpty()
+    @IsString()
+    orderItemId!: string;
+
+    @IsNotEmpty()
+    @IsEnum(OrderNoStatus)
+    status!: OrderNoStatus;
 }

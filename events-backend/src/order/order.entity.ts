@@ -3,7 +3,7 @@ import { IsEnum } from 'class-validator';
 
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne } from 'typeorm';
 import { UserEntity } from 'user/users.entity';
-import { OrderStatus } from './order.dto';
+import { OrderStatus, PaymentMethod } from './order.dto';
 import { OrderItemEntity } from './event.item.entity';
 import { Withdrawal } from 'withdrawal/withdrawal.entity';
 
@@ -18,11 +18,17 @@ export class Order {
     @Column({ type: 'varchar', unique: true })
     orderNo!: string;
 
-    @Column({ type: 'varchar' })
-    paymentMethod!: string;
+    @Column({ type: 'enum', enum: PaymentMethod,nullable: true  })
+    paymentMethod?: PaymentMethod;
 
     @Column({ type: 'decimal' })
     price!: number;
+
+    @Column({ type: 'decimal', nullable: true })
+    discount?: number;
+
+    @Column({ type: 'decimal', nullable: true })
+    originalPrice?: number;
 
     @Column({ type: 'enum', enum: OrderStatus, nullable: true })
     status?: OrderStatus;

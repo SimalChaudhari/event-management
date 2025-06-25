@@ -3,9 +3,8 @@ import { Controller, Post, Get, Put, Delete, Body, Param, Res, Req, UseGuards } 
 import { OrderService } from './order.service';
 import { Order } from './order.entity';
 import { Request, Response } from 'express';
-import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto } from './order.dto';
+import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto, UpdateOrderItemStatusDto } from './order.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
-import { OrderItemEntity } from './event.item.entity';
 
 @Controller('api/orders')
 @UseGuards(JwtAuthGuard)
@@ -61,4 +60,26 @@ export class OrderController {
         });
     }
     
+    @Put('item/status')
+    async updateOrderItemStatus(
+        @Body() dto: UpdateOrderItemStatusDto,
+        @Req() req: Request,
+        @Res() response: Response
+    ) {
+        const userId = req.user.id;
+        const role = req.user.role;
+        
+        const result = await this.orderService.updateOrderItemStatus(
+            dto.orderItemId,
+            dto.status,
+            userId,
+            role
+        );
+        
+        return response.status(200).json({
+            success: true,
+            message: `Order item status updated to ${dto.status} successfully`,
+            data: result,
+        });
+    }
 }

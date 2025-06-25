@@ -121,7 +121,7 @@ const transactionRoutes = [
     component: transactionComponents.OrderList
   },
   {
-    path: '/withdrawal',
+    path: '/withrawal',
     exact: true,
     name: 'Withdrawal List',
     component: transactionComponents.WithdrawalRequest
