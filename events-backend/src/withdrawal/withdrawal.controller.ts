@@ -46,13 +46,13 @@ export class WithdrawalController {
     }),
   )
   async createWithdrawal(
-    @UploadedFile() file: Express.Multer.File,
+    // @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateWithdrawalDto,
     @Request() req: any,
   ) {
-    if (file) {
-      dto.document = `uploads/withdrawals/${file.filename}`;
-    }
+    // if (file) {
+    //   dto.document = `uploads/withdrawals/${file.filename}`;
+    // }
 
     const userId = req.user.id;
 

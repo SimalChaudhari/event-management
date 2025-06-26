@@ -18,15 +18,23 @@ export class CreateWithdrawalDto {
 
   @IsNotEmpty()
   @IsString()
-  reason!: string;
-
-  @IsOptional()
-  @IsString()
-  comment?: string;
+  name!: string;
 
   @IsNotEmpty()
   @IsString()
-  document!: string;
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  reason!: string;
+
+  // @IsOptional()
+  // @IsString()
+  // comment?: string;
+
+  // @IsNotEmpty()
+  // @IsString()
+  // document!: string;
 
   @IsEnum(WithdrawalStatus)
   status!: WithdrawalStatus;

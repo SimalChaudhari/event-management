@@ -27,13 +27,19 @@ export class Withdrawal {
   event?: Event;
 
   @Column()
-  reason?: string;
-
-  @Column({ nullable: true })
-  comment?: string;
+  name?: string;
 
   @Column()
-  document?: string;
+  title?: string;
+
+  @Column()
+  reason?: string;
+
+  // @Column({ nullable: true })
+  // comment?: string;
+
+  // @Column()
+  // document?: string;
 
   @Column({
     type: 'enum',

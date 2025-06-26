@@ -29,6 +29,16 @@ export const orderDelete = (id) => async (dispatch) => {
     }
 };
 
+export const updateOrderStatus = (id, status) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.put(`/orders/item/status/${id}`, { status });
+        console.log(response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating order status:', error);
+        throw error;
+    }
+};
 
 
 

@@ -345,14 +345,8 @@ export class OrderService {
     async updateOrderItemStatus(
         orderItemId: string, 
         status: OrderNoStatus, 
-        userId: string, 
-        role: string
     ): Promise<any> {
-        // Only admin can update order item status
-        if (role !== 'admin') {
-            throw new ForbiddenException('Only admin can update order item status');
-        }
-
+ 
         const orderItem = await this.orderItemRepository.findOne({
             where: { id: orderItemId },
             relations: ['order', 'event'],

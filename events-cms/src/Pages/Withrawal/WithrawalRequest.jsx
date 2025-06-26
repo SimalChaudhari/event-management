@@ -10,14 +10,15 @@ import * as $ from 'jquery';
 import { useLocation } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
-import { WithdrawalList } from '../../store/actions/withdrawalActions';
+import { WithdrawalList, updateWithdrawalStatus } from '../../store/actions/withdrawalActions';
 import ViewWithdrawalModal from './modal/ViewWithdrawalModal';
+import StatusConfirmationModal from './modal/StatusConfirmationModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 // This function will need to be replaced with actual order actions when created
 
-function atable(data, handleDelete, handleView) {
+function atable(data, handleDelete, handleView, handleStatusClick) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -145,6 +146,7 @@ function atable(data, handleDelete, handleView) {
                 title: 'Status',
                 render: function (data, type, row) {
                     let statusClass = 'badge-light-warning';
+                    let statusText = data;
 
                     if (data === 'approved') {
                         statusClass = 'badge-light-success';
@@ -152,7 +154,25 @@ function atable(data, handleDelete, handleView) {
                         statusClass = 'badge-light-danger';
                     }
 
-                    return `<span class="badge ${statusClass}">${data}</span>`;
+                    // Only show action buttons for pending status
+                    if (data === 'pending') {
+                        return `
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-success btn-sm approve-btn" 
+                                        data-id="${row.id}" 
+                                        style="font-size: 11px; padding: 2px 6px;">
+                                    <i class="feather icon-check"></i> Approve
+                                </button>
+                                <button class="btn btn-danger btn-sm reject-btn" 
+                                        data-id="${row.id}" 
+                                        style="font-size: 11px; padding: 2px 6px;">
+                                    <i class="feather icon-x"></i> Reject
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        return `<span class="badge ${statusClass}">${statusText}</span>`;
+                    }
                 }
             },
 
@@ -192,6 +212,26 @@ function atable(data, handleDelete, handleView) {
             handleView(dataOrder);
         }
     });
+
+    // Approve button click
+    $(document).on('click', '.approve-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const withdrawalId = $(this).data('id');
+        const withdrawalData = data.find((item) => item.id === withdrawalId);
+        console.log('Approve clicked for ID:', withdrawalId);
+        handleStatusClick(withdrawalId, 'approved', withdrawalData);
+    });
+
+    // Reject button click
+    $(document).on('click', '.reject-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const withdrawalId = $(this).data('id');
+        const withdrawalData = data.find((item) => item.id === withdrawalId);
+        console.log('Reject clicked for ID:', withdrawalId);
+        handleStatusClick(withdrawalId, 'rejected', withdrawalData);
+    });
 }
 
 const WithrawalRequest = () => {
@@ -204,6 +244,12 @@ const WithrawalRequest = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false); // State for view modal
     const [viewData, setViewData] = useState(null); // State for user data to view
+    
+    // New states for status confirmation
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusToUpdate, setStatusToUpdate] = useState(null);
+    const [withdrawalToUpdate, setWithdrawalToUpdate] = useState(null);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
     const destroyTable = () => {
         if ($.fn.DataTable.isDataTable('#data-table-zero')) {
@@ -216,7 +262,7 @@ const WithrawalRequest = () => {
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(withdraw) && withdraw.length >= 0) {
-            const table = atable(withdraw, handleDelete, handleView);
+            const table = atable(withdraw, handleDelete, handleView, handleStatusClick);
             setCurrentTable(table);
         }
     };
@@ -252,10 +298,56 @@ const WithrawalRequest = () => {
         setShowViewModal(true);
     };
 
+    const handleStatusClick = (withdrawalId, status, withdrawalData) => {
+        setStatusToUpdate({ id: withdrawalId, status });
+        setWithdrawalToUpdate(withdrawalData);
+        setShowStatusModal(true);
+    };
+
+    const handleStatusConfirm = async () => {
+        if (!statusToUpdate) return;
+        
+        setIsUpdatingStatus(true);
+        try {
+            console.log(`Updating withdrawal ${statusToUpdate.id} to status: ${statusToUpdate.status}`);
+            
+            const success = await dispatch(updateWithdrawalStatus(statusToUpdate.id, statusToUpdate.status));
+            
+            if (success) {
+                console.log('Status updated successfully');
+                setShowStatusModal(false);
+                setStatusToUpdate(null);
+                setWithdrawalToUpdate(null);
+            } else {
+                console.log('Failed to update status');
+            }
+        } catch (error) {
+            console.error('Error updating withdrawal status:', error);
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleStatusModalClose = () => {
+        if (!isUpdatingStatus) {
+            setShowStatusModal(false);
+            setStatusToUpdate(null);
+            setWithdrawalToUpdate(null);
+        }
+    };
+
     return (
         <>
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <ViewWithdrawalModal show={showViewModal} handleClose={() => setShowViewModal(false)} withdrawalData={viewData} />
+            <StatusConfirmationModal 
+                show={showStatusModal} 
+                onHide={handleStatusModalClose} 
+                onConfirm={handleStatusConfirm}
+                status={statusToUpdate?.status}
+                withdrawalData={withdrawalToUpdate}
+                isLoading={isUpdatingStatus}
+            />
 
             <Row>
                 <Col sm={12} className="btn-page">
