@@ -36,24 +36,24 @@ export class AuthController {
 
   @Post('register')
   @UseInterceptors(
-    FileInterceptor('profilePicture', {
-      storage: diskStorage({
-        destination: './uploads/images', // Directory to save the uploaded files
-        filename: (req, file, cb) => {
-          const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
-          cb(null, uniqueSuffix);
-        },
-      }),
-    }),
+    // FileInterceptor('profilePicture', {
+    //   storage: diskStorage({
+    //     destination: './uploads/images', // Directory to save the uploaded files
+    //     filename: (req, file, cb) => {
+    //       const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
+    //       cb(null, uniqueSuffix);
+    //     },
+    //   }),
+    // }),
   )
   async register(
     @Res() response: Response,
     @Body() userDto: UserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    // @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (file) {
-      userDto.profilePicture = `uploads/images/${file.filename}`;
-    }
+    // if (file) {
+    //   userDto.profilePicture = `uploads/images/${file.filename}`;
+    // }
     const result = await this.authService.register(userDto);
     return response.status(HttpStatus.OK).json({
       message: result.message,

@@ -51,6 +51,7 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
                 render: function (data, type, row) {
                     const status = row?.status || 'N/A';
                     let statusColor = '#6c757d'; // default: gray
+                    const currencySymbol = '$';
             
                     if (status.toLowerCase() === 'completed') {
                         statusColor = '#28a745'; // green
@@ -70,7 +71,10 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
                                 </p>
 
                                  <p class="mb-1" style="font-weight: 600;">
-                                    <strong>Price:</strong> ${row?.price}
+                                 
+                                    <strong>Price:</strong> ${currencySymbol}${row?.price}
+
+                        
                                 </p>
                               
                                 <p class="mb-0">

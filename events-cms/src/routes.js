@@ -32,7 +32,8 @@ const eventComponents = {
  */
 const transactionComponents = {
   OrderList: React.lazy(() => import('./Pages/Orders/OrderView.jsx')),
-  WithdrawalRequest: React.lazy(() => import('./Pages/Withrawal/WithrawalRequest.jsx'))
+  WithdrawalRequest: React.lazy(() => import('./Pages/Withrawal/WithrawalRequest.jsx')),
+  Reports: React.lazy(() => import('./Pages/Reports/Reports.jsx'))
 };
 
 /**
@@ -125,6 +126,12 @@ const transactionRoutes = [
     exact: true,
     name: 'Withdrawal List',
     component: transactionComponents.WithdrawalRequest
+  },
+  {
+    path: '/reports',
+    exact: true,
+    name: 'Reports',
+    component: transactionComponents.Reports
   }
 ];
 

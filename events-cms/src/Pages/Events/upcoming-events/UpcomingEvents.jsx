@@ -125,7 +125,8 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                 data: 'price',
                 title: 'Price',
                 render: function (data, type, row) {
-                    return `${row.currency} ${parseFloat(data).toFixed(2)}`;
+                    const currencySymbol = row.currency === 'USD' ? '$' : '';
+                    return `${currencySymbol}${parseFloat(data).toFixed(2)}(${row.currency})`;
                 }
             },
             {
