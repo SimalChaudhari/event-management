@@ -31,10 +31,7 @@ import {
   LinkedInLoginDto,
 } from '../user/users.dto';
 import {
-  facebookTokenHtml,
-  html,
-  appleTokenHtml,
-  linkedinTokenHtml,
+  html
 } from 'Data/Data';
 
 @Controller('api/auth')
