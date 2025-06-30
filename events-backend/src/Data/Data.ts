@@ -531,7 +531,7 @@ export const html = `
       }
 
       const clientId = '7731wous76ey71';
-      const redirectUri = encodeURIComponent('https://abc123.ngrok.io/auth/linkedin/callback');
+      const redirectUri = encodeURIComponent('http://events.isca.org.sg:5000/auth/linkedin/callback');
       const scope = encodeURIComponent('r_liteprofile r_emailaddress');
       const state = 'linkedin_oauth_state';
       
