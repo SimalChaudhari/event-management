@@ -137,7 +137,7 @@ export const html = `
     <div id="google-section">
       <h3>Google Login</h3>
       <div id="g_id_onload"
-           data-client_id="YOUR_GOOGLE_CLIENT_ID"
+           data-client_id="228913853292-k6a5fut1gfmg5kjkgorcph25356c0r5b.apps.googleusercontent.com"
            data-callback="handleGoogleResponse"
            data-auto_prompt="false">
       </div>
@@ -151,15 +151,6 @@ export const html = `
       </div>
     </div>
 
-    <div style="margin: 20px 0; color: #666;">OR</div>
-
-    <!-- Facebook Manual Login -->
-    <div id="facebook-section">
-      <h3>Facebook Login</h3>
-      <button id="manual-fb-btn" class="manual-login-btn" onclick="manualFacebookLogin()" disabled>
-        Login with Facebook
-      </button>
-    </div>
 
     <!-- Token Display -->
     <div id="token-display" class="token-display">
@@ -175,49 +166,10 @@ export const html = `
   <!-- Google SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- Facebook SDK -->
-  <div id="fb-root"></div>
-  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 
   <script>
     // HTTPS Check
-    function checkHTTPS() {
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        document.getElementById('https-warning').style.display = 'block';
-        document.getElementById('facebook-section').style.opacity = '0.5';
-        document.getElementById('manual-fb-btn').disabled = true;
-        return false;
-      }
-      return true;
-    }
 
-    // Facebook Init
-    window.fbAsyncInit = function () {
-      if (!checkHTTPS()) return;
-
-      FB.init({
-        appId: '1235957981373454',
-        cookie: true,
-        xfbml: false,
-        version: 'v18.0'
-      });
-
-      FB.AppEvents.logPageView();
-      document.getElementById('manual-fb-btn').disabled = false;
-    };
-
-    function manualFacebookLogin() {
-      FB.login(function (response) {
-        if (response.authResponse) {
-          const token = response.authResponse.accessToken;
-          document.getElementById('id-token').value = token;
-          document.getElementById('token-display').style.display = 'block';
-          showResult('success', '✅ Facebook Login Successful');
-        } else {
-          showResult('error', '❌ Facebook Login Failed');
-        }
-      }, { scope: 'public_profile,email' });
-    }
 
     function handleGoogleResponse(response) {
       const idToken = response.credential;
@@ -956,7 +908,7 @@ export const linkedinTokenHtml = `
       }
 
       const clientId = '7731wous76ey71'; // Replace with actual Client ID
-      const redirectUri = encodeURIComponent('http://localhost:5000/auth/linkedin/callback');
+      const redirectUri = encodeURIComponent('https://abc123.ngrok.io/auth/linkedin/callback');
       const scope = encodeURIComponent('r_liteprofile r_emailaddress');
       const state = 'linkedin_oauth_state';
       
