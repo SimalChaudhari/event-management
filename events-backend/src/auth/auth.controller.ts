@@ -259,7 +259,7 @@ export class AuthController {
   }
 
   // Google Popup Page
-  @Get('google-popup')
+  @Get('social-popup')
   async googlePopupPage(@Res() res: Response) {
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
@@ -289,11 +289,6 @@ export class AuthController {
     }
   }
 
-  @Get('facebook-login')
-  async facebookLoginPage(@Res() res: Response) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(facebookTokenHtml);
-  }
 
   @Post('facebook')
   async facebookLogin(
@@ -343,19 +338,6 @@ export class AuthController {
     }
   }
 
-  // Apple Login Page
-  @Get('apple-login')
-  async appleLoginPage(@Res() res: Response) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(appleTokenHtml);
-  }
-
-  // LinkedIn Login Page
-  @Get('linkedin-login')
-  async linkedinLoginPage(@Res() res: Response) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(linkedinTokenHtml);
-  }
 
   @Post('linkedin')
   async linkedinLogin(
