@@ -112,43 +112,96 @@ export class SocialAuthService {
 
   async facebookLogin(accessToken: string) {
     try {
-      const response = await axios.get(
-        `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
-      );
-
-      const { id, name, email, picture } = response.data;
-
-      if (!email) {
-        throw new BadRequestException('Email is required from Facebook');
+      // Validate access token
+      if (!accessToken) {
+        throw new BadRequestException('Facebook access token is required');
       }
 
+      // Get user data from Facebook Graph API (without email first)
+      const response = await axios.get(
+        `https://graph.facebook.com/me?fields=id,name,picture.type(large)&access_token=${accessToken}`
+      );
+
+      const { id, name, picture } = response.data;
+
+      // Validate required fields
+      if (!id) {
+        throw new BadRequestException('Facebook user ID is required');
+      }
+
+      if (!name) {
+        throw new BadRequestException('Name is required from Facebook');
+      }
+
+      // Try to get email separately (if user has granted permission)
+      let email = null;
+      try {
+        const emailResponse = await axios.get(
+          `https://graph.facebook.com/me?fields=email&access_token=${accessToken}`
+        );
+        email = emailResponse.data.email;
+      } catch (emailError) {
+        console.log('Email permission not granted or not available');
+      }
+
+      // Check if user already exists (by Facebook ID first)
       let user = await this.userRepository.findOne({
-        where: { email },
+        where: { socialId: id, authProvider: AuthProvider.FACEBOOK },
       });
 
-      const [firstName, lastName] = name.split(' ');
+      // If not found by social ID, try email
+      if (!user && email) {
+        user = await this.userRepository.findOne({
+          where: { email },
+        });
+      }
+
+      // Split name into first and last name
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
 
       if (!user) {
-        // Create new user
+        // Create new user with fallback email if not available
+        const userEmail = email || `fb_${id}@facebook.com`;
+        
         user = this.userRepository.create({
-          email,
-          firstName: firstName || '',
-          lastName: lastName || '',
-          profilePicture: picture?.data?.url,
+          email: userEmail,
+          firstName,
+          lastName,
+          profilePicture: picture?.data?.url || null,
           authProvider: AuthProvider.FACEBOOK,
           socialId: id,
           isVerify: true,
+          password: '', // Empty password for social login
+          role: UserRole.User, // Set default role
         });
       } else {
-        // Update existing user
+        // Update existing user with Facebook info
         user.authProvider = AuthProvider.FACEBOOK;
         user.socialId = id;
         user.isVerify = true;
-        if (picture?.data?.url) user.profilePicture = picture.data.url;
+        if (picture?.data?.url) {
+          user.profilePicture = picture.data.url;
+        }
+        // Update name if not already set
+        if (!user.firstName && firstName) {
+          user.firstName = firstName;
+        }
+        if (!user.lastName && lastName) {
+          user.lastName = lastName;
+        }
+        // Update email if available and not a fallback email
+        if (email && !user.email.includes('@facebook.com')) {
+          user.email = email;
+        }
       }
 
+      // Generate tokens
       const refreshToken = this.generateRefreshToken(user);
       user.refreshToken = refreshToken;
+      
+      // Save user
       await this.userRepository.save(user);
 
       return {
@@ -160,12 +213,30 @@ export class SocialAuthService {
           email: user.email,
           profilePicture: user.profilePicture,
           isVerify: user.isVerify,
+          role: user.role,
         },
         accessToken: this.generateAccessToken(user),
         refreshToken,
       };
-    } catch (error) {
-      throw new UnauthorizedException('Facebook authentication failed');
+    } catch (error:any) {
+      console.error('Facebook login error:', error);
+      
+      // Handle specific Facebook API errors
+      if (error.response?.data?.error) {
+        const fbError = error.response.data.error;
+        if (fbError.code === 190) {
+          throw new UnauthorizedException('Invalid Facebook access token');
+        } else if (fbError.code === 200) {
+          throw new BadRequestException('Facebook permissions not granted. Please grant email permission.');
+        }
+      }
+      
+      // Handle axios errors
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new UnauthorizedException('Unable to connect to Facebook. Please try again.');
+      }
+      
+      throw new UnauthorizedException('Facebook authentication failed. Please try again.');
     }
   }
 
@@ -226,56 +297,110 @@ export class SocialAuthService {
 
   async linkedinLogin(accessToken: string) {
     try {
-      const response = await axios.get(
-        'https://api.linkedin.com/v2/me?projection=(id,firstName,lastName,profilePicture(displayImage~:playableStreams))',
+      // Validate access token
+      if (!accessToken) {
+        throw new BadRequestException('LinkedIn access token is required');
+      }
+
+      // Get user data from LinkedIn API
+      const userResponse = await axios.get(
+        'https://api.linkedin.com/v2/me',
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-          },
+            'X-Restli-Protocol-Version': '2.0.0'
+          }
         }
       );
 
-      const { id, firstName, lastName, profilePicture } = response.data;
+      const { id, firstName, lastName, profilePicture } = userResponse.data;
 
-      // Get email from LinkedIn
-      const emailResponse = await axios.get(
-        'https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))',
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
+      // Get email from LinkedIn API (requires additional permission)
+      let email = null;
+      try {
+        const emailResponse = await axios.get(
+          'https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))',
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'X-Restli-Protocol-Version': '2.0.0'
+            }
+          }
+        );
+        
+        if (emailResponse.data.elements && emailResponse.data.elements.length > 0) {
+          email = emailResponse.data.elements[0]['handle~'].emailAddress;
         }
-      );
+      } catch (emailError) {
+        console.log('Email permission not granted or not available');
+      }
 
-      const email = emailResponse.data.elements[0]['handle~'].emailAddress;
+      // Validate required fields
+      if (!id) {
+        throw new BadRequestException('LinkedIn user ID is required');
+      }
 
+      if (!firstName || !lastName) {
+        throw new BadRequestException('Name is required from LinkedIn');
+      }
+
+      // Check if user already exists (by LinkedIn ID first)
       let user = await this.userRepository.findOne({
-        where: { email },
+        where: { socialId: id, authProvider: AuthProvider.LINKEDIN },
       });
 
+      // If not found by social ID, try email
+      if (!user && email) {
+        user = await this.userRepository.findOne({
+          where: { email },
+        });
+      }
+
+      // Extract name components
+      const firstNameValue = firstName.localized?.en_US || firstName || '';
+      const lastNameValue = lastName.localized?.en_US || lastName || '';
+
       if (!user) {
-        // Create new user
+        // Create new user with fallback email if not available
+        const userEmail = email || `li_${id}@linkedin.com`;
+        
         user = this.userRepository.create({
-          email,
-          firstName: firstName.localized.en_US || '',
-          lastName: lastName.localized.en_US || '',
-          profilePicture: profilePicture?.['displayImage~']?.elements?.[0]?.identifiers?.[0]?.identifier,
+          email: userEmail,
+          firstName: firstNameValue,
+          lastName: lastNameValue,
+          profilePicture: profilePicture?.displayImage || null,
           authProvider: AuthProvider.LINKEDIN,
           socialId: id,
           isVerify: true,
+          password: '', // Empty password for social login
+          role: UserRole.User, // Set default role
         });
       } else {
-        // Update existing user
+        // Update existing user with LinkedIn info
         user.authProvider = AuthProvider.LINKEDIN;
         user.socialId = id;
         user.isVerify = true;
-        if (profilePicture?.['displayImage~']?.elements?.[0]?.identifiers?.[0]?.identifier) {
-          user.profilePicture = profilePicture['displayImage~'].elements[0].identifiers[0].identifier;
+        if (profilePicture?.displayImage) {
+          user.profilePicture = profilePicture.displayImage;
+        }
+        // Update name if not already set
+        if (!user.firstName && firstNameValue) {
+          user.firstName = firstNameValue;
+        }
+        if (!user.lastName && lastNameValue) {
+          user.lastName = lastNameValue;
+        }
+        // Update email if available and not a fallback email
+        if (email && !user.email.includes('@linkedin.com')) {
+          user.email = email;
         }
       }
 
+      // Generate tokens
       const refreshToken = this.generateRefreshToken(user);
       user.refreshToken = refreshToken;
+      
+      // Save user
       await this.userRepository.save(user);
 
       return {
@@ -287,12 +412,31 @@ export class SocialAuthService {
           email: user.email,
           profilePicture: user.profilePicture,
           isVerify: user.isVerify,
+          role: user.role,
         },
         accessToken: this.generateAccessToken(user),
         refreshToken,
       };
-    } catch (error) {
-      throw new UnauthorizedException('LinkedIn authentication failed');
+    } catch (error: any) {
+      console.error('LinkedIn login error:', error);
+      
+      // Handle specific LinkedIn API errors
+      if (error.response?.data?.error) {
+        const liError = error.response.data.error;
+        if (liError.code === 401) {
+          throw new UnauthorizedException('Invalid LinkedIn access token');
+        } else if (liError.code === 403) {
+          throw new BadRequestException('LinkedIn permissions not granted. Please grant required permissions.');
+        }
+      }
+      
+      // Handle axios errors
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new UnauthorizedException('Unable to connect to LinkedIn. Please try again.');
+      }
+      
+      throw new UnauthorizedException('LinkedIn authentication failed. Please try again.');
     }
   }
+
 }

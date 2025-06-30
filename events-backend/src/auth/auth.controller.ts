@@ -24,8 +24,18 @@ import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { SocialAuthService } from './social-auth.service';
-import { GoogleLoginDto, FacebookLoginDto, AppleLoginDto, LinkedInLoginDto } from '../user/users.dto';
-import { html } from 'Data/Data';
+import {
+  GoogleLoginDto,
+  FacebookLoginDto,
+  AppleLoginDto,
+  LinkedInLoginDto,
+} from '../user/users.dto';
+import {
+  facebookTokenHtml,
+  html,
+  appleTokenHtml,
+  linkedinTokenHtml,
+} from 'Data/Data';
 
 @Controller('api/auth')
 export class AuthController {
@@ -35,17 +45,16 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  @UseInterceptors(
-    // FileInterceptor('profilePicture', {
-    //   storage: diskStorage({
-    //     destination: './uploads/images', // Directory to save the uploaded files
-    //     filename: (req, file, cb) => {
-    //       const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
-    //       cb(null, uniqueSuffix);
-    //     },
-    //   }),
-    // }),
-  )
+  @UseInterceptors()
+  // FileInterceptor('profilePicture', {
+  //   storage: diskStorage({
+  //     destination: './uploads/images', // Directory to save the uploaded files
+  //     filename: (req, file, cb) => {
+  //       const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
+  //       cb(null, uniqueSuffix);
+  //     },
+  //   }),
+  // }),
   async register(
     @Res() response: Response,
     @Body() userDto: UserDto,
@@ -85,13 +94,13 @@ export class AuthController {
     } catch (error: any) {
       // Get the appropriate status code based on error type
       let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-      
+
       if (error instanceof UnauthorizedException) {
         statusCode = HttpStatus.UNAUTHORIZED;
       } else if (error instanceof BadRequestException) {
         statusCode = HttpStatus.BAD_REQUEST;
       }
-  
+
       return response.status(statusCode).json({
         success: false,
         message: error.message, // Use the actual error message from service
@@ -113,8 +122,7 @@ export class AuthController {
     } catch (error) {
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
-        message:
-          'Login failed. Please check your credentials and try again.',
+        message: 'Login failed. Please check your credentials and try again.',
       });
     }
   }
@@ -250,7 +258,7 @@ export class AuthController {
     }
   }
 
-// Google Popup Page
+  // Google Popup Page
   @Get('google-popup')
   async googlePopupPage(@Res() res: Response) {
     res.setHeader('Content-Type', 'text/html');
@@ -258,9 +266,14 @@ export class AuthController {
   }
 
   @Post('google')
-  async googleLogin(@Body() googleLoginDto: GoogleLoginDto, @Res() response: Response) {
+  async googleLogin(
+    @Body() googleLoginDto: GoogleLoginDto,
+    @Res() response: Response,
+  ) {
     try {
-      const result = await this.socialAuthService.googleLogin(googleLoginDto.idToken);
+      const result = await this.socialAuthService.googleLogin(
+        googleLoginDto.idToken,
+      );
       return response.status(HttpStatus.OK).json({
         success: true,
         message: result.message,
@@ -276,10 +289,21 @@ export class AuthController {
     }
   }
 
+  @Get('facebook-login')
+  async facebookLoginPage(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(facebookTokenHtml);
+  }
+
   @Post('facebook')
-  async facebookLogin(@Body() facebookLoginDto: FacebookLoginDto, @Res() response: Response) {
+  async facebookLogin(
+    @Body() facebookLoginDto: FacebookLoginDto,
+    @Res() response: Response,
+  ) {
     try {
-      const result = await this.socialAuthService.facebookLogin(facebookLoginDto.accessToken);
+      const result = await this.socialAuthService.facebookLogin(
+        facebookLoginDto.accessToken,
+      );
       return response.status(HttpStatus.OK).json({
         success: true,
         message: result.message,
@@ -296,9 +320,14 @@ export class AuthController {
   }
 
   @Post('apple')
-  async appleLogin(@Body() appleLoginDto: AppleLoginDto, @Res() response: Response) {
+  async appleLogin(
+    @Body() appleLoginDto: AppleLoginDto,
+    @Res() response: Response,
+  ) {
     try {
-      const result = await this.socialAuthService.appleLogin(appleLoginDto.identityToken);
+      const result = await this.socialAuthService.appleLogin(
+        appleLoginDto.identityToken,
+      );
       return response.status(HttpStatus.OK).json({
         success: true,
         message: result.message,
@@ -314,10 +343,29 @@ export class AuthController {
     }
   }
 
+  // Apple Login Page
+  @Get('apple-login')
+  async appleLoginPage(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(appleTokenHtml);
+  }
+
+  // LinkedIn Login Page
+  @Get('linkedin-login')
+  async linkedinLoginPage(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(linkedinTokenHtml);
+  }
+
   @Post('linkedin')
-  async linkedinLogin(@Body() linkedinLoginDto: LinkedInLoginDto, @Res() response: Response) {
+  async linkedinLogin(
+    @Body() linkedinLoginDto: LinkedInLoginDto,
+    @Res() response: Response,
+  ) {
     try {
-      const result = await this.socialAuthService.linkedinLogin(linkedinLoginDto.accessToken);
+      const result = await this.socialAuthService.linkedinLogin(
+        linkedinLoginDto.accessToken,
+      );
       return response.status(HttpStatus.OK).json({
         success: true,
         message: result.message,
