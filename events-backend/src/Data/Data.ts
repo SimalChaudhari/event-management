@@ -151,6 +151,15 @@ export const html = `
       </div>
     </div>
 
+    <div style="margin: 20px 0; color: #666;">OR</div>
+
+    <!-- Facebook Manual Login -->
+    <div id="facebook-section">
+      <h3>Facebook Login</h3>
+      <button id="manual-fb-btn" class="manual-login-btn" onclick="manualFacebookLogin()" disabled>
+        Login with Facebook
+      </button>
+    </div>
 
     <!-- Token Display -->
     <div id="token-display" class="token-display">
@@ -166,10 +175,49 @@ export const html = `
   <!-- Google SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <!-- Facebook SDK -->
+  <div id="fb-root"></div>
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 
   <script>
     // HTTPS Check
+    function checkHTTPS() {
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        document.getElementById('https-warning').style.display = 'block';
+        document.getElementById('facebook-section').style.opacity = '0.5';
+        document.getElementById('manual-fb-btn').disabled = true;
+        return false;
+      }
+      return true;
+    }
 
+    // Facebook Init
+    window.fbAsyncInit = function () {
+      if (!checkHTTPS()) return;
+
+      FB.init({
+        appId: '1235957981373454',
+        cookie: true,
+        xfbml: false,
+        version: 'v18.0'
+      });
+
+      FB.AppEvents.logPageView();
+      document.getElementById('manual-fb-btn').disabled = false;
+    };
+
+    function manualFacebookLogin() {
+      FB.login(function (response) {
+        if (response.authResponse) {
+          const token = response.authResponse.accessToken;
+          document.getElementById('id-token').value = token;
+          document.getElementById('token-display').style.display = 'block';
+          showResult('success', '✅ Facebook Login Successful');
+        } else {
+          showResult('error', '❌ Facebook Login Failed');
+        }
+      }, { scope: 'public_profile,email' });
+    }
 
     function handleGoogleResponse(response) {
       const idToken = response.credential;
@@ -202,8 +250,6 @@ export const html = `
 </body>
 </html>
 `;
-
-
 
 export const facebookTokenHtml = `
 <!DOCTYPE html>
@@ -319,8 +365,8 @@ export const facebookTokenHtml = `
     <h1>🔐 Facebook Access Token</h1>
     
     <div id="https-warning" class="warning" style="display: none;">
-      ⚠️ <strong>HTTPS Required:</strong> Facebook login requires HTTPS. 
-      Please use ngrok or HTTPS setup for testing.
+      ⚠️ <strong>HTTPS Required:</strong> Facebook login requires HTTPS for most domains. 
+      Please use HTTPS setup for production.
     </div>
     
     <button id="fb-login-btn" class="fb-btn" onclick="getFacebookToken()" disabled>
@@ -341,12 +387,18 @@ export const facebookTokenHtml = `
   <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 
   <script>
-    // Check HTTPS requirement
+    // Check HTTPS requirement with allowed domains
     function checkHTTPS() {
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      const allowedDomains = ['localhost', 'events.isca.org.sg'];
+      const currentHostname = location.hostname;
+      const isAllowedDomain = allowedDomains.some(domain => 
+        currentHostname === domain || currentHostname.endsWith('.' + domain)
+      );
+      
+      if (location.protocol !== 'https:' && !isAllowedDomain) {
         document.getElementById('https-warning').style.display = 'block';
         document.getElementById('fb-login-btn').disabled = true;
-        showResult('error', '❌ HTTPS is required for Facebook login');
+        showResult('error', '❌ HTTPS is required for Facebook login on this domain');
         return false;
       }
       return true;
@@ -370,7 +422,7 @@ export const facebookTokenHtml = `
     // Get Facebook Access Token
     function getFacebookToken() {
       if (!checkHTTPS()) {
-        showResult('error', '❌ Please use HTTPS for Facebook login');
+        showResult('error', '❌ Please use HTTPS for Facebook login on this domain');
         return;
       }
 
