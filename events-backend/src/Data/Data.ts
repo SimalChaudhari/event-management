@@ -359,7 +359,7 @@ export const html = `
     <p class="subtitle">Choose your preferred login method</p>
 
     <div id="https-warning" class="warning" style="display: none;">
-      ⚠️ <strong>HTTPS Required:</strong> Some social logins require HTTPS for full functionality.
+      ⚠️ <strong>HTTPS Required:</strong> Some social logins require HTTPS for full functionality. HTTP is allowed for development.
     </div>
 
     <div class="login-grid">
@@ -448,14 +448,23 @@ export const html = `
     let currentPlatform = '';
     let currentToken = '';
 
-    // Check HTTPS requirement
+    // Check HTTPS requirement - Allow HTTP for development
     function checkHTTPS() {
-      const allowedDomains = ['localhost', 'events.isca.org.sg'];
+      const allowedDomains = ['localhost', '127.0.0.1', 'events.isca.org.sg'];
       const currentHostname = location.hostname;
       const isAllowedDomain = allowedDomains.some(domain => 
         currentHostname === domain || currentHostname.endsWith('.' + domain)
       );
       
+      // Allow HTTP for localhost and development domains
+      if (location.protocol === 'http:' && isAllowedDomain) {
+        // Show warning but don't disable buttons for development
+        document.getElementById('https-warning').style.display = 'block';
+        document.getElementById('https-warning').innerHTML = '⚠️ <strong>Development Mode:</strong> Using HTTP. For production, use HTTPS.';
+        return true; // Allow HTTP for development
+      }
+      
+      // For production domains, require HTTPS
       if (location.protocol !== 'https:' && !isAllowedDomain) {
         document.getElementById('https-warning').style.display = 'block';
         document.getElementById('facebook-btn').disabled = true;
@@ -463,6 +472,7 @@ export const html = `
         document.getElementById('linkedin-btn').disabled = true;
         return false;
       }
+      
       return true;
     }
 
@@ -485,7 +495,7 @@ export const html = `
     // Facebook Login Handler
     function handleFacebookLogin() {
       if (!checkHTTPS()) {
-        showResult('error', '❌ HTTPS is required for Facebook login');
+        showResult('error', '❌ HTTPS is required for Facebook login on this domain');
         return;
       }
 
@@ -504,7 +514,7 @@ export const html = `
     // Apple Login Handler
     function handleAppleLogin() {
       if (!checkHTTPS()) {
-        showResult('error', '❌ HTTPS is required for Apple Sign In');
+        showResult('error', '❌ HTTPS is required for Apple Sign In on this domain');
         return;
       }
 
@@ -526,7 +536,7 @@ export const html = `
     // LinkedIn Login Handler
     function handleLinkedInLogin() {
       if (!checkHTTPS()) {
-        showResult('error', '❌ HTTPS is required for LinkedIn login');
+        showResult('error', '❌ HTTPS is required for LinkedIn login on this domain');
         return;
       }
 
