@@ -494,7 +494,7 @@ export class AuthService {
 
       try {
         await this.emailService.sendPasswordResetLink(email, resetToken);
-        return { message: 'Password reset link has been sent to your email' };
+        return { message: "We've successfully received your request. A link to reset your password has been sent to your email." };
       } catch (emailError) {
         throw new BadRequestException(
           'Failed to send reset link. Please try again later.',
