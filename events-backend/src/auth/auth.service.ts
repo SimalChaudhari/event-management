@@ -97,8 +97,13 @@ export class AuthService {
           'Email address already taken. Try logging in or using another email.',
         );
       }
+
       if (!userDto.password) {
         throw new BadRequestException('Password is required');
+      }
+
+      if (!userDto.mobile) {
+        throw new BadRequestException('Mobile is required');
       }
       // Hash the password
       const saltRounds = 10;

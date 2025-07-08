@@ -38,8 +38,8 @@ export class UserEntity {
   @Column()
   password!: string; // Updated field
 
-  @Column({ nullable: true })
-  mobile?: string; // Updated field
+  @Column()
+  mobile!: string; // Updated field
 
   @Column({ nullable: true })
   address?: string; // Updated field
