@@ -29,7 +29,7 @@ import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 
-@Controller('privacy-policies')
+@Controller('api/privacy-policies')
 export class PrivacyPolicyController {
   constructor(private readonly privacyPolicyService: PrivacyPolicyService) {}
   
@@ -52,7 +52,7 @@ export class PrivacyPolicyController {
 
 //terms-conditions
 
-@Controller('terms-conditions')
+@Controller('api/terms-conditions')
 export class TermsConditionsController {
   constructor(
     private readonly termsConditionsService: TermsConditionsService,
@@ -75,7 +75,7 @@ export class TermsConditionsController {
   }
 }
 
-@Controller('banners')
+@Controller('api/banners')
 export class BannerController {
   constructor(private readonly bannerService: BannerService) { }
 
@@ -124,7 +124,7 @@ export class BannerController {
 
 
 
-@Controller('banner-events')
+@Controller('api/banner-events')
 export class BannerEventController {
   constructor(private readonly bannerEventService: BannerEventService) { }
 

@@ -28,7 +28,7 @@ export class RegisterEventService {
     userId: string,
     createRegisterEventDto: CreateRegisterEventDto,
   ): Promise<RegisterEvent> {
-    const { eventId, type, registerCode } = createRegisterEventDto;
+    const { eventId, type, registerCode, isCreatedByAdmin } = createRegisterEventDto;
 
     const event = await this.eventRepository.findOne({
       where: { id: eventId },
@@ -50,19 +50,23 @@ export class RegisterEventService {
       );
     }
 
-    // ✅ Validate registerCode for Exhibitor type
-    if (type === 'Exhibitor' && !registerCode) {
+    // ✅ Validate registerCode for Exhibitor type (only if not created by admin)
+    if (type === 'Exhibitor' && !registerCode && !isCreatedByAdmin) {
       throw new BadRequestException('Register code is required for Exhibitor');
     }
 
     // 🆕 Create new registration
-    const registerEvent = this.registerEventRepository.create({
+    const registerEventData = {
       userId: userId,
       eventId: eventId,
       type: type,
       registerCode: registerCode,
-    });
+      isCreatedByAdmin: isCreatedByAdmin || false,
+      // If created by admin, no orderId needed (payment bypassed)
+      orderId: isCreatedByAdmin ? undefined : createRegisterEventDto.orderId,
+    };
 
+    const registerEvent = this.registerEventRepository.create(registerEventData);
     return await this.registerEventRepository.save(registerEvent);
   }
 
@@ -94,9 +98,9 @@ export class RegisterEventService {
       });
     }
   
-    if (!registerEvents || registerEvents.length === 0) {
-      throw new NotFoundException('No registered events found');
-    }
+    // if (!registerEvents || registerEvents.length === 0) {
+    //   throw new NotFoundException('No registered events found');
+    // }
   
     const cleanedData = registerEvents.map((registerEvent) => {
       const speakers =
@@ -118,6 +122,7 @@ export class RegisterEventService {
         ...cleanRegisterEvent,
         event,
         user: cleanedUser,
+        isCreatedByAdmin: registerEvent.isCreatedByAdmin,
       };
     });
   
@@ -182,6 +187,7 @@ export class RegisterEventService {
         ...cleanRegisterEvent,
         event, // Only includes clean event + speakers
         user: cleanedUser, // Only includes user with cleaned fields
+        isCreatedByAdmin: registerEvent.isCreatedByAdmin,
       },
     };
   }

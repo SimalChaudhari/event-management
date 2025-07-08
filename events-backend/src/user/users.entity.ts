@@ -85,10 +85,13 @@ export class UserEntity {
   isVerify!: boolean; // Updated field
 
   @Column({ nullable: true })
-  otp?: string; // Updated field
+  verificationToken?: string; // Add this field
 
+  @Column({ nullable: true, type: 'varchar' })
+  verificationTokenForResetPassword?: string;
+  
   @Column({ nullable: true, type: 'timestamp' })
-  otpExpiry?: Date; // Updated field
+  verificationTokenExpiryForResetPassword?: Date;
 
   @Column({ nullable: true })
   refreshToken?: string; // Add this field

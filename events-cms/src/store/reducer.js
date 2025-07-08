@@ -6,6 +6,9 @@ import userReducer from './reducer/userReducer';
 import eventReducer from './reducer/eventReducer';
 import orderReducer from './reducer/orderReducer';
 import withdrawReducer from './reducer/withdrawReducer';
+import speakerReducer from './reducer/speakerReducer';
+import settingsReducer from './reducer/settingsReducer';
+
 const reducer = combineReducers({
     able: ableReducer,
     demo: demoReducer,
@@ -13,7 +16,9 @@ const reducer = combineReducers({
     user: userReducer,
     event: eventReducer,
     orders: orderReducer,
-    withdraw: withdrawReducer
+    withdraw: withdrawReducer,
+    speaker: speakerReducer,
+    settings: settingsReducer
 });
-// export const useSelector = createSelectorHook();
+
 export default reducer;

@@ -118,6 +118,22 @@ const chartData = {
                     icon: 'feather icon-user',
                     url: '/profile'
 
+                },
+                {
+                    id: 'terms-conditions',
+                    title: 'Terms and Conditions',
+                    type: 'item',
+                    icon: 'feather icon-file-text',
+                    url: '/settings/terms-conditions'
+
+                },
+                {
+                    id: 'privacy-policy',
+                    title: 'Privacy Policy',
+                    type: 'item',
+                    icon: 'feather icon-shield',
+                    url: '/settings/privacy-policy'
+
                 }
             ]
         },

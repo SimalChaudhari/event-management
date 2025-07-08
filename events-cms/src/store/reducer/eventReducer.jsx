@@ -4,7 +4,8 @@ const initialState = {
     event: [],
     eventByID: '',
     participatedEvents: []  ,
-    upcomingEvents: []
+    upcomingEvents: [],
+    
  
 };
 const eventReducer = (state = initialState, { type, payload } = {}) => {

@@ -1,3 +1,4 @@
+
 .close ::before{
     content: 'X';
     visibility: visible;

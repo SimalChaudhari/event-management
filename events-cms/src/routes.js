@@ -46,6 +46,15 @@ const userComponents = {
 };
 
 /**
+ * Settings related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const settingsComponents = {
+  TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
+  PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx'))
+};
+
+/**
  * Sample/Demo components
  * @type {Object.<string, React.LazyExoticComponent>}
  */
@@ -148,6 +157,21 @@ const demoRoutes = [
   }
 ];
 
+const settingsRoutes = [
+  {
+    path: '/settings/terms-conditions',
+    exact: true,
+    name: 'Terms and Conditions',
+    component: settingsComponents.TermsAndConditions
+  },
+  {
+    path: '/settings/privacy-policy',
+    exact: true,
+    name: 'Privacy Policy',
+    component: settingsComponents.PrivacyPolicy
+  }
+];
+
 /**
  * Combined routes configuration
  * @type {RouteConfig[]}
@@ -156,6 +180,7 @@ const routes = [
   ...dashboardRoutes,
   ...userRoutes,
   ...eventRoutes,
+  ...settingsRoutes,
   ...transactionRoutes,
   ...demoRoutes
 ];

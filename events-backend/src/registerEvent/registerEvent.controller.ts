@@ -17,6 +17,28 @@ export class RegisterEventController {
     const userId = req.user.id;
     return this.registerEventService.createRegisterEvent(userId, createRegisterEventDto);
   }
+
+  @Post('admin/create')
+  async adminCreateRegisterEvent(
+    @Req() req: Request,
+    @Body() createRegisterEventDto: CreateRegisterEventDto,
+  ) {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      throw new Error('Only admin can create registrations for other users');
+    }
+
+    // Set isCreatedByAdmin to true for admin-created registrations
+    createRegisterEventDto.isCreatedByAdmin = true;
+    
+    // Use the userId from the request body (admin specifies which user to register)
+    const userId = createRegisterEventDto.userId;
+    if (!userId) {
+      throw new Error('userId is required for admin registration');
+    }
+
+    return this.registerEventService.createRegisterEvent(userId, createRegisterEventDto);
+  }
   
   @Get('all')
   async getAll(@Req() req: Request) {

@@ -30,9 +30,7 @@ import {
   AppleLoginDto,
   LinkedInLoginDto,
 } from '../user/users.dto';
-import {
-  html
-} from 'Data/Data';
+import { html } from 'Data/Data';
 
 @Controller('api/auth')
 export class AuthController {
@@ -61,17 +59,6 @@ export class AuthController {
     //   userDto.profilePicture = `uploads/images/${file.filename}`;
     // }
     const result = await this.authService.register(userDto);
-    return response.status(HttpStatus.OK).json({
-      message: result.message,
-    });
-  }
-
-  @Post('verify-otp')
-  async verifyOtp(
-    @Res() response: Response,
-    @Body() body: { email: string; otp: string },
-  ) {
-    const result = await this.authService.verifyOtp(body.email, body.otp);
     return response.status(HttpStatus.OK).json({
       message: result.message,
     });
@@ -145,31 +132,6 @@ export class AuthController {
     }
   }
 
-  @Post('resend-otp')
-  async resetOtp(@Body() body: { email: string }, @Res() response: Response) {
-    if (!body.email) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: 'Email is required',
-      });
-    }
-
-    const result = await this.authService.resetOtp(body.email);
-    return response.status(HttpStatus.OK).json(result);
-  }
-
-  @Post('admin/forget')
-  @HttpCode(HttpStatus.OK)
-  async adminForgotPassword(@Body('email') email: string) {
-    return this.authService.adminForgotPassword(email);
-  }
-
-  @Post('forget')
-  @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body('email') email: string) {
-    return this.authService.forgotPassword(email);
-  }
-
   @Get('check-user')
   async checkUser(@Query('email') email: string, @Res() response: Response) {
     if (!email) {
@@ -181,18 +143,6 @@ export class AuthController {
 
     const result = await this.authService.checkUserExists(email);
     return response.status(HttpStatus.OK).json(result);
-  }
-
-  @Post('reset')
-  @HttpCode(HttpStatus.OK)
-  async resetPassword(
-    @Body() body: { email: string; otp: string; newPassword: string },
-  ) {
-    return this.authService.verifyOtpAndResetPassword(
-      body.email,
-      body.otp,
-      body.newPassword,
-    );
   }
 
   @Post('change-password')
@@ -286,7 +236,6 @@ export class AuthController {
     }
   }
 
-
   @Post('facebook')
   async facebookLogin(
     @Body() facebookLoginDto: FacebookLoginDto,
@@ -335,7 +284,6 @@ export class AuthController {
     }
   }
 
-
   @Post('linkedin')
   async linkedinLogin(
     @Body() linkedinLoginDto: LinkedInLoginDto,
@@ -354,6 +302,71 @@ export class AuthController {
       });
     } catch (error: any) {
       return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // verify email
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string, @Res() response: Response) {
+    try {
+      const result = await this.authService.verifyEmail(token);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('resend-verification')
+  async resendVerification(
+    @Body() body: { email: string },
+    @Res() response: Response,
+  ) {
+    if (!body.email) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+
+    const result = await this.authService.resendVerification(body.email);
+    return response.status(HttpStatus.OK).json(result);
+  }
+
+  @Post('forget')
+  async forgotPassword(
+    @Body() body: { email: string },
+    @Res() response: Response,
+  ) {
+    const result = await this.authService.forgotPassword(body.email);
+    return response.status(HttpStatus.OK).json(result);
+  }
+
+  @Post('reset')
+  async resetPassword(
+    @Body() body: { token: string; email: string; newPassword: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.authService.resetPasswordWithToken(
+        body.token,
+        body.email,
+        body.newPassword,
+      );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: error.message,
       });

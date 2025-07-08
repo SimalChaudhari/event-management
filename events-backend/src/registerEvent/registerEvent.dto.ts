@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, IsBoolean } from 'class-validator';
 
 export enum Type {
   Attendee = 'Attendee',
@@ -32,5 +32,9 @@ export class CreateRegisterEventDto {
   @IsOptional()
   @IsEnum(Status)
   status: Status = Status.Sucesss;
+
+  @IsOptional()
+  @IsBoolean()
+  isCreatedByAdmin?: boolean = false;
 
 }

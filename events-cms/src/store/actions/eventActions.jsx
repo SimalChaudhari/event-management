@@ -112,7 +112,22 @@ export const registrationDelete = (id) => async (dispatch) => {
         console.error('Error deleting registration:', error);
         throw error;
     }
+}
+
+export const createRegisterEvent = (data) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.post('/register-events/admin/create', data);
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success(response.data.message || 'Register event created successfully!');
+            await dispatch(participatedEvents());
+            return true;
+        }
+        return true;
+    } catch (error) {
+        throw error;
+    }
 };  
+
 
 
 

@@ -54,6 +54,9 @@ export class RegisterEvent {
   })
   status?: Status;
 
+  @Column({ type: 'boolean', default: false })
+  isCreatedByAdmin?: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 }

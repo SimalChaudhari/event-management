@@ -12,6 +12,7 @@ import { useLocation } from 'react-router-dom';
 import '../../../assets/css/register.css'; // Import the CSS file
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
+import AddRegisterEventModal from './modal/AddRegisterEventModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -26,21 +27,23 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(registrations, handleView) {
+function atable(registrations, handleView, handleAddRegisterEvent) {
     let tableZero = '#data-table-zero';
+    $.fn.dataTable.ext.errMode = 'throw';
 
-    // Clean up existing table
+    // Preserve the current page
+    let currentPage = $(tableZero).DataTable().page();
+
+    // Clean up existing table and event listeners
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        const existingTable = $(tableZero).DataTable();
-        existingTable.destroy();
-        $(tableZero).empty();
+        $(tableZero).DataTable().clear().destroy();
     }
 
     // Sort registrations by event start date
     const sortedRegistrations = [...registrations].sort((a, b) => new Date(a.event.startDate) - new Date(b.event.startDate));
 
-    const tableConfig = {
-        data: sortedRegistrations,
+    $(tableZero).DataTable({
+        data: sortedRegistrations || [],
         order: [[5, 'asc']], // Sort by Event Schedule column by default
         searching: true,
         searchDelay: 500,
@@ -51,7 +54,7 @@ function atable(registrations, handleView) {
         ],
         pagingType: 'full_numbers',
         dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f>>>" +
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-register-event-button ml-2'>>>" +
             "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
@@ -61,6 +64,11 @@ function atable(registrations, handleView) {
                 data: 'user',
                 title: 'Registered By',
                 render: function (data, type, row) {
+                    let createdByBadge = '';
+                    if (row.isCreatedByAdmin === true) {
+                        createdByBadge = '<span class="badge badge-danger"><i class="feather icon-shield mr-1"></i>Admin</span>';
+                    }
+
                     const regDate = new Date(row.createdAt).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
@@ -74,6 +82,15 @@ function atable(registrations, handleView) {
                             <span class="text-muted">${row.user.email}</span>
                             ${row.user.mobile ? `<br><span class="text-muted">${row.user.mobile}</span>` : ''}
                                <div><span class="text-muted">${regDate}</span></div>
+                                    ${
+                                        row.isCreatedByAdmin === true
+                                            ? `
+                            <div class="created-by-section">
+                                <p class="text-muted d-block mb-1 mt-2">Created By:  ${createdByBadge}</p>
+                            </div>
+                            `
+                                            : ''
+                                    }
                         </div>
                     `;
                 }
@@ -84,17 +101,24 @@ function atable(registrations, handleView) {
                 title: 'User Type',
                 render: function (data, type, row) {
                     let bgColor = '';
+
                     if (row.type?.toLowerCase() === 'exhibitor') {
-                        bgColor = 'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                        bgColor =
+                            'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
                     } else if (row.type?.toLowerCase() === 'attendee') {
-                        bgColor = 'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                        bgColor =
+                            'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
                     }
-                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${row.type || 'N/A'}</span></div>`;
+                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;">
+                    <span style="${bgColor}">${row.type || 'N/A'}</span>
+                    
+                  
+                    </div>`;
                 }
             },
             {
                 data: 'event.name',
-            
+
                 render: function (data, type, row) {
                     const eventDate = new Date(row.event.startDate);
                     const today = new Date();
@@ -291,19 +315,41 @@ function atable(registrations, handleView) {
 
             // Setup date filter after table is initialized
             setupDateFilter(this.api());
-            
+
             // Add event listener for view button
-            $(document).on('click', '.view-btn', function() {
+            $(document).on('click', '.view-btn', function () {
                 const eventId = $(this).data('id');
-                const registration = registrations.find(reg => reg.event.id === eventId);
+                const registration = registrations.find((reg) => reg.event.id === eventId);
                 if (registration) {
                     handleView(registration);
                 }
             });
-        }
-    };
 
-    return $(tableZero).DataTable(tableConfig);
+            // Add button initialization
+            if (!$('#addRegisterEventBtn').length) {
+                $('.add-register-event-button').html(`
+                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addRegisterEventBtn">
+                        <i class="feather icon-plus mr-1"></i>
+                        Add Register Event
+                    </button>
+                `);
+
+                $('#addRegisterEventBtn').on('click', handleAddRegisterEvent);
+            }
+        }
+    });
+
+    // Restore the page
+    $(tableZero).DataTable().page(currentPage).draw(false);
+
+    // Attach event listeners for actions
+    $(document).on('click', '.view-btn', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = registrations.find((reg) => reg.event.id === eventId);
+        if (dataEvent) {
+            handleView(dataEvent);
+        }
+    });
 }
 
 const RegisteredEvents = () => {
@@ -311,36 +357,49 @@ const RegisteredEvents = () => {
     const registrations = useSelector((state) => state.event.participatedEvents.data || []);
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
-    
+
     // Add state for view modal
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewData, setViewData] = useState(null);
-    
+
+    // Add state for Add Register Event modal
+    const [showAddRegisterModal, setShowAddRegisterModal] = useState(false);
+
     // Add handler for view button
     const handleView = (registration) => {
         setViewData(registration);
         setShowViewModal(true);
     };
 
+    // Add handler for Add Register Event button
+    const handleAddRegisterEvent = () => {
+        setShowAddRegisterModal(true);
+    };
+
+    const destroyTable = () => {
+        if (currentTable) {
+            $('#data-table-zero').off('click', '.view-btn');
+            currentTable.destroy();
+            setCurrentTable(null);
+        }
+    };
+
+    const initializeTable = () => {
+        destroyTable();
+        if (Array.isArray(registrations) && registrations.length >= 0) {
+            const table = atable(registrations, handleView, handleAddRegisterEvent);
+            setCurrentTable(table);
+        }
+    };
+
     useEffect(() => {
         dispatch(participatedEvents());
+        return () => destroyTable();
     }, [dispatch]);
 
     useEffect(() => {
-        if (registrations?.length) {
-            const table = atable(registrations, handleView);
-            setCurrentTable(table);
-        }
-
-        return () => {
-            if (currentTable) {
-                // Remove event listener to prevent memory leaks
-                $(document).off('click', '.view-btn');
-                resetFilters(currentTable);
-                currentTable.destroy();
-                setCurrentTable(null);
-            }
-        };
+        initializeTable();
+        return () => destroyTable();
     }, [registrations]);
 
     useEffect(() => {
@@ -353,11 +412,9 @@ const RegisteredEvents = () => {
 
     return (
         <Row>
-            <RegisterEventModal 
-                show={showViewModal} 
-                onHide={() => setShowViewModal(false)} 
-                eventData={viewData} 
-            />
+            <RegisterEventModal show={showViewModal} onHide={() => setShowViewModal(false)} eventData={viewData} />
+
+            <AddRegisterEventModal show={showAddRegisterModal} onHide={() => setShowAddRegisterModal(false)} />
 
             <Col sm={12} className="btn-page">
                 <Card className="event-list">
@@ -394,27 +451,6 @@ function calculateDuration(startDate, endDate) {
     } else {
         return `<span class="badge badge-light-info">${diffDays} days</span>`;
     }
-}
-
-// Add this helper function to parse the date string
-function parseDate(dateStr) {
-    // Convert date format "DD MMM YYYY" to Date object
-    const [day, month, year] = dateStr.split(' ');
-    const months = {
-        Jan: 0,
-        Feb: 1,
-        Mar: 2,
-        Apr: 3,
-        May: 4,
-        Jun: 5,
-        Jul: 6,
-        Aug: 7,
-        Sep: 8,
-        Oct: 9,
-        Nov: 10,
-        Dec: 11
-    };
-    return new Date(year, months[month], parseInt(day));
 }
 
 export default RegisteredEvents;
