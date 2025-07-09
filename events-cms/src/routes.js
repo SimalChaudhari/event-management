@@ -51,7 +51,8 @@ const userComponents = {
  */
 const settingsComponents = {
   TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
-  PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx'))
+  PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx')),
+  BannerManagement: React.lazy(() => import('./Pages/Settings/Banner/BannerManagement.jsx'))
 };
 
 /**
@@ -169,6 +170,12 @@ const settingsRoutes = [
     exact: true,
     name: 'Privacy Policy',
     component: settingsComponents.PrivacyPolicy
+  },
+  {
+    path: '/settings/banner-management',
+    exact: true,
+    name: 'Banner Management',
+    component: settingsComponents.BannerManagement
   }
 ];
 

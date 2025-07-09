@@ -10,12 +10,17 @@ import { checkAuthStatus } from '../store/actions/authActions';
 const AdminLayout = lazy(() => import('./layout/AdminLayout'));
 
 const App = () => {
-    const { authenticated } = useSelector((state) => state.auth);
+    const { authenticated, loading } = useSelector((state) => state.auth);
     const dispatch = useDispatch();
 
     useEffect(() => {
         dispatch(checkAuthStatus());
     }, [dispatch]);
+
+    // Show loader while checking authentication
+    if (loading) {
+        return <Loader />;
+    }
 
     return (
         <BrowserRouter basename={Config.basename}>
@@ -37,6 +42,7 @@ const App = () => {
                             />
                         )
                     )}
+                    
                     {/* Protected Routes */}
                     {authenticated ? (
                         <Route path="/" element={<AdminLayout />}>
@@ -47,17 +53,15 @@ const App = () => {
                                     element={<route.component />}
                                 />
                             ))}
+                            {/* Add a catch-all route for authenticated users */}
+                            <Route path="*" element={<Navigate to={Config.defaultPath} />} />
                         </Route>
                     ) : (
                         <Route path="*" element={<Navigate to="/auth/signin" />} />
                     )}
-
-                    {/* Default Redirect */}
-                    <Route path="*" element={<Navigate to={Config.defaultPath} />} />
                 </Routes>
             </Suspense>
         </BrowserRouter>
-
     );
 };
 

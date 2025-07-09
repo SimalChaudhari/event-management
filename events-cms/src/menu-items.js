@@ -134,6 +134,13 @@ const chartData = {
                     icon: 'feather icon-shield',
                     url: '/settings/privacy-policy'
 
+                },
+                {
+                    id: 'banner-management',
+                    title: 'Banner Management',
+                    type: 'item',
+                    icon: 'feather icon-image',
+                    url: '/settings/banner-management'
                 }
             ]
         },

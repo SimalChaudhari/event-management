@@ -8,6 +8,7 @@ import orderReducer from './reducer/orderReducer';
 import withdrawReducer from './reducer/withdrawReducer';
 import speakerReducer from './reducer/speakerReducer';
 import settingsReducer from './reducer/settingsReducer';
+import bannerReducer from './reducer/bannerReducer';
 
 const reducer = combineReducers({
     able: ableReducer,
@@ -18,7 +19,8 @@ const reducer = combineReducers({
     orders: orderReducer,
     withdraw: withdrawReducer,
     speaker: speakerReducer,
-    settings: settingsReducer
+    settings: settingsReducer,
+    banner: bannerReducer
 });
 
 export default reducer;

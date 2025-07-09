@@ -110,15 +110,16 @@ export class BannerController {
     return this.bannerService.createOrUpdate(createBannerDto);
   }
 
-  @Delete('image')
-  async deleteImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: Banner }> {
-    return this.bannerService.deleteImage(imageUrl);
+  // New API to clear all banners
+  @Delete('clear-all')
+  async clearAllBanners(): Promise<{ message: string }> {
+    return this.bannerService.clearAllBanners();
   }
 
-  @Delete('image/:index')
-  async deleteImageByIndex(@Param('index') index: string): Promise<{ message: string; data: Banner }> {
-    const imageIndex = parseInt(index);
-    return this.bannerService.deleteImageByIndex(imageIndex);
+  // New API to delete specific image
+  @Delete('delete-image')
+  async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: Banner }> {
+    return this.bannerService.deleteSpecificImage(imageUrl);
   }
 }
 
@@ -159,14 +160,15 @@ export class BannerEventController {
     return this.bannerEventService.createOrUpdate(createBannerEventDto);
   }
 
-  @Delete('image')
-  async deleteImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
-    return this.bannerEventService.deleteImage(imageUrl);
+  // New API to clear all banner events
+  @Delete('clear-all')
+  async clearAllBannerEvents(): Promise<{ message: string }> {
+    return this.bannerEventService.clearAllBannerEvents();
   }
 
-  @Delete('image/:index')
-  async deleteImageByIndex(@Param('index') index: string): Promise<{ message: string; data: BannerEvent }> {
-    const imageIndex = parseInt(index);
-    return this.bannerEventService.deleteImageByIndex(imageIndex);
+  // New API to delete specific image
+  @Delete('delete-image')
+  async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
+    return this.bannerEventService.deleteSpecificImage(imageUrl);
   }
 }
