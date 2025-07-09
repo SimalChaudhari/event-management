@@ -245,34 +245,52 @@ export class EventController {
     }
 
     try {
+      // Handle images - combine existing and new images
+      const allImages = [];
+      
+      // Add existing images from originalImages field
+      if (eventDto.originalImages) {
+        const originalImages = Array.isArray(eventDto.originalImages) 
+          ? eventDto.originalImages 
+          : [eventDto.originalImages];
+        allImages.push(...originalImages);
+      }
+      
+      // Add new uploaded images
       if (files.images && files.images.length > 0) {
-        // Delete old images if they exist
-        if (existingEvent.images && existingEvent.images.length > 0) {
-          existingEvent.images.forEach((oldImg) => {
-            const oldPath = path.join(__dirname, '..', '..', oldImg);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          });
-        }
-        eventDto.images = files.images.map(
+        const newImages = files.images.map(
           (img) => `uploads/event/images/${img.filename}`,
         );
+        allImages.push(...newImages);
+      }
+      
+      // Set the combined images
+      if (allImages.length > 0) {
+        eventDto.images = allImages;
       }
 
+      // Handle documents - combine existing and new documents
+      const allDocuments = [];
+      
+      // Add existing documents from originalDocuments field
+      if (eventDto.originalDocuments) {
+        const originalDocuments = Array.isArray(eventDto.originalDocuments) 
+          ? eventDto.originalDocuments 
+          : [eventDto.originalDocuments];
+        allDocuments.push(...originalDocuments);
+      }
+      
+      // Add new uploaded documents
       if (files.documents && files.documents.length > 0) {
-        // Delete old documents if they exist
-        if (existingEvent.documents && existingEvent.documents.length > 0) {
-          existingEvent.documents.forEach((oldDoc) => {
-            const oldPath = path.join(__dirname, '..', '..', oldDoc);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          });
-        }
-        eventDto.documents = files.documents.map(
+        const newDocuments = files.documents.map(
           (doc) => `uploads/event/documents/${doc.filename}`,
         );
+        allDocuments.push(...newDocuments);
+      }
+      
+      // Set the combined documents
+      if (allDocuments.length > 0) {
+        eventDto.documents = allDocuments;
       }
 
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
@@ -320,5 +338,87 @@ export class EventController {
   @Roles(UserRole.Admin)
   async deleteEvent(@Param('id') id: string) {
     return await this.eventService.deleteEvent(id);
+  }
+
+  // Remove individual image
+  @Delete('images/:id')
+  @Roles(UserRole.Admin)
+  async removeEventImage(
+    @Param('id') id: string,
+    @Body() body: { imagePath: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const event = await this.eventService.getEventEntityById(id);
+      if (!event) {
+        throw new NotFoundException('Event not found');
+      }
+
+      const { imagePath } = body;
+
+      // Check if image exists in event
+      if (!event.images || !event.images.includes(imagePath)) {
+        throw new NotFoundException('Image not found in this event');
+      }
+
+      // Remove image from filesystem
+      const fullPath = path.join(__dirname, '..', '..', imagePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+
+      // Remove image from database using new method
+      const updatedImages = event.images.filter(img => img !== imagePath);
+      await this.eventService.updateEventImages(id, updatedImages);
+
+      return response.status(200).json({
+        success: true,
+        message: 'Image removed successfully',
+        data: { images: updatedImages }
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Remove individual document
+  @Delete('documents/:id')
+  @Roles(UserRole.Admin)
+  async removeEventDocument(
+    @Param('id') id: string,
+    @Body() body: { documentPath: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const event = await this.eventService.getEventEntityById(id);
+      if (!event) {
+        throw new NotFoundException('Event not found');
+      }
+
+      const { documentPath } = body;
+
+      // Check if document exists in event
+      if (!event.documents || !event.documents.includes(documentPath)) {
+        throw new NotFoundException('Document not found in this event');
+      }
+
+      // Remove document from filesystem
+      const fullPath = path.join(__dirname, '..', '..', documentPath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+
+      // Remove document from database using new method
+      const updatedDocuments = event.documents.filter(doc => doc !== documentPath);
+      await this.eventService.updateEventDocuments(id, updatedDocuments);
+
+      return response.status(200).json({
+        success: true,
+        message: 'Document removed successfully',
+        data: { documents: updatedDocuments }
+      });
+    } catch (error) {
+      throw error;
+    }
   }
 }

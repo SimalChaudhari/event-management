@@ -327,4 +327,22 @@ export class EventService {
     await this.eventRepository.remove(event);
     return { message: 'Event deleted successfully' };
   }
+
+  async updateEventImages(id: string, images: string[]): Promise<Partial<Event>> {
+    const event = await this.eventRepository.findOne({ where: { id } });
+    if (!event) throw new NotFoundException('Event not found!');
+    
+    event.images = images;
+    return await this.eventRepository.save(event);
+}
+
+async updateEventDocuments(id: string, documents: string[]): Promise<Partial<Event>> {
+    const event = await this.eventRepository.findOne({ where: { id } });
+    if (!event) throw new NotFoundException('Event not found!');
+    
+    event.documents = documents;
+    return await this.eventRepository.save(event);
+}
+
+
 }

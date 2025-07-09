@@ -13949,7 +13949,7 @@ react-dev-utils@^12.0.1:
     strip-ansi "^6.0.1"
     text-table "^0.2.0"
 
-react-dom@*, "react-dom@^0.14 || ^15.0", "react-dom@^0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.0 || ^15.0.0 || ^16 || ^17 || ^18 || ^19", "react-dom@^0.14.0 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.0 || ^15.0.0-rc || ^16.0.0-rc || ^16.0.0", "react-dom@^0.14.0 || ^15.0.1 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.3 || ^15.0.0", "react-dom@^15.0.0 || ^16.0.0", "react-dom@^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react-dom@^15.3.0 || ^16.2.0", react-dom@^15.3.2, "react-dom@^15.5.x || ^16.x || ^17.x || ^18.x", "react-dom@^16 || ^17 || ^18", "react-dom@^16.0.0 || ^17.0.0", "react-dom@^16.5.0 || ^17.0.0", "react-dom@^16.7.0 || ^17", "react-dom@^16.8 || ^17 || ^18 || ^19", "react-dom@^16.8.0 || ^17 || ^18", "react-dom@^16.8.0 || ^17.0.0", "react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^16.9.0 || ^17", "react-dom@^18 || ^19", react-dom@^19.0.0, "react-dom@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", "react-dom@>= 0.14.x", "react-dom@>= 16.3.0", "react-dom@>= 16.3.2", "react-dom@>= 16.4.0", "react-dom@>= 16.8.0", react-dom@>=0.14, react-dom@>=0.14.0, react-dom@>=15.0.0, react-dom@>=16.14.0, react-dom@>=16.3.0, react-dom@>=16.3.3, react-dom@>=16.6.0, react-dom@>=16.9.0, react-dom@>=18, react-dom@>15.0.1, "react-dom@~0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react-dom@~0.14.8 || ^15.0.0 || ^16.0.0", "react-dom@0.14.x || 15.x || 16.x || 17.x", "react-dom@15 - 18", "react-dom@15.x || 16.x || 16.4.0-alpha.0911da3":
+react-dom@*, "react-dom@^0.14 || ^15.0", "react-dom@^0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.0 || ^15.0.0 || ^16 || ^17 || ^18 || ^19", "react-dom@^0.14.0 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.0 || ^15.0.0-rc || ^16.0.0-rc || ^16.0.0", "react-dom@^0.14.0 || ^15.0.1 || ^16.0.0 || ^17.0.0", "react-dom@^0.14.3 || ^15.0.0", "react-dom@^15.0.0 || ^16.0.0", "react-dom@^15.0.0 || ^16.0.0 || ^17.0.0", "react-dom@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react-dom@^15.3.0 || ^16.2.0", react-dom@^15.3.2, "react-dom@^15.5.x || ^16.x || ^17.x || ^18.x", "react-dom@^16 || ^17 || ^18", "react-dom@^16.0.0 || ^17.0.0", "react-dom@^16.5.0 || ^17.0.0", "react-dom@^16.7.0 || ^17", "react-dom@^16.8 || ^17 || ^18 || ^19", "react-dom@^16.8.0 || ^17 || ^18", "react-dom@^16.8.0 || ^17.0.0", "react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^16.9.0 || ^17", "react-dom@^18 || ^19", react-dom@^19.0.0, "react-dom@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", "react-dom@>= 0.14.x", "react-dom@>= 16.3.0", "react-dom@>= 16.3.2", "react-dom@>= 16.4.0", "react-dom@>= 16.8.0", react-dom@>=0.14, react-dom@>=0.14.0, react-dom@>=15.0.0, react-dom@>=16.14.0, react-dom@>=16.3.0, react-dom@>=16.3.3, react-dom@>=16.6.0, react-dom@>=16.9.0, react-dom@>=18, react-dom@>15.0.1, "react-dom@~0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react-dom@~0.14.8 || ^15.0.0 || ^16.0.0", "react-dom@0.14.x || 15.x || 16.x || 17.x", "react-dom@15 - 18", "react-dom@15.x || 16.x || 16.4.0-alpha.0911da3", "react-dom@16.x || 17.x":
   version "19.0.0"
   resolved "https://registry.npmjs.org/react-dom/-/react-dom-19.0.0.tgz"
   integrity sha512-4GV5sHFG0e/0AD4X+ySy6UJd3jVl1iNsNHdpad0qhABJ11twS3TTBnseqsKurKcsNqCEFeGL3uLpVChpIO3QfQ==
@@ -14114,6 +14114,14 @@ react-icons@^3.10.0:
   dependencies:
     camelcase "^5.0.0"
 
+react-image-lightbox@^5.1.4:
+  version "5.1.4"
+  resolved "https://registry.npmjs.org/react-image-lightbox/-/react-image-lightbox-5.1.4.tgz"
+  integrity sha512-kTiAODz091bgT7SlWNHab0LSMZAPJtlNWDGKv7pLlLY1krmf7FuG1zxE0wyPpeA8gPdwfr3cu6sPwZRqWsc3Eg==
+  dependencies:
+    prop-types "^15.7.2"
+    react-modal "^3.11.1"
+
 react-image-video-lightbox@2.0.1:
   version "2.0.1"
   resolved "https://registry.npmjs.org/react-image-video-lightbox/-/react-image-video-lightbox-2.0.1.tgz"
@@ -14236,7 +14244,7 @@ react-loki@^1.2.0:
   dependencies:
     prop-types "^15.5.10"
 
-react-modal@^3.16.3:
+react-modal@^3.11.1, react-modal@^3.16.3:
   version "3.16.3"
   resolved "https://registry.npmjs.org/react-modal/-/react-modal-3.16.3.tgz"
   integrity sha512-yCYRJB5YkeQDQlTt17WGAgFJ7jr2QYcWa1SHqZ3PluDmnKJ/7+tVU+E6uKyZ0nODaeEj+xCpK4LcSnKXLMC0Nw==
@@ -14623,7 +14631,7 @@ react-window-size@^1.2.2:
   dependencies:
     babel-runtime "^6.6.1"
 
-react@*, "react@^0.14 || ^15.0", "react@^0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react@^0.14.0 || ^15.0.0 || ^16 || ^17 || ^18 || ^19", "react@^0.14.0 || ^15.0.0 || ^16.0.0", "react@^0.14.0 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react@^0.14.0 || ^15.0.0-rc || ^16.0.0-rc || ^16.0.0", "react@^0.14.0 || ^15.0.1 || ^16.0.0 || ^17.0.0", "react@^0.14.3 || ^15.0.0", "react@^15.0.0 || ^16.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0|| ^18.0.0", "react@^15.3.0 || ^16.0.0", "react@^15.3.0 || ^16.2.0", react@^15.3.2, "react@^15.5.x || ^16.x || ^17.x || ^18.x", "react@^16 || ^17 || ^18", "react@^16.0.0 || ^17.0.0", "react@^16.13.1 || ^17.0.0 || ^18.0.0", "react@^16.5.0 || ^17.0.0", "react@^16.7.0 || ^17", "react@^16.8 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17 || ^18", "react@^16.8.0 || ^17.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1", "react@^16.8.3 || ^17", react@^16.8.6, "react@^16.9.0 || ^17", react@^18, "react@^18 || ^19", react@^19.0.0, "react@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", "react@>= ^16.0.0", "react@>= 0.14.0", "react@>= 0.14.x", "react@>= 16", "react@>= 16.3.0", "react@>= 16.3.2", "react@>= 16.4.0", "react@>= 16.8.0", react@>=0.13, react@>=0.14, react@>=0.14.0, react@>=0.14.9, react@>=0.15, react@>=15.0.0, react@>=16.0.0, react@>=16.14.0, react@>=16.3.0, react@>=16.3.3, react@>=16.6.0, react@>=16.8.0, react@>=16.9.0, react@>=18, react@>15.0.1, "react@~0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react@~0.14.8 || ^15.0.0 || ^16.0.0", "react@0.14.x || 15.x || 16.x || 17.x", "react@15 - 18", "react@15.x || 16.x || 16.4.0-alpha.0911da3", react@16.x:
+react@*, "react@^0.14 || ^15.0", "react@^0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react@^0.14.0 || ^15.0.0 || ^16 || ^17 || ^18 || ^19", "react@^0.14.0 || ^15.0.0 || ^16.0.0", "react@^0.14.0 || ^15.0.0 || ^16.0.0 || ^17.0.0", "react@^0.14.0 || ^15.0.0-rc || ^16.0.0-rc || ^16.0.0", "react@^0.14.0 || ^15.0.1 || ^16.0.0 || ^17.0.0", "react@^0.14.3 || ^15.0.0", "react@^15.0.0 || ^16.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react@^15.0.0 || ^16.0.0 || ^17.0.0|| ^18.0.0", "react@^15.3.0 || ^16.0.0", "react@^15.3.0 || ^16.2.0", react@^15.3.2, "react@^15.5.x || ^16.x || ^17.x || ^18.x", "react@^16 || ^17 || ^18", "react@^16.0.0 || ^17.0.0", "react@^16.13.1 || ^17.0.0 || ^18.0.0", "react@^16.5.0 || ^17.0.0", "react@^16.7.0 || ^17", "react@^16.8 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17 || ^18", "react@^16.8.0 || ^17.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react@^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1", "react@^16.8.3 || ^17", react@^16.8.6, "react@^16.9.0 || ^17", react@^18, "react@^18 || ^19", react@^19.0.0, "react@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", "react@>= ^16.0.0", "react@>= 0.14.0", "react@>= 0.14.x", "react@>= 16", "react@>= 16.3.0", "react@>= 16.3.2", "react@>= 16.4.0", "react@>= 16.8.0", react@>=0.13, react@>=0.14, react@>=0.14.0, react@>=0.14.9, react@>=0.15, react@>=15.0.0, react@>=16.0.0, react@>=16.14.0, react@>=16.3.0, react@>=16.3.3, react@>=16.6.0, react@>=16.8.0, react@>=16.9.0, react@>=18, react@>15.0.1, "react@~0.14 || ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0", "react@~0.14.8 || ^15.0.0 || ^16.0.0", "react@0.14.x || 15.x || 16.x || 17.x", "react@15 - 18", "react@15.x || 16.x || 16.4.0-alpha.0911da3", react@16.x, "react@16.x || 17.x":
   version "19.0.0"
   resolved "https://registry.npmjs.org/react/-/react-19.0.0.tgz"
   integrity sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==

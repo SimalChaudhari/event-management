@@ -20,6 +20,7 @@ import { SettingModule } from 'settings/setting.module';
 import { FavoriteEventModule } from 'favorite-event/favorite-event.module';
 import { FeedbackModule } from 'feedback/feedback.module';
 import { CouponModule } from 'coupon/coupon.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -44,6 +45,7 @@ console.log(join(__dirname, '..', 'uploads'))
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     }),
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

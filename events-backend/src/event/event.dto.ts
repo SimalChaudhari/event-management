@@ -80,6 +80,8 @@ export class EventDto {
     
     @IsOptional()
     speakerIds?: string; 
+  originalImages: any;
+  originalDocuments: any;
 
 
 }

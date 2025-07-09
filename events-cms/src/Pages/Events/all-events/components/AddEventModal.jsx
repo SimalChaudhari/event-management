@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Row, Col, Card } from 'react-bootstrap';
+import { Modal, Button, Row, Col, Card, Badge } from 'react-bootstrap';
 import Select from 'react-select';
 import { useDispatch } from 'react-redux';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
@@ -14,6 +14,7 @@ import LocationMarker from './LocationMarker';
 import SpeakerFormSidebar from './SpeakerFormSidebar';
 import SpeakerFormModal from './SpeakerFormSidebar';
 import { addSpeaker } from '../../../../store/actions/speakerActions';
+import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 
 function AddEventModal({ show, handleClose, editData }) {
     const dispatch = useDispatch();
@@ -33,7 +34,8 @@ function AddEventModal({ show, handleClose, editData }) {
         location: '',
         venue: '',
         country: '',
-        image: null,
+        images: [], // Changed from null to empty array for multiple images
+        documents: [], // Add documents array
         type: 'Physical',
         price: '',
         currency: '',
@@ -42,6 +44,18 @@ function AddEventModal({ show, handleClose, editData }) {
         longitude: '' // Added longitude
     });
     const [showMapModal, setShowMapModal] = useState(false); // For showing the map modal
+
+    // Add new state for image management
+    const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState({});
+
+    // Add new state for document management
+    const [documentPreviewUrls, setDocumentPreviewUrls] = useState([]);
+    const [documentUploadProgress, setDocumentUploadProgress] = useState({});
+
+    // Add state to track removed files for edit mode
+    const [removedImages, setRemovedImages] = useState([]);
+    const [removedDocuments, setRemovedDocuments] = useState([]);
 
     // Fetch user's current location
     const getCurrentLocation = () => {
@@ -69,6 +83,241 @@ function AddEventModal({ show, handleClose, editData }) {
         getCurrentLocation(); // Automatically fetch current location when the component mounts
     }, []);
 
+    // Add function to handle image removal
+    const handleRemoveImage = async (indexToRemove) => {
+        const imageToRemove = formData.images[indexToRemove];
+        
+        if (typeof imageToRemove === 'string' && editData) {
+            // Existing image - call backend API to remove
+            try {
+                const updatedImages = await dispatch(removeEventImage(editData.id, imageToRemove));
+                if (updatedImages) {
+                    // Update local state with response data
+                    setFormData(prev => ({
+                        ...prev,
+                        images: updatedImages
+                    }));
+                    
+                    // Update preview URLs
+                    const newPreviewUrls = updatedImages.map(img => 
+                        img.startsWith('http') ? img : `${API_URL}/${img.replace(/\\/g, '/')}`
+                    );
+                    setImagePreviewUrls(newPreviewUrls);
+                }
+            } catch (error) {
+                console.error('Error removing image:', error);
+            }
+        } else {
+            // New uploaded file - just remove from state
+            setFormData(prev => ({
+                ...prev,
+                images: prev.images.filter((_, index) => index !== indexToRemove)
+            }));
+            
+            setImagePreviewUrls(prev => 
+                prev.filter((_, index) => index !== indexToRemove)
+            );
+        }
+    };
+
+    // Add function to handle image reordering
+    const handleImageReorder = (fromIndex, toIndex) => {
+        const newImages = [...formData.images];
+        const [movedImage] = newImages.splice(fromIndex, 1);
+        newImages.splice(toIndex, 0, movedImage);
+        
+        setFormData(prev => ({
+            ...prev,
+            images: newImages
+        }));
+        
+        // Also reorder preview URLs
+        const newPreviewUrls = [...imagePreviewUrls];
+        const [movedUrl] = newPreviewUrls.splice(fromIndex, 1);
+        newPreviewUrls.splice(toIndex, 0, movedUrl);
+        setImagePreviewUrls(newPreviewUrls);
+    };
+
+    // Add function to handle document removal
+    const handleRemoveDocument = async (indexToRemove) => {
+        const documentToRemove = formData.documents[indexToRemove];
+        
+        if (typeof documentToRemove === 'string' && editData) {
+            // Existing document - call backend API to remove
+            try {
+                const updatedDocuments = await dispatch(removeEventDocument(editData.id, documentToRemove));
+                if (updatedDocuments) {
+                    // Update local state with response data
+                    setFormData(prev => ({
+                        ...prev,
+                        documents: updatedDocuments
+                    }));
+                    
+                    // Update preview URLs
+                    const newPreviewUrls = updatedDocuments.map(doc => 
+                        doc.startsWith('http') ? doc : `${API_URL}/${doc.replace(/\\/g, '/')}`
+                    );
+                    setDocumentPreviewUrls(newPreviewUrls);
+                }
+            } catch (error) {
+                console.error('Error removing document:', error);
+            }
+        } else {
+            // New uploaded file - just remove from state
+            setFormData(prev => ({
+                ...prev,
+                documents: prev.documents.filter((_, index) => index !== indexToRemove)
+            }));
+            
+            setDocumentPreviewUrls(prev => 
+                prev.filter((_, index) => index !== indexToRemove)
+            );
+        }
+    };
+
+    // Update handleChange to handle both images and documents
+    const handleChange = (e) => {
+        const { name, value, type, files } = e.target;
+        
+        if (type === 'file') {
+            const newFiles = Array.from(files);
+            
+            if (name === 'images') {
+                // Handle images - preserve existing images
+                const validFiles = newFiles.filter(file => {
+                    const isValidType = file.type.startsWith('image/');
+                    const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+                    
+                    if (!isValidType) {
+                        alert(`${file.name} is not a valid image file.`);
+                    }
+                    if (!isValidSize) {
+                        alert(`${file.name} is too large. Maximum size is 5MB.`);
+                    }
+                    
+                    return isValidType && isValidSize;
+                });
+                
+                const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+                
+                // Preserve existing images and add new ones
+                setFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, ...validFiles]
+                }));
+                
+                setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+            } else if (name === 'documents') {
+                // Handle documents - preserve existing documents
+                const validFiles = newFiles.filter(file => {
+                    const isValidType = file.type === 'application/pdf' || 
+                                     file.type === 'application/msword' ||
+                                     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                                     file.type === 'application/vnd.ms-excel' ||
+                                     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                    const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
+                    
+                    if (!isValidType) {
+                        alert(`${file.name} is not a valid document file. Supported: PDF, DOC, DOCX, XLS, XLSX`);
+                    }
+                    if (!isValidSize) {
+                        alert(`${file.name} is too large. Maximum size is 10MB.`);
+                    }
+                    
+                    return isValidType && isValidSize;
+                });
+                
+                const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+                
+                // Preserve existing documents and add new ones
+                setFormData(prev => ({
+                    ...prev,
+                    documents: [...prev.documents, ...validFiles]
+                }));
+                
+                setDocumentPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+            }
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
+    };
+
+    // Add drag and drop functionality
+    const handleDragOver = (e) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files);
+        
+        const validFiles = files.filter(file => {
+            const isValidType = file.type.startsWith('image/');
+            const isValidSize = file.size <= 5 * 1024 * 1024;
+            
+            if (!isValidType) {
+                alert(`${file.name} is not a valid image file.`);
+            }
+            if (!isValidSize) {
+                alert(`${file.name} is too large. Maximum size is 5MB.`);
+            }
+            
+            return isValidType && isValidSize;
+        });
+        
+        const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+        
+        // Preserve existing images and add new ones
+        setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, ...validFiles]
+        }));
+        
+        setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    };
+
+    // Add drag and drop functionality for documents
+    const handleDocumentDragOver = (e) => {
+        e.preventDefault();
+    };
+
+    const handleDocumentDrop = (e) => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files);
+        
+        const validFiles = files.filter(file => {
+            const isValidType = file.type === 'application/pdf' || 
+                             file.type === 'application/msword' ||
+                             file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                             file.type === 'application/vnd.ms-excel' ||
+                             file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            const isValidSize = file.size <= 10 * 1024 * 1024;
+            
+            if (!isValidType) {
+                alert(`${file.name} is not a valid document file.`);
+            }
+            if (!isValidSize) {
+                alert(`${file.name} is too large. Maximum size is 10MB.`);
+            }
+            
+            return isValidType && isValidSize;
+        });
+        
+        const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+        
+        // Preserve existing documents and add new ones
+        setFormData(prev => ({
+            ...prev,
+            documents: [...prev.documents, ...validFiles]
+        }));
+        
+        setDocumentPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    };
+
+    // Update resetFormData to include removed files tracking
     const resetFormData = () => {
         setFormData({
             name: '',
@@ -80,14 +329,21 @@ function AddEventModal({ show, handleClose, editData }) {
             location: '',
             venue: '',
             country: '',
-            image: null,
+            images: [],
+            documents: [], // Add documents
             type: 'Physical',
             price: '',
             currency: '',
             speakerIds: [],
-            latitude: '', // Added latitude
-            longitude: '' // Added longitude
+            latitude: '',
+            longitude: ''
         });
+        setImagePreviewUrls([]);
+        setDocumentPreviewUrls([]); // Add document preview URLs
+        setRemovedImages([]); // Reset removed images
+        setRemovedDocuments([]); // Reset removed documents
+        setUploadProgress({});
+        setDocumentUploadProgress({});
     };
 
     // Load speakers from API
@@ -121,6 +377,7 @@ function AddEventModal({ show, handleClose, editData }) {
         fetchSpeakers();
     }, []);
 
+    // Update useEffect for editData to reset removed files tracking
     useEffect(() => {
         if (editData) {
             // Check for both possible speaker data formats
@@ -133,39 +390,84 @@ function AddEventModal({ show, handleClose, editData }) {
                 speakerIds = editData.speakersData.map((speaker) => speaker.id);
             }
 
-            // Set form data with the extracted speaker IDs
+            // Handle images for edit mode - FIXED VERSION
+            let imagesData = [];
+            let previewUrls = [];
+            
+            if (editData.images) {
+                // Handle different image data formats from backend
+                if (typeof editData.images === 'string') {
+                    // Single image as string
+                    imagesData = [editData.images];
+                    previewUrls = [`${API_URL}/${editData.images.replace(/\\/g, '/')}`];
+                } else if (Array.isArray(editData.images)) {
+                    // Multiple images as array
+                    imagesData = editData.images;
+                    previewUrls = editData.images.map(img => {
+                        if (typeof img === 'string') {
+                            // If it's already a full URL, use it directly
+                            if (img.startsWith('http')) {
+                                return img;
+                            }
+                            // If it's a relative path, construct the full URL
+                            return `${API_URL}/${img.replace(/\\/g, '/')}`;
+                        }
+                        return img;
+                    });
+                }
+            }
+
+            // Handle documents for edit mode
+            let documentsData = [];
+            let documentPreviewUrls = [];
+            
+            if (editData.documents) {
+                if (typeof editData.documents === 'string') {
+                    documentsData = [editData.documents];
+                    documentPreviewUrls = [`${API_URL}/${editData.documents.replace(/\\/g, '/')}`];
+                } else if (Array.isArray(editData.documents)) {
+                    documentsData = editData.documents;
+                    documentPreviewUrls = editData.documents.map(doc => {
+                        if (typeof doc === 'string') {
+                            if (doc.startsWith('http')) {
+                                return doc;
+                            }
+                            return `${API_URL}/${doc.replace(/\\/g, '/')}`;
+                        }
+                        return doc;
+                    });
+                }
+            }
+
+            // Set form data with proper image handling
             setFormData({
-                name: '',
-                description: '',
-                startDate: '',
-                startTime: '',
-                endDate: '',
-                endTime: '',
-                location: '',
-                venue: '',
-                latitude: '',
-                longitude: '',
-                country: '',
-                image: null,
-                type: 'Physical',
-                price: '',
-                currency: '',
-                ...editData,
-                speakerIds: speakerIds,
-                image: editData.image ? `${API_URL}/${editData.image.replace(/\\/g, '/')}` : null
+                name: editData.name || '',
+                description: editData.description || '',
+                startDate: editData.startDate || '',
+                startTime: editData.startTime || '',
+                endDate: editData.endDate || '',
+                endTime: editData.endTime || '',
+                location: editData.location || '',
+                venue: editData.venue || '',
+                latitude: editData.latitude || '',
+                longitude: editData.longitude || '',
+                country: editData.country || '',
+                images: imagesData, // Use processed images data
+                documents: documentsData, // Add documents
+                type: editData.type || 'Physical',
+                price: editData.price || '',
+                currency: editData.currency || '',
+                speakerIds: speakerIds
             });
+            
+            setImagePreviewUrls(previewUrls);
+            setDocumentPreviewUrls(documentPreviewUrls); // Add document preview URLs
+            setRemovedImages([]); // Reset removed images when editing
+            setRemovedDocuments([]); // Reset removed documents when editing
         } else {
             resetFormData();
         }
     }, [editData]);
-
-    const handleChange = (e) => {
-        const { name, value, type, files } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: type === 'file' ? files[0] : value
-        }));
-    };
 
     // 🎯 Handle multi-speaker select
     const handleSpeakerSelect = (selectedOptions) => {
@@ -183,36 +485,62 @@ function AddEventModal({ show, handleClose, editData }) {
         const formattedStartTime = formatTime(formData.startTime);
         const formattedEndTime = formatTime(formData.endTime);
 
-        // Create a data object without speakersData
         const dataToSend = {
             ...formData,
             startTime: formattedStartTime,
             endTime: formattedEndTime
         };
 
-        // Remove speakersData property if it exists
         if (dataToSend.speakersData) {
             delete dataToSend.speakersData;
         }
 
         Object.keys(dataToSend).forEach((key) => {
             if (key === 'speakerIds') {
-                // Make sure speakerIds is an array before joining
                 const speakersArray = Array.isArray(dataToSend.speakerIds) ? dataToSend.speakerIds : [];
-
-                // Convert to comma-separated string - this is what the backend expects
                 formDataToSend.append('speakerIds', speakersArray.join(','));
-            } else if (key === 'image') {
-                if (dataToSend[key] && typeof dataToSend[key] !== 'string') {
-                    formDataToSend.append(key, dataToSend[key]);
+            } else if (key === 'images') {
+                if (dataToSend[key] && Array.isArray(dataToSend[key])) {
+                    dataToSend[key].forEach((file) => {
+                        if (file instanceof File) {
+                            formDataToSend.append('images', file);
+                        }
+                    });
+                }
+            } else if (key === 'documents') {
+                if (dataToSend[key] && Array.isArray(dataToSend[key])) {
+                    dataToSend[key].forEach((file) => {
+                        if (file instanceof File) {
+                            formDataToSend.append('documents', file);
+                        }
+                    });
                 }
             } else if (key !== 'speakersData' && dataToSend[key] !== null) {
                 formDataToSend.append(key, dataToSend[key]);
             }
         });
 
-        if (editData && editData.image && typeof formData.image === 'string') {
-            formDataToSend.append('originalImage', editData.image);
+        // Handle existing files for edit mode - FIXED VERSION
+        if (editData) {
+            // Add existing images that are still in formData (not removed)
+            if (formData.images && formData.images.length > 0) {
+                formData.images.forEach((image) => {
+                    if (typeof image === 'string') {
+                        // This is an existing image that wasn't removed
+                        formDataToSend.append('originalImages', image);
+                    }
+                });
+            }
+
+            // Add existing documents that are still in formData (not removed)
+            if (formData.documents && formData.documents.length > 0) {
+                formData.documents.forEach((document) => {
+                    if (typeof document === 'string') {
+                        // This is an existing document that wasn't removed
+                        formDataToSend.append('originalDocuments', document);
+                    }
+                });
+            }
         }
 
         try {
@@ -220,7 +548,7 @@ function AddEventModal({ show, handleClose, editData }) {
             if (success) {
                 fetchEvent();
                 handleClose();
-                resetFormData(); // Reset the form data
+                resetFormData();
             }
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -600,18 +928,281 @@ function AddEventModal({ show, handleClose, editData }) {
                                 />
                             </div>
                         </Col>
-                        <Col sm={6}>
+                        <Col sm={12}>
                             <div className="form-group fill">
-                                <label className="floating-label" htmlFor="image">
-                                    Image
+                                <label className="floating-label" htmlFor="images">
+                                    Images <Badge bg="info">{formData.images.length}/10</Badge>
                                 </label>
-                                <input type="file" className="form-control" name="image" onChange={handleChange} accept="image/*" />
-                                {formData.image && (
-                                    <img
-                                        src={typeof formData.image === 'string' ? formData.image : URL.createObjectURL(formData.image)}
-                                        alt="Event"
-                                        style={{ width: '100px', height: '100px', marginTop: '10px' }}
+                                
+                                {/* Drag and Drop Zone */}
+                                <div 
+                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                                    onDragOver={handleDragOver}
+                                    onDrop={handleDrop}
+                                    style={{
+                                        border: '2px dashed #ccc',
+                                        borderRadius: '8px',
+                                        padding: '20px',
+                                        textAlign: 'center',
+                                        backgroundColor: '#f9f9f9',
+                                        marginBottom: '10px'
+                                    }}
+                                >
+                                    <div className="mb-3">
+                                        <i className="fas fa-cloud-upload-alt fa-3x text-muted"></i>
+                                    </div>
+                                    <p className="text-muted mb-2">
+                                        Drag and drop images here, or click to select files
+                                    </p>
+                                    <p className="text-muted small">
+                                        Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 10 images.
+                                    </p>
+                                    <input 
+                                        type="file" 
+                                        className="form-control" 
+                                        name="images" 
+                                        onChange={handleChange} 
+                                        accept="image/*" 
+                                        multiple
+                                        style={{ display: 'none' }}
+                                        id="imageInput"
                                     />
+                                    <Button 
+                                        variant="outline-primary" 
+                                        onClick={() => document.getElementById('imageInput').click()}
+                                    >
+                                        Choose Files
+                                    </Button>
+                                </div>
+
+                                {/* Image Preview Grid */}
+                                {formData.images && formData.images.length > 0 && (
+                                    <div className="mt-3">
+                                        <h6>Selected Images ({formData.images.length})</h6>
+                                        <div style={{ 
+                                            display: 'grid', 
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                                            gap: '10px',
+                                            marginTop: '10px'
+                                        }}>
+                                            {formData.images.map((image, index) => {
+                                                // Determine the image source
+                                                let imageSrc = '';
+                                                let isExistingImage = false;
+                                                
+                                                if (typeof image === 'string') {
+                                                    // Existing image from backend
+                                                    isExistingImage = true;
+                                                    if (image.startsWith('http')) {
+                                                        imageSrc = image;
+                                                    } else {
+                                                        imageSrc = `${API_URL}/${image.replace(/\\/g, '/')}`;
+                                                    }
+                                                } else if (image instanceof File) {
+                                                    // New uploaded file
+                                                    imageSrc = imagePreviewUrls[index] || URL.createObjectURL(image);
+                                                } else {
+                                                    // Fallback
+                                                    imageSrc = imagePreviewUrls[index] || '';
+                                                }
+                                                
+                                                return (
+                                                    <div key={index} style={{ position: 'relative' }}>
+                                                        <img
+                                                            src={imageSrc}
+                                                            alt={`Event ${index + 1}`}
+                                                            style={{ 
+                                                                width: '100%', 
+                                                                height: '120px', 
+                                                                objectFit: 'cover',
+                                                                borderRadius: '8px',
+                                                                border: '2px solid #ddd'
+                                                            }}
+                                                            onError={(e) => {
+                                                                console.error('Image failed to load:', imageSrc);
+                                                                e.target.style.display = 'none';
+                                                            }}
+                                                        />
+                                                        
+                                                        {/* Image Controls */}
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            top: '5px',
+                                                            right: '5px',
+                                                            display: 'flex',
+                                                            gap: '2px'
+                                                        }}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="danger"
+                                                                onClick={() => handleRemoveImage(index)}
+                                                                style={{ padding: '2px 6px', fontSize: '10px' }}
+                                                            >
+                                                                ×
+                                                            </Button>
+                                                        </div>
+                                                        
+                                                        {/* Image Info */}
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            bottom: '5px',
+                                                            left: '5px',
+                                                            right: '5px',
+                                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                                            color: 'white',
+                                                            padding: '2px 4px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '10px'
+                                                        }}>
+                                                            {isExistingImage ? 'Existing' : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
+                                                        </div>
+                                                        
+                                                        {/* Image Index Badge */}
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            top: '5px',
+                                                            left: '5px',
+                                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                                            color: 'white',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 'bold'
+                                                        }}>
+                                                            {index + 1}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        {/* Reorder Instructions */}
+                                        {formData.images.length > 1 && (
+                                            <div className="mt-2">
+                                                <small className="text-muted">
+                                                    💡 First image will be the main event image. Drag to reorder.
+                                                </small>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </Col>
+                        <Col sm={12}>
+                            <div className="form-group fill">
+                                <label className="floating-label" htmlFor="documents">
+                                    Documents <Badge bg="info">{formData.documents.length}/10</Badge>
+                                </label>
+                                
+                                {/* Drag and Drop Zone for Documents */}
+                                <div 
+                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                                    onDragOver={handleDocumentDragOver}
+                                    onDrop={handleDocumentDrop}
+                                    style={{
+                                        border: '2px dashed #ccc',
+                                        borderRadius: '8px',
+                                        padding: '20px',
+                                        textAlign: 'center',
+                                        backgroundColor: '#f9f9f9',
+                                        marginBottom: '10px'
+                                    }}
+                                >
+                                    <div className="mb-3">
+                                        <i className="fas fa-file-alt fa-3x text-muted"></i>
+                                    </div>
+                                    <p className="text-muted mb-2">
+                                        Drag and drop documents here, or click to select files
+                                    </p>
+                                    <p className="text-muted small">
+                                        Supported formats: PDF Max size: 10MB per file. Max 10 files.
+                                    </p>
+                                    <input 
+                                        type="file" 
+                                        className="form-control" 
+                                        name="documents" 
+                                        onChange={handleChange} 
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx" 
+                                        multiple
+                                        style={{ display: 'none' }}
+                                        id="documentInput"
+                                    />
+                                    <Button 
+                                        variant="outline-primary" 
+                                        onClick={() => document.getElementById('documentInput').click()}
+                                    >
+                                        Choose Documents
+                                    </Button>
+                                </div>
+
+                                {/* Document Preview List */}
+                                {formData.documents && formData.documents.length > 0 && (
+                                    <div className="mt-3">
+                                        <h6>Selected Documents ({formData.documents.length})</h6>
+                                        <div style={{ 
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '10px',
+                                            marginTop: '10px'
+                                        }}>
+                                            {formData.documents.map((document, index) => {
+                                                let documentSrc = '';
+                                                let isExistingDocument = false;
+                                                
+                                                if (typeof document === 'string') {
+                                                    isExistingDocument = true;
+                                                    if (document.startsWith('http')) {
+                                                        documentSrc = document;
+                                                    } else {
+                                                        documentSrc = `${API_URL}/${document.replace(/\\/g, '/')}`;
+                                                    }
+                                                } else if (document instanceof File) {
+                                                    documentSrc = documentPreviewUrls[index] || URL.createObjectURL(document);
+                                                }
+                                                
+                                                return (
+                                                    <div key={index} style={{ 
+                                                        display: 'flex', 
+                                                        alignItems: 'center',
+                                                        padding: '10px',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: '#f8f9fa'
+                                                    }}>
+                                                        <div style={{ marginRight: '10px' }}>
+                                                            <i className="fas fa-file-pdf fa-2x text-danger"></i>
+                                                        </div>
+                                                        
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 'bold' }}>
+                                                                {typeof document === 'string' ? document.split('/').pop() : document.name}
+                                                            </div>
+                                                            <div style={{ fontSize: '12px', color: '#666' }}>
+                                                                {isExistingDocument ? 'Existing Document' : `${(document.size / 1024 / 1024).toFixed(1)}MB`}
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div style={{ display: 'flex', gap: '5px' }}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline-primary"
+                                                                onClick={() => window.open(documentSrc, '_blank')}
+                                                            >
+                                                                <i className="fas fa-eye"></i>
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="danger"
+                                                                onClick={() => handleRemoveDocument(index)}
+                                                            >
+                                                                <i className="fas fa-trash"></i>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </Col>

@@ -128,6 +128,42 @@ export const createRegisterEvent = (data) => async (dispatch) => {
     }
 };  
 
+export const removeEventImage = (eventId, imagePath) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/events/images/${eventId}`, {
+            data: { imagePath }
+        });
+        
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success('Image removed successfully!');
+            // Return the updated images array from response
+            return response.data.data.images;
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage || 'Error removing image');
+    }
+    return false;
+};
+
+export const removeEventDocument = (eventId, documentPath) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/events/documents/${eventId}`, {
+            data: { documentPath }
+        });
+        
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success('Document removed successfully!');
+            // Return the updated documents array from response
+            return response.data.data.documents;
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage || 'Error removing document');
+    }
+    return false;
+};
+
 
 
 

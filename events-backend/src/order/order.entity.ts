@@ -1,7 +1,7 @@
 // events-backend/src/event/order.entity.ts
 import { IsEnum } from 'class-validator';
 
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { UserEntity } from 'user/users.entity';
 import { OrderStatus, PaymentMethod } from './order.dto';
 import { OrderItemEntity } from './event.item.entity';
@@ -42,6 +42,10 @@ export class Order {
     @OneToMany(() => Withdrawal, (withdrawal) => withdrawal.order)
     withdrawals?: Withdrawal[];
     
+    @CreateDateColumn({ type: 'timestamp' })
+    createdAt?: Date;
 
+    @UpdateDateColumn({ type: 'timestamp' })
+    updatedAt?: Date;
 
 }

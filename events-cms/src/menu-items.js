@@ -13,7 +13,6 @@ const chartData = {
                     icon: 'feather icon-home',
                     url: '/dashboard'
                 },
-
             ]
         },
         {
@@ -28,7 +27,6 @@ const chartData = {
                     type: 'item',
                     icon: 'feather icon-users',
                     url: '/users'
-
                 },
                 {
                     id: 'events',
@@ -41,7 +39,6 @@ const chartData = {
                             title: 'All Events',
                             type: 'item',
                             url: '/events/event-list',
-                           
                         },
                         {
                             id: 'upcoming-events',
@@ -60,9 +57,7 @@ const chartData = {
                             url: '/events/registered'
                         }
                     ]
-
                 },
-            
                 {
                     id: 'order ',
                     title: 'Orders ',
@@ -73,8 +68,6 @@ const chartData = {
                         type: 'badge-success'
                     },
                     url: '/order'
-
-
                 },
                 {
                     id: 'withrawal ',
@@ -83,7 +76,6 @@ const chartData = {
                     icon: 'feather icon-credit-card',
                     url: '/withrawal'
                 },
-
             ]
         },
         {
@@ -92,59 +84,60 @@ const chartData = {
             type: 'group',
             icon: 'icon-ui',
             children: [
-    
                 {
                     id: 'reports',
                     title: 'Reports',
                     type: 'item',
                     icon: 'feather icon-bar-chart',
                     url: '/reports'
-
-
                 }
             ]
         },
-
+        // Settings 
         {
-            id: 'settings',
-            title: 'Settings',
+            id: 'system-config',
+            title: 'System Configuration',
             type: 'group',
             icon: 'icon-ui',
             children: [
                 {
-                    id: 'profile',
-                    title: 'Profile',
-                    type: 'item',
-                    icon: 'feather icon-user',
-                    url: '/profile'
-
-                },
-                {
-                    id: 'terms-conditions',
-                    title: 'Terms and Conditions',
-                    type: 'item',
-                    icon: 'feather icon-file-text',
-                    url: '/settings/terms-conditions'
-
-                },
-                {
-                    id: 'privacy-policy',
-                    title: 'Privacy Policy',
-                    type: 'item',
-                    icon: 'feather icon-shield',
-                    url: '/settings/privacy-policy'
-
-                },
-                {
-                    id: 'banner-management',
-                    title: 'Banner Management',
-                    type: 'item',
-                    icon: 'feather icon-image',
-                    url: '/settings/banner-management'
+                    id: 'settings',
+                    title: 'Settings',
+                    type: 'collapse',
+                    icon: 'feather icon-settings',
+                    children: [
+                        {
+                            id: 'profile',
+                            title: 'Profile',
+                            type: 'item',
+                           
+                            url: '/profile'
+                        },
+                        {
+                            id: 'terms-conditions',
+                            title: 'Terms and Conditions',
+                            type: 'item',
+                           
+                            url: '/settings/terms-conditions'
+                        },
+                        {
+                            id: 'privacy-policy',
+                            title: 'Privacy Policy',
+                            type: 'item',
+                          
+                            url: '/settings/privacy-policy'
+                        },
+                        {
+                            id: 'banner-management',
+                            title: 'Banner Management',
+                            type: 'item',
+                          
+                            url: '/settings/banner-management'
+                        }
+                    ]
                 }
             ]
         },
-
     ]
 };
 export default chartData;
