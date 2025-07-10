@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 
 import { Event } from '../event/event.entity';
 import { Order } from '../order/order.entity';
@@ -24,7 +24,6 @@ export class DashboardService {
     const [
       totalUsers,
       activeUsers,
-      newUsersThisMonth,
       totalEvents,
       upcomingEvents,
       completedEvents,
@@ -35,12 +34,6 @@ export class DashboardService {
     ] = await Promise.all([
       this.userRepository.count({ where: { role: UserRole.User } }),
       this.userRepository.count({ where: {  isVerify: true } }),
-      this.userRepository.count({
-        where: {
-          role: UserRole.User,
-          createdAt: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        },
-      }),
       this.eventRepository.count(),
       this.eventRepository.count({
         where: { startDate: new Date() },
@@ -50,7 +43,10 @@ export class DashboardService {
       }),
       this.eventRepository.count({
         where: {
-          createdAt: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          createdAt: Between(
+            new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59, 999)
+          ),
         },
       }),
       this.orderRepository.count(),
@@ -67,32 +63,19 @@ export class DashboardService {
       users: {
         total: totalUsers,
         active: activeUsers,
-        newThisMonth: newUsersThisMonth,
-        growth: ((newUsersThisMonth / totalUsers) * 100).toFixed(1),
       },
       events: {
         total: totalEvents,
         upcoming: upcomingEvents,
-        completed: completedEvents,
         thisMonth: eventsThisMonth,
       },
       revenue: {
         total: revenue,
-        thisMonth: revenue * 0.3, // Placeholder calculation
-        growth: 8.3,
-        averagePerEvent: revenue / totalEvents || 0,
       },
       participants: {
-        total: totalParticipants,
-        averagePerEvent: totalParticipants / totalEvents || 0,
-        growth: 15.2,
+        total: totalParticipants
       },
-      analytics: {
-        conversionRate: 78.5,
-        satisfactionScore: 4.6,
-        responseTime: 2.3,
-        uptime: 99.9,
-      },
+
     };
   }
 
@@ -149,6 +132,7 @@ export class DashboardService {
         status: 'success',
       });
     });
+    
 
     // activities को समय के अनुसार sort करने के लिए getTime() का उपयोग करें
     return activities

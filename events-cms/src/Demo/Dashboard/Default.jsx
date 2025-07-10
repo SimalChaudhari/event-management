@@ -134,8 +134,8 @@ const Default = () => {
                         Refresh
                     </Button>
                 </div>
-                <div style={{maxHeight: '300px', overflowY: 'auto'}}>
-                    {recentActivities.map((activity) => (
+                <div>
+                    {recentActivities.slice(0, 5).map((activity) => (
                         <div key={activity.id} className="d-flex align-items-center mb-3 p-2" style={{borderRadius: '8px', backgroundColor: '#f8f9fa'}}>
                             <div className={`bg-${activity.status} rounded-circle mr-3`} style={{width: '8px', height: '8px'}}></div>
                             <div className="flex-grow-1">
@@ -155,91 +155,91 @@ const Default = () => {
     );
 
     // Top Events Component
-    const TopEvents = () => (
-        <Card className='h-100' style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
-            <Card.Body>
-                <h6 className="mb-3">
-                    <i className="feather icon-star mr-2"></i>
-                    Top Performing Events
-                </h6>
-                <Table responsive className="mb-0">
-                    <thead>
-                        <tr>
-                            <th>Event</th>
-                            <th>Participants</th>
-                            <th>Revenue</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {topEvents.map((event, index) => (
-                            <tr key={event.id}>
-                                <td>
-                                    <div>
-                                        <strong>{event.title}</strong>
-                                        <div><small className="text-muted">#{index + 1} Top Event</small></div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <Badge variant="info">{event.participants || 0}</Badge>
-                                </td>
-                                <td>
-                                    <strong>₹{event.price || 0}</strong>
-                                </td>
-                                <td>
-                                    <Badge variant={event.status === 'upcoming' ? 'warning' : 'success'}>
-                                        {event.status}
-                                    </Badge>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </Table>
-            </Card.Body>
-        </Card>
-    );
+    const TopEvents = () => {
+        const staticTopEvents = [
+            {
+                id: 1,
+                title: "Tech Conference 2024",
+                participants: 250,
+                price: 15000,
+                status: "upcoming"
+            },
+            {
+                id: 2,
+                title: "Music Festival",
+                participants: 180,
+                price: 8000,
+                status: "completed"
+            },
+            {
+                id: 3,
+                title: "Business Summit",
+                participants: 120,
+                price: 12000,
+                status: "upcoming"
+            },
+            {
+                id: 4,
+                title: "Art Exhibition",
+                participants: 95,
+                price: 5000,
+                status: "completed"
+            },
+            {
+                id: 5,
+                title: "Sports Tournament",
+                participants: 200,
+                price: 10000,
+                status: "upcoming"
+            }
+        ];
 
-    const QuickStats = () => {
         return (
             <Card className='h-100' style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
-                  <Card.Body>
-                     <h6 className="mb-4 text-start">
-                        <i className="feather icon-bar-chart mr-2"></i>
-                        Quick Stats
+                <Card.Body>
+                    <h6 className="mb-3">
+                        <i className="feather icon-star mr-2"></i>
+                        Top Performing Events
                     </h6>
-                    <Card.Body className="d-flex flex-column justify-content-center align-items-center" style={{minHeight: '200px'}}>
-              
-                    <Row className="w-100 justify-content-center mt-5">
-                        <Col md={6} className="mb-5">
-                            <div className="text-center">
-                                <h4 className="text-success mb-1">{dashboardData.events.upcoming}</h4>
-                                <small className="text-muted">Upcoming Events</small>
-                            </div>
-                        </Col>
-                        <Col md={6} className="mb-5">
-                            <div className="text-center">
-                                <h4 className="text-info mb-1">{dashboardData.users.newThisMonth}</h4>
-                                <small className="text-muted">New Users</small>
-                            </div>
-                        </Col>
-                        <Col md={6} className="mb-5">
-                            <div className="text-center">
-                                <h4 className="text-warning mb-1">{dashboardData.events.thisMonth}</h4>
-                                <small className="text-muted">Events This Month</small>
-                            </div>
-                        </Col>
-                        <Col md={6} className="mb-5">
-                            <div className="text-center">
-                                <h4 className="text-danger mb-1">₹{dashboardData.revenue.thisMonth.toLocaleString()}</h4>
-                                <small className="text-muted">Revenue This Month</small>
-                            </div>
-                        </Col>
-                    </Row>
-                    </Card.Body>
+                    <Table responsive className="mb-0">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Participants</th>
+                                <th>Revenue</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {staticTopEvents.map((event, index) => (
+                                <tr key={event.id}>
+                                    <td>
+                                        <div>
+                                            <strong>{event.title}</strong>
+                                            <div><small className="text-muted">#{index + 1} Top Event</small></div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <Badge variant="info">{event.participants}</Badge>
+                                    </td>
+                                    <td>
+                                        <strong>₹{event.price}</strong>
+                                    </td>
+                                    <td>
+                                        <Badge variant={event.status === 'upcoming' ? 'warning' : 'success'}>
+                                            {event.status}
+                                        </Badge>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </Table>
                 </Card.Body>
             </Card>
-        )
-    }
+        );
+    };
+
+
     
 
     if (loading) {
@@ -294,19 +294,14 @@ const Default = () => {
                                                 Unverified: {(dashboardData.users.total - dashboardData.users.active).toLocaleString()}
                                             </small>
                                         </div>
-                                        <small className="text-white-75">
-                                            <i className="feather icon-arrow-up text-success mr-1"></i>
-                                            {dashboardData.users.growth}% this month
-                                        </small>
+                                       
                                         <ProgressBar 
                                             now={dashboardData.users.active} 
                                             max={dashboardData.users.total}
                                             className="mt-2"
                                             style={{height: '4px', backgroundColor: 'rgba(255,255,255,0.2)'}}
                                         />
-                                        <small className="text-white-75 mt-1 d-block">
-                                            {((dashboardData.users.active / dashboardData.users.total) * 100).toFixed(1)}% Active Rate
-                                        </small>
+                                       
                                     </div>
                                 </div>
                             </div>
@@ -333,9 +328,7 @@ const Default = () => {
                                             <Badge variant="light" className="mr-1">
                                                 {dashboardData.events.upcoming} Upcoming
                                             </Badge>
-                                            <Badge variant="light">
-                                                {dashboardData.events.completed} Completed
-                                            </Badge>
+                                           
                                         </div>
                                     </div>
                                 </div>
@@ -354,17 +347,7 @@ const Default = () => {
                                     <h2 className="text-white display-4 font-weight-bold mb-0">
                                         ${dashboardData.revenue.total.toLocaleString()}
                                     </h2>
-                                    <div className="mt-2">
-                                        <small className="text-white-75">
-                                            <i className="feather icon-trending-up text-white mr-1"></i>
-                                            {dashboardData.revenue.growth}% growth
-                                        </small>
-                                        <div className="mt-2">
-                                            <small className="text-white-75">
-                                                ${dashboardData.revenue.averagePerEvent.toLocaleString()} avg/event
-                                            </small>
-                                        </div>
-                                    </div>
+                                   
                                 </div>
                             </div>
                             <i className="feather icon-dollar-sign" style={iconStyle}></i>
@@ -381,17 +364,7 @@ const Default = () => {
                                     <h2 className="text-white display-4 font-weight-bold mb-0">
                                         {dashboardData.participants.total.toLocaleString()}
                                     </h2>
-                                    <div className="mt-2">
-                                        <small className="text-white-75">
-                                            <i className="feather icon-users text-white mr-1"></i>
-                                            {dashboardData.participants.averagePerEvent.toFixed(0)} avg/event
-                                        </small>
-                                        <div className="mt-2">
-                                            <small className="text-white-75">
-                                                {dashboardData.participants.growth}% increase
-                                            </small>
-                                        </div>
-                                    </div>
+                                    
                                 </div>
                             </div>
                             <i className="feather icon-user-check" style={iconStyle}></i>
@@ -404,16 +377,14 @@ const Default = () => {
 
             {/* Additional Features */}
             <Row className="mt-4">
-                <Col lg={4} md={12} className="mb-4">
+                <Col lg={6} md={12} className="mb-4">
                     <RecentActivities />
                 </Col>
 
-                <Col lg={4} md={12} className="mb-4">
+                <Col lg={6} md={12} className="mb-4">
                     <TopEvents />
                 </Col>
-                <Col lg={4} md={12} className="mb-4">
-                    <QuickStats />
-                </Col>
+               
                
             </Row>
 
