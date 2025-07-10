@@ -114,26 +114,7 @@ const Default = () => {
                             </div>
                         </Col>
                     </Row>
-                    <Row className="mt-3">
-                        <Col md={4}>
-                            <div className="text-center">
-                                <h5 className="text-success mb-1">{systemHealth.uptime}%</h5>
-                                <small className="text-muted">Uptime</small>
-                            </div>
-                        </Col>
-                        <Col md={4}>
-                            <div className="text-center">
-                                <h5 className="text-info mb-1">{systemHealth.responseTime}s</h5>
-                                <small className="text-muted">Response Time</small>
-                            </div>
-                        </Col>
-                        <Col md={4}>
-                            <div className="text-center">
-                                <h5 className="text-warning mb-1">{systemHealth.satisfactionScore}/5</h5>
-                                <small className="text-muted">Satisfaction</small>
-                            </div>
-                        </Col>
-                    </Row>
+                    
                 </Card.Body>
             </Card>
         );
@@ -303,6 +284,16 @@ const Default = () => {
                                         {dashboardData.users.total.toLocaleString()}
                                     </h2>
                                     <div className="mt-2">
+                                        <div className="d-flex align-items-center mb-2" style={{gap: '20px'}}>
+                                            <small className="text-white-75">
+                                                <i className="feather icon-user-check mr-1"></i>
+                                                Verified: {dashboardData.users.active.toLocaleString()}
+                                            </small>
+                                            <small className="text-white-75">
+                                                <i className="feather icon-user-x mr-1"></i>
+                                                Unverified: {(dashboardData.users.total - dashboardData.users.active).toLocaleString()}
+                                            </small>
+                                        </div>
                                         <small className="text-white-75">
                                             <i className="feather icon-arrow-up text-success mr-1"></i>
                                             {dashboardData.users.growth}% this month
@@ -313,6 +304,9 @@ const Default = () => {
                                             className="mt-2"
                                             style={{height: '4px', backgroundColor: 'rgba(255,255,255,0.2)'}}
                                         />
+                                        <small className="text-white-75 mt-1 d-block">
+                                            {((dashboardData.users.active / dashboardData.users.total) * 100).toFixed(1)}% Active Rate
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -358,7 +352,7 @@ const Default = () => {
                                 <div>
                                     <h6 className="text-white-50 mb-2">Total Revenue</h6>
                                     <h2 className="text-white display-4 font-weight-bold mb-0">
-                                        ₹{dashboardData.revenue.total.toLocaleString()}
+                                        ${dashboardData.revenue.total.toLocaleString()}
                                     </h2>
                                     <div className="mt-2">
                                         <small className="text-white-75">
@@ -367,7 +361,7 @@ const Default = () => {
                                         </small>
                                         <div className="mt-2">
                                             <small className="text-white-75">
-                                                ₹{dashboardData.revenue.averagePerEvent.toLocaleString()} avg/event
+                                                ${dashboardData.revenue.averagePerEvent.toLocaleString()} avg/event
                                             </small>
                                         </div>
                                     </div>

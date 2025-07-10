@@ -64,6 +64,49 @@ export class AuthController {
     });
   }
 
+
+  @Post('register-admin')
+  @UseInterceptors(
+    FileInterceptor('profilePicture', {
+      storage: diskStorage({
+        destination: './uploads/images',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        // Allow only image files for profile pictures
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        
+        if (allowedMimeTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Invalid file type. Only images are allowed for profile pictures.'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  // admin register
+  async registerAdmin(
+    @Res() response: Response,
+    @Body() userDto: UserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (file) {
+      userDto.profilePicture = `uploads/images/${file.filename}`;
+    }
+    const result = await this.authService.register(userDto);
+    return response.status(HttpStatus.OK).json({
+      message: result.message,
+    });
+  }
+
+
+
   @Post('login')
   async login(@Res() response: Response, @Body() loginDto: UserDto) {
     try {

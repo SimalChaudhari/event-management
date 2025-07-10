@@ -20,7 +20,7 @@ export const userList = () => async (dispatch) => {
 
 export const createUser = (data) => async (dispatch) => {
     try {
-        const response = await axiosInstance.post('/auth/register', data);
+        const response = await axiosInstance.post('/auth/register-admin', data);
         console.log({ response });
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'User registered successfully!');

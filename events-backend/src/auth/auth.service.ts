@@ -91,6 +91,7 @@ export class AuthService {
       const existingUser = await this.userRepository.findOne({
         where: [{ email: userDto.email }],
       });
+      console.log({existingUser});
 
       if (existingUser) {
         throw new BadRequestException(
@@ -138,6 +139,7 @@ export class AuthService {
       this.handleError(error);
     }
   }
+
 
   // Login a user
   async login(userDto: UserDto): Promise<{
