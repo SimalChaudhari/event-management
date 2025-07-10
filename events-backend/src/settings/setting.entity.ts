@@ -2,8 +2,6 @@
 
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-
-
 @Entity('privacy_policies')
 export class PrivacyPolicy {
     @PrimaryGeneratedColumn('uuid')
@@ -18,7 +16,6 @@ export class PrivacyPolicy {
     @UpdateDateColumn()
     updatedAt!: Date;
 }
-
 
 @Entity('terms_conditions')
 export class TermsConditions {
@@ -40,8 +37,11 @@ export class Banner {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
 
-    @Column('simple-array')
-    imageUrls!: string[]; // Array of image URLs
+    @Column('text')
+    imageUrl!: string; // Single image URL
+
+    @Column('text', { nullable: true })
+    hyperlink?: string; // Single optional hyperlink
 
     @CreateDateColumn()
     createdAt!: Date;
@@ -58,10 +58,12 @@ export class BannerEvent {
     @Column('simple-array')
     imageUrls!: string[]; // Array of image URLs
 
+    @Column('text', { nullable: true })
+    hyperlink?: string; // Single optional hyperlink
+
     @CreateDateColumn()
     createdAt!: Date;
 
     @UpdateDateColumn()
     updatedAt!: Date;
-
 }

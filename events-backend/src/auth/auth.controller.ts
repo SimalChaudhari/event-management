@@ -351,37 +351,20 @@ export class AuthController {
     }
   }
 
-  // verify email
-  @Get('verify-email')
-  async verifyEmail(@Query('token') token: string, @Res() response: Response) {
+  @Post('verify-otp')
+  async verifyOTP(
+    @Body() body: { email: string; otp: string },
+    @Res() response: Response,
+  ) {
     try {
-      const result = await this.authService.verifyEmail(token);
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: result.message,
-      });
+      const result = await this.authService.verifyOTP(body.email, body.otp);
+      return response.status(HttpStatus.OK).json(result);
     } catch (error: any) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: error.message,
       });
     }
-  }
-
-  @Post('resend-verification')
-  async resendVerification(
-    @Body() body: { email: string },
-    @Res() response: Response,
-  ) {
-    if (!body.email) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: 'Email is required',
-      });
-    }
-
-    const result = await this.authService.resendVerification(body.email);
-    return response.status(HttpStatus.OK).json(result);
   }
 
   @Post('forget')
@@ -393,15 +376,16 @@ export class AuthController {
     return response.status(HttpStatus.OK).json(result);
   }
 
+
   @Post('reset')
   async resetPassword(
-    @Body() body: { token: string; email: string; newPassword: string },
+    @Body() body: { email: string; otp: string; newPassword: string },
     @Res() response: Response,
   ) {
     try {
-      const result = await this.authService.resetPasswordWithToken(
-        body.token,
+      const result = await this.authService.resetPasswordWithOTP(
         body.email,
+        body.otp,
         body.newPassword,
       );
       return response.status(HttpStatus.OK).json({
@@ -415,4 +399,5 @@ export class AuthController {
       });
     }
   }
+  
 }

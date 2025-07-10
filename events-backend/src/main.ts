@@ -22,7 +22,7 @@ async function bootstrap() {
       prefix: '/uploads/', // Access uploaded files via /upload/filename.jpg
     });
 
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 5000;
     // Enable CORS
     app.enableCors({
       origin: '*', // Replace with your frontend URL

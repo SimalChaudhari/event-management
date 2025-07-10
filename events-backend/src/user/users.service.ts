@@ -78,7 +78,6 @@ async update(
   const {
     password,
     id: userId,
-      verificationToken,
     ...safeUpdateData
   } = updateData;
 
@@ -89,7 +88,6 @@ async update(
   // Remove sensitive fields from response
   const {
     password: _,
-    verificationToken: ___,
     ...result
   } = updatedUser;
 

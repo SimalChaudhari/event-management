@@ -138,25 +138,26 @@ export class BannerService {
             });
 
             if (banner) {
-                // Delete previous files from upload folder
-                await this.deleteFilesFromFolder(banner.imageUrls);
+                // Delete previous file from upload folder
+                await this.deleteFileFromFolder(banner.imageUrl);
                 
                 // Update existing banner
                 const updatedBanner = this.bannerRepository.merge(banner, createBannerDto);
                 const result = await this.bannerRepository.save(updatedBanner);
-                return { message: 'Banners updated successfully', data: result };
+                return { message: 'Banner updated successfully', data: result };
             } else {
                 // Create new banner if none exists
                 const newBanner = this.bannerRepository.create(createBannerDto);
                 const result = await this.bannerRepository.save(newBanner);
-                return { message: 'Banners created successfully', data: result };
+                return { message: 'Banner created successfully', data: result };
             }
         } catch (error: any) {
-            throw new InternalServerErrorException('Error creating or updating banners', error.message);
+            throw new InternalServerErrorException('Error creating or updating banner', error.message);
         }
     }
 
-    async deleteImage(imageUrl: string): Promise<{ message: string; data: Banner }> {
+    // New method to clear banner
+    async clearBanner(): Promise<{ message: string }> {
         try {
             const [banner] = await this.bannerRepository.find({
                 take: 1,
@@ -164,94 +165,28 @@ export class BannerService {
             });
 
             if (!banner) {
-                throw new NotFoundException('No banners found');
+                throw new NotFoundException('No banner found');
             }
 
-            const updatedImageUrls = banner.imageUrls.filter(url => url !== imageUrl);
-            
-            if (updatedImageUrls.length === banner.imageUrls.length) {
-                throw new NotFoundException('Image not found in banners');
-            }
+            // Delete file from upload folder
+            await this.deleteFileFromFolder(banner.imageUrl);
 
-            // Delete the specific file from upload folder
-            await this.deleteFileFromFolder(imageUrl);
-
-            banner.imageUrls = updatedImageUrls;
-            const result = await this.bannerRepository.save(banner);
-            
-            return { message: 'Banner image deleted successfully', data: result };
-        } catch (error: any) {
-            if (error instanceof NotFoundException) {
-                throw error;
-            }
-            throw new InternalServerErrorException('Error deleting banner image', error.message);
-        }
-    }
-
-    async deleteImageByIndex(index: number): Promise<{ message: string; data: Banner }> {
-        try {
-            const [banner] = await this.bannerRepository.find({
-                take: 1,
-                order: { id: 'ASC' }
-            });
-
-            if (!banner) {
-                throw new NotFoundException('No banners found');
-            }
-
-            if (index < 0 || index >= banner.imageUrls.length) {
-                throw new BadRequestException('Invalid image index');
-            }
-
-            // Get the image URL to delete from folder
-            const imageUrlToDelete = banner.imageUrls[index];
-
-            // Remove the image at the specified index
-            banner.imageUrls.splice(index, 1);
-            const result = await this.bannerRepository.save(banner);
-
-            // Delete the file from upload folder
-            await this.deleteFileFromFolder(imageUrlToDelete);
-            
-            return { message: 'Banner image deleted successfully', data: result };
-        } catch (error: any) {
-            if (error instanceof NotFoundException || error instanceof BadRequestException) {
-                throw error;
-            }
-            throw new InternalServerErrorException('Error deleting banner image', error.message);
-        }
-    }
-
-    // New method to clear all banners
-    async clearAllBanners(): Promise<{ message: string }> {
-        try {
-            const [banner] = await this.bannerRepository.find({
-                take: 1,
-                order: { id: 'ASC' }
-            });
-
-            if (!banner) {
-                throw new NotFoundException('No banners found');
-            }
-
-            // Delete all files from upload folder
-            await this.deleteFilesFromFolder(banner.imageUrls);
-
-            // Clear the imageUrls array
-            banner.imageUrls = [];
+            // Clear the imageUrl and hyperlink
+            banner.imageUrl = '';
+            banner.hyperlink = null as any;
             await this.bannerRepository.save(banner);
             
-            return { message: 'All banners cleared successfully' };
+            return { message: 'Banner cleared successfully' };
         } catch (error: any) {
             if (error instanceof NotFoundException) {
                 throw error;
             }
-            throw new InternalServerErrorException('Error clearing all banners', error.message);
+            throw new InternalServerErrorException('Error clearing banner', error.message);
         }
     }
 
-    // New method to delete a specific image by URL
-    async deleteSpecificImage(imageUrl: string): Promise<{ message: string; data: Banner }> {
+    // New method to delete banner image
+    async deleteBannerImage(): Promise<{ message: string; data: Banner }> {
         try {
             const [banner] = await this.bannerRepository.find({
                 take: 1,
@@ -259,33 +194,29 @@ export class BannerService {
             });
 
             if (!banner) {
-                throw new NotFoundException('No banners found');
+                throw new NotFoundException('No banner found');
             }
 
-            const updatedImageUrls = banner.imageUrls.filter(url => url !== imageUrl);
-            
-            if (updatedImageUrls.length === banner.imageUrls.length) {
-                throw new NotFoundException('Image not found in banners');
-            }
+            // Delete the file from upload folder
+            await this.deleteFileFromFolder(banner.imageUrl);
 
-            // Delete the specific file from upload folder
-            await this.deleteFileFromFolder(imageUrl);
-
-            banner.imageUrls = updatedImageUrls;
+            // Clear the imageUrl
+            banner.imageUrl = '';
             const result = await this.bannerRepository.save(banner);
             
-            return { message: 'Specific banner image deleted successfully', data: result };
+            return { message: 'Banner image deleted successfully', data: result };
         } catch (error: any) {
             if (error instanceof NotFoundException) {
                 throw error;
             }
-            throw new InternalServerErrorException('Error deleting specific banner image', error.message);
+            throw new InternalServerErrorException('Error deleting banner image', error.message);
         }
     }
 
     // Helper method to delete a single file from folder
     private async deleteFileFromFolder(imageUrl: string): Promise<void> {
         try {
+            if (!imageUrl) return;
             const filePath = path.join(process.cwd(), imageUrl);
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
@@ -293,17 +224,6 @@ export class BannerService {
             }
         } catch (error) {
             console.error(`Error deleting file ${imageUrl}:`, error);
-        }
-    }
-
-    // Helper method to delete multiple files from folder
-    private async deleteFilesFromFolder(imageUrls: string[]): Promise<void> {
-        try {
-            for (const imageUrl of imageUrls) {
-                await this.deleteFileFromFolder(imageUrl);
-            }
-        } catch (error) {
-            console.error('Error deleting files:', error);
         }
     }
 }
@@ -356,7 +276,7 @@ export class BannerEventService {
         }
     }
 
-    async deleteImage(imageUrl: string): Promise<{ message: string; data: Banner }> {
+    async deleteImage(imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
         try {
             const [bannerEvent] = await this.bannerEventRepository.find({
                 take: 1,
@@ -388,7 +308,7 @@ export class BannerEventService {
         }
     }
 
-    async deleteImageByIndex(index: number): Promise<{ message: string; data: Banner }> {
+    async deleteImageByIndex(index: number): Promise<{ message: string; data: BannerEvent }> {
         try {
             const [bannerEvent] = await this.bannerEventRepository.find({
                 take: 1,
@@ -437,8 +357,9 @@ export class BannerEventService {
             // Delete all files from upload folder
             await this.deleteFilesFromFolder(bannerEvent.imageUrls);
 
-            // Clear the imageUrls array
+            // Clear the imageUrls array and hyperlink
             bannerEvent.imageUrls = [];
+            bannerEvent.hyperlink = null as any;
             await this.bannerEventRepository.save(bannerEvent);
             
             return { message: 'All banner events cleared successfully' };

@@ -17,10 +17,7 @@ const App = () => {
         dispatch(checkAuthStatus());
     }, [dispatch]);
 
-    // Show loader while checking authentication
-    if (loading) {
-        return <Loader />;
-    }
+
 
     return (
         <BrowserRouter basename={Config.basename}>

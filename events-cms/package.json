@@ -2,7 +2,7 @@
     "name": "evential-cms",
     "version": "1.0.0",
     "private": true,
-    "homepage": "/dashboard",
+    "homepage": "/",
     "dependencies": {
         "@ckeditor/ckeditor5-build-classic": "^32.0.0",
         "@ckeditor/ckeditor5-react": "^4.0.1",

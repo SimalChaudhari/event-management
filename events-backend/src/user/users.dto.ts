@@ -85,12 +85,12 @@ export class UserDto {
   @IsBoolean()
   isVerify?: boolean; // Updated field
 
-  // @IsOptional()
-  // @IsString()
-  // otp?: string; // Updated field
+  @IsOptional()
+  @IsString()
+  otp?: string; // Updated field
 
-  // @IsOptional()
-  // otpExpiry?: Date; // Updated field
+  @IsOptional()
+  otpExpiry?: Date; // Updated field
 
    // Optional field for Terms & Conditions acceptance
    @IsOptional()

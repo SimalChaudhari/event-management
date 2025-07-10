@@ -10,6 +10,7 @@ import {
   Put,
   UseInterceptors,
   UploadedFiles,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   PrivacyPolicyService,
@@ -24,7 +25,7 @@ import {
   CreateBannerEventDto,
 } from './setting.dto';
 import { PrivacyPolicy, TermsConditions, Banner, BannerEvent } from './setting.entity';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
@@ -90,22 +91,26 @@ export class BannerController {
 
   @Post()
   @UseInterceptors(
-    FilesInterceptor('images', 10, { // Allow up to 10 images
+    FileInterceptor('image', { // Single image for banners
       storage: diskStorage({
         destination: './uploads/banners',
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
         },
+      
       }),
     }),
   )
   async createOrUpdate(
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFile() file: Express.Multer.File,
+    @Body('hyperlink') hyperlink?: string,
   ): Promise<{ message: string; data: Banner }> {
-    const imageUrls = files.map(file => `uploads/banners/${file.filename}`);
+    const imageUrl = `uploads/banners/${file.filename}`;
+    
     const createBannerDto: CreateBannerDto = {
-      imageUrls: imageUrls
+      imageUrl: imageUrl,
+      hyperlink: hyperlink
     };
     return this.bannerService.createOrUpdate(createBannerDto);
   }
@@ -113,17 +118,15 @@ export class BannerController {
   // New API to clear all banners
   @Delete('clear-all')
   async clearAllBanners(): Promise<{ message: string }> {
-    return this.bannerService.clearAllBanners();
+    return this.bannerService.clearBanner();
   }
 
   // New API to delete specific image
   @Delete('delete-image')
   async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: Banner }> {
-    return this.bannerService.deleteSpecificImage(imageUrl);
+    return this.bannerService.deleteBannerImage();
   }
 }
-
-
 
 @Controller('api/banner-events')
 export class BannerEventController {
@@ -140,22 +143,26 @@ export class BannerEventController {
 
   @Post()
   @UseInterceptors(
-    FilesInterceptor('images', 10, { // Allow up to 10 images
+    FilesInterceptor('images', 10, { // Multiple images for banner events
       storage: diskStorage({
         destination: './uploads/banner-events',
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
         },
+       
       }),
     }),
   )
   async createOrUpdate(
     @UploadedFiles() files: Express.Multer.File[],
+    @Body('hyperlink') hyperlink?: string,
   ): Promise<{ message: string; data: BannerEvent }> {
     const imageUrls = files.map(file => `uploads/banner-events/${file.filename}`);
+    
     const createBannerEventDto: CreateBannerEventDto = {
-      imageUrls: imageUrls
+      imageUrls: imageUrls,
+      hyperlink: hyperlink
     };
     return this.bannerEventService.createOrUpdate(createBannerEventDto);
   }

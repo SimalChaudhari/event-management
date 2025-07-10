@@ -77,12 +77,8 @@ export class AuthService {
     }
   }
 
-  private generateVerificationToken(): string {
-    return require('crypto').randomBytes(32).toString('hex');
-  }
-
-  private generateResetToken(): string {
-    return require('crypto').randomBytes(32).toString('hex');
+  private generateOTP(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
   }
 
   // Register a new user
@@ -91,7 +87,6 @@ export class AuthService {
       const existingUser = await this.userRepository.findOne({
         where: [{ email: userDto.email }],
       });
-      console.log({existingUser});
 
       if (existingUser) {
         throw new BadRequestException(
@@ -110,8 +105,9 @@ export class AuthService {
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(userDto.password, saltRounds);
 
-      // Generate verification token
-      const verificationToken = this.generateVerificationToken();
+      // Generate OTP for email verification
+      const otp = this.generateOTP();
+      // const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       // Create the new user with hashed password
       const newUser = this.userRepository.create({
@@ -119,27 +115,27 @@ export class AuthService {
         password: hashedPassword,
         role: userDto.role || UserRole.User,
         acceptTerms: Boolean(userDto.acceptTerms),
-        verificationToken: verificationToken,
+        otp: otp,
+        // otpExpiry: otpExpiry,
         isVerify: false, // Ensure user is not verified initially
       });
 
       await this.userRepository.save(newUser);
 
-      // Send verification link via email
+      // Send OTP via email
       if (!userDto.email) {
         throw new BadRequestException('Email is required');
       }
-      await this.emailService.sendVerificationLink(userDto.email, verificationToken);
+      await this.emailService.sendOTP(userDto.email, otp);
 
       return {
         message:
-          "We've sent a verification email to your inbox. Please check your email and click the verification link to activate your account. Once your account is activated, you can proceed to the login page.",
+          "We've sent a One-Time Password (OTP) to your registered email address. Please check your inbox and enter the OTP to verify your account. Once your account is verified, you can proceed to the login page.",
       };
     } catch (error) {
       this.handleError(error);
     }
   }
-
 
   // Login a user
   async login(userDto: UserDto): Promise<{
@@ -241,9 +237,6 @@ export class AuthService {
     }
   }
 
-
-
-
   async checkUserExists(email: string): Promise<{
     success: boolean;
     message: string;
@@ -271,7 +264,6 @@ export class AuthService {
       };
     }
   }
-
 
   // admin
   async adminLogin(userDto: UserDto): Promise<{
@@ -416,37 +408,11 @@ export class AuthService {
     return !!(await this.cacheManager.get(`blacklisted_${token}`));
   }
 
-  // Verify email with token
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    try {
-      
-      const user = await this.userRepository.findOne({
-        where: { verificationToken: token },
-      });
-
-      console.log({user});
-      if (!user) {
-        throw new BadRequestException('Invalid verification token');
-      }
-
-
-      if (user.isVerify) {
-        throw new BadRequestException('Email is already verified');
-      }
-
-      // Mark user as verified and clear verification token
-      user.isVerify = true;
-      user.verificationToken = null as any;
-      await this.userRepository.save(user);
-
-      return { message: 'Email verified successfully. You can now log in to your account.' };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  // Resend verification email
-  async resendVerification(email: string): Promise<{ success: boolean; message: string }> {
+  // Verify OTP
+  async verifyOTP(
+    email: string,
+    otp: string,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const user = await this.userRepository.findOne({
         where: { email },
@@ -456,31 +422,40 @@ export class AuthService {
         throw new BadRequestException('User not found');
       }
 
+      // Check if user is already verified
       if (user.isVerify) {
         return {
-          success: false,
-          message: 'Account is already verified. No need to resend verification.',
+          success: true,
+          message:
+            'Your account is already verified. You can proceed to login.',
         };
       }
 
-      // Generate new verification token
-      const verificationToken = this.generateVerificationToken();
-      user.verificationToken = verificationToken;
-  
-      await this.userRepository.save(user);
+      if (!user.otp || user.otp !== otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
 
-      // Send new verification link via email
-      await this.emailService.sendVerificationLink(user.email, verificationToken);
+      // if (!user.otpExpiry || new Date() > user.otpExpiry) {
+      //   throw new BadRequestException('OTP has expired');
+      // }
+
+      // Mark user as verified and clear OTP after successful verification
+      user.isVerify = true;
+      user.otp = null as any;
+      // user.otpExpiry = null as any;
+      await this.userRepository.save(user);
 
       return {
         success: true,
-        message: 'New verification link has been sent to your email.',
+        message:
+          'OTP verified successfully. Your account is now verified. You can now login.',
       };
     } catch (error) {
       this.handleError(error);
     }
   }
 
+  // OTP-based forgot password
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
       const user = await this.userRepository.findOne({
@@ -491,20 +466,31 @@ export class AuthService {
         throw new BadRequestException('Email not found');
       }
 
-      // Generate reset token
-      const resetToken = this.generateResetToken();
+      // Check if user is verified - only verified users can reset password
+      if (!user.isVerify) {
+        throw new BadRequestException(
+          'Your account is not verified. Please verify your account first before resetting password.',
+        );
+      }
 
-      // Save reset token and expiry time (1 hour)
-      user.verificationTokenForResetPassword = resetToken;
-      user.verificationTokenExpiryForResetPassword = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      // Generate OTP
+      const otp = this.generateOTP();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Save OTP and expiry time
+      user.otp = otp;
+      user.otpExpiry = otpExpiry;
       await this.userRepository.save(user);
 
       try {
-        await this.emailService.sendPasswordResetLink(email, resetToken);
-        return { message: "We've successfully received your request. A link to reset your password has been sent to your email." };
+        await this.emailService.sendOTP(email, otp);
+        return {
+          message:
+            "We've successfully sent an OTP to your email. Please check your inbox and enter the 6-digit code.",
+        };
       } catch (emailError) {
         throw new BadRequestException(
-          'Failed to send reset link. Please try again later.',
+          'Failed to send OTP. Please try again later.',
         );
       }
     } catch (error) {
@@ -512,34 +498,42 @@ export class AuthService {
     }
   }
 
-  async resetPasswordWithToken(
-    token: string,
+  // Reset password with OTP verification
+  async resetPasswordWithOTP(
     email: string,
+    otp: string,
     newPassword: string,
   ): Promise<{ message: string }> {
     try {
       const user = await this.userRepository.findOne({
-        where: { email, verificationTokenForResetPassword: token },
+        where: { email },
       });
-  
+
       if (!user) {
-        throw new BadRequestException('Invalid reset token or email');
+        throw new BadRequestException('User not found');
       }
-  
-      if (!user.verificationTokenExpiryForResetPassword || new Date() > user.verificationTokenExpiryForResetPassword) {
-        throw new BadRequestException('Reset token has expired');
+
+      if (!user.otp || user.otp !== otp) {
+        throw new BadRequestException('Invalid OTP');
       }
-  
+
+      if (!user.otpExpiry || new Date() > user.otpExpiry) {
+        throw new BadRequestException('OTP has expired');
+      }
+
       // Hash new password
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-  
-      // Update password and clear reset token data
+
+      // Update password and clear OTP data
       user.password = hashedPassword;
-      user.verificationTokenForResetPassword = null as any;
-      user.verificationTokenExpiryForResetPassword = null as any;
+      user.otp = null as any;
+      user.otpExpiry = null as any;
       await this.userRepository.save(user);
-  
-      return { message: 'Password reset successful. You can now login with your new password.' };
+
+      return {
+        message:
+          'Password reset successful. You can now login with your new password.',
+      };
     } catch (error) {
       this.handleError(error);
     }
