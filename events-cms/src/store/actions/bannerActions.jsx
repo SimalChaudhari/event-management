@@ -66,40 +66,28 @@ export const getBannerEvents = () => async (dispatch) => {
 };
 
 // Upload Banners
-export const uploadBanners = (files) => async (dispatch) => {
+export const uploadBanners = (file, hyperlink) => async dispatch => {
     try {
-        dispatch(setBannerLoading(true));
-        
         const formData = new FormData();
-        files.forEach((file) => {
-            formData.append('images', file);
+        formData.append('image', file); // सिर्फ एक file, नाम 'image'
+        if (hyperlink) formData.append('hyperlink', hyperlink);
+
+        // axios/fetch call
+        const response = await axiosInstance.post('/banners', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        const response = await axiosInstance.post('/banners', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        
-        dispatch({
-            type: UPLOAD_BANNERS,
-            payload: response.data.data,
-        });
-        
-        toast.success(response.data.message || 'Banners uploaded successfully!');
+        // success dispatch
+        dispatch({ type: UPLOAD_BANNERS, payload: response.data });
         return true;
     } catch (error) {
-        const errorMessage = error?.response?.data?.message || 'Failed to upload banners';
-        dispatch(setBannerError(errorMessage));
-        toast.error(errorMessage);
-    } finally {
-        dispatch(setBannerLoading(false));
+        dispatch({ type: SET_BANNER_ERROR, payload: error.message });
+        return false;
     }
-    return false;
 };
 
 // Upload Banner Events
-export const uploadBannerEvents = (files) => async (dispatch) => {
+export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
@@ -107,6 +95,11 @@ export const uploadBannerEvents = (files) => async (dispatch) => {
         files.forEach((file) => {
             formData.append('images', file);
         });
+        
+        // Add hyperlink to formData if provided
+        if (hyperlink) {
+            formData.append('hyperlink', hyperlink);
+        }
 
         const response = await axiosInstance.post('/banner-events', formData, {
             headers: {

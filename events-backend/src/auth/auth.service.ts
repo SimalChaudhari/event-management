@@ -123,10 +123,10 @@ export class AuthService {
       await this.userRepository.save(newUser);
 
       // Send OTP via email
-      if (!userDto.email) {
-        throw new BadRequestException('Email is required');
+      if (!userDto.email || !userDto.firstName || !userDto.lastName) {
+        throw new BadRequestException('Email, firstName and lastName are required');
       }
-      await this.emailService.sendOTP(userDto.email, otp);
+      await this.emailService.sendWelcomeEmail(userDto.email, userDto.firstName, userDto.lastName, otp);
 
       return {
         message:

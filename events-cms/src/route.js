@@ -15,7 +15,7 @@ import * as React from 'react';
 const authComponents = {
   Signin: React.lazy(() => import('./Pages/Authentication/SignIn/SignIn')),
   ResetPassword: React.lazy(() => import('./Pages/Authentication/ResetPassword/ResetPassword')),
-  ForgotPassword: React.lazy(() => import('./Pages/Authentication/ResetPassword/ForgotPassword')),
+
   ChangePassword: React.lazy(() => import('./Pages/Authentication/ChangePassword'))
 };
 
@@ -39,13 +39,6 @@ const authRoutes = [
     exact: true,
     name: 'Signin',
     component: authComponents.Signin
-  },
-
-  {
-    path: '/auth/forgot-password',
-    exact: true,
-    name: 'Forgot Password',
-    component: authComponents.ForgotPassword
   },
 
   {

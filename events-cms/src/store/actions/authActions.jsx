@@ -68,7 +68,7 @@ export const logout = () => async (dispatch) => {
 
 export const forgetPassword = (data) => async (dispatch) => {
     try {
-        const response = await axiosInstance.post('/auth/admin/forget', data);
+        const response = await axiosInstance.post('/auth/forget', data);
        if (response.data) {
             toast.success(response.data.message);
             return { success: true };
@@ -88,6 +88,40 @@ export const verifyOtp = (data) => async (dispatch) => {
         const response = await axiosInstance.post('auth/verify-otp', data);
         if (response.data.success) {
             toast.success(response.data.message || 'OTP verified successfully');
+            return { success: true };
+        } else {
+            toast.error(response.data.message);
+            return { success: false };
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
+        toast.error(errorMessage);
+        return { success: false };
+    }
+};
+
+export const verifyEmailOTP = (data) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.post('auth/verify-email-otp', data);
+        if (response.data.success) {
+            toast.success(response.data.message || 'Email verified successfully');
+            return { success: true };
+        } else {
+            toast.error(response.data.message);
+            return { success: false };
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
+        toast.error(errorMessage);
+        return { success: false };
+    }
+};
+
+export const resendVerificationOTP = (data) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.post('auth/resend-verification-otp', data);
+        if (response.data.success) {
+            toast.success(response.data.message || 'OTP sent successfully');
             return { success: true };
         } else {
             toast.error(response.data.message);

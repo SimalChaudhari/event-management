@@ -82,7 +82,7 @@ const SignIn = () => {
                                     </form>
                                     <p className="mb-2 text-muted">
                                         Forgot password?{' '}
-                                        <NavLink to="/auth/forgot-password" className="f-w-400">
+                                        <NavLink to="/auth/reset-password" className="f-w-400">
                                             Reset
                                         </NavLink>
                                     </p>
