@@ -76,7 +76,7 @@ export class TermsConditionsController {
   }
 }
 
-@Controller('api/banners')
+@Controller('api/auth/banners')
 export class BannerController {
   constructor(private readonly bannerService: BannerService) { }
 
