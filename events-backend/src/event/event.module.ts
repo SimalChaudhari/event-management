@@ -5,14 +5,15 @@ import { EventService } from './event.service';
 import { EventController } from './event.controller';
 import { Event } from './event.entity';
 import { JwtModule } from '@nestjs/jwt';
-import { EventSpeaker } from './event-speaker.entity';
+import { EventCategory, EventSpeaker } from './event-speaker.entity';
 import { SpeakerService } from 'speaker/speaker.service';
 import { Speaker } from 'speaker/speaker.entity';
 import { Cart } from 'cart/cart.entity';
 import { OrderModule } from 'order/order.module';
+import { Category } from 'category/category.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Event,EventSpeaker,Speaker,Cart]),
+    imports: [TypeOrmModule.forFeature([Event,EventSpeaker,EventCategory,Speaker,Cart,Category]),
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration

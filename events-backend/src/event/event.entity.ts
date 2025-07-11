@@ -1,10 +1,11 @@
 // src/entities/event.entity.ts
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { EventSpeaker } from './event-speaker.entity';
+import { EventCategory, EventSpeaker } from './event-speaker.entity';
 import { Cart } from 'cart/cart.entity';
 import { OrderItemEntity } from 'order/event.item.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Feedback } from 'feedback/feedback.entity';
+import { Category } from 'category/category.entity';
 
 export enum EventType {
     Physical = 'Physical',
@@ -69,6 +70,7 @@ export class Event {
     @Column({ type: 'varchar', length: 10, default: 'USD', nullable: true })
     currency?: string;
 
+
     @CreateDateColumn()
     createdAt!: Date;
 
@@ -79,6 +81,10 @@ export class Event {
 
     @OneToMany(() => EventSpeaker, (eventSpeaker) => eventSpeaker.event)
     eventSpeakers!: EventSpeaker[];
+
+    // Category relationship
+    @OneToMany(() => EventCategory, (eventCategory) => eventCategory.event)
+    category?: EventCategory[];
 
     @OneToMany(() => Cart, (cart) => cart.event) // Define the relationship
     carts!: Cart[]; // Carts associated with the event

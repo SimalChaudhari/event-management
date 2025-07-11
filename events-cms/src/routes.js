@@ -23,7 +23,8 @@ const dashboardComponents = {
 const eventComponents = {
   List: React.lazy(() => import('./Pages/Events/all-events/EventView.jsx')),
   Upcoming: React.lazy(() => import('./Pages/Events/upcoming-events/UpcomingEvents.jsx')),
-  Registered: React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx'))
+  Registered: React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx')),
+  Categories: React.lazy(() => import('./Pages/Events/categories/Categories.jsx')),
 };
 
 /**
@@ -42,7 +43,8 @@ const transactionComponents = {
  */
 const userComponents = {
   Profile: React.lazy(() => import('./Pages/Settings/Profile/Profile.jsx')),
-  List: React.lazy(() => import('./Pages/Users/UserList.jsx'))
+  List: React.lazy(() => import('./Pages/Users/UserList.jsx')),
+  Speakers: React.lazy(() => import('./Pages/Speakers/Speakers.jsx'))
 };
 
 /**
@@ -92,6 +94,13 @@ const userRoutes = [
     exact: true,
     name: 'Profile List',
     component: userComponents.Profile
+  },
+
+  {
+    path: '/speakers',
+    exact: true,
+    name: 'Speakers List',
+    component: userComponents.Speakers
   }
 ];
 
@@ -117,7 +126,13 @@ const eventRoutes = [
     exact: true,
     name: 'Registered Events',
     component: eventComponents.Registered
-  }
+  },
+  {
+    path: '/categories',
+    exact: true,
+    name: 'Categories List',
+    component: eventComponents.Categories
+  },
 ];
 
 /**

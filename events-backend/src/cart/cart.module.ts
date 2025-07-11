@@ -8,12 +8,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { EventService } from 'event/event.service';
 import { Event } from 'event/event.entity';
 import { EventModule } from 'event/event.module';
-import { EventSpeaker } from 'event/event-speaker.entity';
+import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
 import { Speaker } from 'speaker/speaker.entity';
+import { Category } from 'category/category.entity';
 
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,Speaker]),
+    imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,EventCategory,Category,Speaker]),
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration

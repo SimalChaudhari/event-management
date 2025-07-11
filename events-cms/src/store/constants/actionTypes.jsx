@@ -9,6 +9,17 @@ export const SPEAKER_LIST = 'SPEAKER_LIST';
 export const TERMS_CONDITIONS = 'TERMS_CONDITIONS';
 export const PRIVACY_POLICY = 'PRIVACY_POLICY';
 
+// Category Action Types
+export const CATEGORY_LIST = 'CATEGORY_LIST';
+export const CREATE_CATEGORY = 'CREATE_CATEGORY';
+export const UPDATE_CATEGORY = 'UPDATE_CATEGORY';
+export const DELETE_CATEGORY = 'DELETE_CATEGORY';
+
+// Speaker Action Types
+export const CREATE_SPEAKER = 'CREATE_SPEAKER';
+export const UPDATE_SPEAKER = 'UPDATE_SPEAKER';
+export const DELETE_SPEAKER = 'DELETE_SPEAKER';
+
 // Banner Action Types
 export const GET_BANNERS = 'GET_BANNERS';
 export const GET_BANNER_EVENTS = 'GET_BANNER_EVENTS';

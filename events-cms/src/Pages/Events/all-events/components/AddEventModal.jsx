@@ -13,7 +13,7 @@ import L from 'leaflet'; // Import Leaflet for custom markers
 import LocationMarker from './LocationMarker';
 import SpeakerFormSidebar from './SpeakerFormSidebar';
 import SpeakerFormModal from './SpeakerFormSidebar';
-import { addSpeaker } from '../../../../store/actions/speakerActions';
+import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 
 function AddEventModal({ show, handleClose, editData }) {
@@ -602,7 +602,7 @@ function AddEventModal({ show, handleClose, editData }) {
         });
 
         try {
-            const success = await dispatch(addSpeaker(formDataToSend));
+            const success = await dispatch(createSpeaker(formDataToSend));
             if (success) {
                 fetchSpeakers();
                 setNewSpeaker('');

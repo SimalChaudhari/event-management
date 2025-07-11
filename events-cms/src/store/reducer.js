@@ -9,6 +9,7 @@ import withdrawReducer from './reducer/withdrawReducer';
 import speakerReducer from './reducer/speakerReducer';
 import settingsReducer from './reducer/settingsReducer';
 import bannerReducer from './reducer/bannerReducer';
+import categoryReducer from './reducer/categoryReducer';
 
 const reducer = combineReducers({
     able: ableReducer,
@@ -20,7 +21,8 @@ const reducer = combineReducers({
     withdraw: withdrawReducer,
     speaker: speakerReducer,
     settings: settingsReducer,
-    banner: bannerReducer
+    banner: bannerReducer,
+    category: categoryReducer
 });
 
 export default reducer;

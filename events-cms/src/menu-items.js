@@ -59,6 +59,20 @@ const chartData = {
                     ]
                 },
                 {
+                    id: 'categories',
+                    title: 'Categories',
+                    type: 'item',
+                    icon: 'feather icon-tag',
+                    url: '/categories'
+                },
+                {
+                    id: 'speakers',
+                    title: 'Speakers',
+                    type: 'item',
+                    icon: 'feather icon-users',
+                    url: '/speakers'
+                },
+                {
                     id: 'order ',
                     title: 'Orders ',
                     type: 'item',
