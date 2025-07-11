@@ -249,7 +249,7 @@ export class AuthService {
     if (user) {
       return {
         success: true,
-        message: 'User exists.',
+        message: 'Email address already taken. Try logging in or using another email.',
         data: {
           id: user.id,
           email: user.email,
