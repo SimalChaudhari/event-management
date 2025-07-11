@@ -17,15 +17,17 @@ export class PrivacyPolicyService {
         private privacyPolicyRepository: Repository<PrivacyPolicy>
     ) { }
 
-    async getOrShow(): Promise<TermsConditions | null> {
+    async getOrShow(): Promise<PrivacyPolicy | { message: string }> {
         try {
-            // Use `find` with `take: 1` to get the first Terms and Conditions entry
             const [privacyPolicy] = await this.privacyPolicyRepository.find({
                 take: 1,
-                order: { id: 'ASC' } // Adjust ordering if necessary
+                order: { id: 'ASC' }
             });
 
-            return privacyPolicy || null; // Return null if no entry is found
+            if (!privacyPolicy) {
+                return { message: 'No privacy policy found' };
+            }
+            return privacyPolicy;
         } catch (error: any) {
             throw new InternalServerErrorException('Error retrieving privacy policy', error.message);
         }
@@ -67,15 +69,17 @@ export class TermsConditionsService {
         private termsConditionsRepository: Repository<TermsConditions>
     ) { }
 
-    async getOrShow(): Promise<TermsConditions | null> {
+    async getOrShow(): Promise<TermsConditions | { message: string }> {
         try {
-            // Use `find` with `take: 1` to get the first Terms and Conditions entry
             const [termsConditions] = await this.termsConditionsRepository.find({
                 take: 1,
-                order: { id: 'ASC' } // Adjust ordering if necessary
+                order: { id: 'ASC' }
             });
 
-            return termsConditions || null; // Return null if no entry is found
+            if (!termsConditions) {
+                return { message: 'No terms and conditions found' };
+            }
+            return termsConditions;
         } catch (error: any) {
             throw new InternalServerErrorException('Error retrieving terms and conditions', error.message);
         }
@@ -117,14 +121,17 @@ export class BannerService {
         private bannerRepository: Repository<Banner>
     ) { }
 
-    async getOrShow(): Promise<Banner | null> {
+    async getOrShow(): Promise<Banner | { message: string }> {
         try {
             const [banner] = await this.bannerRepository.find({
                 take: 1,
                 order: { id: 'ASC' }
             });
 
-            return banner || null;
+            if (!banner) {
+                return { message: 'No banners found' };
+            }
+            return banner;
         } catch (error: any) {
             throw new InternalServerErrorException('Error retrieving banners', error.message);
         }
@@ -171,9 +178,9 @@ export class BannerService {
             // Delete file from upload folder
             await this.deleteFileFromFolder(banner.imageUrl);
 
-            // Clear the imageUrl and hyperlink
+            // Clear the imageUrl and hyperlink with empty strings instead of null
             banner.imageUrl = '';
-            banner.hyperlink = null as any;
+            banner.hyperlink = '';
             await this.bannerRepository.save(banner);
             
             return { message: 'Banner cleared successfully' };
@@ -200,7 +207,7 @@ export class BannerService {
             // Delete the file from upload folder
             await this.deleteFileFromFolder(banner.imageUrl);
 
-            // Clear the imageUrl
+            // Clear the imageUrl with empty string instead of null
             banner.imageUrl = '';
             const result = await this.bannerRepository.save(banner);
             
@@ -237,14 +244,17 @@ export class BannerEventService {
         private bannerEventRepository: Repository<BannerEvent>
     ) { }
 
-    async getOrShow(): Promise<BannerEvent | null> {
+    async getOrShow(): Promise<BannerEvent | { message: string }> {
         try {
             const [bannerEvent] = await this.bannerEventRepository.find({
                 take: 1,
                 order: { id: 'ASC' }
             });
 
-            return bannerEvent || null;
+            if (!bannerEvent) {
+                return { message: 'No banner events found' };
+            }
+            return bannerEvent;
         } catch (error: any) {
             throw new InternalServerErrorException('Error retrieving banner events', error.message);
         }
@@ -357,9 +367,9 @@ export class BannerEventService {
             // Delete all files from upload folder
             await this.deleteFilesFromFolder(bannerEvent.imageUrls);
 
-            // Clear the imageUrls array and hyperlink
+            // Clear the imageUrls array and hyperlink with empty values instead of null
             bannerEvent.imageUrls = [];
-            bannerEvent.hyperlink = null as any;
+            bannerEvent.hyperlink = '';
             await this.bannerEventRepository.save(bannerEvent);
             
             return { message: 'All banner events cleared successfully' };

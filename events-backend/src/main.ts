@@ -2,20 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from 'validation/validation.pipe';
 
 async function bootstrap() {
   try {
    
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    // app.useGlobalPipes(
-    //   new ValidationPipe({
-    //     whitelist: true,
-    //     forbidNonWhitelisted: true,
-    //     transform: true,
-    //   }),
-    // );
+    app.useGlobalPipes(new ValidationPipe()); // Use custom pipe globally
 
     // Static assets setup
     app.useStaticAssets(join(__dirname, '..', 'uploads'), {
