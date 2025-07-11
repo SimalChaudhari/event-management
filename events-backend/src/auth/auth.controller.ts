@@ -367,7 +367,7 @@ export class AuthController {
     }
   }
 
-  @Post('forget')
+  @Post('forgot-password')
   async forgotPassword(
     @Body() body: { email: string },
     @Res() response: Response,
@@ -377,7 +377,7 @@ export class AuthController {
   }
 
 
-  @Post('reset')
+  @Post('reset-password')
   async resetPassword(
     @Body() body: { email: string; otp: string; newPassword: string },
     @Res() response: Response,
