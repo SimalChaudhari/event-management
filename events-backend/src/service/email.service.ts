@@ -13,7 +13,7 @@ export class EmailService {
       },
     });
   }
-  async sendOTP(email: string, otp: string): Promise<string> {
+  async sendOTP(email: string,firstName: string, lastName: string, otp: string): Promise<string> {
     const mailOptions = {
       from: process.env.SMTP_USER,
       to: email,
@@ -23,7 +23,7 @@ export class EmailService {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
             <h2 style="color: #333; text-align: center;">One-Time Password (OTP)</h2>
             <p style="color: #555; font-size: 16px;">
-                Dear User,
+                Dear ${firstName} ${lastName},
             </p>
             <p style="color: #555; font-size: 16px;">
                 Your OTP code is:

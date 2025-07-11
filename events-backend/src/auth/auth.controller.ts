@@ -376,6 +376,24 @@ export class AuthController {
     return response.status(HttpStatus.OK).json(result);
   }
 
+  @Post('resend-otp')
+  async resendOTP(
+    @Body() body: { email: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.authService.resendOTP(body.email);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 
   @Post('reset-password')
   async resetPassword(

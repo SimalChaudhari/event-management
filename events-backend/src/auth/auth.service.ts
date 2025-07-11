@@ -465,7 +465,6 @@ export class AuthService {
       if (!user) {
         throw new BadRequestException('Email not found');
       }
-
       // Check if user is verified - only verified users can reset password
       if (!user.isVerify) {
         throw new BadRequestException(
@@ -483,7 +482,7 @@ export class AuthService {
       await this.userRepository.save(user);
 
       try {
-        await this.emailService.sendOTP(email, otp);
+        await this.emailService.sendOTP(email,user.firstName,user.lastName, otp);
         return {
           message:
             "We've successfully sent an OTP to your email. Please check your inbox and enter the 6-digit code.",
@@ -497,6 +496,49 @@ export class AuthService {
       this.handleError(error);
     }
   }
+
+  async resendOTP(email: string): Promise<{ message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Email not found');
+      }
+
+      // Check if user is verified - only verified users can reset password
+      if (!user.isVerify) {
+        throw new BadRequestException(
+          'Your account is not verified. Please verify your account first before resetting password.',
+        );
+      }
+
+      // Generate new OTP
+      const otp = this.generateOTP();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Save new OTP and expiry time
+      user.otp = otp;
+      user.otpExpiry = otpExpiry;
+      await this.userRepository.save(user);
+
+      try {
+        await this.emailService.sendOTP(email, user.firstName, user.lastName, otp);
+        return {
+          message:
+            "We've successfully resent the OTP to your email. Please check your inbox and enter the 6-digit code.",
+        };
+      } catch (emailError) {
+        throw new BadRequestException(
+          'Failed to send OTP. Please try again later.',
+        );
+      }
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
 
   // Reset password with OTP verification
   async resetPasswordWithOTP(
