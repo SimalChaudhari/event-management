@@ -71,6 +71,8 @@ export class FavoriteEventService {
       .leftJoinAndSelect('favorite.event', 'event')
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
       .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+      .leftJoinAndSelect('event.category', 'eventCategory') // Add this
+      .leftJoinAndSelect('eventCategory.category', 'category') // Add this
       .where('favorite.userId = :userId', { userId });
 
     // Apply filters based on filter type
@@ -114,17 +116,42 @@ export class FavoriteEventService {
 
     const favorites = await query.getMany();
 
-    return favorites.map((favorite) => {
-      const { eventSpeakers, ...eventData } = favorite.event;
-      return {
-        id: favorite.id,
-        createdAt: favorite.createdAt,
-        event: {
-          ...eventData,
-          color: getEventColor(favorite.event.type),
-          speakers: eventSpeakers?.map((es) => es.speaker) || [],
-        },
-      };
+    // Add attendance count and favorite status to each favorite event
+    const favoritesWithAttendance = await Promise.all(
+      favorites.map(async (favorite) => {
+        const attendanceCount = favorite.eventId ? await this.getEventAttendanceCount(favorite.eventId) : 0;
+        
+        // Since these are favorite events, isFavorite will always be true
+        const isFavorite = true;
+        
+        const { eventSpeakers, category, ...eventData } = favorite.event;
+        
+        // Extract categories
+        const categories = category?.map((ec) => ec.category) || [];
+        
+        return {
+          id: favorite.id,
+          createdAt: favorite.createdAt,
+          event: {
+            ...eventData,
+            color: getEventColor(favorite.event.type),
+            speakers: eventSpeakers?.map((es) => es.speaker) || [],
+            categories: categories,
+            attendanceCount: attendanceCount,
+            isFavorite: isFavorite, // Always true for favorite events
+          },
+        };
+      })
+    );
+
+    return favoritesWithAttendance;
+  }
+
+  // Add this method to get event attendance count
+  async getEventAttendanceCount(eventId: string): Promise<number> {
+    const count = await this.registerEventRepository.count({
+      where: { eventId: eventId }
     });
+    return count;
   }
 }

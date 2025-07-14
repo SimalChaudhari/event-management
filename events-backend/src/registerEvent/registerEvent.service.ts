@@ -85,6 +85,8 @@ export class RegisterEventService {
           'event',
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
+          'event.category', // Add this
+          'event.category.category', // Add this
           'order',
         ],
       });
@@ -97,6 +99,8 @@ export class RegisterEventService {
           'event',
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
+          'event.category', // Add this
+          'event.category.category', // Add this
           'order',
         ],
       });
@@ -118,21 +122,25 @@ export class RegisterEventService {
         
         const speakers =
           registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
-    
-        const { eventSpeakers, ...restEvent } = registerEvent.event || {};
+
+        // Extract categories
+        const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+
+        const { eventSpeakers, category, ...restEvent } = registerEvent.event || {};
         const event = {
           ...restEvent,
           color: getEventColor(registerEvent.event?.type),
           speakers,
+          categories, // Add categories here
           attendanceCount: attendanceCount,
-          isFavorite: isFavorite, // Add isFavorite field to event
+          isFavorite: isFavorite,
         };
-    
+
         const { firstName, lastName, email, mobile } = registerEvent.user || {};
         const cleanedUser = { firstName, lastName, email, mobile };
-    
+
         const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
-    
+
         return {
           ...cleanRegisterEvent,
           event,
@@ -174,6 +182,8 @@ export class RegisterEventService {
         'event',
         'event.eventSpeakers',
         'event.eventSpeakers.speaker',
+        'event.category', // Add this
+        'event.category.category', // Add this
         'order',
       ],
     });
@@ -198,16 +208,20 @@ export class RegisterEventService {
     const speakers =
       registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
 
-    // 🧼 Clean up event object (remove eventSpeakers)
-    const { eventSpeakers, ...restEvent } = registerEvent.event || {};
+    // Extract categories
+    const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-    // ✅ Replace with clean speakers
+    // 🧼 Clean up event object (remove eventSpeakers and category)
+    const { eventSpeakers, category, ...restEvent } = registerEvent.event || {};
+
+    // ✅ Replace with clean speakers and categories
     const event = {
       ...restEvent,
       color: getEventColor(registerEvent.event?.type),
       speakers,
+      categories, // Add categories here
       attendanceCount: attendanceCount,
-      isFavorite: isFavorite, // Add isFavorite field to event
+      isFavorite: isFavorite,
     };
 
     // 🧼 Clean up user object, showing only specific fields

@@ -44,7 +44,7 @@ export class FavoriteEventController {
       success: true,
       message: `Favorites retrieved successfully with filter: ${filter}`,
       filter: filter,
-      totalCount: favorites.length,
+      total: favorites.length,
       metadata: {
         filter: filter,
         totalFavorites: favorites.length,
