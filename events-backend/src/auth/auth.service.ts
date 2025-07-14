@@ -140,9 +140,11 @@ export class AuthService {
   // Login a user
   async login(userDto: UserDto): Promise<{
     message: string;
-    user: Partial<UserEntity>;
-    accessToken: string;
-    refreshToken: string;
+    user?: Partial<UserEntity>;
+    accessToken?: string;
+    refreshToken?: string;
+    requiresVerification?: boolean;
+    verificationCode?: string;
   }> {
     try {
       const user = await this.userRepository.findOne({
@@ -152,11 +154,6 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException(
           'Email or password not recognized. Create an account to get started.',
-        );
-      }
-      if (!user.isVerify) {
-        throw new UnauthorizedException(
-          'User is not verified. Please verify your email.',
         );
       }
 
@@ -175,6 +172,40 @@ export class AuthService {
         );
       }
 
+      // Check if user is not verified
+      if (!user.isVerify) {
+        // Generate new OTP for verification
+        const otp = this.generateOTP();
+        
+        // Update user with new OTP
+        user.otp = otp;
+        await this.userRepository.save(user);
+
+        // Send OTP via email
+        await this.emailService.sendWelcomeEmail(
+          user.email, 
+          user.firstName, 
+          user.lastName, 
+          otp
+        );
+
+        // Return special response for non-verified users
+        return {
+          message: 'Please verify your email address to continue. We have sent a new OTP to your email.',
+          requiresVerification: true,
+          verificationCode: 'EMAIL_VERIFICATION_REQUIRED',
+          user: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            mobile: user.mobile,
+            isVerify: user.isVerify,
+          },
+        };
+      }
+
+      // User is verified, proceed with normal login
       const accessToken = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken(user);
 
@@ -575,6 +606,44 @@ export class AuthService {
       return {
         message:
           'Password reset successful. You can now login with your new password.',
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // Method to resend OTP for non-verified users during login
+  async resendLoginOTP(email: string): Promise<{ message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email },
+      });
+
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      if (user.isVerify) {
+        throw new BadRequestException('User is already verified');
+      }
+
+      // Generate new OTP
+      const otp = this.generateOTP();
+      
+      // Update user with new OTP
+      user.otp = otp;
+      await this.userRepository.save(user);
+
+      // Send OTP via email
+      await this.emailService.sendWelcomeEmail(
+        user.email, 
+        user.firstName, 
+        user.lastName, 
+        otp
+      );
+
+      return {
+        message: 'A new OTP has been sent to your email address. Please check your inbox and enter the code to verify your account.',
       };
     } catch (error) {
       this.handleError(error);

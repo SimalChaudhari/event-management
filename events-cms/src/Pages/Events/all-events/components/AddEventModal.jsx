@@ -6,14 +6,13 @@ import { FetchEventData } from '../fetchEvents/FetchEventApi';
 import { createEvent, editEvent } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-
-import L from 'leaflet'; // Import Leaflet for custom markers
 import LocationMarker from './LocationMarker';
-import SpeakerFormSidebar from './SpeakerFormSidebar';
 import SpeakerFormModal from './SpeakerFormSidebar';
+import CategoryFormModal from './CategoryFormModal';
 import { createSpeaker } from '../../../../store/actions/speakerActions';
+import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 
 function AddEventModal({ show, handleClose, editData }) {
@@ -23,6 +22,7 @@ function AddEventModal({ show, handleClose, editData }) {
     const [display, setDisplay] = useState(null);
 
     const [speakerList, setSpeakerList] = useState([]);
+    const [categoryList, setCategoryList] = useState([]);
     const [countryList, setCountryList] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
@@ -39,9 +39,10 @@ function AddEventModal({ show, handleClose, editData }) {
         type: 'Physical',
         price: '',
         currency: '',
-        speakerIds: [],
-        latitude: '', // Added latitude
-        longitude: '' // Added longitude
+        speakerIds: [], // Changed to array for multiple speakers
+        categoryIds: [], // Changed to array for multiple categories
+        latitude: '',
+        longitude: ''
     });
     const [showMapModal, setShowMapModal] = useState(false); // For showing the map modal
 
@@ -335,6 +336,7 @@ function AddEventModal({ show, handleClose, editData }) {
             price: '',
             currency: '',
             speakerIds: [],
+            categoryIds: [], // Changed to array
             latitude: '',
             longitude: ''
         });
@@ -372,14 +374,28 @@ function AddEventModal({ show, handleClose, editData }) {
         }
     };
 
-    // Load speakers from API
+    const fetchCategories = async () => {
+        try {
+            const response = await axiosInstance.get('categories/get');
+            if (response.data.success) {
+                setCategoryList(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
+    };
+
+    // Load speakers and categories from API
     useEffect(() => {
         fetchSpeakers();
+        fetchCategories();
     }, []);
 
-    // Update useEffect for editData to reset removed files tracking
+    // Update useEffect for editData to properly handle categories
     useEffect(() => {
         if (editData) {
+            console.log('Edit Data:', editData); // Debug log
+            
             // Check for both possible speaker data formats
             let speakerIds = [];
 
@@ -390,26 +406,34 @@ function AddEventModal({ show, handleClose, editData }) {
                 speakerIds = editData.speakersData.map((speaker) => speaker.id);
             }
 
-            // Handle images for edit mode - FIXED VERSION
+            // Handle multiple categories data - check multiple possible formats
+            let categoryIds = [];
+            console.log('Categories from editData:', editData.categories); // Debug log
+            
+              if (editData.categories) {
+                categoryIds = editData.categories.map((category) => category.id);
+            } else if (editData.categoriesData) {
+                categoryIds = editData.categoriesData.map((category) => category.id);
+            }
+
+            
+            console.log('Extracted categoryIds:', categoryIds); // Debug log
+
+            // Handle images for edit mode
             let imagesData = [];
             let previewUrls = [];
             
             if (editData.images) {
-                // Handle different image data formats from backend
                 if (typeof editData.images === 'string') {
-                    // Single image as string
                     imagesData = [editData.images];
                     previewUrls = [`${API_URL}/${editData.images.replace(/\\/g, '/')}`];
                 } else if (Array.isArray(editData.images)) {
-                    // Multiple images as array
                     imagesData = editData.images;
                     previewUrls = editData.images.map(img => {
                         if (typeof img === 'string') {
-                            // If it's already a full URL, use it directly
                             if (img.startsWith('http')) {
                                 return img;
                             }
-                            // If it's a relative path, construct the full URL
                             return `${API_URL}/${img.replace(/\\/g, '/')}`;
                         }
                         return img;
@@ -439,7 +463,7 @@ function AddEventModal({ show, handleClose, editData }) {
                 }
             }
 
-            // Set form data with proper image handling
+            // Set form data with proper handling
             setFormData({
                 name: editData.name || '',
                 description: editData.description || '',
@@ -452,18 +476,19 @@ function AddEventModal({ show, handleClose, editData }) {
                 latitude: editData.latitude || '',
                 longitude: editData.longitude || '',
                 country: editData.country || '',
-                images: imagesData, // Use processed images data
-                documents: documentsData, // Add documents
+                images: imagesData,
+                documents: documentsData,
                 type: editData.type || 'Physical',
                 price: editData.price || '',
                 currency: editData.currency || '',
-                speakerIds: speakerIds
+                speakerIds: speakerIds,
+                categoryIds: categoryIds // Use array for multiple categories
             });
             
             setImagePreviewUrls(previewUrls);
-            setDocumentPreviewUrls(documentPreviewUrls); // Add document preview URLs
-            setRemovedImages([]); // Reset removed images when editing
-            setRemovedDocuments([]); // Reset removed documents when editing
+            setDocumentPreviewUrls(documentPreviewUrls);
+            setRemovedImages([]);
+            setRemovedDocuments([]);
         } else {
             resetFormData();
         }
@@ -475,6 +500,15 @@ function AddEventModal({ show, handleClose, editData }) {
         setFormData((prev) => ({
             ...prev,
             speakerIds: selectedIds
+        }));
+    };
+
+    // Handle multi-category select
+    const handleCategorySelect = (selectedOptions) => {
+        const selectedIds = selectedOptions.map((option) => option.value);
+        setFormData((prev) => ({
+            ...prev,
+            categoryIds: selectedIds
         }));
     };
 
@@ -499,6 +533,9 @@ function AddEventModal({ show, handleClose, editData }) {
             if (key === 'speakerIds') {
                 const speakersArray = Array.isArray(dataToSend.speakerIds) ? dataToSend.speakerIds : [];
                 formDataToSend.append('speakerIds', speakersArray.join(','));
+            } else if (key === 'categoryIds') {
+                const categoriesArray = Array.isArray(dataToSend.categoryIds) ? dataToSend.categoryIds : [];
+                formDataToSend.append('categoryIds', categoriesArray.join(','));
             } else if (key === 'images') {
                 if (dataToSend[key] && Array.isArray(dataToSend[key])) {
                     dataToSend[key].forEach((file) => {
@@ -520,23 +557,19 @@ function AddEventModal({ show, handleClose, editData }) {
             }
         });
 
-        // Handle existing files for edit mode - FIXED VERSION
+        // Handle existing files for edit mode
         if (editData) {
-            // Add existing images that are still in formData (not removed)
             if (formData.images && formData.images.length > 0) {
                 formData.images.forEach((image) => {
                     if (typeof image === 'string') {
-                        // This is an existing image that wasn't removed
                         formDataToSend.append('originalImages', image);
                     }
                 });
             }
 
-            // Add existing documents that are still in formData (not removed)
             if (formData.documents && formData.documents.length > 0) {
                 formData.documents.forEach((document) => {
                     if (typeof document === 'string') {
-                        // This is an existing document that wasn't removed
                         formDataToSend.append('originalDocuments', document);
                     }
                 });
@@ -562,15 +595,30 @@ function AddEventModal({ show, handleClose, editData }) {
         return `${hours.toString().padStart(2, '0')}:${minutes}`;
     };
 
+    // Update the speaker and category options to handle the data properly
     const speakerOptions = speakerList.map((speaker) => ({
         label: speaker.name,
         value: speaker.id
     }));
 
-    const selectedSpeakerOptions = speakerOptions.filter((option) => formData.speakerIds.includes(option.value));
+    const selectedSpeakerOptions = speakerOptions.filter((option) => 
+        formData.speakerIds && formData.speakerIds.includes(option.value)
+    );
+
+    // Update the category options to handle the data properly
+    const categoryOptions = categoryList.map((category) => ({
+        label: category.name,
+        value: category.id
+    }));
+
+    const selectedCategoryOptions = categoryOptions.filter((option) => {
+        console.log('Checking option:', option.value, 'against categoryIds:', formData.categoryIds); // Debug log
+        return formData.categoryIds && formData.categoryIds.includes(String(option.value));
+    });
 
     const [selectedSpeakers, setSelectedSpeakers] = useState([]);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [newSpeaker, setNewSpeaker] = useState({
         name: '',
         companyName: '',
@@ -580,6 +628,10 @@ function AddEventModal({ show, handleClose, editData }) {
         location: '',
         description: '',
         speakerProfile: null
+    });
+    const [newCategory, setNewCategory] = useState({
+        name: '',
+        description: ''
     });
 
     const handleInputChange = (e) => {
@@ -605,11 +657,36 @@ function AddEventModal({ show, handleClose, editData }) {
             const success = await dispatch(createSpeaker(formDataToSend));
             if (success) {
                 fetchSpeakers();
-                setNewSpeaker('');
+                setNewSpeaker({
+                    name: '',
+                    companyName: '',
+                    position: '',
+                    mobile: '',
+                    email: '',
+                    location: '',
+                    description: '',
+                    speakerProfile: null
+                });
                 setShowSidebar(false);
             }
         } catch (error) {
             console.error('Error adding speaker:', error);
+        }
+    };
+
+    const handleAddCategory = async () => {
+        try {
+            const success = await dispatch(createCategory(newCategory));
+            if (success) {
+                fetchCategories();
+                setNewCategory({
+                    name: '',
+                    description: ''
+                });
+                setShowCategoryModal(false);
+            }
+        } catch (error) {
+            console.error('Error adding category:', error);
         }
     };
 
@@ -875,14 +952,15 @@ function AddEventModal({ show, handleClose, editData }) {
                         <Col sm={12}>
                             <div className="form-group d-flex align-items-center">
                                 <div style={{ flex: 1 }}>
-                                    <label>Select Speakers</label>
+                                    <label>{editData ? 'Update Speakers' : 'Select Speakers'}</label>
 
                                     <Select
+                                        key={`speakers-${formData.speakerIds?.join(',') || 'empty'}`}
                                         isMulti
                                         options={speakerOptions}
                                         value={selectedSpeakerOptions}
                                         onChange={handleSpeakerSelect}
-                                        placeholder="Choose speakers..."
+                                        placeholder={editData ? "Update speakers..." : "Choose speakers..."}
                                         styles={{
                                             control: (base) => ({
                                                 ...base,
@@ -896,13 +974,15 @@ function AddEventModal({ show, handleClose, editData }) {
                                         }}
                                     />
                                 </div>
-                                <Button
-                                    variant="primary"
-                                    style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
-                                    onClick={() => setShowSidebar(true)}
-                                >
-                                    Add Speaker
-                                </Button>
+                                {!editData && (
+                                    <Button
+                                        variant="primary"
+                                        style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
+                                        onClick={() => setShowSidebar(true)}
+                                    >
+                                        Add Speaker
+                                    </Button>
+                                )}
                             </div>
 
                             <SpeakerFormModal
@@ -912,6 +992,55 @@ function AddEventModal({ show, handleClose, editData }) {
                                 onSubmit={handleAddSpeaker}
                                 formData={newSpeaker}
                             />
+
+                            <CategoryFormModal
+                                show={showCategoryModal}
+                                onClose={() => setShowCategoryModal(false)}
+                                onChange={(e) => {
+                                    const { name, value } = e.target;
+                                    setNewCategory(prev => ({
+                                        ...prev,
+                                        [name]: value
+                                    }));
+                                }}
+                                onSubmit={handleAddCategory}
+                                formData={newCategory}
+                            />
+                        </Col>
+                        <Col sm={12}>
+                            <div className="form-group d-flex align-items-center">
+                                <div style={{ flex: 1 }}>
+                                    <label>{editData ? 'Update Categories' : 'Select Categories'}</label>
+
+                                    <Select
+                                        key={`categories-${JSON.stringify(formData.categoryIds)}`} // More specific key
+                                        isMulti
+                                        options={categoryOptions}
+                                        value={selectedCategoryOptions}
+                                        onChange={handleCategorySelect}
+                                        placeholder={editData ? "Update categories..." : "Choose categories..."}
+                                        styles={{
+                                            control: (base) => ({
+                                                ...base,
+                                                zIndex: 9999
+                                            }),
+                                            menu: (base) => ({
+                                                ...base,
+                                                zIndex: 9999
+                                            })
+                                        }}
+                                    />
+                                </div>
+                                {!editData && (
+                                    <Button
+                                        variant="primary"
+                                        style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
+                                        onClick={() => setShowCategoryModal(true)}
+                                    >
+                                        Add Category
+                                    </Button>
+                                )}
+                            </div>
                         </Col>
                         <Col sm={12}>
                             <div className="form-group fill">
@@ -930,13 +1059,11 @@ function AddEventModal({ show, handleClose, editData }) {
                         </Col>
                         <Col sm={12}>
                             <div className="form-group fill">
-                                <label className="floating-label" htmlFor="images">
-                                    Images <Badge bg="info">{formData.images.length}/10</Badge>
-                                </label>
-                                
+                                      <Badge bg="info"> <span>Images </span> {formData.images.length}/10</Badge>
+                                  
                                 {/* Drag and Drop Zone */}
                                 <div 
-                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
                                     onDragOver={handleDragOver}
                                     onDrop={handleDrop}
                                     style={{
@@ -945,16 +1072,31 @@ function AddEventModal({ show, handleClose, editData }) {
                                         padding: '20px',
                                         textAlign: 'center',
                                         backgroundColor: '#f9f9f9',
-                                        marginBottom: '10px'
+                                        marginBottom: '10px',
+                                        minHeight: '120px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center',
+                                        alignItems: 'center'
                                     }}
                                 >
                                     <div className="mb-3">
                                         <i className="fas fa-cloud-upload-alt fa-3x text-muted"></i>
                                     </div>
-                                    <p className="text-muted mb-2">
+                                    <p className="text-muted mb-2" style={{ 
+                                        fontSize: '14px',
+                                        lineHeight: '1.4',
+                                        maxWidth: '100%',
+                                        wordWrap: 'break-word'
+                                    }}>
                                         Drag and drop images here, or click to select files
                                     </p>
-                                    <p className="text-muted small">
+                                    <p className="text-muted small" style={{ 
+                                        fontSize: '12px',
+                                        lineHeight: '1.3',
+                                        maxWidth: '100%',
+                                        wordWrap: 'break-word'
+                                    }}>
                                         Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 10 images.
                                     </p>
                                     <input 
@@ -970,6 +1112,7 @@ function AddEventModal({ show, handleClose, editData }) {
                                     <Button 
                                         variant="outline-primary" 
                                         onClick={() => document.getElementById('imageInput').click()}
+                                        style={{ marginTop: '10px' }}
                                     >
                                         Choose Files
                                     </Button>
@@ -978,11 +1121,18 @@ function AddEventModal({ show, handleClose, editData }) {
                                 {/* Image Preview Grid */}
                                 {formData.images && formData.images.length > 0 && (
                                     <div className="mt-3">
-                                        <h6>Selected Images ({formData.images.length})</h6>
+                                        <h6 style={{ 
+                                            fontSize: '16px',
+                                            fontWeight: '600',
+                                            marginBottom: '15px',
+                                            color: '#333'
+                                        }}>
+                                            Selected Images ({formData.images.length})
+                                        </h6>
                                         <div style={{ 
                                             display: 'grid', 
-                                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                                            gap: '10px',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                            gap: '15px',
                                             marginTop: '10px'
                                         }}>
                                             {formData.images.map((image, index) => {
@@ -1007,16 +1157,25 @@ function AddEventModal({ show, handleClose, editData }) {
                                                 }
                                                 
                                                 return (
-                                                    <div key={index} style={{ position: 'relative' }}>
+                                                    <div key={index} style={{ 
+                                                        position: 'relative',
+                                                        borderRadius: '8px',
+                                                        overflow: 'hidden',
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                        transition: 'transform 0.2s ease',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                    >
                                                         <img
                                                             src={imageSrc}
                                                             alt={`Event ${index + 1}`}
                                                             style={{ 
                                                                 width: '100%', 
-                                                                height: '120px', 
+                                                                height: '140px', 
                                                                 objectFit: 'cover',
-                                                                borderRadius: '8px',
-                                                                border: '2px solid #ddd'
+                                                                display: 'block'
                                                             }}
                                                             onError={(e) => {
                                                                 console.error('Image failed to load:', imageSrc);
@@ -1027,16 +1186,28 @@ function AddEventModal({ show, handleClose, editData }) {
                                                         {/* Image Controls */}
                                                         <div style={{
                                                             position: 'absolute',
-                                                            top: '5px',
-                                                            right: '5px',
+                                                            top: '8px',
+                                                            right: '8px',
                                                             display: 'flex',
-                                                            gap: '2px'
+                                                            gap: '4px'
                                                         }}>
                                                             <Button
                                                                 size="sm"
                                                                 variant="danger"
-                                                                onClick={() => handleRemoveImage(index)}
-                                                                style={{ padding: '2px 6px', fontSize: '10px' }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRemoveImage(index);
+                                                                }}
+                                                                style={{ 
+                                                                    padding: '4px 8px', 
+                                                                    fontSize: '12px',
+                                                                    borderRadius: '50%',
+                                                                    width: '28px',
+                                                                    height: '28px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center'
+                                                                }}
                                                             >
                                                                 ×
                                                             </Button>
@@ -1045,14 +1216,17 @@ function AddEventModal({ show, handleClose, editData }) {
                                                         {/* Image Info */}
                                                         <div style={{
                                                             position: 'absolute',
-                                                            bottom: '5px',
-                                                            left: '5px',
-                                                            right: '5px',
-                                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                                            bottom: '0',
+                                                            left: '0',
+                                                            right: '0',
+                                                            backgroundColor: 'rgba(0,0,0,0.8)',
                                                             color: 'white',
-                                                            padding: '2px 4px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '10px'
+                                                            padding: '6px 8px',
+                                                            fontSize: '11px',
+                                                            textAlign: 'center',
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
                                                         }}>
                                                             {isExistingImage ? 'Existing' : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
                                                         </div>
@@ -1060,14 +1234,16 @@ function AddEventModal({ show, handleClose, editData }) {
                                                         {/* Image Index Badge */}
                                                         <div style={{
                                                             position: 'absolute',
-                                                            top: '5px',
-                                                            left: '5px',
-                                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                                            top: '8px',
+                                                            left: '8px',
+                                                            backgroundColor: 'rgba(0,0,0,0.8)',
                                                             color: 'white',
-                                                            padding: '2px 6px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '10px',
-                                                            fontWeight: 'bold'
+                                                            padding: '4px 8px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 'bold',
+                                                            minWidth: '20px',
+                                                            textAlign: 'center'
                                                         }}>
                                                             {index + 1}
                                                         </div>
@@ -1078,9 +1254,21 @@ function AddEventModal({ show, handleClose, editData }) {
                                         
                                         {/* Reorder Instructions */}
                                         {formData.images.length > 1 && (
-                                            <div className="mt-2">
-                                                <small className="text-muted">
-                                                    💡 First image will be the main event image. Drag to reorder.
+                                            <div className="mt-3" style={{
+                                                padding: '10px',
+                                                backgroundColor: '#f8f9fa',
+                                                borderRadius: '6px',
+                                                border: '1px solid #e9ecef'
+                                            }}>
+                                                <small className="text-muted" style={{
+                                                    fontSize: '12px',
+                                                    lineHeight: '1.4',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    <span>💡</span>
+                                                    <span>First image will be the main event image. Drag to reorder.</span>
                                                 </small>
                                             </div>
                                         )}
@@ -1090,13 +1278,12 @@ function AddEventModal({ show, handleClose, editData }) {
                         </Col>
                         <Col sm={12}>
                             <div className="form-group fill">
-                                <label className="floating-label" htmlFor="documents">
-                                    Documents <Badge bg="info">{formData.documents.length}/10</Badge>
-                                </label>
+                                      <Badge bg="info"> <span>Documents </span> {formData.documents.length}/10</Badge>
+                          
                                 
                                 {/* Drag and Drop Zone for Documents */}
                                 <div 
-                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
                                     onDragOver={handleDocumentDragOver}
                                     onDrop={handleDocumentDrop}
                                     style={{
@@ -1105,17 +1292,32 @@ function AddEventModal({ show, handleClose, editData }) {
                                         padding: '20px',
                                         textAlign: 'center',
                                         backgroundColor: '#f9f9f9',
-                                        marginBottom: '10px'
+                                        marginBottom: '10px',
+                                        minHeight: '120px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center',
+                                        alignItems: 'center'
                                     }}
                                 >
                                     <div className="mb-3">
                                         <i className="fas fa-file-alt fa-3x text-muted"></i>
                                     </div>
-                                    <p className="text-muted mb-2">
+                                    <p className="text-muted mb-2" style={{ 
+                                        fontSize: '14px',
+                                        lineHeight: '1.4',
+                                        maxWidth: '100%',
+                                        wordWrap: 'break-word'
+                                    }}>
                                         Drag and drop documents here, or click to select files
                                     </p>
-                                    <p className="text-muted small">
-                                        Supported formats: PDF Max size: 10MB per file. Max 10 files.
+                                    <p className="text-muted small" style={{ 
+                                        fontSize: '12px',
+                                        lineHeight: '1.3',
+                                        maxWidth: '100%',
+                                        wordWrap: 'break-word'
+                                    }}>
+                                        Supported formats: PDF, DOC, DOCX, XLS, XLSX. Max size: 10MB per file. Max 10 files.
                                     </p>
                                     <input 
                                         type="file" 
@@ -1130,6 +1332,7 @@ function AddEventModal({ show, handleClose, editData }) {
                                     <Button 
                                         variant="outline-primary" 
                                         onClick={() => document.getElementById('documentInput').click()}
+                                        style={{ marginTop: '10px' }}
                                     >
                                         Choose Documents
                                     </Button>
@@ -1138,11 +1341,18 @@ function AddEventModal({ show, handleClose, editData }) {
                                 {/* Document Preview List */}
                                 {formData.documents && formData.documents.length > 0 && (
                                     <div className="mt-3">
-                                        <h6>Selected Documents ({formData.documents.length})</h6>
+                                        <h6 style={{ 
+                                            fontSize: '16px',
+                                            fontWeight: '600',
+                                            marginBottom: '15px',
+                                            color: '#333'
+                                        }}>
+                                            Selected Documents ({formData.documents.length})
+                                        </h6>
                                         <div style={{ 
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '10px',
+                                            gap: '12px',
                                             marginTop: '10px'
                                         }}>
                                             {formData.documents.map((document, index) => {
@@ -1160,33 +1370,68 @@ function AddEventModal({ show, handleClose, editData }) {
                                                     documentSrc = documentPreviewUrls[index] || URL.createObjectURL(document);
                                                 }
                                                 
+                                                const fileName = typeof document === 'string' ? document.split('/').pop() : document.name;
+                                                
                                                 return (
                                                     <div key={index} style={{ 
                                                         display: 'flex', 
                                                         alignItems: 'center',
-                                                        padding: '10px',
-                                                        border: '1px solid #ddd',
+                                                        padding: '12px',
+                                                        border: '1px solid #e9ecef',
                                                         borderRadius: '8px',
-                                                        backgroundColor: '#f8f9fa'
-                                                    }}>
-                                                        <div style={{ marginRight: '10px' }}>
+                                                        backgroundColor: '#ffffff',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                                                        e.currentTarget.style.transform = 'translateY(0)';
+                                                    }}
+                                                    >
+                                                        <div style={{ marginRight: '12px', flexShrink: 0 }}>
                                                             <i className="fas fa-file-pdf fa-2x text-danger"></i>
                                                         </div>
                                                         
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 'bold' }}>
-                                                                {typeof document === 'string' ? document.split('/').pop() : document.name}
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ 
+                                                                fontWeight: '600',
+                                                                fontSize: '14px',
+                                                                color: '#333',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                marginBottom: '2px'
+                                                            }}>
+                                                                {fileName}
                                                             </div>
-                                                            <div style={{ fontSize: '12px', color: '#666' }}>
+                                                            <div style={{ 
+                                                                fontSize: '12px', 
+                                                                color: '#666',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis'
+                                                            }}>
                                                                 {isExistingDocument ? 'Existing Document' : `${(document.size / 1024 / 1024).toFixed(1)}MB`}
                                                             </div>
                                                         </div>
                                                         
-                                                        <div style={{ display: 'flex', gap: '5px' }}>
+                                                        <div style={{ 
+                                                            display: 'flex', 
+                                                            gap: '6px',
+                                                            flexShrink: 0
+                                                        }}>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline-primary"
                                                                 onClick={() => window.open(documentSrc, '_blank')}
+                                                                style={{
+                                                                    padding: '6px 10px',
+                                                                    fontSize: '12px'
+                                                                }}
                                                             >
                                                                 <i className="fas fa-eye"></i>
                                                             </Button>
@@ -1194,6 +1439,10 @@ function AddEventModal({ show, handleClose, editData }) {
                                                                 size="sm"
                                                                 variant="danger"
                                                                 onClick={() => handleRemoveDocument(index)}
+                                                                style={{
+                                                                    padding: '6px 10px',
+                                                                    fontSize: '12px'
+                                                                }}
                                                             >
                                                                 <i className="fas fa-trash"></i>
                                                             </Button>

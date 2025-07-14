@@ -6,8 +6,28 @@ function ViewOrderModal({ show, handleClose, orderData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [showImageModal, setShowImageModal] = useState(false);
     const [currentEventIndex, setCurrentEventIndex] = useState(0);
+    const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
+    const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
+    const [showEventMainImageModal, setShowEventMainImageModal] = useState(false);
+    const [currentEventMainImage, setCurrentEventMainImage] = useState('');
     
     if (!orderData) return null;
+
+    // Speaker image zoom function
+    const handleSpeakerImageClick = (speakerProfile) => {
+        if(speakerProfile){
+            setCurrentSpeakerImage(speakerProfile);
+            setShowSpeakerImageModal(true);
+        }else{
+            setShowSpeakerImageModal(false);
+        }
+    };
+
+    // Event main image zoom function
+    const handleEventMainImageClick = (imagePath) => {
+        setCurrentEventMainImage(imagePath);
+        setShowEventMainImageModal(true);
+    };
 
     // Format time utility function
     const formatTime = (time) => {
@@ -252,55 +272,7 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         );
     };
 
-    // Render speakers for an event
-    const renderSpeakers = (event) => {
-        if (!event?.speakers?.length) {
-            return <p>No speakers listed.</p>;
-        }
-
-        return event.speakers.map((speaker) => (
-            <Row key={speaker.id} className="mb-3">
-                <Col xs={12} md={3} className="text-center mb-3 mb-md-0">
-                    {speaker.speakerProfile && (
-                        <img
-                            src={`${API_URL}/${speaker.speakerProfile}`}
-                            alt={speaker.name}
-                            style={{
-                                width: 100,
-                                height: 100,
-                                objectFit: 'cover',
-                                borderRadius: '10%',
-                                border: '2px solid #4680ff'
-                            }}
-                        />
-                    )}
-                </Col>
-                <Col xs={12} md={9}>
-                    <p className="mb-2">
-                        <strong>Name:</strong> {speaker.name}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Company:</strong> {speaker.companyName}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Position:</strong> {speaker.position}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Mobile:</strong> {speaker.mobile}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Email:</strong> {speaker.email}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Location:</strong> {speaker.location}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Description:</strong> {speaker.description}
-                    </p>
-                </Col>
-            </Row>
-        ));
-    };
+  
 
     const renderOrderItems = () => {
         if (!orderData.orderItems?.length) {
@@ -320,18 +292,45 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                     <Row className="align-items-center mb-3">
                         <Col md={4} className="text-center mb-3 mb-md-0">
                             {event.images && event.images.length > 0 && (
-                                <img
-                                    src={getImageSrc(event.images[0])}
-                                    alt={event.name}
-                                    style={{
-                                        width: '100%',
-                                        maxWidth: '200px',
-                                        height: '200px',
-                                        objectFit: 'cover',
-                                        borderRadius: '10%',
-                                        border: '3px solid #4680ff'
-                                    }}
-                                />
+                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                    <img
+                                        src={getImageSrc(event.images[0])}
+                                        alt={event.name}
+                                        style={{
+                                            width: '100%',
+                                            maxWidth: '200px',
+                                            height: '200px',
+                                            objectFit: 'cover',
+                                            borderRadius: '10%',
+                                            border: '3px solid #4680ff',
+                                            cursor: 'pointer',
+                                            transition: 'transform 0.2s'
+                                        }}
+                                        onClick={() => handleEventMainImageClick(event.images[0])}
+                                        onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
+                                        onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
+                                    />
+
+                                    {/* Zoom Icon for Event Main Image */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '10px',
+                                            right: '10px',
+                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                            color: 'white',
+                                            padding: '5px',
+                                            borderRadius: '50%',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            zIndex: 10
+                                        }}
+                                        onClick={() => handleEventMainImageClick(event.images[0])}
+                                    >
+                                        <i className="fas fa-search-plus"></i>
+                                    </div>
+                                </div>
                             )}
                         </Col>
                         <Col md={8}>
@@ -364,12 +363,6 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                         {renderDocuments(event)}
                     </div>
 
-                    {/* Speakers Section */}
-                    <div className="mb-3">
-                        <h6>Speakers Details</h6>
-                        <hr />
-                        {renderSpeakers(event)}
-                    </div>
                 </div>
             );
         });
@@ -582,6 +575,188 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             }}
                             onError={(e) => {
                                 console.error('Modal image failed to load');
+                                e.target.style.display = 'none';
+                            }}
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Speaker Image Modal */}
+            <Modal
+                show={showSpeakerImageModal}
+                onHide={() => setShowSpeakerImageModal(false)}
+                size="xl"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            >
+                <Modal.Body
+                    style={{
+                        padding: 0,
+                        backgroundColor: 'transparent',
+                        position: 'relative',
+                        minHeight: '90vh'
+                    }}
+                >
+                    {/* Close Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowSpeakerImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Download Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `${API_URL}/${currentSpeakerImage}`;
+                            link.download = `speaker-profile.jpg`;
+                            link.click();
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-download"></i>
+                    </Button>
+
+                    {/* Image Container */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
+                        <img
+                            src={`${API_URL}/${currentSpeakerImage}`}
+                            alt="Speaker Profile"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Speaker image failed to load:', currentSpeakerImage);
+                                e.target.style.display = 'none';
+                            }}
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Event Main Image Modal */}
+            <Modal
+                show={showEventMainImageModal}
+                onHide={() => setShowEventMainImageModal(false)}
+                size="xl"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            >
+                <Modal.Body
+                    style={{
+                        padding: 0,
+                        backgroundColor: 'transparent',
+                        position: 'relative',
+                        minHeight: '90vh'
+                    }}
+                >
+                    {/* Close Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowEventMainImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Download Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`;
+                            link.download = `event-main-image.jpg`;
+                            link.click();
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-download"></i>
+                    </Button>
+
+                    {/* Image Container */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
+                        <img
+                            src={`${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`}
+                            alt="Event Main Image"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Event main image failed to load:', currentEventMainImage);
                                 e.target.style.display = 'none';
                             }}
                         />

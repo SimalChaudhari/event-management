@@ -18,6 +18,9 @@ const App = () => {
     }, [dispatch]);
 
 
+    if (loading) {
+        return <Loader />;
+    }
 
     return (
         <BrowserRouter basename={Config.basename}>

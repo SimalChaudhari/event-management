@@ -57,4 +57,4 @@ export const FEATURES = {
 
 // Dummy Data
 export const DUMMY_PATH = "https://img.freepik.com/free-vector/party-invitation-design-with-crowd_23-2147737844.jpg";
-export const DUMMY_PATH_USER = "https://www.pngitem.com/pimgs/m/140-1403945_transparent-avatar-png-flat-hd-png-download.png";
+export const DUMMY_PATH_USER = "https://img.freepik.com/premium-vector/avatar-profile-icon-flat-style-female-user-profile-vector-illustration-isolated-background-women-profile-sign-business-concept_157943-38866.jpg?semt=ais_hybrid&w=740";

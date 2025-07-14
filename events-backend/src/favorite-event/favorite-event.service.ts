@@ -1,11 +1,13 @@
 // src/services/favorite-event.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FavoriteEvent } from './favorite-event.entity';
 import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
+import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { getEventColor } from 'utils/event-color.util';
+import { FavoriteFilterType } from './favorite-event.dto';
 
 @Injectable()
 export class FavoriteEventService {
@@ -16,6 +18,8 @@ export class FavoriteEventService {
     private eventRepository: Repository<Event>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+    @InjectRepository(RegisterEvent)
+    private registerEventRepository: Repository<RegisterEvent>,
   ) {}
 
   async toggleFavorite(userId: string, eventId: string): Promise<{ isFavorite: boolean; message: string }> {
@@ -50,11 +54,38 @@ export class FavoriteEventService {
     }
   }
 
-  async getUserFavorites(userId: string) {
-    const favorites = await this.favoriteEventRepository.find({
-      where: { userId },
-      relations: ['event', 'event.eventSpeakers', 'event.eventSpeakers.speaker'],
-    });
+  async getUserFavorites(userId: string, filter: FavoriteFilterType = FavoriteFilterType.ALL) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let query = this.favoriteEventRepository
+      .createQueryBuilder('favorite')
+      .leftJoinAndSelect('favorite.event', 'event')
+      .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
+      .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+      .where('favorite.userId = :userId', { userId });
+
+    // Apply filters based on filter type
+    switch (filter) {
+      case FavoriteFilterType.UPCOMING:
+        query = query.andWhere('event.startDate >= :today', { today });
+        break;
+      
+        case FavoriteFilterType.MY_EVENTS:
+        // Show favorite events where user is ALSO registered for that event
+        // This means user has both favorited AND registered for the event
+        query = query
+          .innerJoin('registerEvent', 'register', 'register.eventId = favorite.eventId')
+          .andWhere('register.userId = :userId', { userId });
+        break;
+      
+      case FavoriteFilterType.ALL:
+      default:
+        // Show all favorite events (no additional filter)
+        break;
+    }
+
+    const favorites = await query.getMany();
 
     return favorites.map(favorite => {
       const { eventSpeakers, ...eventData } = favorite.event;
@@ -69,5 +100,4 @@ export class FavoriteEventService {
       };
     });
   }
-
 }

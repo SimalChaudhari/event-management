@@ -101,6 +101,19 @@ export class AuthController {
   async login(@Res() response: Response, @Body() loginDto: LoginDto) { // Use LoginDto
     try {
       const result = await this.authService.login(loginDto);
+      
+      // Check if user requires verification
+      if (result.requiresVerification) {
+        return response.status(HttpStatus.TEMPORARY_REDIRECT).json({
+          success: false,
+          message: result.message,
+          user: result.user,
+          errorCode: "EMAIL_VERIFICATION_REQUIRED",
+          requiresVerification: true,
+        });
+      }
+
+      // Normal login response
       return response.status(HttpStatus.OK).json({
         success: true,
         message: 'Login successful. Welcome back!',
@@ -391,6 +404,25 @@ export class AuthController {
         body.otp,
         body.newPassword,
       );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('resend-login-otp')
+  async resendLoginOTP(
+    @Body() body: { email: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.authService.resendLoginOTP(body.email);
       return response.status(HttpStatus.OK).json({
         success: true,
         message: result.message,

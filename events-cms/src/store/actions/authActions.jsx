@@ -170,20 +170,48 @@ export const changePassword = (data) => async (dispatch) => {
 
 export const checkAuthStatus = () => async (dispatch) => {
     try {
+        // Set loading to true initially
+        dispatch({
+            type: "SET_LOADING",
+            payload: true
+        });
+
         const token = localStorage.getItem(CACHE_CONFIG.TOKEN_KEY);
         const userData = localStorage.getItem('userData');
         
         if (token && userData) {
-            const user = JSON.parse(userData).user;
+            try {
+                const user = JSON.parse(userData).user;
+                dispatch({
+                    type: AUTH_DATA,
+                    payload: { user }
+                });
+                return true;
+            } catch (parseError) {
+                console.error('Failed to parse user data:', parseError);
+                // Clear invalid data
+                localStorage.removeItem(CACHE_CONFIG.TOKEN_KEY);
+                localStorage.removeItem('userData');
+                dispatch({
+                    type: "LOGOUT"
+                });
+                return false;
+            }
+        } else {
+            // No token or user data, set loading to false
             dispatch({
-                type: AUTH_DATA,
-                payload: { user }
+                type: "SET_LOADING",
+                payload: false
             });
-            return true;
+            return false;
         }
-        return false;
     } catch (error) {
         console.error('Auth check failed:', error);
+        // Set loading to false on error
+        dispatch({
+            type: "SET_LOADING",
+            payload: false
+        });
         return false;
     }
 };

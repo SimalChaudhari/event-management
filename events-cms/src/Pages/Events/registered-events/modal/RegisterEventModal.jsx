@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Modal, Button, Card, Row, Col, Container, Badge } from 'react-bootstrap';
-import { API_URL } from '../../../../configs/env';
+import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
 
 const RegisterEventModal = ({ show, onHide, eventData }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [showImageModal, setShowImageModal] = useState(false);
+    const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
+    const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
+    const [currentEventMainImage, setCurrentEventMainImage] = useState('');
+    const [showEventMainImageModal, setShowEventMainImageModal] = useState(false);
     
     console.log(eventData);
     if (!eventData) return null;
@@ -106,6 +110,22 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
         setCurrentImageIndex((prevIndex) => 
             prevIndex === images.length - 1 ? 0 : prevIndex + 1
         );
+    };
+
+    // Speaker image zoom function
+    const handleSpeakerImageClick = (speakerProfile) => {
+        if(speakerProfile){
+            setCurrentSpeakerImage(speakerProfile);
+            setShowSpeakerImageModal(true);
+        }else{
+            setShowSpeakerImageModal(false); 
+        }
+    };
+
+    // Event main image zoom function
+    const handleEventMainImageClick = (imagePath) => {
+        setCurrentEventMainImage(imagePath);
+        setShowEventMainImageModal(true);
     };
 
     // Render image grid
@@ -267,48 +287,108 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
             return <p>No speakers listed.</p>;
         }
 
-        return eventData.event?.speakers.map((speaker) => (
-            <Row key={speaker.id} className="mb-3">
-                <Col xs={12} md={3} className="text-center mb-3 mb-md-0">
-                    {speaker.speakerProfile && (
-                        <img
-                            src={`${API_URL}/${speaker.speakerProfile}`}
-                            alt={speaker.name}
+        const speakers = eventData.event.speakers;
+        const colWidth = speakers.length === 1 ? 12 : 6; // 1 है तो full, 2 या ज्यादा है तो 6-6
+
+        // हर लाइन में 2 कार्ड
+        const rows = [];
+        for (let i = 0; i < speakers.length; i += 2) {
+            rows.push(
+                <Row key={i}>
+                    {[0, 1].map((j) => {
+                        const speaker = speakers[i + j];
+                        if (!speaker) return null;
+                        return (
+                            <Col xs={12} md={colWidth} key={speaker.id} className="mb-4 d-flex">
+                                <Card
                             style={{
-                                width: 100,
-                                height: 100,
-                                objectFit: 'cover',
-                                borderRadius: '10%',
-                                border: '2px solid #4680ff'
-                            }}
-                        />
-                    )}
-                </Col>
-                <Col xs={12} md={9}>
-                    <p className="mb-2">
-                        <strong>Name:</strong> {speaker.name}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Company:</strong> {speaker.companyName}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Position:</strong> {speaker.position}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Mobile:</strong> {speaker.mobile}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Email:</strong> {speaker.email}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Location:</strong> {speaker.location}
-                    </p>
-                    <p className="mb-2">
-                        <strong>Description:</strong> {speaker.description}
-                    </p>
-                </Col>
-            </Row>
-        ));
+                                        width: '100%',
+                                        borderRadius: 18,
+                                        boxShadow: '0 4px 16px rgba(70,128,255,0.10)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'stretch',
+                                        overflow: 'visible'
+                                    }}
+                                    className="w-100 h-100"
+                                >
+                                    <Card.Body className="d-flex flex-column justify-content-between" style={{ flex: 1 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 12 }}>
+                                            <div
+                                                style={{
+                                                    width: 110,
+                                                    height: 110,
+                                                    borderRadius: '50%',
+                                                    overflow: 'hidden',
+                                                    border: '3px solid #4680ff',
+                                                    boxShadow: '0 2px 8px rgba(70,128,255,0.10)',
+                                                    marginTop: -60,
+                                                    background: '#fff',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'transform 0.2s'
+                                                }}
+                                                onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}
+                                                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.06)')}
+                                                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                                            >
+                                                <img
+                                                    src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
+                                                    alt={speaker.name}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                        objectFit: 'cover'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Card.Title style={{ fontWeight: 700, fontSize: 20, textAlign: 'left' }}>{speaker.name}</Card.Title>
+                                            <div style={{ fontSize: 15, color: '#4680ff', marginBottom: 8, textAlign: 'left' }}>
+                                                {speaker.position}
+                                            </div>
+                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
+                                                <i className="fas fa-building" style={{ marginRight: 8, fontSize: 18, color: '#4680ff' }}></i>
+                                                <span>{speaker.companyName}</span>
+                                            </div>
+                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
+                                            <i className="fas fa-mobile" style={{ marginRight: 8, fontSize: 18, color: '#28a745' }}></i>
+                                            <span>{speaker.mobile}</span>
+                                            </div>
+                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
+                                                <i className="fas fa-envelope" style={{ marginRight: 8, fontSize: 18, color: '#ff9800' }}></i>
+                                                <span>{speaker.email}</span>
+                                            </div>
+                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
+                                                <i className="fas fa-map-marker-alt" style={{ marginRight: 8, fontSize: 18, color: '#e91e63' }}></i>
+                                                <span>{speaker.location}</span>
+                                            </div>
+                                            <div style={{ fontSize: 13, color: '#666', marginTop: 8, textAlign: 'left', wordBreak: 'break-word' }}>
+                                                {speaker.description}
+                                            </div>
+                                        </div>
+                                        <div className="mt-3" style={{ textAlign: 'left' }}>
+                                                        <Button
+                                                variant="outline-primary"
+                                                            size="sm"
+                                                style={{ borderRadius: 20, fontWeight: 500 }}
+                                                onClick={() => alert(`Contact: ${speaker.email}`)}
+                                            >
+                                                Contact
+                                                        </Button>
+                                                </div>
+                                </Card.Body>
+                            </Card>
+                            </Col>
+                        );
+                    })}
+                </Row>
+            );
+        }
+
+        return <>{rows}</>;
     };
 
     const eventStatus = getEventStatus();
@@ -383,26 +463,58 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                                 <Row className="align-items-center flex-md-row flex-column">
                                     <Col md={4} className="text-center mb-3 mb-md-0">
                                         {eventData.event?.images && eventData.event.images.length > 0 && (
-                                            <img
-                                                src={getImageSrc(eventData.event.images[0])}
-                                                alt="Event"
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    maxWidth: '200px',
-                                                    maxHeight: '200px',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '10%',
-                                                    border: '3px solid #4680ff'
-                                                }}
-                                            />
+                                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                <img
+                                                    src={getImageSrc(eventData.event.images[0])}
+                                                    alt="Event"
+                                                    style={{
+                                                        width: '100%',
+                                                        maxWidth: '220px',
+                                                        height: '180px',
+                                                        objectFit: 'cover',
+                                                        borderRadius: '16px',
+                                                        border: '3px solid #4680ff',
+                                                        boxShadow: '0 4px 16px rgba(70,128,255,0.15)',
+                                                        cursor: 'pointer',
+                                                        transition: 'transform 0.2s'
+                                                    }}
+                                                    onClick={() => handleEventMainImageClick(eventData.event.images[0])}
+                                                    onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
+                                                    onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
+                                                />
+
+                                                {/* Zoom Icon for Event Main Image */}
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '10px',
+                                                        right: '10px',
+                                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                                        color: 'white',
+                                                        padding: '5px',
+                                                        borderRadius: '50%',
+                                                        fontSize: '12px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        zIndex: 10
+                                                    }}
+                                                    onClick={() => handleEventMainImageClick(eventData.event.images[0])}
+                                                >
+                                                    <i className="fas fa-search-plus"></i>
+                                                </div>
+                                            </div>
                                         )}
                                     </Col>
                                     <Col md={8}>
-                                        <h5 className="mb-2">{eventData.event?.name}</h5>
                                         <p className="mb-2">
-                                            <Badge className={eventStatus.class}>{eventStatus.text}</Badge>
-                                            <Badge bg="secondary" className="ml-2">{eventData.event?.type}</Badge>
+                                            <strong>Name:</strong> {eventData.event?.name}
+                                        </p>
+                                        <p className="mb-2">
+                                            <strong>Date:</strong> {eventData.event?.startDate} {eventData.event?.startTime} to {eventData.event?.endDate}{' '}
+                                            {eventData.event?.endTime}
+                                        </p>
+                                        <p className="mb-2">
+                                            <strong>Type:</strong> {eventData.event?.type || 'N/A'}
                                         </p>
                                         <p className="mb-2">
                                             <strong>Description:</strong> {eventData.event?.description}
@@ -418,33 +530,57 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                                 <Card.Title>Location & Pricing</Card.Title>
                                 <hr />
                                 <Row>
-                                    <Col xs={6} md={3} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Location:</strong>
-                                            <br />
-                                            {eventData.event?.location || 'N/A'}
-                                        </Card.Text>
+                                    <Col xs={12} md={3} className="mb-3">
+                                        <div className="text-center p-3" style={{
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <i className="fas fa-map-marker-alt text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Location</h6>
+                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                {eventData.event?.location || 'N/A'}
+                                            </p>
+                                        </div>
                                     </Col>
-                                    <Col xs={6} md={3} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Venue:</strong>
-                                            <br />
-                                            {eventData.event?.venue || 'N/A'}
-                                        </Card.Text>
+                                    <Col xs={12} md={3} className="mb-3">
+                                        <div className="text-center p-3" style={{
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <i className="fas fa-building text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Venue</h6>
+                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                {eventData.event?.venue || 'N/A'}
+                                            </p>
+                                        </div>
                                     </Col>
-                                    <Col xs={6} md={3} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Country:</strong>
-                                            <br />
-                                            {eventData.event?.country || 'N/A'}
-                                        </Card.Text>
+                                    <Col xs={12} md={3} className="mb-3">
+                                        <div className="text-center p-3" style={{
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <i className="fas fa-flag text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Country</h6>
+                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                {eventData.event?.country || 'N/A'}
+                                            </p>
+                                        </div>
                                     </Col>
-                                    <Col xs={6} md={3} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Price:</strong>
-                                            <br />
-                                            {eventData.event?.price} {eventData.event?.currency}
-                                        </Card.Text>
+                                    <Col xs={12} md={3} className="mb-3">
+                                        <div className="text-center p-3" style={{
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <i className="fas fa-dollar-sign text-success mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Price</h6>
+                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
+                                                {eventData.event?.price} {eventData.event?.currency}
+                                            </p>
+                                        </div>
                                     </Col>
                                 </Row>
                             </Card.Body>
@@ -513,7 +649,7 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                             </Card.Body>
                         </Card>
 
-                        {/* Speakers */}
+                        {/* Speakers Info */}
                         <Card className="mb-3">
                             <Card.Body>
                                 <Card.Title>Speakers Details</Card.Title>
@@ -756,6 +892,188 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                             }}
                             onError={(e) => {
                                 console.error('Modal image failed to load:', getImageSrc(eventData.event?.images?.[currentImageIndex]));
+                                e.target.style.display = 'none';
+                            }}
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Speaker Image Modal */}
+            <Modal
+                show={showSpeakerImageModal}
+                onHide={() => setShowSpeakerImageModal(false)}
+                size="xl"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            >
+                <Modal.Body
+                    style={{
+                        padding: 0,
+                        backgroundColor: 'transparent',
+                        position: 'relative',
+                        minHeight: '90vh'
+                    }}
+                >
+                    {/* Close Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowSpeakerImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Download Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `${API_URL}/${currentSpeakerImage}`;
+                            link.download = `speaker-profile.jpg`;
+                            link.click();
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-download"></i>
+                    </Button>
+
+                    {/* Image Container */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
+                        <img
+                            src={`${API_URL}/${currentSpeakerImage}`}
+                            alt="Speaker Profile"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Speaker image failed to load:', currentSpeakerImage);
+                                e.target.style.display = 'none';
+                            }}
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Event Main Image Modal */}
+            <Modal
+                show={showEventMainImageModal}
+                onHide={() => setShowEventMainImageModal(false)}
+                size="xl"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            >
+                <Modal.Body
+                    style={{
+                        padding: 0,
+                        backgroundColor: 'transparent',
+                        position: 'relative',
+                        minHeight: '90vh'
+                    }}
+                >
+                    {/* Close Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowEventMainImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Download Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`;
+                            link.download = `event-main-image.jpg`;
+                            link.click();
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-download"></i>
+                    </Button>
+
+                    {/* Image Container */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
+                        <img
+                            src={`${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`}
+                            alt="Event Main Image"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Event main image failed to load:', currentEventMainImage);
                                 e.target.style.display = 'none';
                             }}
                         />

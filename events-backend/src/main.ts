@@ -9,7 +9,7 @@ async function bootstrap() {
    
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    app.useGlobalPipes(new ValidationPipe()); // Use custom pipe globally
+    // app.useGlobalPipes(new ValidationPipe()); // Use custom pipe globally
 
     // Static assets setup
     app.useStaticAssets(join(__dirname, '..', 'uploads'), {

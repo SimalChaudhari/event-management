@@ -39,7 +39,7 @@ const ViewCategoryModal = ({ show, handleClose, categoryData }) => {
 
                     <Col md={12}>
                         <div className="mb-4">
-                            <h6 className="text-muted mb-2">
+                            <h6 className="text-primary mb-2">
                                 <i className="feather icon-file-text mr-2"></i>
                                 Description
                             </h6>
@@ -57,7 +57,7 @@ const ViewCategoryModal = ({ show, handleClose, categoryData }) => {
 
                     <Col md={6}>
                         <div className="mb-3">
-                            <h6 className="text-muted mb-2">
+                            <h6 className="text-primary mb-2">
                                 <i className="feather icon-calendar mr-2"></i>
                                 Created
                             </h6>
@@ -67,7 +67,7 @@ const ViewCategoryModal = ({ show, handleClose, categoryData }) => {
 
                     <Col md={6}>
                         <div className="mb-3">
-                            <h6 className="text-muted mb-2">
+                            <h6 className="text-primary mb-2">
                                 <i className="feather icon-edit mr-2"></i>
                                 Updated
                             </h6>
