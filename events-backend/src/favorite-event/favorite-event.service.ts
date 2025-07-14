@@ -22,7 +22,10 @@ export class FavoriteEventService {
     private registerEventRepository: Repository<RegisterEvent>,
   ) {}
 
-  async toggleFavorite(userId: string, eventId: string): Promise<{ isFavorite: boolean; message: string }> {
+  async toggleFavorite(
+    userId: string,
+    eventId: string,
+  ): Promise<{ isFavorite: boolean; message: string }> {
     // Check if user exists
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -30,7 +33,9 @@ export class FavoriteEventService {
     }
 
     // Check if event exists
-    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+    });
     if (!event) {
       throw new NotFoundException('Event not found');
     }
@@ -54,7 +59,10 @@ export class FavoriteEventService {
     }
   }
 
-  async getUserFavorites(userId: string, filter: FavoriteFilterType = FavoriteFilterType.ALL) {
+  async getUserFavorites(
+    userId: string,
+    filter: FavoriteFilterType = FavoriteFilterType.ALL,
+  ) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -70,15 +78,34 @@ export class FavoriteEventService {
       case FavoriteFilterType.UPCOMING:
         query = query.andWhere('event.startDate >= :today', { today });
         break;
-      
-        case FavoriteFilterType.MY_EVENTS:
-        // Show favorite events where user is ALSO registered for that event
-        // This means user has both favorited AND registered for the event
-        query = query
-          .innerJoin('registerEvent', 'register', 'register.eventId = favorite.eventId')
-          .andWhere('register.userId = :userId', { userId });
+
+      case FavoriteFilterType.MY_EVENTS:
+        // Get events where user is registered AND has favorited
+        // First get all registered event IDs for this user
+        const registeredEvents = await this.registerEventRepository
+          .createQueryBuilder('register')
+          .select('register.eventId')
+          .where('register.userId = :userId', { userId })
+          .getRawMany();
+
+        const registeredEventIds = registeredEvents.map(
+          (item) => item.register_eventId,
+        );
+
+        if (registeredEventIds.length > 0) {
+          // Only show favorite events that user has also registered for
+          query = query.andWhere(
+            'favorite.eventId IN (:...registeredEventIds)',
+            { registeredEventIds },
+          );
+          console.log('Query with registered events filter applied');
+        } else {
+          // If no registered events, return empty array
+          console.log('No registered events found, returning empty array');
+          return [];
+        }
         break;
-      
+
       case FavoriteFilterType.ALL:
       default:
         // Show all favorite events (no additional filter)
@@ -87,7 +114,7 @@ export class FavoriteEventService {
 
     const favorites = await query.getMany();
 
-    return favorites.map(favorite => {
+    return favorites.map((favorite) => {
       const { eventSpeakers, ...eventData } = favorite.event;
       return {
         id: favorite.id,
@@ -95,7 +122,7 @@ export class FavoriteEventService {
         event: {
           ...eventData,
           color: getEventColor(favorite.event.type),
-          speakers: eventSpeakers?.map(es => es.speaker) || [],
+          speakers: eventSpeakers?.map((es) => es.speaker) || [],
         },
       };
     });

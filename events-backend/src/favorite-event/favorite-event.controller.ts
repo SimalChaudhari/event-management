@@ -2,7 +2,7 @@
 import { Controller, Post, Get, Body, Param, Res, UseGuards, Request, Query } from '@nestjs/common';
 import { Response } from 'express';
 import { FavoriteEventService } from './favorite-event.service';
-import { FavoriteFilterType, GetFavoritesDto, ToggleFavoriteDto } from './favorite-event.dto';
+import { ToggleFavoriteDto, GetFavoritesDto, FavoriteFilterType } from './favorite-event.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
 @Controller('api/favorites')
@@ -30,14 +30,19 @@ export class FavoriteEventController {
   }
 
   @Get('my-favorites')
-  async getMyFavorites(@Request() req: any, @Res() response: Response,    @Query() query: GetFavoritesDto) {
+  async getMyFavorites(
+    @Request() req: any, 
+    @Res() response: Response,
+    @Query() query: GetFavoritesDto
+  ) {
     const userId = req.user.id;
     const filter = query.filter || FavoriteFilterType.ALL;
-    const favorites = await this.favoriteEventService.getUserFavorites(userId);
+    
+    const favorites = await this.favoriteEventService.getUserFavorites(userId, filter);
     
     return response.status(200).json({
       success: true,
-      message: 'Favorites retrieved successfully',
+      message: `Favorites retrieved successfully with filter: ${filter}`,
       filter: filter,
       totalCount: favorites.length,
       metadata: {

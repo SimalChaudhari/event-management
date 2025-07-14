@@ -1,5 +1,5 @@
 // src/dto/favorite-event.dto.ts
-import { IsEnum, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID, IsOptional, IsEnum } from 'class-validator';
 
 export class ToggleFavoriteDto {
   @IsNotEmpty()
@@ -14,8 +14,9 @@ export class FavoriteEventResponseDto {
 }
 
 export enum FavoriteFilterType {
-  ALL = 'featured',
+  ALL = 'all',
   UPCOMING = 'upcoming',
+  FEATURED = 'featured',
   MY_EVENTS = 'my_events'
 }
 

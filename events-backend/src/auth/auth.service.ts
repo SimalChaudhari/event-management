@@ -496,13 +496,7 @@ export class AuthService {
       if (!user) {
         throw new BadRequestException('Email not found');
       }
-      // Check if user is verified - only verified users can reset password
-      if (!user.isVerify) {
-        throw new BadRequestException(
-          'Your account is not verified. Please verify your account first before resetting password.',
-        );
-      }
-
+  
       // Generate OTP
       const otp = this.generateOTP();
       const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -536,13 +530,6 @@ export class AuthService {
 
       if (!user) {
         throw new BadRequestException('Email not found');
-      }
-
-      // Check if user is verified - only verified users can reset password
-      if (!user.isVerify) {
-        throw new BadRequestException(
-          'Your account is not verified. Please verify your account first before resetting password.',
-        );
       }
 
       // Generate new OTP
