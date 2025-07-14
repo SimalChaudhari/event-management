@@ -16,6 +16,8 @@ import { Category } from 'category/category.entity';
 import path from 'path';
 import * as fs from 'fs';
 import { getEventColor } from 'utils/event-color.util';
+import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 
 @Injectable()
 export class EventService {
@@ -30,6 +32,10 @@ export class EventService {
     private speakerRepository: Repository<Speaker>,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
+    @InjectRepository(RegisterEvent)
+    private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(FavoriteEvent)
+    private favoriteEventRepository: Repository<FavoriteEvent>,
   ) { }
 
   async createEvent(eventDto: EventDto) {
@@ -159,7 +165,7 @@ export class EventService {
     venue?: string;
     upcoming?: boolean;
     categoryId?: string;
-  }) {
+  }, userId?: string) {
     const queryBuilder = this.eventRepository.createQueryBuilder('event')
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
       .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
@@ -219,17 +225,42 @@ export class EventService {
 
     const events = await queryBuilder.getMany();
 
-    return events.map(event => {
-      const { eventSpeakers, category, ...eventData } = event;
+    // Add attendance count and favorite status to each event
+    const eventsWithAttendance = await Promise.all(
+      events.map(async (event) => {
+        const attendanceCount = await this.getEventAttendanceCount(event.id);
+        const { eventSpeakers, category, ...eventData } = event;
 
-      return {
-        ...eventData,
-        color: getEventColor(event.type),
-        speakersData: eventSpeakers.map(es => es.speaker),
-        categoriesData: category?.map(ec => ec.category) || [],
-      };
-    });
+        // Check if event is favorited by user
+        let isFavorite = false;
+        if (userId) {
+          const favorite = await this.favoriteEventRepository.findOne({
+            where: { userId, eventId: event.id }
+          });
+          isFavorite = !!favorite;
+        }
+
+        return {
+          ...eventData,
+          color: getEventColor(event.type),
+          speakersData: eventSpeakers.map(es => es.speaker),
+          categoriesData: category?.map(ec => ec.category) || [],
+          attendanceCount: attendanceCount,
+          isFavorite: isFavorite,
+        };
+      })
+    );
+
+    return eventsWithAttendance;
   }
+
+    // Get event attendance count
+    async getEventAttendanceCount(eventId: string): Promise<number> {
+      const count = await this.registerEventRepository.count({
+        where: { eventId: eventId }
+      });
+      return count;
+    }
 
   async getEventEntityById(id: string): Promise<Event> {
     const event = await this.eventRepository.findOne({ where: { id } });
@@ -237,7 +268,7 @@ export class EventService {
     return event;
   }
 
-  async getEventById(id: string) {
+  async getEventById(id: string, userId?: string) {
     const event = await this.eventRepository.createQueryBuilder('event')
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
       .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
@@ -250,11 +281,24 @@ export class EventService {
 
     const { eventSpeakers, category, ...eventData } = event;
 
+    const attendanceCount = await this.getEventAttendanceCount(id);
+
+    // Check if event is favorited by user
+    let isFavorite = false;
+    if (userId) {
+      const favorite = await this.favoriteEventRepository.findOne({
+        where: { userId, eventId: id }
+      });
+      isFavorite = !!favorite;
+    }
+
     return {
       ...eventData,
       color: getEventColor(event.type),
       speakers: eventSpeakers.map(es => es.speaker),
       categories: category?.map(ec => ec.category) || [],
+      attendanceCount: attendanceCount,
+      isFavorite: isFavorite,
     };
   }
 

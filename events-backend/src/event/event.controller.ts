@@ -14,7 +14,7 @@ import {
   UseGuards,
   NotFoundException,
   UploadedFiles,
-
+  Request,
 } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -142,9 +142,11 @@ export class EventController {
       price?: number;
       location?: string;
     },
+    @Request() req: any,
     @Res() response: Response,
   ) {
-    const events = await this.eventService.getAllEvents(filters);
+    const userId = req.user?.id; // Get user ID from JWT token
+    const events = await this.eventService.getAllEvents(filters, userId);
     return response.status(200).json({
       success: true,
       total: events.length,
@@ -154,8 +156,13 @@ export class EventController {
   }
 
   @Get(':id')
-  async getEventById(@Param('id') id: string, @Res() response: Response) {
-    const event = await this.eventService.getEventById(id);
+  async getEventById(
+    @Param('id') id: string, 
+    @Request() req: any,
+    @Res() response: Response
+  ) {
+    const userId = req.user?.id; // Get user ID from JWT token
+    const event = await this.eventService.getEventById(id, userId);
     return response.status(200).json({
       success: true,
       message: 'Event retrieved successfully',

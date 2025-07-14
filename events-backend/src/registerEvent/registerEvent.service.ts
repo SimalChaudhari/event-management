@@ -10,6 +10,7 @@ import { CreateRegisterEventDto } from './registerEvent.dto';
 import { Event } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { getEventColor } from 'utils/event-color.util';
+import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 
 @Injectable()
 export class RegisterEventService {
@@ -22,6 +23,9 @@ export class RegisterEventService {
 
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+
+    @InjectRepository(FavoriteEvent)
+    private readonly favoriteEventRepository: Repository<FavoriteEvent>,
   ) {}
 
   async createRegisterEvent(
@@ -98,33 +102,45 @@ export class RegisterEventService {
       });
     }
   
-    // if (!registerEvents || registerEvents.length === 0) {
-    //   throw new NotFoundException('No registered events found');
-    // }
-  
-    const cleanedData = registerEvents.map((registerEvent) => {
-      const speakers =
-        registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
-  
-      const { eventSpeakers, ...restEvent } = registerEvent.event || {};
-      const event = {
-        ...restEvent,
-        color: getEventColor(registerEvent.event?.type),
-        speakers,
-      };
-  
-      const { firstName, lastName, email, mobile } = registerEvent.user || {};
-      const cleanedUser = { firstName, lastName, email, mobile };
-  
-      const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
-  
-      return {
-        ...cleanRegisterEvent,
-        event,
-        user: cleanedUser,
-        isCreatedByAdmin: registerEvent.isCreatedByAdmin,
-      };
-    });
+    // Add attendance count and favorite status to each registered event
+    const registerEventsWithAttendance = await Promise.all(
+      registerEvents.map(async (registerEvent) => {
+        const attendanceCount = registerEvent.eventId ? await this.getEventAttendanceCount(registerEvent.eventId) : 0;
+        
+        // Check if event is favorited by the user
+        let isFavorite = false;
+        if (registerEvent.userId) {
+          const favorite = await this.favoriteEventRepository.findOne({
+            where: { userId: registerEvent.userId, eventId: registerEvent.eventId }
+          });
+          isFavorite = !!favorite;
+        }
+        
+        const speakers =
+          registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
+    
+        const { eventSpeakers, ...restEvent } = registerEvent.event || {};
+        const event = {
+          ...restEvent,
+          color: getEventColor(registerEvent.event?.type),
+          speakers,
+          attendanceCount: attendanceCount,
+          isFavorite: isFavorite, // Add isFavorite field to event
+        };
+    
+        const { firstName, lastName, email, mobile } = registerEvent.user || {};
+        const cleanedUser = { firstName, lastName, email, mobile };
+    
+        const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
+    
+        return {
+          ...cleanRegisterEvent,
+          event,
+          user: cleanedUser,
+          isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+        };
+      })
+    );
   
     return {
       success: true,
@@ -132,13 +148,21 @@ export class RegisterEventService {
         role === 'admin'
           ? 'All registered events fetched for admin'
           : 'Your registered events fetched successfully',
-      count: cleanedData.length,
-      data: cleanedData,
+      count: registerEventsWithAttendance.length,
+      data: registerEventsWithAttendance,
     };
   }
   
 
-  async findOne(id: string, userId: string,role:string) {
+  // Get event attendance count
+  async getEventAttendanceCount(eventId: string): Promise<number> {
+    const count = await this.registerEventRepository.count({
+      where: { eventId: eventId }
+    });
+    return count;
+  }
+
+  async findOne(id: string, userId: string, role: string) {
     // Query to find the specific register event, ensuring it belongs to the current user
     const registerEvent = await this.registerEventRepository.findOne({
       where:
@@ -158,6 +182,18 @@ export class RegisterEventService {
       throw new NotFoundException('Register event not found for this user');
     }
 
+    // Get attendance count for this event
+    const attendanceCount = registerEvent.eventId ? await this.getEventAttendanceCount(registerEvent.eventId) : 0;
+
+    // Check if event is favorited by the user
+    let isFavorite = false;
+    if (registerEvent.userId) {
+      const favorite = await this.favoriteEventRepository.findOne({
+        where: { userId: registerEvent.userId, eventId: registerEvent.eventId }
+      });
+      isFavorite = !!favorite;
+    }
+
     // 🧼 Extract only speakers
     const speakers =
       registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
@@ -170,6 +206,8 @@ export class RegisterEventService {
       ...restEvent,
       color: getEventColor(registerEvent.event?.type),
       speakers,
+      attendanceCount: attendanceCount,
+      isFavorite: isFavorite, // Add isFavorite field to event
     };
 
     // 🧼 Clean up user object, showing only specific fields
@@ -185,7 +223,7 @@ export class RegisterEventService {
       message: 'Register event fetched successfully',
       data: {
         ...cleanRegisterEvent,
-        event, // Only includes clean event + speakers
+        event, // Only includes clean event + speakers + isFavorite
         user: cleanedUser, // Only includes user with cleaned fields
         isCreatedByAdmin: registerEvent.isCreatedByAdmin,
       },

@@ -11,10 +11,12 @@ import { EventModule } from 'event/event.module';
 import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
 import { Speaker } from 'speaker/speaker.entity';
 import { Category } from 'category/category.entity';
+import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,EventCategory,Category,Speaker]),
+    imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,EventCategory,Category,Speaker,RegisterEvent,FavoriteEvent]),
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration
