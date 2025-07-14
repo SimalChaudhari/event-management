@@ -51,7 +51,7 @@ export class AuthService {
           role: user.role,
           // type: 'access' // Add a type claim
         },
-        { expiresIn: '10d', secret: process.env.JWT_SECRET }, // Use a specific secret for access tokens
+        { expiresIn: '15m', secret: process.env.JWT_SECRET }, // Use a specific secret for access tokens
       ); // Access token expires in 15 minutes
     } catch (error) {
       this.handleError(error);
@@ -70,7 +70,7 @@ export class AuthService {
           role: user.role,
           // type: 'refresh' // Add a type claim
         },
-        { expiresIn: '30d', secret: process.env.REFRESH_TOKEN_SECRET }, // Use a specific secret for refresh tokens
+        { expiresIn: '7d', secret: process.env.REFRESH_TOKEN_SECRET }, // Use a specific secret for refresh tokens
       ); // Refresh token expires in 7 days
     } catch (error) {
       this.handleError(error);
