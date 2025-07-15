@@ -1,23 +1,13 @@
 import React, { useState } from 'react';
-import { Modal, Button, Row, Col, Card, Container } from 'react-bootstrap';
+import { Modal, Button, Row, Col, Card, Container, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 
 const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
+    const [activeTab, setActiveTab] = useState('professional');
 
     if (!speakerData) return null;
-
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
 
     const imageUrl = speakerData.speakerProfile ? `${API_URL}/${speakerData.speakerProfile}` : DUMMY_PATH;
 
@@ -31,6 +21,25 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
         }
     };
 
+    const tabStyle = {
+        border: 'none',
+        backgroundColor: 'transparent',
+        color: '#6c757d',
+        fontWeight: '500',
+        padding: '12px 20px',
+        borderRadius: '8px 8px 0 0',
+        marginRight: '5px',
+        transition: 'all 0.3s ease',
+        fontSize: '14px'
+    };
+
+    const activeTabStyle = {
+        ...tabStyle,
+        backgroundColor: '#4680ff',
+        color: 'white',
+        fontWeight: '600'
+    };
+
     return (
         <>
             <Modal show={show} onHide={handleClose} size="lg">
@@ -41,15 +50,18 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body style={{ backgroundColor: '#f8f9fa', padding: 20 }}>
-                    <Container>
+                    <Container fluid>
                         
-                        {/* Speaker Info */}
-                        <Card className="mb-3">
+                        {/* Speaker Image and Basic Info */}
+                        <Card className="mb-4">
                             <Card.Body>
-                                <Card.Title>Speaker Information</Card.Title>
+                                <Card.Title>
+                                    <i className="feather icon-user mr-2"></i>
+                                    Speaker Information
+                                </Card.Title>
                                 <hr />
-                                <Row className="align-items-center flex-md-row flex-column">
-                                    <Col md={4} className="text-center mb-3 mb-md-0">
+                                <Row className="align-items-center">
+                                    <Col xs={12} md={4} className="text-center mb-3 mb-md-0">
                                         {speakerData.speakerProfile && (
                                             <div style={{ position: 'relative', display: 'inline-block' }}>
                                                 <img 
@@ -57,9 +69,8 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                     alt="speaker" 
                                                     style={{
                                                         width: '100%',
-                                                        height: '100%',
                                                         maxWidth: '200px',
-                                                        maxHeight: '200px',
+                                                        height: '200px',
                                                         objectFit: 'cover',
                                                         borderRadius: '10%',
                                                         border: '3px solid #4680ff',
@@ -70,8 +81,6 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                     onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
                                                     onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
                                                 />
-
-                                                {/* Zoom Icon for Speaker Image */}
                                                 <div
                                                     style={{
                                                         position: 'absolute',
@@ -82,9 +91,7 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                         padding: '5px',
                                                         borderRadius: '50%',
                                                         fontSize: '12px',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s ease',
-                                                        zIndex: 10
+                                                        cursor: 'pointer'
                                                     }}
                                                     onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
                                                 >
@@ -98,9 +105,8 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                 alt="speaker" 
                                                 style={{
                                                     width: '100%',
-                                                    height: '100%',
                                                     maxWidth: '200px',
-                                                    maxHeight: '200px',
+                                                    height: '200px',
                                                     objectFit: 'cover',
                                                     borderRadius: '10%',
                                                     border: '3px solid #4680ff'
@@ -108,91 +114,144 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                             />
                                         )}
                                     </Col>
-                                    <Col md={8}>
-                                        <p className="mb-2"><strong>Name:</strong> {speakerData.name}</p>
-                                        <p className="mb-2"><strong>Email:</strong> {speakerData.email || 'N/A'}</p>
-                                        <p className="mb-2"><strong>Mobile:</strong> {speakerData.mobile || 'N/A'}</p>
+                                    <Col xs={12} md={8}>
+                                        <div className="row">
+                                            <div className="col-12 mb-2">
+                                                <strong>Name:</strong> {speakerData.name}
+                                            </div>
+                                            <div className="col-12 mb-2">
+                                                <strong>Email:</strong> {speakerData.email || 'N/A'}
+                                            </div>
+                                            <div className="col-12 mb-2">
+                                                <strong>Mobile:</strong> {speakerData.mobile || 'N/A'}
+                                            </div>
+                                        </div>
                                     </Col>
                                 </Row>
                             </Card.Body>
                         </Card>
 
-                        {/* Professional Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Professional Details</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col xs={6} md={6} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Position:</strong><br />
-                                            {speakerData.position || 'N/A'}
-                                        </Card.Text>
-                                    </Col>
-                                    <Col xs={6} md={6} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Company:</strong><br />
-                                            {speakerData.companyName || 'N/A'}
-                                        </Card.Text>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
+                        {/* Responsive Tab Navigation */}
+                        <div className="mb-4">
+                            <Nav 
+                                variant="tabs" 
+                                className="flex-column flex-sm-row"
+                                style={{
+                                    borderBottom: '2px solid #e9ecef',
+                                    gap: '5px'
+                                }}
+                            >
+                                <Nav.Item>
+                                    <Nav.Link
+                                        active={activeTab === 'professional'}
+                                        onClick={() => setActiveTab('professional')}
+                                        style={activeTab === 'professional' ? activeTabStyle : tabStyle}
+                                        className="text-center"
+                                    >
+                                        <i className="feather icon-briefcase mr-2"></i>
+                                        <span className="d-none d-sm-inline">Professional</span>
+                                        <span className="d-sm-none">Work</span>
+                                    </Nav.Link>
+                                </Nav.Item>
+                                <Nav.Item>
+                                    <Nav.Link
+                                        active={activeTab === 'location'}
+                                        onClick={() => setActiveTab('location')}
+                                        style={activeTab === 'location' ? activeTabStyle : tabStyle}
+                                        className="text-center"
+                                    >
+                                        <i className="feather icon-map-pin mr-2"></i>
+                                        <span className="d-none d-sm-inline">Location</span>
+                                        <span className="d-sm-none">Location</span>
+                                    </Nav.Link>
+                                </Nav.Item>
+                                {speakerData.description && (
+                                    <Nav.Item>
+                                        <Nav.Link
+                                            active={activeTab === 'description'}
+                                            onClick={() => setActiveTab('description')}
+                                            style={activeTab === 'description' ? activeTabStyle : tabStyle}
+                                            className="text-center"
+                                        >
+                                            <i className="feather icon-file-text mr-2"></i>
+                                            <span className="d-none d-sm-inline">Description</span>
+                                            <span className="d-sm-none">About</span>
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                )}
+                            </Nav>
+                        </div>
 
-                        {/* Location Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Location Details</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col xs={12} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Location:</strong><br />
-                                            {speakerData.location || 'N/A'}
-                                        </Card.Text>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
+                        {/* Tab Content */}
+                        <Tab.Content>
+                            {/* Professional Tab */}
+                            {activeTab === 'professional' && (
+                                <Tab.Pane active>
+                                    <Card>
+                                        <Card.Body>
+                                            <Card.Title>
+                                                <i className="feather icon-briefcase mr-2"></i>
+                                                Professional Details
+                                            </Card.Title>
+                                            <hr />
+                                            <Row>
+                                                <Col xs={12} md={6} className="mb-3">
+                                                    <strong>Position:</strong><br />
+                                                    <span className="text-muted">{speakerData.position || 'N/A'}</span>
+                                                </Col>
+                                                <Col xs={12} md={6} className="mb-3">
+                                                    <strong>Company:</strong><br />
+                                                    <span className="text-muted">{speakerData.companyName || 'N/A'}</span>
+                                                </Col>
+                                            </Row>
+                                        </Card.Body>
+                                    </Card>
+                                </Tab.Pane>
+                            )}
 
-                        {/* Timestamp Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Timestamps</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col xs={6} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Created:</strong><br />
-                                            {formatDate(speakerData.createdAt)}
-                                        </Card.Text>
-                                    </Col>
-                                    <Col xs={6} className="text-start">
-                                        <Card.Text className="mb-2">
-                                            <strong>Updated:</strong><br />
-                                            {formatDate(speakerData.updatedAt)}
-                                        </Card.Text>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
+                            {/* Location Tab */}
+                            {activeTab === 'location' && (
+                                <Tab.Pane active>
+                                    <Card>
+                                        <Card.Body>
+                                            <Card.Title>
+                                                <i className="feather icon-map-pin mr-2"></i>
+                                                Location Details
+                                            </Card.Title>
+                                            <hr />
+                                            <Row>
+                                                <Col xs={12}>
+                                                    <strong>Location:</strong><br />
+                                                    <span className="text-muted">{speakerData.location || 'N/A'}</span>
+                                                </Col>
+                                            </Row>
+                                        </Card.Body>
+                                    </Card>
+                                </Tab.Pane>
+                            )}
 
-                        {/* Description */}
-                        {speakerData.description && (
-                            <Card className="mb-3">
-                                <Card.Body>
-                                    <Card.Title>Description</Card.Title>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={12} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                {speakerData.description}
-                                            </Card.Text>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
-                        )}
+                            {/* Description Tab */}
+                            {activeTab === 'description' && speakerData.description && (
+                                <Tab.Pane active>
+                                    <Card>
+                                        <Card.Body>
+                                            <Card.Title>
+                                                <i className="feather icon-file-text mr-2"></i>
+                                                Description
+                                            </Card.Title>
+                                            <hr />
+                                            <Row>
+                                                <Col xs={12}>
+                                                    <p className="text-muted" style={{ lineHeight: '1.6' }}>
+                                                        {speakerData.description}
+                                                    </p>
+                                                </Col>
+                                            </Row>
+                                        </Card.Body>
+                                    </Card>
+                                </Tab.Pane>
+                            )}
+                        </Tab.Content>
                     </Container>
                 </Modal.Body>
                 <Modal.Footer style={{ backgroundColor: '#f8f9fa' }}>

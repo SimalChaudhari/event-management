@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Modal, Button, Row, Col, Card, Container, Badge } from 'react-bootstrap';
-import { API_URL } from '../../../configs/env';
+import { Modal, Button, Row, Col, Card, Badge, Nav, Tab } from 'react-bootstrap';
+import { API_URL, DUMMY_PATH_USER } from '../../../configs/env';
+import '../../../assets/css/speakers.css';
 
 function ViewOrderModal({ show, handleClose, orderData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -10,15 +11,15 @@ function ViewOrderModal({ show, handleClose, orderData }) {
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
     const [showEventMainImageModal, setShowEventMainImageModal] = useState(false);
     const [currentEventMainImage, setCurrentEventMainImage] = useState('');
-    
+
     if (!orderData) return null;
 
     // Speaker image zoom function
     const handleSpeakerImageClick = (speakerProfile) => {
-        if(speakerProfile){
+        if (speakerProfile) {
             setCurrentSpeakerImage(speakerProfile);
             setShowSpeakerImageModal(true);
-        }else{
+        } else {
             setShowSpeakerImageModal(false);
         }
     };
@@ -89,6 +90,90 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         return bgColor;
     };
 
+    // Render order statistics
+    const renderOrderStats = () => {
+        return (
+            <Row>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-shopping-cart text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Total Items
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
+                            {orderData.orderItems?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-dollar-sign text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Total Amount
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {orderData.price} {orderData.currency || '$'}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-calendar text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Order Date
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {new Date(orderData.createdAt).toLocaleDateString('en-GB')}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-credit-card text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Payment Method
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {orderData.paymentMethod || 'N/A'}
+                        </p>
+                    </div>
+                </Col>
+            </Row>
+        );
+    };
+
     // Get image source
     const getImageSrc = (image) => {
         if (typeof image === 'string') {
@@ -105,17 +190,13 @@ function ViewOrderModal({ show, handleClose, orderData }) {
     const goToPreviousImage = () => {
         const currentEvent = orderData.orderItems[currentEventIndex]?.event;
         const images = currentEvent?.images || [];
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === 0 ? images.length - 1 : prevIndex - 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === 0 ? images.length - 1 : prevIndex - 1));
     };
 
     const goToNextImage = () => {
         const currentEvent = orderData.orderItems[currentEventIndex]?.event;
         const images = currentEvent?.images || [];
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === images.length - 1 ? 0 : prevIndex + 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === images.length - 1 ? 0 : prevIndex + 1));
     };
 
     // Render image grid for an event
@@ -131,19 +212,21 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         };
 
         return (
-            <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                gap: '10px',
-                marginTop: '10px'
-            }}>
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '10px',
+                    marginTop: '10px'
+                }}
+            >
                 {images.map((image, index) => {
                     const imageSrc = getImageSrc(image);
-                    
+
                     return (
-                        <div 
-                            key={index} 
-                            style={{ 
+                        <div
+                            key={index}
+                            style={{
                                 position: 'relative',
                                 cursor: 'pointer',
                                 borderRadius: '8px',
@@ -152,21 +235,13 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                 transition: 'transform 0.2s ease, border-color 0.2s ease'
                             }}
                             onClick={() => handleImageClick(index)}
-                            onMouseEnter={(e) => {
-                                e.target.style.transform = 'scale(1.05)';
-                                e.target.style.borderColor = '#4680ff';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.target.style.transform = 'scale(1)';
-                                e.target.style.borderColor = '#ddd';
-                            }}
                         >
                             <img
                                 src={imageSrc}
                                 alt={`Event ${index + 1}`}
-                                style={{ 
-                                    width: '100%', 
-                                    height: '120px', 
+                                style={{
+                                    width: '100%',
+                                    height: '120px',
                                     objectFit: 'cover'
                                 }}
                                 onError={(e) => {
@@ -174,33 +249,37 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                     e.target.style.display = 'none';
                                 }}
                             />
-                            
+
                             {/* Image Index Badge */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '5px',
-                                left: '5px',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 'bold'
-                            }}>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    left: '5px',
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold'
+                                }}
+                            >
                                 {index + 1}
                             </div>
-                            
+
                             {/* Zoom Icon */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '5px',
-                                right: '5px',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '50%',
-                                fontSize: '10px'
-                            }}>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    right: '5px',
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '50%',
+                                    fontSize: '10px'
+                                }}
+                            >
                                 <i className="fas fa-search-plus"></i>
                             </div>
                         </div>
@@ -218,15 +297,17 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         }
 
         return (
-            <div style={{ 
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                marginTop: '15px'
-            }}>
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginTop: '15px'
+                }}
+            >
                 {documents.map((document, index) => {
                     let documentSrc = '';
-                    
+
                     if (typeof document === 'string') {
                         if (document.startsWith('http')) {
                             documentSrc = document;
@@ -234,36 +315,64 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             documentSrc = `${API_URL}/${document.replace(/\\/g, '/')}`;
                         }
                     }
-                    
+
                     return (
-                        <div key={index} style={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            borderRadius: '8px',
-                            backgroundColor: '#f8f9fa'
-                        }}>
-                            <div style={{ marginRight: '12px' }}>
-                                <i className="fas fa-file-pdf fa-2x text-danger"></i>
+                        <div
+                            key={index}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '12px',
+                                border: '1px solid #ddd',
+                                borderRadius: '8px',
+                                backgroundColor: '#f8f9fa',
+                                gap: '12px'
+                            }}
+                        >
+                            <div style={{ flexShrink: 0 }}>
+                                <i
+                                    className="fas fa-file-pdf text-danger"
+                                    style={{
+                                        fontSize: '1.5rem'
+                                    }}
+                                ></i>
                             </div>
-                            
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                    style={{
+                                        fontWeight: 'bold',
+                                        fontSize: '14px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
                                     {typeof document === 'string' ? document.split('/').pop() : document.name}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#666' }}>
+                                <div
+                                    style={{
+                                        fontSize: '12px',
+                                        color: '#666'
+                                    }}
+                                >
                                     Document {index + 1}
                                 </div>
                             </div>
-                            
+
                             <Button
                                 size="sm"
                                 variant="outline-primary"
                                 onClick={() => window.open(documentSrc, '_blank')}
-                                style={{ marginLeft: '10px' }}
+                                style={{
+                                    marginLeft: 'auto',
+                                    fontSize: '12px',
+                                    padding: '6px 12px',
+                                    borderRadius: '6px'
+                                }}
                             >
-                                <i className="fas fa-eye"></i> View
+                                <i className="fas fa-eye" style={{ marginRight: '4px' }}></i>
+                                View
                             </Button>
                         </div>
                     );
@@ -272,7 +381,192 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         );
     };
 
-  
+    // Render categories for an event
+    const renderCategories = (event) => {
+        if (!event?.categories?.length) {
+            return <p>No categories listed.</p>;
+        }
+
+        return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {event.categories.map((category, index) => (
+                    <Badge
+                        bg="success"
+                        key={category.id}
+                        style={{
+                            fontSize: '14px',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            backgroundColor: '#FFF'
+                        }}
+                    >
+                        {index + 1}. {category.name}
+                    </Badge>
+                ))}
+            </div>
+        );
+    };
+
+    // Render speakers for an event
+    const renderSpeakers = (event) => {
+        console.log(event);
+        if (!event?.speakers?.length) {
+            return <p>No speakers listed.</p>;
+        }
+
+        return (
+            <div className="speakers-grid">
+                {event.speakers.map((speaker) => (
+                    <div key={speaker.id} className="speaker-card">
+                        <div className="speaker-header">
+                            <div className="speaker-image" onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}>
+                                <img
+                                    src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
+                                    alt={speaker.name}
+                                />
+                            </div>
+
+                            <div className="speaker-info">
+                                <h6 className="speaker-name">{speaker.name}</h6>
+                                <p className="speaker-position">{speaker.position}</p>
+                            </div>
+                        </div>
+
+                        {speaker.companyName && (
+                            <div className="speaker-company">
+                                <i className="fas fa-building"></i>
+                                <span>{speaker.companyName}</span>
+                            </div>
+                        )}
+
+                        <div className="speaker-contact">
+                            {speaker.mobile && (
+                                <div className="contact-item">
+                                    <i className="fas fa-mobile"></i>
+                                    <span>{speaker.mobile}</span>
+                                </div>
+                            )}
+
+                            {speaker.email && (
+                                <div className="contact-item">
+                                    <i className="fas fa-envelope"></i>
+                                    <span>{speaker.email}</span>
+                                </div>
+                            )}
+
+                            {speaker.location && (
+                                <div className="contact-item">
+                                    <i className="fas fa-map-marker-alt"></i>
+                                    <span>{speaker.location}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    // Simple Event Details Cards with better spacing
+    const renderEventDetailsCards = (event) => {
+        return (
+            <Row className="mb-4">
+                {/* Basic Info Cards */}
+                <Col md={4} className="mb-3">
+                    <div
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            padding: '15px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            height: '100%'
+                        }}
+                    >
+                        <div className="d-flex align-items-center mb-2">
+                            <i className="fas fa-calendar me-3" style={{ fontSize: '16px', marginRight: '10px', color: '#6c757d' }}></i>
+                            <h6 className="mb-0" style={{ fontSize: '14px', fontWeight: '600', color: '#495057' }}>
+                                Schedule
+                            </h6>
+                        </div>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#6c757d' }}>
+                            {new Date(event.startDate).toLocaleDateString('en-GB')} {formatTime(event.startTime)}
+                        </p>
+                    </div>
+                </Col>
+
+                <Col md={4} className="mb-3">
+                    <div
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            padding: '15px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            height: '100%'
+                        }}
+                    >
+                        <div className="d-flex align-items-center mb-2">
+                            <i
+                                className="fas fa-map-marker-alt me-3"
+                                style={{ fontSize: '16px', marginRight: '10px', color: '#6c757d' }}
+                            ></i>
+                            <h6 className="mb-0" style={{ fontSize: '14px', fontWeight: '600', color: '#495057' }}>
+                                Location
+                            </h6>
+                        </div>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#6c757d' }}>
+                            {event.location || 'N/A'}
+                        </p>
+                    </div>
+                </Col>
+
+                <Col md={4} className="mb-3">
+                    <div
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            padding: '15px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            height: '100%'
+                        }}
+                    >
+                        <div className="d-flex align-items-center mb-2">
+                            <i className="fas fa-dollar-sign me-3" style={{ fontSize: '16px', marginRight: '10px', color: '#6c757d' }}></i>
+                            <h6 className="mb-0" style={{ fontSize: '14px', fontWeight: '600', color: '#495057' }}>
+                                Price
+                            </h6>
+                        </div>
+                        <p className="mb-0" style={{ fontSize: '13px', fontWeight: '600', color: '#28a745' }}>
+                            {event.price} {event.currency}
+                        </p>
+                    </div>
+                </Col>
+
+                {/* Description Card - Full Width */}
+                <Col md={12} className="mb-3">
+                    <div
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            padding: '15px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef'
+                        }}
+                    >
+                        <div className="d-flex align-items-center mb-2">
+                            <i className="fas fa-info-circle me-3" style={{ fontSize: '16px', marginRight: '10px', color: '#6c757d' }}></i>
+                            <h6 className="mb-0" style={{ fontSize: '14px', fontWeight: '600', color: '#495057' }}>
+                                Description
+                            </h6>
+                        </div>
+                        <p className="mb-0" style={{ fontSize: '13px', lineHeight: '1.4', color: '#6c757d' }}>
+                            {event.description}
+                        </p>
+                    </div>
+                </Col>
+            </Row>
+        );
+    };
 
     const renderOrderItems = () => {
         if (!orderData.orderItems?.length) {
@@ -280,89 +574,195 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         }
 
         return orderData.orderItems.map(({ id, event, status }, index) => {
-            const eventStatus = getEventStatus(event);
-            
             return (
-                <div key={id} className="mb-4 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h5 className="mb-0">Event {index + 1}: {event.name}</h5>
-                        <Badge bg={getOrderStatusBadge(status)}>{status}</Badge>
-                    </div>
-                    
-                    <Row className="align-items-center mb-3">
-                        <Col md={4} className="text-center mb-3 mb-md-0">
-                            {event.images && event.images.length > 0 && (
-                                <div style={{ position: 'relative', display: 'inline-block' }}>
-                                    <img
-                                        src={getImageSrc(event.images[0])}
-                                        alt={event.name}
-                                        style={{
-                                            width: '100%',
-                                            maxWidth: '200px',
-                                            height: '200px',
-                                            objectFit: 'cover',
-                                            borderRadius: '10%',
-                                            border: '3px solid #4680ff',
-                                            cursor: 'pointer',
-                                            transition: 'transform 0.2s'
-                                        }}
-                                        onClick={() => handleEventMainImageClick(event.images[0])}
-                                        onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
-                                        onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-                                    />
-
-                                    {/* Zoom Icon for Event Main Image */}
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: '10px',
-                                            right: '10px',
-                                            backgroundColor: 'rgba(0,0,0,0.7)',
-                                            color: 'white',
-                                            padding: '5px',
-                                            borderRadius: '50%',
-                                            fontSize: '12px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease',
-                                            zIndex: 10
-                                        }}
-                                        onClick={() => handleEventMainImageClick(event.images[0])}
-                                    >
-                                        <i className="fas fa-search-plus"></i>
-                                    </div>
+                <div
+                    key={id}
+                    className="mb-4 p-4 border rounded"
+                    style={{
+                        backgroundColor: '#fff',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        borderRadius: '12px'
+                    }}
+                >
+                    {/* Event Header */}
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                        <div className="d-flex align-items-center">
+                            <div
+                                className="me-3"
+                                style={{
+                                    width: '50px',
+                                    height: '50px',
+                                    backgroundColor: '#4680ff',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    fontSize: '18px',
+                                    marginRight: '10px'
+                                }}
+                            >
+                                {index + 1}
+                            </div>
+                            <div>
+                                <h5 className="mb-1" style={{ color: '#2c3e50', fontWeight: '600' }}>
+                                    {event.name}
+                                </h5>
+                                <div className="d-flex align-items-center gap-2">
+                                    <Badge bg="success" style={{ fontSize: '12px' }}>
+                                        {event.type}
+                                    </Badge>
                                 </div>
-                            )}
-                        </Col>
-                        <Col md={8}>
-                            <p className="mb-2">
-                                <Badge className={eventStatus.class}>{eventStatus.text}</Badge>
-                                <Badge bg="secondary" className="ml-2">{event.type}</Badge>
-                            </p>
-                            <p className="mb-2"><strong>Description:</strong> {event.description}</p>
-                            <p className="mb-2">
-                                <strong>Schedule:</strong> {new Date(event.startDate).toLocaleDateString('en-GB')} {formatTime(event.startTime)} to {new Date(event.endDate).toLocaleDateString('en-GB')} {formatTime(event.endTime)}
-                            </p>
-                            <p className="mb-2"><strong>Duration:</strong> {calculateDuration(event.startDate, event.endDate)}</p>
-                            <p className="mb-2"><strong>Location:</strong> {event.location || 'N/A'}</p>
-                            <p className="mb-2"><strong>Venue:</strong> {event.venue || 'N/A'}, {event.country || 'N/A'}</p>
-                            <p className="mb-2"><strong>Price:</strong> {event.price} {event.currency}</p>
-                        </Col>
-                    </Row>
-
-                    {/* Images Section */}
-                    <div className="mb-3">
-                        <h6>Event Images <Badge bg="info">{event.images?.length || 0}</Badge></h6>
-                        <hr />
-                        {renderImageGrid(event)}
+                            </div>
+                        </div>
+                        <Badge
+                            bg={getOrderStatusBadge(status)}
+                            style={{
+                                fontSize: '14px',
+                                padding: '8px 16px',
+                                borderRadius: '20px'
+                            }}
+                        >
+                            {status}
+                        </Badge>
                     </div>
 
-                    {/* Documents Section */}
-                    <div className="mb-3">
-                        <h6>Event Documents <Badge bg="info">{event.documents?.length || 0}</Badge></h6>
-                        <hr />
-                        {renderDocuments(event)}
-                    </div>
+                    {/* Simple Event Details */}
+                    <div className="mb-4">{renderEventDetailsCards(event)}</div>
 
+                    {/* Event Tabs */}
+                    <div className="mb-3">
+                        <Tab.Container id={`event-tabs-${index}`} defaultActiveKey="categories">
+                            <Row>
+                                <Col sm={12}>
+                                    <Nav
+                                        variant="tabs"
+                                        className="mb-3"
+                                        style={{
+                                            borderBottom: '2px solid #e9ecef',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px 8px 0 0'
+                                        }}
+                                    >
+                                        <Nav.Item>
+                                            <Nav.Link
+                                                eventKey="categories"
+                                                style={{
+                                                    border: 'none',
+                                                    borderRadius: '8px 8px 0 0',
+                                                    fontWeight: '500'
+                                                }}
+                                            >
+                                                <i className="fas fa-tags me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                                Categories{' '}
+                                                <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                    {event.categories?.length || 0}
+                                                </Badge>
+                                            </Nav.Link>
+                                        </Nav.Item>
+
+                                        <Nav.Item>
+                                            <Nav.Link
+                                                eventKey="speakers"
+                                                style={{
+                                                    border: 'none',
+                                                    borderRadius: '8px 8px 0 0',
+                                                    fontWeight: '500'
+                                                }}
+                                            >
+                                                <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                                Speakers{' '}
+                                                <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                    {event.speakers?.length || 0}
+                                                </Badge>
+                                            </Nav.Link>
+                                        </Nav.Item>
+
+                                        <Nav.Item>
+                                            <Nav.Link
+                                                eventKey="media"
+                                                style={{
+                                                    border: 'none',
+                                                    borderRadius: '8px 8px 0 0',
+                                                    fontWeight: '500'
+                                                }}
+                                            >
+                                                <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                                Media{' '}
+                                                <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                    {(event.images?.length || 0) + (event.documents?.length || 0)}
+                                                </Badge>
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    </Nav>
+                                </Col>
+                            </Row>
+
+                            <Tab.Content
+                                style={{
+                                    backgroundColor: '#fff',
+                                    border: '1px solid #e9ecef',
+                                    borderTop: 'none',
+                                    borderRadius: '0 0 8px 8px',
+                                    padding: '20px'
+                                }}
+                            >
+                                {/* Speakers Tab */}
+                                <Tab.Pane eventKey="speakers">
+                                    <div>
+                                        <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600' }}>
+                                            <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                            Event Speakers{' '}
+                                            <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                {event.speakers?.length || 0}
+                                            </Badge>
+                                        </h6>
+                                        <hr />
+                                        {renderSpeakers(event)}
+                                    </div>
+                                </Tab.Pane>
+
+                                {/* Categories Tab */}
+                                <Tab.Pane eventKey="categories">
+                                    <div>{renderCategories(event)}</div>
+                                </Tab.Pane>
+
+                                {/* Media Tab */}
+                                <Tab.Pane eventKey="media">
+                                    <div>
+                                        <Row>
+                                            <Col md={6}>
+                                                <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600' }}>
+                                                    <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                                    Event Images{' '}
+                                                    <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                        {event.images?.length || 0}
+                                                    </Badge>
+                                                </h6>
+                                                <hr />
+                                                {renderImageGrid(event)}
+                                            </Col>
+                                            <Col md={6} className="section-speakers">
+                                                <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600' }}>
+                                                    <i
+                                                        className="fas fa-file-alt me-2"
+                                                        style={{ color: '#4680ff', marginRight: '8px' }}
+                                                    ></i>
+                                                    Event Documents{' '}
+                                                    <Badge bg="info" style={{ fontSize: '10px', marginLeft: '8px' }}>
+                                                        {event.documents?.length || 0}
+                                                    </Badge>
+                                                </h6>
+                                                <hr />
+                                                {renderDocuments(event)}
+                                            </Col>
+                                        </Row>
+                                    </div>
+                                </Tab.Pane>
+                            </Tab.Content>
+                        </Tab.Container>
+                    </div>
                 </div>
             );
         });
@@ -375,37 +775,216 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                     <Modal.Title>View Order Details</Modal.Title>
                 </Modal.Header>
 
-                <Modal.Body style={{ backgroundColor: '#f8f9fa', padding: 20 }}>
-                    <Container>
-                        {/* Order & Customer Info */}
-                        <div className="mb-4 p-3 border rounded" style={{ backgroundColor: '#fff' }}>
-                            <h5 className="mb-3">Order & Customer Information</h5>
-                            <Row>
-                                <Col md={6}>
-                                    <p className="mb-2"><strong>Customer:</strong> {orderData.user.firstName} {orderData.user.lastName}</p>
-                                    <p className="mb-2"><strong>Email:</strong> {orderData.user.email}</p>
-                                    <p className="mb-2"><strong>Mobile:</strong> {orderData.user.mobile || 'N/A'}</p>
-                                </Col>
-                                <Col md={6}>
-                                    <p className="mb-2"><strong>Order No:</strong> {orderData.orderNo}</p>
-                                    <p className="mb-2">
-                                        <strong>Status:</strong>
-                                        <Badge bg={getOrderStatusBadge(orderData.status)} className="ml-2">
-                                            {orderData.status}
-                                        </Badge>
-                                    </p>
-                                    <p className="mb-2"><strong>Payment Method:</strong> {orderData.paymentMethod}</p>
-                                    <p className="mb-2"><strong>Total Price:</strong> {orderData.price} {orderData.currency || '$'}</p>
-                                </Col>
-                            </Row>
+                <Modal.Body
+                    style={{
+                        backgroundColor: '#f8f9fa',
+                        padding: '20px'
+                    }}
+                >
+                    <div className="lg:container-fluid">
+                        {/* Order Statistics */}
+                        <div
+                            className="mb-3"
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                padding: '20px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <h5>Order Statistics</h5>
+                            <hr />
+                            {renderOrderStats()}
                         </div>
 
-                        {/* Ordered Events */}
-                        <div className="mb-4">
-                            <h5 className="mb-3">Ordered Events <Badge bg="info">{orderData.orderItems?.length || 0}</Badge></h5>
-                            {renderOrderItems()}
+                        {/* Tabbed Content */}
+                        <div
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                padding: '20px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <Tab.Container id="order-tabs" defaultActiveKey="customer">
+                                <Row>
+                                    <Col sm={12}>
+                                        <Nav variant="tabs" className="mb-3">
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="customer">
+                                                    <i className="fas fa-user me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
+                                                    Customer Info
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="order">
+                                                    <i
+                                                        className="fas fa-shopping-cart me-2"
+                                                        style={{ color: '#4680ff', marginRight: '8px' }}
+                                                    ></i>
+                                                    Order Details
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="events">
+                                                    <i
+                                                        className="fas fa-calendar me-2"
+                                                        style={{ color: '#4680ff', marginRight: '8px' }}
+                                                    ></i>
+                                                    Events
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                        </Nav>
+                                    </Col>
+                                </Row>
+
+                                <Tab.Content>
+                                    {/* Customer Info Tab */}
+                                    <Tab.Pane eventKey="customer">
+                                        <div className="p-3" style={{ padding: '10px' }}>
+                                            <h5>Customer Information</h5>
+                                            <hr />
+                                            <Row>
+                                                <Col md={6}>
+                                                    <p>
+                                                        <strong>Customer Name:</strong> {orderData.user.firstName} {orderData.user.lastName}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Email:</strong> {orderData.user.email}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Mobile:</strong> {orderData.user.mobile || 'N/A'}
+                                                    </p>
+                                                </Col>
+                                                <Col md={6}>
+                                                    <p>
+                                                        <strong>Order Date:</strong>{' '}
+                                                        {new Date(orderData.createdAt).toLocaleDateString('en-GB')}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Order Time:</strong>{' '}
+                                                        {new Date(orderData.createdAt).toLocaleTimeString('en-GB')}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Customer ID:</strong> {orderData.user.id}
+                                                    </p>
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    </Tab.Pane>
+
+                                    {/* Order Details Tab */}
+                                    <Tab.Pane eventKey="order">
+                                        <div className="p-3" style={{ padding: '20px' }}>
+                                            <h5>Order Information</h5>
+                                            <hr />
+                                            <Row>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-hashtag text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Order Number
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {orderData.orderNo}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-info-circle text-primary mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Status
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            <Badge bg={getOrderStatusBadge(orderData.status)}>{orderData.status}</Badge>
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-credit-card text-primary mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Payment Method
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {orderData.paymentMethod || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-dollar-sign text-success mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Total Amount
+                                                        </h6>
+                                                        <p
+                                                            className="mb-0"
+                                                            style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}
+                                                        >
+                                                            {orderData.price} {orderData.currency || '$'}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    </Tab.Pane>
+
+                                    {/* Events Tab */}
+                                    <Tab.Pane eventKey="events">
+                                        <div className="p-3">
+                                            <h5>
+                                                Ordered Events <Badge bg="info">{orderData.orderItems?.length || 0}</Badge>
+                                            </h5>
+                                            <hr />
+                                            {renderOrderItems()}
+                                        </div>
+                                    </Tab.Pane>
+                                </Tab.Content>
+                            </Tab.Container>
                         </div>
-                    </Container>
+                    </div>
                 </Modal.Body>
 
                 <Modal.Footer style={{ backgroundColor: '#f8f9fa' }}>
@@ -416,21 +995,23 @@ function ViewOrderModal({ show, handleClose, orderData }) {
             </Modal>
 
             {/* Full Screen Image Modal with Navigation */}
-            <Modal 
-                show={showImageModal} 
-                onHide={() => setShowImageModal(false)} 
+            <Modal
+                show={showImageModal}
+                onHide={() => setShowImageModal(false)}
                 size="xl"
                 centered
                 style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
             >
-                <Modal.Body style={{ 
-                    padding: 0, 
-                    backgroundColor: 'transparent',
-                    position: 'relative',
-                    minHeight: '90vh'
-                }}>
+                <Modal.Body
+                    style={{
+                        padding: 0,
+                        backgroundColor: 'transparent',
+                        position: 'relative',
+                        minHeight: '90vh'
+                    }}
+                >
                     {/* Fixed Position Controls - Always visible */}
-                    
+
                     {/* Close Button - Fixed Top Right */}
                     <Button
                         variant="light"
@@ -451,7 +1032,7 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                     >
                         <i className="fas fa-times"></i>
                     </Button>
-                    
+
                     {/* Download Button - Fixed Top Left */}
                     <Button
                         variant="light"
@@ -479,87 +1060,93 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                     >
                         <i className="fas fa-download"></i>
                     </Button>
-                    
+
                     {/* Navigation Arrows - Fixed Left/Right Center */}
                     {(() => {
                         const currentEvent = orderData.orderItems[currentEventIndex]?.event;
                         const images = currentEvent?.images || [];
-                        return images.length > 1 && (
-                            <>
-                                <Button
-                                    variant="light"
-                                    size="lg"
-                                    onClick={goToPreviousImage}
-                                    style={{
-                                        position: 'fixed',
-                                        left: '20px',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        borderRadius: '50%',
-                                        width: '50px',
-                                        height: '50px',
-                                        zIndex: 1000,
-                                        backgroundColor: 'rgba(0,0,0,0.7)',
-                                        border: 'none',
-                                        color: 'white'
-                                    }}
-                                >
-                                    <i className="fas fa-chevron-left"></i>
-                                </Button>
-                                
-                                <Button
-                                    variant="light"
-                                    size="lg"
-                                    onClick={goToNextImage}
-                                    style={{
-                                        position: 'fixed',
-                                        right: '20px',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        borderRadius: '50%',
-                                        width: '50px',
-                                        height: '50px',
-                                        zIndex: 1000,
-                                        backgroundColor: 'rgba(0,0,0,0.7)',
-                                        border: 'none',
-                                        color: 'white'
-                                    }}
-                                >
-                                    <i className="fas fa-chevron-right"></i>
-                                </Button>
-                            </>
+                        return (
+                            images.length > 1 && (
+                                <>
+                                    <Button
+                                        variant="light"
+                                        size="lg"
+                                        onClick={goToPreviousImage}
+                                        style={{
+                                            position: 'fixed',
+                                            left: '20px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            borderRadius: '50%',
+                                            width: '50px',
+                                            height: '50px',
+                                            zIndex: 1000,
+                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                            border: 'none',
+                                            color: 'white'
+                                        }}
+                                    >
+                                        <i className="fas fa-chevron-left"></i>
+                                    </Button>
+
+                                    <Button
+                                        variant="light"
+                                        size="lg"
+                                        onClick={goToNextImage}
+                                        style={{
+                                            position: 'fixed',
+                                            right: '20px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            borderRadius: '50%',
+                                            width: '50px',
+                                            height: '50px',
+                                            zIndex: 1000,
+                                            backgroundColor: 'rgba(0,0,0,0.7)',
+                                            border: 'none',
+                                            color: 'white'
+                                        }}
+                                    >
+                                        <i className="fas fa-chevron-right"></i>
+                                    </Button>
+                                </>
+                            )
                         );
                     })()}
-                    
+
                     {/* Image Counter - Fixed Bottom Center */}
-                    <div style={{
-                        position: 'fixed',
-                        bottom: '20px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        color: 'white',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        zIndex: 1000
-                    }}>
+                    <div
+                        style={{
+                            position: 'fixed',
+                            bottom: '20px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            zIndex: 1000
+                        }}
+                    >
                         {(() => {
                             const currentEvent = orderData.orderItems[currentEventIndex]?.event;
                             const images = currentEvent?.images || [];
                             return `${currentImageIndex + 1} / ${images.length}`;
                         })()}
                     </div>
-                    
+
                     {/* Image Container - Centered */}
-                    <div style={{ 
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        minHeight: '90vh',
-                        padding: '60px 80px 80px 80px' // Top, Right, Bottom, Left padding to avoid controls
-                    }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px' // Top, Right, Bottom, Left padding to avoid controls
+                        }}
+                    >
                         <img
                             src={(() => {
                                 const currentEvent = orderData.orderItems[currentEventIndex]?.event;
@@ -567,9 +1154,9 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                 return getImageSrc(images[currentImageIndex]);
                             })()}
                             alt={`Event Image ${currentImageIndex + 1}`}
-                            style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '100%', 
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
                                 objectFit: 'contain',
                                 borderRadius: '8px'
                             }}

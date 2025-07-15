@@ -26,7 +26,6 @@ export class WithdrawalService {
     @InjectRepository(RegisterEvent)
     private readonly registerEventRepository: Repository<RegisterEvent>,
 
-
     @InjectRepository(OrderItemEntity)
     private readonly orderItemRepository: Repository<OrderItemEntity>,
   ) { }
@@ -87,8 +86,23 @@ export class WithdrawalService {
     if (withdrawal.order?.orderItems?.length) {
       withdrawal.order.orderItems.forEach((item) => {
         if (item.event) {
+          // Extract categories
+          const categories = item.event?.category?.map((ec) => ec.category) || [];
+          
+          // Extract speakers
+          const speakers = item.event?.eventSpeakers?.map((es) => es.speaker) || [];
+          
+          // Clean up event object
+          const { eventSpeakers, category, ...restEvent } = item.event || {};
+          
+          // Add color and processed data
           const color = getEventColor(item.event.type);
-          (item.event as any).color = color; // 👈 cast to 'any' to bypass TS check
+          (item.event as any) = {
+            ...restEvent,
+            color,
+            speakers,
+            categories,
+          };
         }
       });
     }
@@ -122,7 +136,10 @@ export class WithdrawalService {
         'order.user',
         'order.orderItems',
         'order.orderItems.event',
-        'event', // Make sure event relation is loaded
+        'order.orderItems.event.eventSpeakers.speaker',
+        'order.orderItems.event.category',
+        'order.orderItems.event.category.category',
+        'event',
       ],
     });
 
@@ -136,6 +153,9 @@ export class WithdrawalService {
         'order.user',
         'order.orderItems',
         'order.orderItems.event',
+        'order.orderItems.event.eventSpeakers.speaker',
+        'order.orderItems.event.category',
+        'order.orderItems.event.category.category',
         'event',
       ],
     });
@@ -151,6 +171,9 @@ export class WithdrawalService {
         'order.user',
         'order.orderItems',
         'order.orderItems.event',
+        'order.orderItems.event.eventSpeakers.speaker',
+        'order.orderItems.event.category',
+        'order.orderItems.event.category.category',
         'event',
       ],
     });
@@ -173,6 +196,9 @@ export class WithdrawalService {
         'order.user',
         'order.orderItems',
         'order.orderItems.event',
+        'order.orderItems.event.eventSpeakers.speaker',
+        'order.orderItems.event.category',
+        'order.orderItems.event.category.category',
         'event',
       ],
     });

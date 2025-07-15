@@ -7,6 +7,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import App from './App/index';
 import * as serviceWorker from './serviceWorker';
 import './assets/scss/style.scss';
+import './assets/css/speakers.css';
 import store from './store/store';
 
 // Example toast message that will show when the app loads

@@ -206,7 +206,11 @@ export class OrderService {
     async getOrderById(orderId: string, userId: string,role:string): Promise<any> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
-            relations: ['user', 'orderItems', 'orderItems.event'],
+            relations: ['user', 'orderItems', 'orderItems.event', 
+                'orderItems.event.eventSpeakers.speaker',
+                'orderItems.event.category', // Add this
+                'orderItems.event.category.category', // Add this
+              ],
         });
 
 
@@ -217,35 +221,48 @@ export class OrderService {
         throw new ForbiddenException('You are not allowed to view this order');
     }
     
-        const orderItems = order.orderItems.map(item => ({
+    const orderItems = order.orderItems.map(item => {
+        // Extract categories
+        const categories = item.event?.category?.map((ec) => ec.category) || [];
+        
+        // Extract speakers
+        const speakers = item.event?.eventSpeakers?.map((es) => es.speaker) || [];
+        
+        // Clean up event object
+        const { eventSpeakers, category, ...restEvent } = item.event || {};
+        
+        return {
             id: item.id,
             event: {
-              ...item.event,
-                color: getEventColor(item.event.type), 
-             },
-            status:item.status,
+                ...restEvent,
+                color: getEventColor(item.event.type),
+                speakers,
+                categories, // Add categories here
+            },
+            status: item.status,
             invoiceNumber: item.invoiceNumber || null,
             createdAt: item.createdAt,
-        }));
-    
-        return {
-            id: order.id,
-            orderNo: order.orderNo,
-            paymentMethod: order.paymentMethod,
-            price: Number(order.price),
-            status: order.status,
-            discount: Number(order.discount),
-            originalPrice: Number(order.originalPrice),
-            user: {
-                id: order.user.id,
-                firstName: order.user.firstName,
-                lastName: order.user.lastName,
-                mobile: order.user.mobile,
-                email: order.user.email,
-            },
-            orderItems,
         };
-    }
+    });
+
+    return {
+        id: order.id,
+        orderNo: order.orderNo,
+        paymentMethod: order.paymentMethod,
+        price: Number(order.price),
+        status: order.status,
+        discount: Number(order.discount),
+        originalPrice: Number(order.originalPrice),
+        user: {
+            id: order.user.id,
+            firstName: order.user.firstName,
+            lastName: order.user.lastName,
+            mobile: order.user.mobile,
+            email: order.user.email,
+        },
+        orderItems,
+    };
+}
     
     async getAllOrders(userId: string,role:string): Promise<any[]> {
         let orders;
@@ -253,19 +270,27 @@ export class OrderService {
         if (role === 'admin') {
             // 🧑‍💼 Admin can see all orders
             orders = await this.orderRepository.find({
-                relations: ['user', 'orderItems', 'orderItems.event'],
+                relations: ['user', 'orderItems', 'orderItems.event',
+                    'orderItems.event.eventSpeakers.speaker',
+                    'orderItems.event.category', // Add this
+                    'orderItems.event.category.category', // Add this
+                ],
             });
         } else {
 
           orders = await this.orderRepository.find({
             where: { user: { id: userId } },
-            relations: ['user', 'orderItems', 'orderItems.event'],
+            relations: ['user', 'orderItems', 'orderItems.event',
+                'orderItems.event.eventSpeakers.speaker',
+                'orderItems.event.category', // Add this
+                'orderItems.event.category.category', // Add this
+            ],
         });
         }
         if (!orders || orders.length === 0) {
             throw new NotFoundException('No orders found');
         }
-    
+
     
         return orders.map(order => ({
             id: order.id,
@@ -282,16 +307,29 @@ export class OrderService {
                 mobile: order.user.mobile,
                 email: order.user.email,
             },
-            orderItems: order.orderItems.map(item => ({
-                id: item.id,
-                event: {
-                  ...item.event,
-                    color: getEventColor(item.event.type), 
-                 },
-                status:item.status,
-                invoiceNumber: item.invoiceNumber || null,
-                createdAt: item.createdAt,
-            })),
+            orderItems: order.orderItems.map(item => {
+                // Extract categories
+                const categories = item.event?.category?.map((ec) => ec.category) || [];
+                
+                // Extract speakers
+                const speakers = item.event?.eventSpeakers?.map((es) => es.speaker) || [];
+                
+                // Clean up event object
+                const { eventSpeakers, category, ...restEvent } = item.event || {};
+                
+                return {
+                    id: item.id,
+                    event: {
+                        ...restEvent,
+                        color: getEventColor(item.event.type),
+                        speakers,
+                        categories, // Add categories here
+                    },
+                    status: item.status,
+                    invoiceNumber: item.invoiceNumber || null,
+                    createdAt: item.createdAt,
+                };
+            }),
         }));
     }
     async deleteOrder(orderId: string, userId: string,role:string): Promise<void> {

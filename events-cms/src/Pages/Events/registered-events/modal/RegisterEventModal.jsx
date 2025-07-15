@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { Modal, Button, Card, Row, Col, Container, Badge } from 'react-bootstrap';
+import { Modal, Button, Row, Col, Card, Badge, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
 
-const RegisterEventModal = ({ show, onHide, eventData }) => {
+function RegisterEventModal({ show, onHide, eventData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [showImageModal, setShowImageModal] = useState(false);
-    const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
-    const [currentEventMainImage, setCurrentEventMainImage] = useState('');
+    const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
     const [showEventMainImageModal, setShowEventMainImageModal] = useState(false);
-    
-    console.log(eventData);
+    const [currentEventMainImage, setCurrentEventMainImage] = useState('');
+
     if (!eventData) return null;
 
     const regDate = new Date(eventData.createdAt).toLocaleDateString('en-GB', {
@@ -21,68 +20,191 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
         minute: '2-digit'
     });
 
-    // Format time utility function
-    const formatTime = (time) => {
-        if (!time) return '';
-        const [hours, minutes] = time.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        return `${hour12}:${minutes} ${ampm}`;
-    };
-
-    // Calculate duration
-    const calculateDuration = (startDate, endDate) => {
-        const diffTime = Math.abs(new Date(endDate) - new Date(startDate));
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-            return '1 day';
-        } else if (diffDays === 0) {
-            return 'Same day';
+    // Speaker image zoom function
+    const handleSpeakerImageClick = (speakerProfile) => {
+        if (speakerProfile) {
+            setCurrentSpeakerImage(speakerProfile);
+            setShowSpeakerImageModal(true);
         } else {
-            return `${diffDays} days`;
+            setShowSpeakerImageModal(false);
         }
     };
 
-    // Get event status
-    const getEventStatus = () => {
-        const eventDate = new Date(eventData.event?.startDate);
-        const today = new Date();
-        const daysUntilEvent = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
-
-        if (daysUntilEvent < 0) {
-            return { class: 'badge-light-secondary', text: `${Math.abs(daysUntilEvent)} days ago` };
-        } else if (daysUntilEvent === 0) {
-            return { class: 'badge-light-success', text: 'Today' };
-        } else if (daysUntilEvent === 1) {
-            return { class: 'badge-light-danger', text: 'Tomorrow' };
-        } else if (daysUntilEvent <= 3) {
-            return { class: 'badge-light-danger', text: `in ${daysUntilEvent} days` };
-        } else if (daysUntilEvent <= 7) {
-            return { class: 'badge-light-warning', text: `in ${daysUntilEvent} days` };
-        } else {
-            return { class: 'badge-light-info', text: `in ${daysUntilEvent} days` };
-        }
+    // Event main image zoom function
+    const handleEventMainImageClick = (imagePath) => {
+        setCurrentEventMainImage(imagePath);
+        setShowEventMainImageModal(true);
     };
 
-    // Get user type badge style
-    const getUserTypeStyle = () => {
-        const type = eventData.type?.toLowerCase();
-        if (type === 'exhibitor') {
-            return {
-                backgroundColor: 'rgb(162, 209, 231)',
-                color: 'rgb(14, 13, 13)',
-                fontWeight: '500'
-            };
-        } else if (type === 'attendee') {
-            return {
-                backgroundColor: 'rgb(223, 228, 165)',
-                color: 'rgb(14, 13, 13)',
-                fontWeight: '500'
-            };
+    // Render categories
+    const renderCategories = () => {
+        if (!eventData?.event?.categories?.length) {
+            return <p>No categories listed.</p>;
         }
-        return {};
+
+        return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {eventData.event.categories.map((category, index) => (
+                    <Badge
+                        key={category.id}
+                        bg="success"
+                        style={{
+                            fontSize: '14px',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            backgroundColor: '#FFF'
+                        }}
+                    >
+                        <i className="fas fa-tag me-2" style={{ color: '#000', marginRight: 6 }}></i>
+                        {category.name}
+                    </Badge>
+                ))}
+            </div>
+        );
+    };
+
+    // Render event statistics
+    const renderEventStats = () => {
+        return (
+            <Row>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-users text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Attendance
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
+                            {eventData.event?.attendanceCount || 0}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-microphone text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Speakers
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {eventData.event?.speakers?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-images text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Images
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {eventData.event?.images?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} md={3} className="mb-3">
+                    <div
+                        className="text-center p-3"
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            padding: '20px'
+                        }}
+                    >
+                        <i className="fas fa-file-pdf text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                            Documents
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                            {eventData.event?.documents?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+            </Row>
+        );
+    };
+
+    const renderSpeakers = () => {
+        if (!eventData?.event?.speakers?.length) {
+            return <p>No speakers listed.</p>;
+        }
+
+        return (
+            <div className="speakers-grid">
+                {eventData.event.speakers.map((speaker) => (
+                    <div key={speaker.id} className="speaker-card">
+                        <div className="speaker-header">
+                            <div className="speaker-image" onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}>
+                                <img
+                                    src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
+                                    alt={speaker.name}
+                                />
+                            </div>
+
+                            <div className="speaker-info">
+                                <h6 className="speaker-name">{speaker.name}</h6>
+                                <p className="speaker-position">{speaker.position}</p>
+                            </div>
+                        </div>
+
+                        {speaker.companyName && (
+                            <div className="speaker-company">
+                                <i className="fas fa-building"></i>
+                                <span>{speaker.companyName}</span>
+                            </div>
+                        )}
+
+                        <div className="speaker-contact">
+                            {speaker.mobile && (
+                                <div className="contact-item">
+                                    <i className="fas fa-mobile"></i>
+                                    <span>{speaker.mobile}</span>
+                                </div>
+                            )}
+
+                            {speaker.email && (
+                                <div className="contact-item">
+                                    <i className="fas fa-envelope"></i>
+                                    <span>{speaker.email}</span>
+                                </div>
+                            )}
+
+                            {speaker.location && (
+                                <div className="contact-item">
+                                    <i className="fas fa-map-marker-alt"></i>
+                                    <span>{speaker.location}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
+                    </div>
+                ))}
+            </div>
+        );
     };
 
     // Get image source
@@ -99,39 +221,16 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
 
     // Navigation functions for modal
     const goToPreviousImage = () => {
-        const images = eventData.event?.images || [];
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === 0 ? images.length - 1 : prevIndex - 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === 0 ? eventData.event.images.length - 1 : prevIndex - 1));
     };
 
     const goToNextImage = () => {
-        const images = eventData.event?.images || [];
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === images.length - 1 ? 0 : prevIndex + 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === eventData.event.images.length - 1 ? 0 : prevIndex + 1));
     };
 
-    // Speaker image zoom function
-    const handleSpeakerImageClick = (speakerProfile) => {
-        if(speakerProfile){
-            setCurrentSpeakerImage(speakerProfile);
-            setShowSpeakerImageModal(true);
-        }else{
-            setShowSpeakerImageModal(false); 
-        }
-    };
-
-    // Event main image zoom function
-    const handleEventMainImageClick = (imagePath) => {
-        setCurrentEventMainImage(imagePath);
-        setShowEventMainImageModal(true);
-    };
-
-    // Render image grid
+    // Render simple image grid for UI
     const renderImageGrid = () => {
-        const images = eventData.event?.images || [];
-        if (!images || images.length === 0) {
+        if (!eventData?.event?.images || eventData.event.images.length === 0) {
             return <p>No images available.</p>;
         }
 
@@ -141,19 +240,21 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
         };
 
         return (
-            <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                gap: '10px',
-                marginTop: '10px'
-            }}>
-                {images.map((image, index) => {
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '10px',
+                    marginTop: '10px'
+                }}
+            >
+                {eventData.event.images.map((image, index) => {
                     const imageSrc = getImageSrc(image);
-                    
+
                     return (
-                        <div 
-                            key={index} 
-                            style={{ 
+                        <div
+                            key={index}
+                            style={{
                                 position: 'relative',
                                 cursor: 'pointer',
                                 borderRadius: '8px',
@@ -162,21 +263,13 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                                 transition: 'transform 0.2s ease, border-color 0.2s ease'
                             }}
                             onClick={() => handleImageClick(index)}
-                            onMouseEnter={(e) => {
-                                e.target.style.transform = 'scale(1.05)';
-                                e.target.style.borderColor = '#4680ff';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.target.style.transform = 'scale(1)';
-                                e.target.style.borderColor = '#ddd';
-                            }}
                         >
                             <img
                                 src={imageSrc}
                                 alt={`Event ${index + 1}`}
-                                style={{ 
-                                    width: '100%', 
-                                    height: '120px', 
+                                style={{
+                                    width: '100%',
+                                    height: '120px',
                                     objectFit: 'cover'
                                 }}
                                 onError={(e) => {
@@ -184,33 +277,37 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                                     e.target.style.display = 'none';
                                 }}
                             />
-                            
+
                             {/* Image Index Badge */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '5px',
-                                left: '5px',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 'bold'
-                            }}>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    left: '5px',
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold'
+                                }}
+                            >
                                 {index + 1}
                             </div>
-                            
+
                             {/* Zoom Icon */}
-                            <div style={{
-                                position: 'absolute',
-                                top: '5px',
-                                right: '5px',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '50%',
-                                fontSize: '10px'
-                            }}>
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    right: '5px',
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '50%',
+                                    fontSize: '10px'
+                                }}
+                            >
                                 <i className="fas fa-search-plus"></i>
                             </div>
                         </div>
@@ -222,21 +319,22 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
 
     // Render documents
     const renderDocuments = () => {
-        const documents = eventData.event?.documents || [];
-        if (!documents || documents.length === 0) {
+        if (!eventData?.event?.documents || eventData.event.documents.length === 0) {
             return <p>No documents available.</p>;
         }
 
         return (
-            <div style={{ 
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                marginTop: '15px'
-            }}>
-                {documents.map((document, index) => {
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    marginTop: '15px'
+                }}
+            >
+                {eventData.event.documents.map((document, index) => {
                     let documentSrc = '';
-                    
+
                     if (typeof document === 'string') {
                         if (document.startsWith('http')) {
                             documentSrc = document;
@@ -244,36 +342,64 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                             documentSrc = `${API_URL}/${document.replace(/\\/g, '/')}`;
                         }
                     }
-                    
+
                     return (
-                        <div key={index} style={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            borderRadius: '8px',
-                            backgroundColor: '#f8f9fa'
-                        }}>
-                            <div style={{ marginRight: '12px' }}>
-                                <i className="fas fa-file-pdf fa-2x text-danger"></i>
+                        <div
+                            key={index}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '12px',
+                                border: '1px solid #ddd',
+                                borderRadius: '8px',
+                                backgroundColor: '#f8f9fa',
+                                gap: '12px'
+                            }}
+                        >
+                            <div style={{ flexShrink: 0 }}>
+                                <i
+                                    className="fas fa-file-pdf text-danger"
+                                    style={{
+                                        fontSize: '1.5rem'
+                                    }}
+                                ></i>
                             </div>
-                            
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                    style={{
+                                        fontWeight: 'bold',
+                                        fontSize: '14px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
                                     {typeof document === 'string' ? document.split('/').pop() : document.name}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#666' }}>
+                                <div
+                                    style={{
+                                        fontSize: '12px',
+                                        color: '#666'
+                                    }}
+                                >
                                     Document {index + 1}
                                 </div>
                             </div>
-                            
+
                             <Button
                                 size="sm"
                                 variant="outline-primary"
                                 onClick={() => window.open(documentSrc, '_blank')}
-                                style={{ marginLeft: '10px' }}
+                                style={{
+                                    marginLeft: 'auto',
+                                    fontSize: '12px',
+                                    padding: '6px 12px',
+                                    borderRadius: '6px'
+                                }}
                             >
-                                <i className="fas fa-eye"></i> View
+                                <i className="fas fa-eye" style={{ marginRight: '4px' }}></i>
+                                View
                             </Button>
                         </div>
                     );
@@ -282,462 +408,400 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
         );
     };
 
-    const renderSpeakers = () => {
-        if (!eventData?.event?.speakers?.length) {
-            return <p>No speakers listed.</p>;
-        }
-
-        const speakers = eventData.event.speakers;
-        const colWidth = speakers.length === 1 ? 12 : 6; // 1 है तो full, 2 या ज्यादा है तो 6-6
-
-        // हर लाइन में 2 कार्ड
-        const rows = [];
-        for (let i = 0; i < speakers.length; i += 2) {
-            rows.push(
-                <Row key={i}>
-                    {[0, 1].map((j) => {
-                        const speaker = speakers[i + j];
-                        if (!speaker) return null;
-                        return (
-                            <Col xs={12} md={colWidth} key={speaker.id} className="mb-4 d-flex">
-                                <Card
-                            style={{
-                                        width: '100%',
-                                        borderRadius: 18,
-                                        boxShadow: '0 4px 16px rgba(70,128,255,0.10)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'stretch',
-                                        overflow: 'visible'
-                                    }}
-                                    className="w-100 h-100"
-                                >
-                                    <Card.Body className="d-flex flex-column justify-content-between" style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 12 }}>
-                                            <div
-                                                style={{
-                                                    width: 110,
-                                                    height: 110,
-                                                    borderRadius: '50%',
-                                                    overflow: 'hidden',
-                                                    border: '3px solid #4680ff',
-                                                    boxShadow: '0 2px 8px rgba(70,128,255,0.10)',
-                                                    marginTop: -60,
-                                                    background: '#fff',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'transform 0.2s'
-                                                }}
-                                                onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}
-                                                onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.06)')}
-                                                onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                                            >
-                                                <img
-                                                    src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
-                                                    alt={speaker.name}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                        objectFit: 'cover'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <Card.Title style={{ fontWeight: 700, fontSize: 20, textAlign: 'left' }}>{speaker.name}</Card.Title>
-                                            <div style={{ fontSize: 15, color: '#4680ff', marginBottom: 8, textAlign: 'left' }}>
-                                                {speaker.position}
-                                            </div>
-                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
-                                                <i className="fas fa-building" style={{ marginRight: 8, fontSize: 18, color: '#4680ff' }}></i>
-                                                <span>{speaker.companyName}</span>
-                                            </div>
-                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
-                                            <i className="fas fa-mobile" style={{ marginRight: 8, fontSize: 18, color: '#28a745' }}></i>
-                                            <span>{speaker.mobile}</span>
-                                            </div>
-                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
-                                                <i className="fas fa-envelope" style={{ marginRight: 8, fontSize: 18, color: '#ff9800' }}></i>
-                                                <span>{speaker.email}</span>
-                                            </div>
-                                            <div style={{ fontSize: 15, marginBottom: 6, textAlign: 'left', display: 'flex', alignItems: 'center' }}>
-                                                <i className="fas fa-map-marker-alt" style={{ marginRight: 8, fontSize: 18, color: '#e91e63' }}></i>
-                                                <span>{speaker.location}</span>
-                                            </div>
-                                            <div style={{ fontSize: 13, color: '#666', marginTop: 8, textAlign: 'left', wordBreak: 'break-word' }}>
-                                                {speaker.description}
-                                            </div>
-                                        </div>
-                                        <div className="mt-3" style={{ textAlign: 'left' }}>
-                                                        <Button
-                                                variant="outline-primary"
-                                                            size="sm"
-                                                style={{ borderRadius: 20, fontWeight: 500 }}
-                                                onClick={() => alert(`Contact: ${speaker.email}`)}
-                                            >
-                                                Contact
-                                                        </Button>
-                                                </div>
-                                </Card.Body>
-                            </Card>
-                            </Col>
-                        );
-                    })}
-                </Row>
-            );
-        }
-
-        return <>{rows}</>;
-    };
-
-    const eventStatus = getEventStatus();
-    const userTypeStyle = getUserTypeStyle();
-
     return (
         <>
             <Modal show={show} onHide={onHide} size="xl">
                 <Modal.Header style={{ backgroundColor: '#4680ff', color: '#fff' }}>
                     <Modal.Title>Registered Event Details</Modal.Title>
                 </Modal.Header>
-                <Modal.Body style={{ backgroundColor: '#f8f9fa', padding: 20 }}>
-                    <Container>
+
+                <Modal.Body
+                    style={{
+                        backgroundColor: '#f8f9fa',
+                        padding: '20px'
+                    }}
+                >
+                    <div className="lg:container-fluid">
                         {/* Registration Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Registration Information</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col md={6}>
+                        <div
+                            className="mb-3"
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                padding: '20px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <h5>Registration Information</h5>
+                            <hr />
+                            <Row>
+                                <Col md={6}>
+                                    <p className="mb-2">
+                                        <strong>Registered By:</strong> {eventData.user?.firstName} {eventData.user?.lastName}
+                                    </p>
+                                    <p className="mb-2">
+                                        <strong>Email:</strong> {eventData.user?.email}
+                                    </p>
+                                    <p className="mb-2">
+                                        <strong>Mobile:</strong> {eventData.user?.mobile || 'N/A'}
+                                    </p>
+                                    <p className="mb-2">
+                                        <strong>Registration Date:</strong> {regDate}
+                                    </p>
+                                </Col>
+                                <Col md={6}>
+                                    <p className="mb-2">
+                                        <strong>User Type:</strong>
+                                        <span 
+                                            className="badge ml-2" 
+                                            style={{
+                                                backgroundColor: eventData.type === 'exhibitor' ? 'rgb(162, 209, 231)' : 'rgb(223, 228, 165)',
+                                                color: 'rgb(14, 13, 13)',
+                                                fontWeight: '500'
+                                            }}
+                                        >
+                                            {eventData.type || 'N/A'}
+                                        </span>
+                                    </p>
+                                    <p className="mb-2">
+                                        <strong>Registration Status:</strong>
+                                        <Badge 
+                                            bg={eventData.status === 'Success' ? 'success' : 
+                                                eventData.status === 'Withdraw' ? 'danger' : 'warning'}
+                                            className="ml-2"
+                                        >
+                                            {eventData.status}
+                                        </Badge>
+                                    </p>
+                                    {eventData.isCreatedByAdmin && (
                                         <p className="mb-2">
-                                            <strong>Registered By:</strong> {eventData.user?.firstName} {eventData.user?.lastName}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Email:</strong> {eventData.user?.email}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Mobile:</strong> {eventData.user?.mobile || 'N/A'}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Registration Date:</strong> {regDate}
-                                        </p>
-                                    </Col>
-                                    <Col md={6}>
-                                        <p className="mb-2">
-                                            <strong>User Type:</strong>
-                                            <span 
-                                                className="badge ml-2" 
-                                                style={userTypeStyle}
-                                            >
-                                                {eventData.type || 'N/A'}
-                                            </span>
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Registration Status:</strong>
-                                            <Badge 
-                                                bg={eventData.status === 'Success' ? 'success' : 
-                                                    eventData.status === 'Withdraw' ? 'danger' : 'warning'}
-                                                className="ml-2"
-                                            >
-                                                {eventData.status}
+                                            <strong>Created By:</strong>
+                                            <Badge bg="danger" className="ml-2">
+                                                <i className="fas fa-shield mr-1"></i>Admin
                                             </Badge>
                                         </p>
-                                        {eventData.isCreatedByAdmin && (
-                                            <p className="mb-2">
-                                                <strong>Created By:</strong>
-                                                <Badge bg="danger" className="ml-2">
-                                                    <i className="fas fa-shield mr-1"></i>Admin
-                                                </Badge>
-                                            </p>
-                                        )}
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
+                                    )}
+                                </Col>
+                            </Row>
+                        </div>
 
-                        {/* Event Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Event Information</Card.Title>
-                                <hr />
-                                <Row className="align-items-center flex-md-row flex-column">
-                                    <Col md={4} className="text-center mb-3 mb-md-0">
-                                        {eventData.event?.images && eventData.event.images.length > 0 && (
-                                            <div style={{ position: 'relative', display: 'inline-block' }}>
-                                                <img
-                                                    src={getImageSrc(eventData.event.images[0])}
-                                                    alt="Event"
-                                                    style={{
-                                                        width: '100%',
-                                                        maxWidth: '220px',
-                                                        height: '180px',
-                                                        objectFit: 'cover',
-                                                        borderRadius: '16px',
-                                                        border: '3px solid #4680ff',
-                                                        boxShadow: '0 4px 16px rgba(70,128,255,0.15)',
-                                                        cursor: 'pointer',
-                                                        transition: 'transform 0.2s'
-                                                    }}
-                                                    onClick={() => handleEventMainImageClick(eventData.event.images[0])}
-                                                    onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
-                                                    onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-                                                />
+                        {/* Event Statistics */}
+                        <div
+                            className="mb-3"
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                padding: '20px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <h5>Event Statistics</h5>
+                            <hr />
+                            {renderEventStats()}
+                        </div>
 
-                                                {/* Zoom Icon for Event Main Image */}
-                                                <div
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '10px',
-                                                        right: '10px',
-                                                        backgroundColor: 'rgba(0,0,0,0.7)',
-                                                        color: 'white',
-                                                        padding: '5px',
-                                                        borderRadius: '50%',
-                                                        fontSize: '12px',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s ease',
-                                                        zIndex: 10
-                                                    }}
-                                                    onClick={() => handleEventMainImageClick(eventData.event.images[0])}
-                                                >
-                                                    <i className="fas fa-search-plus"></i>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </Col>
-                                    <Col md={8}>
-                                        <p className="mb-2">
-                                            <strong>Name:</strong> {eventData.event?.name}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Date:</strong> {eventData.event?.startDate} {eventData.event?.startTime} to {eventData.event?.endDate}{' '}
-                                            {eventData.event?.endTime}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Type:</strong> {eventData.event?.type || 'N/A'}
-                                        </p>
-                                        <p className="mb-2">
-                                            <strong>Description:</strong> {eventData.event?.description}
-                                        </p>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
-
-                        {/* Location Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Location & Pricing</Card.Title>
-                                <hr />
+                        {/* Tabbed Content */}
+                        <div
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                padding: '20px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <Tab.Container id="event-tabs" defaultActiveKey="details">
                                 <Row>
-                                    <Col xs={12} md={3} className="mb-3">
-                                        <div className="text-center p-3" style={{
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <i className="fas fa-map-marker-alt text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Location</h6>
-                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                {eventData.event?.location || 'N/A'}
-                                            </p>
-                                        </div>
-                                    </Col>
-                                    <Col xs={12} md={3} className="mb-3">
-                                        <div className="text-center p-3" style={{
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <i className="fas fa-building text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Venue</h6>
-                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                {eventData.event?.venue || 'N/A'}
-                                            </p>
-                                        </div>
-                                    </Col>
-                                    <Col xs={12} md={3} className="mb-3">
-                                        <div className="text-center p-3" style={{
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <i className="fas fa-flag text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Country</h6>
-                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                {eventData.event?.country || 'N/A'}
-                                            </p>
-                                        </div>
-                                    </Col>
-                                    <Col xs={12} md={3} className="mb-3">
-                                        <div className="text-center p-3" style={{
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <i className="fas fa-dollar-sign text-success mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                            <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>Price</h6>
-                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
-                                                {eventData.event?.price} {eventData.event?.currency}
-                                            </p>
-                                        </div>
+                                    <Col sm={12}>
+                                        <Nav variant="tabs" className="mb-3">
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="details">
+                                                    <i className="fas fa-info-circle me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                    Details
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="location">
+                                                    <i
+                                                        className="fas fa-map-marker-alt me-2"
+                                                        style={{ color: '#4680ff', marginRight: 6 }}
+                                                    ></i>
+                                                    Location & Pricing
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="speakers">
+                                                    <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                    Speakers
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                            <Nav.Item>
+                                                <Nav.Link eventKey="media">
+                                                    <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                    Media
+                                                </Nav.Link>
+                                            </Nav.Item>
+                                        </Nav>
                                     </Col>
                                 </Row>
-                            </Card.Body>
-                        </Card>
 
-                        {/* Event Schedule */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Event Schedule</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col md={8}>
-                                        <div className="event-schedule-inline">
-                                            <div className="schedule-time">
-                                                <i className="fas fa-calendar text-primary mr-2"></i>
-                                                <span className="date-range">
-                                                    {new Date(eventData.event?.startDate).toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric'
-                                                    })} {formatTime(eventData.event?.startTime)}
-                                                    <i className="fas fa-arrow-right mx-2"></i>
-                                                    {new Date(eventData.event?.endDate).toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric'
-                                                    })} {formatTime(eventData.event?.endTime)}
-                                                </span>
-                                            </div>
-                                            <div className="duration-badge mt-2">
-                                                <Badge bg="info">{calculateDuration(eventData.event?.startDate, eventData.event?.endDate)}</Badge>
-                                            </div>
+                                <Tab.Content>
+                                    {/* Details Tab */}
+                                    <Tab.Pane eventKey="details">
+                                        <div className="p-3" style={{ padding: '10px' }}>
+                                            <h5>Event Information</h5>
+                                            <hr />
+                                            <Row>
+                                                <Col md={6}>
+                                                    <p>
+                                                        <strong>Event Name:</strong> {eventData.event?.name}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Event Type:</strong> {eventData.event?.type || 'N/A'}
+                                                    </p>
+                                                    <p>
+                                                        <strong>Start Date:</strong> {eventData.event?.startDate} {eventData.event?.startTime}
+                                                    </p>
+                                                    <p>
+                                                        <strong>End Date:</strong> {eventData.event?.endDate} {eventData.event?.endTime}
+                                                    </p>
+                                                </Col>
+                                                <Col md={6}>
+                                                    <p>
+                                                        <strong>Categories:</strong>
+                                                    </p>
+                                                    {renderCategories()}
+                                                    <p className="mt-3">
+                                                        <strong>Description:</strong>
+                                                    </p>
+                                                    <p
+                                                        style={{
+                                                            textAlign: 'justify',
+                                                            lineHeight: '1.5'
+                                                        }}
+                                                    >
+                                                        {eventData.event?.description}
+                                                    </p>
+                                                </Col>
+                                            </Row>
                                         </div>
-                                    </Col>
-                                    <Col md={4}>
-                                        <div className="text-end">
-                                            <Badge bg="success">
-                                                <i className="fas fa-map-marker-alt mr-1"></i>
-                                                {eventData.event?.venue || 'N/A'}, {eventData.event?.country || 'N/A'}
-                                            </Badge>
+                                    </Tab.Pane>
+
+                                    {/* Location & Pricing Tab */}
+                                    <Tab.Pane eventKey="location">
+                                        <div className="p-3" style={{ padding: '20px' }}>
+                                            <h5>Location & Pricing Information</h5>
+                                            <hr />
+                                            <Row>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-map-marker-alt text-primary mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Location
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {eventData.event?.location || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-building text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Venue
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {eventData.event?.venue || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-flag text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Country
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {eventData.event?.country || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                                <Col xs={12} md={3} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-dollar-sign text-success mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Price
+                                                        </h6>
+                                                        <p
+                                                            className="mb-0"
+                                                            style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}
+                                                        >
+                                                            {eventData.event?.price} {eventData.event?.currency}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+                                            </Row>
                                         </div>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
+                                    </Tab.Pane>
 
-                        {/* Images Section */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>
-                                    Event Images <Badge bg="info">{eventData.event?.images?.length || 0}</Badge>
-                                </Card.Title>
-                                <hr />
-                                {renderImageGrid()}
-                            </Card.Body>
-                        </Card>
+                                    {/* Speakers Tab */}
+                                    <Tab.Pane eventKey="speakers">
+                                        <div className="p-3">
+                                            <h5>Speakers Details</h5>
+                                            <hr />
+                                            {renderSpeakers()}
+                                        </div>
+                                    </Tab.Pane>
 
-                        {/* Documents Section */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>
-                                    Event Documents <Badge bg="info">{eventData.event?.documents?.length || 0}</Badge>
-                                </Card.Title>
-                                <hr />
-                                {renderDocuments()}
-                            </Card.Body>
-                        </Card>
-
-                        {/* Speakers Info */}
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Speakers Details</Card.Title>
-                                <hr />
-                                {renderSpeakers()}
-                            </Card.Body>
-                        </Card>
+                                    {/* Media Tab */}
+                                    <Tab.Pane eventKey="media">
+                                        <div className="p-3" style={{ padding: '20px' }}>
+                                            <Row>
+                                                <Col md={6}>
+                                                    <h5>
+                                                        Event Images <Badge bg="info">{eventData?.event?.images?.length || 0}</Badge>
+                                                    </h5>
+                                                    <hr />
+                                                    {renderImageGrid()}
+                                                </Col>
+                                                <Col md={6} className="section-speakers">
+                                                    <h5>
+                                                        Event Documents <Badge bg="info">{eventData?.event?.documents?.length || 0}</Badge>
+                                                    </h5>
+                                                    <hr />
+                                                    {renderDocuments()}
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    </Tab.Pane>
+                                </Tab.Content>
+                            </Tab.Container>
+                        </div>
 
                         {/* Order Info */}
                         {eventData?.order && (
-                            <Card className="mb-3">
-                                <Card.Body>
-                                    <Card.Title>Order Details</Card.Title>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={6} md={4} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                <strong>Order Number:</strong>
-                                                <br />
-                                                {eventData.order?.orderNo || 'N/A'}
-                                            </Card.Text>
-                                        </Col>
-                                        <Col xs={6} md={4} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                <strong>Payment Status:</strong>
-                                                <br />
-                                                <Badge 
-                                                    bg={eventData.order?.status === 'Success' ? 'success' : 
-                                                        eventData.order?.status === 'Withdraw' ? 'danger' : 'warning'}
-                                                >
-                                                    {eventData.order?.status || 'N/A'}
-                                                </Badge>
-                                            </Card.Text>
-                                        </Col>
-                                        <Col xs={6} md={4} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                <strong>Amount Paid:</strong>
-                                                <br />
-                                                {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
-                                            </Card.Text>
-                                        </Col>
-                                        <Col xs={6} md={4} className="text-start mt-2">
-                                            <Card.Text className="mb-2">
-                                                <strong>Payment Method:</strong>
-                                                <br />
-                                                {eventData.order.paymentMethod || 'N/A'}
-                                            </Card.Text>
-                                        </Col>
-                                        <Col xs={6} md={4} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                <strong>Transaction Date:</strong>
-                                                <br />
-                                                {regDate ? regDate : 'N/A'}
-                                            </Card.Text>
-                                        </Col>
-                                        <Col xs={6} md={4} className="text-start">
-                                            <Card.Text className="mb-2">
-                                                <strong>Receipt/Invoice:</strong>
-                                                <br />
-                                                <div className="mt-2">
-                                                    {eventData.receiptUrl && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="info"
-                                                            className="mr-2"
-                                                            onClick={() => window.open(eventData.receiptUrl, '_blank')}
-                                                        >
-                                                            <i className="fas fa-download"></i> Receipt
-                                                        </Button>
-                                                    )}
-                                                    {eventData.invoiceUrl && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="primary"
-                                                            onClick={() => window.open(eventData.invoiceUrl, '_blank')}
-                                                        >
-                                                            <i className="fas fa-file-text"></i> Invoice
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </Card.Text>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
+                            <div
+                                className="mb-3"
+                                style={{
+                                    backgroundColor: '#fff',
+                                    borderRadius: '8px',
+                                    padding: '20px',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                <h5>Order Details</h5>
+                                <hr />
+                                <Row>
+                                    <Col xs={6} md={4} className="text-start">
+                                        <p className="mb-2">
+                                            <strong>Order Number:</strong>
+                                            <br />
+                                            {eventData.order?.orderNo || 'N/A'}
+                                        </p>
+                                    </Col>
+                                    <Col xs={6} md={4} className="text-start">
+                                        <p className="mb-2">
+                                            <strong>Payment Status:</strong>
+                                            <br />
+                                            <Badge 
+                                                bg={eventData.order?.status === 'Success' ? 'success' : 
+                                                    eventData.order?.status === 'Withdraw' ? 'danger' : 'warning'}
+                                            >
+                                                {eventData.order?.status || 'N/A'}
+                                            </Badge>
+                                        </p>
+                                    </Col>
+                                    <Col xs={6} md={4} className="text-start">
+                                        <p className="mb-2">
+                                            <strong>Amount Paid:</strong>
+                                            <br />
+                                            {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
+                                        </p>
+                                    </Col>
+                                    <Col xs={6} md={4} className="text-start mt-2">
+                                        <p className="mb-2">
+                                            <strong>Payment Method:</strong>
+                                            <br />
+                                            {eventData.order.paymentMethod || 'N/A'}
+                                        </p>
+                                    </Col>
+                                    <Col xs={6} md={4} className="text-start">
+                                        <p className="mb-2">
+                                            <strong>Transaction Date:</strong>
+                                            <br />
+                                            {regDate ? regDate : 'N/A'}
+                                        </p>
+                                    </Col>
+                                    <Col xs={6} md={4} className="text-start">
+                                        <p className="mb-2">
+                                            <strong>Receipt/Invoice:</strong>
+                                            <br />
+                                            <div className="mt-2">
+                                                {eventData.receiptUrl && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="info"
+                                                        className="mr-2"
+                                                        onClick={() => window.open(eventData.receiptUrl, '_blank')}
+                                                    >
+                                                        <i className="fas fa-download"></i> Receipt
+                                                    </Button>
+                                                )}
+                                                {eventData.invoiceUrl && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="primary"
+                                                        onClick={() => window.open(eventData.invoiceUrl, '_blank')}
+                                                    >
+                                                        <i className="fas fa-file-text"></i> Invoice
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </p>
+                                    </Col>
+                                </Row>
+                            </div>
                         )}
-                    </Container>
+                    </div>
                 </Modal.Body>
+
                 <Modal.Footer style={{ backgroundColor: '#f8f9fa' }}>
                     <Button variant="secondary" onClick={onHide}>
                         Close
@@ -745,22 +809,17 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                 </Modal.Footer>
             </Modal>
 
-            {/* Full Screen Image Modal with Navigation */}
-            <Modal 
-                show={showImageModal} 
-                onHide={() => setShowImageModal(false)} 
+            {/* Existing Image Modal */}
+            <Modal
+                show={showImageModal}
+                onHide={() => setShowImageModal(false)}
                 size="xl"
                 centered
                 style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
             >
-                <Modal.Body style={{ 
-                    padding: 0, 
-                    backgroundColor: 'transparent',
-                    position: 'relative',
-                    minHeight: '90vh'
-                }}>
+                <Modal.Body>
                     {/* Fixed Position Controls - Always visible */}
-                    
+
                     {/* Close Button - Fixed Top Right */}
                     <Button
                         variant="light"
@@ -781,15 +840,14 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                     >
                         <i className="fas fa-times"></i>
                     </Button>
-                    
+
                     {/* Download Button - Fixed Top Left */}
                     <Button
                         variant="light"
                         size="sm"
                         onClick={() => {
-                            const images = eventData.event?.images || [];
                             const link = document.createElement('a');
-                            link.href = getImageSrc(images[currentImageIndex]);
+                            link.href = getImageSrc(eventData.event.images[currentImageIndex]);
                             link.download = `event-image-${currentImageIndex + 1}.jpg`;
                             link.click();
                         }}
@@ -808,9 +866,9 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                     >
                         <i className="fas fa-download"></i>
                     </Button>
-                    
+
                     {/* Navigation Arrows - Fixed Left/Right Center */}
-                    {eventData.event?.images && eventData.event.images.length > 1 && (
+                    {eventData.event.images.length > 1 && (
                         <>
                             <Button
                                 variant="light"
@@ -832,7 +890,7 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                             >
                                 <i className="fas fa-chevron-left"></i>
                             </Button>
-                            
+
                             <Button
                                 variant="light"
                                 size="lg"
@@ -855,43 +913,47 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
                             </Button>
                         </>
                     )}
-                    
+
                     {/* Image Counter - Fixed Bottom Center */}
-                    <div style={{
-                        position: 'fixed',
-                        bottom: '20px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        color: 'white',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        zIndex: 1000
-                    }}>
-                        {currentImageIndex + 1} / {eventData.event?.images?.length || 0}
+                    <div
+                        style={{
+                            position: 'fixed',
+                            bottom: '20px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            zIndex: 1000
+                        }}
+                    >
+                        {currentImageIndex + 1} / {eventData.event.images.length}
                     </div>
-                    
+
                     {/* Image Container - Centered */}
-                    <div style={{ 
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        minHeight: '90vh',
-                        padding: '60px 80px 80px 80px' // Top, Right, Bottom, Left padding to avoid controls
-                    }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px' // Top, Right, Bottom, Left padding to avoid controls
+                        }}
+                    >
                         <img
-                            src={getImageSrc(eventData.event?.images?.[currentImageIndex])}
+                            src={getImageSrc(eventData.event.images[currentImageIndex])}
                             alt={`Event Image ${currentImageIndex + 1}`}
-                            style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '100%', 
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
                                 objectFit: 'contain',
                                 borderRadius: '8px'
                             }}
                             onError={(e) => {
-                                console.error('Modal image failed to load:', getImageSrc(eventData.event?.images?.[currentImageIndex]));
+                                console.error('Modal image failed to load:', getImageSrc(eventData.event.images[currentImageIndex]));
                                 e.target.style.display = 'none';
                             }}
                         />
@@ -1082,6 +1144,6 @@ const RegisterEventModal = ({ show, onHide, eventData }) => {
             </Modal>
         </>
     );
-};
+}
 
 export default RegisterEventModal;

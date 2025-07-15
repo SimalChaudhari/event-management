@@ -29,7 +29,7 @@ export const setBannerError = (error) => ({
 export const getBanners = () => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
-        const response = await axiosInstance.get('/banners');
+        const response = await axiosInstance.get('/auth/banners');
         dispatch({
             type: GET_BANNERS,
             payload: response.data,
