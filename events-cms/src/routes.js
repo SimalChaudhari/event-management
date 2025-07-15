@@ -71,7 +71,7 @@ const demoComponents = {
  */
 const dashboardRoutes = [
   {
-    path: '/dashboard',
+    path: '/',
     exact: true,
     name: 'Dashboard',
     component: dashboardComponents.Default

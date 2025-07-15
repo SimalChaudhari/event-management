@@ -11,7 +11,7 @@ const chartData = {
                     title: 'Dashboard',
                     type: 'item',
                     icon: 'feather icon-home',
-                    url: '/dashboard'
+                    url: '/'
                 },
             ]
         },

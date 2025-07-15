@@ -1,5 +1,5 @@
 const Config = {
-    defaultPath: '/dashboard',
+    defaultPath: '/',
     basename: '',
     layout: 'vertical',
     subLayout: '',

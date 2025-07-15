@@ -22,10 +22,38 @@ const Default = () => {
         fetchDashboardData();
     }, []);
 
+    // Enhanced time formatting function with months and years
+    const formatTimeAgo = (timestamp) => {
+        const now = new Date();
+        const activityTime = new Date(timestamp);
+        const diffInSeconds = Math.floor((now - activityTime) / 1000);
+        
+        if (diffInSeconds < 60) {
+            return 'now';
+        } else if (diffInSeconds < 3600) {
+            const minutes = Math.floor(diffInSeconds / 60);
+            return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        } else if (diffInSeconds < 86400) {
+            const hours = Math.floor(diffInSeconds / 3600);
+            return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        } else if (diffInSeconds < 172800) {
+            return 'yesterday';
+        } else if (diffInSeconds < 2592000) { // 30 days
+            const days = Math.floor(diffInSeconds / 86400);
+            return `${days} day${days > 1 ? 's' : ''} ago`;
+        } else if (diffInSeconds < 31536000) { // 365 days
+            const months = Math.floor(diffInSeconds / 2592000);
+            return `${months} month${months > 1 ? 's' : ''} ago`;
+        } else {
+            const years = Math.floor(diffInSeconds / 31536000);
+            return `${years} year${years > 1 ? 's' : ''} ago`;
+        }
+    };
+
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [stats, activities, events, health] = await Promise.all([
+            const [stats, activities, topEvents, health] = await Promise.all([
                 dashboardService.getDashboardStats(),
                 dashboardService.getRecentActivities(),
                 dashboardService.getTopEvents(),
@@ -34,7 +62,7 @@ const Default = () => {
 
             setDashboardData(stats.data);
             setRecentActivities(activities.data);
-            setTopEvents(events.events || []);
+            setTopEvents(topEvents.data || []);
             setSystemHealth(health.data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -114,133 +142,106 @@ const Default = () => {
                             </div>
                         </Col>
                     </Row>
-                    
                 </Card.Body>
             </Card>
         );
     };
 
     // Recent Activities Component
-    const RecentActivities = () => (
-        <Card className='h-100' style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
-            <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="mb-0">
-                        <i className="feather icon-clock mr-2"></i>
-                        Recent Activities
-                    </h6>
-                    <Button variant="outline-primary" size="sm" onClick={fetchDashboardData}>
-                        <i className="feather icon-refresh-cw mr-1"></i>
-                        Refresh
-                    </Button>
-                </div>
-                <div>
-                    {recentActivities.slice(0, 5).map((activity) => (
-                        <div key={activity.id} className="d-flex align-items-center mb-3 p-2" style={{borderRadius: '8px', backgroundColor: '#f8f9fa'}}>
-                            <div className={`bg-${activity.status} rounded-circle mr-3`} style={{width: '8px', height: '8px'}}></div>
-                            <div className="flex-grow-1">
-                                <div className="d-flex justify-content-between">
-                                    <strong>{activity.action}</strong>
-                                    <small className="text-muted">
-                                        {new Date(activity.time).toLocaleString()}
-                                    </small>
-                                </div>
-                                <small className="text-muted">{activity.title}</small>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </Card.Body>
-        </Card>
-    );
-
-    // Top Events Component
-    const TopEvents = () => {
-        const staticTopEvents = [
-            {
-                id: 1,
-                title: "Tech Conference 2024",
-                participants: 250,
-                price: 15000,
-                status: "upcoming"
-            },
-            {
-                id: 2,
-                title: "Music Festival",
-                participants: 180,
-                price: 8000,
-                status: "completed"
-            },
-            {
-                id: 3,
-                title: "Business Summit",
-                participants: 120,
-                price: 12000,
-                status: "upcoming"
-            },
-            {
-                id: 4,
-                title: "Art Exhibition",
-                participants: 95,
-                price: 5000,
-                status: "completed"
-            },
-            {
-                id: 5,
-                title: "Sports Tournament",
-                participants: 200,
-                price: 10000,
-                status: "upcoming"
-            }
-        ];
-
+    const RecentActivities = () => {
         return (
             <Card className='h-100' style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
                 <Card.Body>
-                    <h6 className="mb-3">
-                        <i className="feather icon-star mr-2"></i>
-                        Top Performing Events
-                    </h6>
-                    <Table responsive className="mb-0">
-                        <thead>
-                            <tr>
-                                <th>Event</th>
-                                <th>Participants</th>
-                                <th>Revenue</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {staticTopEvents.map((event, index) => (
-                                <tr key={event.id}>
-                                    <td>
-                                        <div>
-                                            <strong>{event.title}</strong>
-                                            <div><small className="text-muted">#{index + 1} Top Event</small></div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <Badge variant="info">{event.participants}</Badge>
-                                    </td>
-                                    <td>
-                                        <strong>₹{event.price}</strong>
-                                    </td>
-                                    <td>
-                                        <Badge variant={event.status === 'upcoming' ? 'warning' : 'success'}>
-                                            {event.status}
-                                        </Badge>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </Table>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h6 className="mb-0">
+                            <i className="feather icon-clock mr-2"></i>
+                            Recent Activities
+                        </h6>
+                        <Button variant="outline-primary" size="sm" onClick={fetchDashboardData}>
+                            <i className="feather icon-refresh-cw mr-1"></i>
+                            Refresh
+                        </Button>
+                    </div>
+                    <div>
+                        {recentActivities.map((activity) => (
+                            <div key={activity.id} className="d-flex align-items-center mb-3 p-2" style={{borderRadius: '8px', backgroundColor: '#f8f9fa'}}>
+                                <div className={`bg-${activity.status} rounded-circle mr-3`} style={{width: '8px', height: '8px'}}></div>
+                                <div className="flex-grow-1">
+                                    <div className="d-flex justify-content-between">
+                                        <strong>{activity.action}</strong>
+                                        <small className="text-muted">
+                                            {formatTimeAgo(activity.time)}
+                                        </small>
+                                    </div>
+                                    <small className="text-muted">{activity.title}</small>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </Card.Body>
             </Card>
         );
     };
 
-
-    
+    // Top Events Component
+    const TopEvents = () => {
+        return (
+            <Card className='h-100' style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
+                <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h6 className="mb-0">
+                            <i className="feather icon-star mr-2"></i>
+                            Top Performing Events
+                        </h6>
+                        <Button variant="outline-primary" size="sm" onClick={fetchDashboardData}>
+                            <i className="feather icon-refresh-cw mr-1"></i>
+                            Refresh
+                        </Button>
+                    </div>
+                    {topEvents.length > 0 ? (
+                        <Table responsive className="mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Participants</th>
+                                    <th>Revenue</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {topEvents.map((event, index) => (
+                                    <tr key={event.id}>
+                                        <td>
+                                            <div>
+                                                <strong>{event.name}</strong>
+                                                <div><small className="text-muted">#{index + 1} Top Event</small></div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <Badge variant="info">{event.totalAttendance}</Badge>
+                                        </td>
+                                        <td>
+                                            <strong>₹{event.totalRevenue.toLocaleString()}</strong>
+                                        </td>
+                                        <td>
+                                            <Badge variant={event.isUpcoming ? 'warning' : 'success'}>
+                                                {event.isUpcoming ? 'Upcoming' : 'Completed'}
+                                            </Badge>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    ) : (
+                        <div className="text-center py-4">
+                            <i className="feather icon-calendar text-muted" style={{fontSize: '48px'}}></i>
+                            <p className="text-muted mt-2">No events found</p>
+                        </div>
+                    )}
+                </Card.Body>
+            </Card>
+        );
+    };
 
     if (loading) {
         return (
@@ -373,8 +374,6 @@ const Default = () => {
                 </Col>
             </Row>
 
-     
-
             {/* Additional Features */}
             <Row className="mt-4">
                 <Col lg={6} md={12} className="mb-4">
@@ -384,10 +383,7 @@ const Default = () => {
                 <Col lg={6} md={12} className="mb-4">
                     <TopEvents />
                 </Col>
-               
-               
             </Row>
-
         </div>
     );
 };

@@ -4,6 +4,7 @@ import { Between, Repository } from 'typeorm';
 
 import { Event } from '../event/event.entity';
 import { Order } from '../order/order.entity';
+import { OrderItemEntity } from '../order/event.item.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { UserEntity, UserRole } from 'user/users.entity';
 
@@ -16,6 +17,8 @@ export class DashboardService {
     private eventRepository: Repository<Event>,
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
+    @InjectRepository(OrderItemEntity)
+    private orderItemRepository: Repository<OrderItemEntity>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
   ) {}
@@ -82,17 +85,17 @@ export class DashboardService {
   async getRecentActivities() {
     const recentEvents = await this.eventRepository.find({
       order: { createdAt: 'DESC' },
-      take: 5,
+      take: 2,
     });
 
     const recentUsers = await this.userRepository.find({
       order: { createdAt: 'DESC' },
-      take: 5,
+      take: 2,
     });
 
     const recentOrders = await this.orderRepository.find({
       order: { createdAt: 'DESC' },
-      take: 5,
+      take: 2,
     });
 
     const activities: any[] = [];
@@ -134,7 +137,7 @@ export class DashboardService {
     });
     
 
-    // activities को समय के अनुसार sort करने के लिए getTime() का उपयोग करें
+    // activities sort getTime() use
     return activities
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, 10);
@@ -150,5 +153,65 @@ export class DashboardService {
       responseTime: 2.3,
       satisfactionScore: 4.6,
     };
+  }
+
+  async getTopEvents() {
+    // Get all events (both upcoming and past)
+    const allEvents = await this.eventRepository.find({
+      order: { startDate: 'DESC' }
+    });
+
+    // for each event calculate attendance count and revenue
+    const eventsWithStats = await Promise.all(
+      allEvents.map(async (event) => {
+        // Attendance count
+        const attendanceCount = await this.registerEventRepository.count({
+          where: { eventId: event.id }
+        });
+
+        // Revenue calculation (OrderItemEntity from event orders revenue)
+        const eventRevenue = await this.orderRepository
+          .createQueryBuilder('order')
+          .leftJoin('order.orderItems', 'orderItem')
+          .leftJoin('orderItem.event', 'event')
+          .where('event.id = :eventId', { eventId: event.id })
+          .andWhere('order.status = :status', { status: 'Completed' })
+          .select('SUM(order.price)', 'totalRevenue')
+          .getRawOne();
+        
+        const totalRevenue = eventRevenue?.totalRevenue || 0;
+        const isUpcoming = new Date(event.startDate) > new Date();
+
+        return {
+          id: event.id,
+          name: event.name,
+          totalAttendance: attendanceCount,
+          totalRevenue: parseFloat(totalRevenue),
+          isUpcoming: isUpcoming,
+          startDate: event.startDate
+        };
+      })
+    );
+
+    // Sort by priority: High Revenue + Upcoming events first
+    const sortedEvents = eventsWithStats
+      .sort((a, b) => {
+        // Priority 1: High Revenue (70% weight)
+        const revenueScoreA = a.totalRevenue * 0.7;
+        const revenueScoreB = b.totalRevenue * 0.7;
+        
+        // Priority 2: Upcoming events (30% weight)
+        const upcomingScoreA = a.isUpcoming ? 1000 : 0; // Bonus for upcoming
+        const upcomingScoreB = b.isUpcoming ? 1000 : 0;
+        
+        // Combined score
+        const totalScoreA = revenueScoreA + upcomingScoreA;
+        const totalScoreB = revenueScoreB + upcomingScoreB;
+        
+        return totalScoreB - totalScoreA; // Highest score first
+      })
+      .slice(0, 5); // Only top 5
+
+    return sortedEvents;
   }
 } 

@@ -151,8 +151,9 @@ function atable(registrations, handleView, handleAddRegisterEvent) {
                             <h6 class="m-b-5">${row.event.name}</h6>
                             <p class="m-b-0">
                                 <span class="badge ${badgeClass}">${statusText}</span>
-                                <span class="badge badge-secondary ml-1">${row.event.type}</span>
+                    
                             </p>
+                              <span class="badge badge-primary font-weight-bold mt-2">Total Attendance: ${row.event.attendanceCount}</span>
                         </div>
                     `;
                 }
@@ -424,7 +425,7 @@ const RegisteredEvents = () => {
                                 <tr>
                                     <th>Registered By</th>
                                     <th>User Type</th>
-                                    <th>Event Name / Date / Type</th>
+                                    <th>Event Name / Date</th>
                                     <th>Location / Venue / Country</th>
                                     <th>Event Schedule</th>
                                     <th>Status</th>

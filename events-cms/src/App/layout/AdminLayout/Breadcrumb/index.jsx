@@ -75,7 +75,7 @@ const Breadcrumb = (props) => {
                                 </div>
                                 <ul className="breadcrumb">
                                     <li className="breadcrumb-item">
-                                        <Link to="/dashboard">
+                                        <Link to="/">
                                             <i className="feather icon-home"/>
                                         </Link>
                                     </li>

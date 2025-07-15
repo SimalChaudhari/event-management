@@ -58,7 +58,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
         columns: [
             {
                 data: 'name',
-              
+
                 render: function (data, type, row) {
                     const imageUrl = DUMMY_PATH;
                     const eventDate = new Date(row.startDate);
@@ -91,7 +91,9 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
 
                     return `
                         <div class="d-inline-block align-middle">
-                         <img src="${row.image ? `${API_URL}/${row.image}` : imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                         <img src="${
+                             row.image ? `${API_URL}/${row.image}` : imageUrl
+                         }" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
                               <div class="d-inline-block">
                             <p class="m-b-0">
                                  <h6>${row.name}</h6>
@@ -100,22 +102,28 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                                         <span class="ml-1">${statusText}</span>
                                     </span>
                             </p>
+                                <span class="badge badge-primary font-weight-bold">Total Attendance: ${row.attendanceCount}</span>
+
                                </div>
                         </div>   
                     `;
                 }
-            },    
+            },
             {
                 data: 'type',
                 title: 'User Type',
                 render: function (data, type, row) {
                     let bgColor = '';
                     if (row.type?.toLowerCase() === 'physical') {
-                        bgColor = 'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                        bgColor =
+                            'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
                     } else if (row.type?.toLowerCase() === 'virtual') {
-                        bgColor = 'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
+                        bgColor =
+                            'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
                     }
-                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${row.type || 'N/A'}</span></div>`;
+                    return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${
+                        row.type || 'N/A'
+                    }</span></div>`;
                 }
             },
 

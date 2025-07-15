@@ -68,4 +68,23 @@ export class DashboardController {
       });
     }
   }
+
+  @Get('top-events')
+  @Roles(UserRole.Admin)
+  async getTopEvents(@Res() response: Response) {
+    try {
+      const topEvents = await this.dashboardService.getTopEvents();
+      return response.status(200).json({
+        success: true,
+        message: 'Top events retrieved successfully',
+        data: topEvents,
+      });
+    } catch (error:any) {
+      return response.status(500).json({
+        success: false,
+        message: 'Failed to retrieve top events',
+        error: error.message,
+      });
+    }
+  }
 } 

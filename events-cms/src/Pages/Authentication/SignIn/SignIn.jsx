@@ -29,7 +29,7 @@ const SignIn = () => {
             const data = { email, password };
             const response = await dispatch(login(data));
             if (response.success) {
-                navigate('/dashboard');
+                navigate('/');
             } else {
                 resetForm();
             }

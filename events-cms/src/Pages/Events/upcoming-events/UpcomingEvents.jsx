@@ -103,6 +103,8 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                                         <span class="ml-1">${statusText}</span>
                                     </span>
                             </p>
+                                 <span class="badge badge-primary font-weight-bold">Total Attendance: ${row.attendanceCount}</span>
+
                                </div>
                         </div> 
                     `;

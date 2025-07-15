@@ -59,7 +59,7 @@ class DashboardService {
     // Get top performing events
     async getTopEvents() {
         try {
-            const response = await axiosInstance.get('/events?sort=revenue&limit=5');
+            const response = await axiosInstance.get('/dashboard/top-events');
             return response.data;
         } catch (error) {
             console.error('Error fetching top events:', error);
