@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Row, Col, Card, Container, Badge, Nav, Tab } from 'react-bootstrap';
 import { API_URL } from '../../../configs/env';
 import '../../../assets/css/speakers.css';
+import DateTimeFormatter from '../../../components/dateTime/DateTimeFormatter';
 
 function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -87,7 +88,7 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
     const renderWithdrawalStats = () => {
         return (
             <Row>
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={12} md={4} lg={3} className="mb-3">
                     <div
                         className="text-center p-3"
                         style={{
@@ -106,7 +107,7 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                         </p>
                     </div>
                 </Col>
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={12} md={4} lg={3} className="mb-3">
                     <div
                         className="text-center p-3"
                         style={{
@@ -121,11 +122,15 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                             Request Date
                         </h6>
                         <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                            {new Date(request_at).toLocaleDateString('en-GB')}
+                            <DateTimeFormatter 
+                                date={request_at} 
+                                // time={request_at}
+                                showDay={true}
+                            />
                         </p>
                     </div>
                 </Col>
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={12} md={4} lg={3} className="mb-3">
                     <div
                         className="text-center p-3"
                         style={{
@@ -144,7 +149,7 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                         </p>
                     </div>
                 </Col>
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={12} md={4} lg={3} className="mb-3">
                     <div
                         className="text-center p-3"
                         style={{
@@ -1006,11 +1011,24 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                                                         </h6>
                                                         <div className="d-flex justify-content-between align-items-center">
                                                             <div>
-                                                                <strong>Requested At:</strong> {new Date(request_at).toLocaleString()}
+                                                                <strong>Requested At:</strong> 
+                                                                <DateTimeFormatter 
+                                                                    date={request_at} 
+                                                                    time={request_at}
+                                                                    showDay={true}
+                                                                />
                                                             </div>
                                                             <div>
                                                                 <strong>Reviewed At:</strong>{' '}
-                                                                {reviewed_at ? new Date(reviewed_at).toLocaleString() : 'Pending'}
+                                                                {reviewed_at ? (
+                                                                    <DateTimeFormatter
+                                                                        date={reviewed_at}
+                                                                        time={reviewed_at}
+                                                                        showDay={true}
+                                                                    />
+                                                                ) : (
+                                                                    'Pending'
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

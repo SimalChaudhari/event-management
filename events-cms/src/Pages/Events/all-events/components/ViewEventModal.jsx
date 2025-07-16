@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Row, Col, Card, Badge, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
+import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
 
 function ViewEventModal({ show, handleClose, eventData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -488,10 +489,10 @@ function ViewEventModal({ show, handleClose, eventData }) {
                                                         <strong>Event Type:</strong> {eventData.type || 'N/A'}
                                                     </p>
                                                     <p>
-                                                        <strong>Start Date:</strong> {eventData.startDate} {eventData.startTime}
+                                                        <strong>Start Date:</strong> <DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />
                                                     </p>
                                                     <p>
-                                                        <strong>End Date:</strong> {eventData.endDate} {eventData.endTime}
+                                                        <strong>End Date:</strong> <DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />
                                                     </p>
                                                 </Col>
                                                 <Col md={6}>

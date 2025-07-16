@@ -141,6 +141,7 @@ export class EventController {
       type?: EventType;
       price?: number;
       location?: string;
+      category?: string;
     },
     @Request() req: any,
     @Res() response: Response,
@@ -150,6 +151,7 @@ export class EventController {
     return response.status(200).json({
       success: true,
       total: events.length,
+      
       message: 'Events retrieved successfully',
       events: events,
     });

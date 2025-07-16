@@ -16,6 +16,7 @@ import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmatio
 import ViewEventModal from '../all-events/components/ViewEventModal';
 import AddEventModal from '../all-events/components/AddEventModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -150,63 +151,9 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
             },
             {
                 data: null,
-                title: 'Start',
+                title: 'Event Date',
                 render: function (data, type, row) {
-                    const date = new Date(row.startDate);
-                    const formattedDate = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    const formattedTime = row.startTime ? formatTime(row.startTime) : '';
-                    return `
-                        <div class="event-date-time">
-                            <div class="event-date">${formattedDate}</div>
-                            ${formattedTime ? `<div class="event-time-text">${formattedTime}</div>` : ''}
-                        </div>
-                    `;
-                }
-            },
-            {
-                data: null,
-                title: 'End',
-                render: function (data, type, row) {
-                    const date = new Date(row.endDate);
-                    const formattedDate = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    const formattedTime = row.endTime ? formatTime(row.endTime) : '';
-                    return `
-                        <div class="event-date-time">
-                            <div class="event-date">${formattedDate}</div>
-                            ${formattedTime ? `<div class="event-time-text">${formattedTime}</div>` : ''}
-                        </div>
-                    `;
-                }
-            },
-            {
-                data: null,
-                title: 'Duration',
-                render: function (data, type, row) {
-                    if (!row.startDate || !row.endDate) return '';
-
-                    const startDate = new Date(row.startDate);
-                    const endDate = new Date(row.endDate);
-                    const diffTime = Math.abs(endDate - startDate);
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                    let duration = '';
-                    if (diffDays === 0) {
-                        duration = 'Same day';
-                    } else if (diffDays === 1) {
-                        duration = '1 day';
-                    } else {
-                        duration = `${diffDays} days`;
-                    }
-
-                    return `<span class="badge badge-light">${duration}</span>`;
+                    return formatDateTimeForTable(row.startDate, row.startTime);
                 }
             },
             {
@@ -416,9 +363,7 @@ const UpcomingEvents = () => {
                                         <th>Type</th>
                                         <th>Price</th>
                                         <th>Location</th> 
-                                        <th>Start</th>
-                                        <th>End</th>
-                                        <th>Duration</th>
+                                        <th>Event Date</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

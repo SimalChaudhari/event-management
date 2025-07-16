@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Row, Col, Card, Badge, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH_USER } from '../../../configs/env';
 import '../../../assets/css/speakers.css';
+import DateTimeFormatter from '../../../components/dateTime/DateTimeFormatter';
 
 function ViewOrderModal({ show, handleClose, orderData }) {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -92,6 +93,7 @@ function ViewOrderModal({ show, handleClose, orderData }) {
 
     // Render order statistics
     const renderOrderStats = () => {
+        
         return (
             <Row>
                 <Col xs={6} md={3} className="mb-3">
@@ -147,7 +149,15 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             Order Date
                         </h6>
                         <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                            {new Date(orderData.createdAt).toLocaleDateString('en-GB')}
+                            {orderData.orderItems.map((item) => {
+                                return (
+                                    <DateTimeFormatter 
+                                        date={item.createdAt} 
+                                        time={item.createdAt}
+                                        showDay={false}
+                                    />
+                                );
+                            })}
                         </p>
                     </div>
                 </Col>
@@ -491,7 +501,11 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             </h6>
                         </div>
                         <p className="mb-0" style={{ fontSize: '13px', color: '#6c757d' }}>
-                            {new Date(event.startDate).toLocaleDateString('en-GB')} {formatTime(event.startTime)}
+                            <DateTimeFormatter 
+                                date={event.startDate} 
+                                time={event.startTime}
+                                showDay={false}
+                            />
                         </p>
                     </div>
                 </Col>
@@ -806,23 +820,17 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                             }}
                         >
-                            <Tab.Container id="order-tabs" defaultActiveKey="customer">
+                            <Tab.Container id="order-tabs" defaultActiveKey="order">
                                 <Row>
                                     <Col sm={12}>
                                         <Nav variant="tabs" className="mb-3">
-                                            <Nav.Item>
-                                                <Nav.Link eventKey="customer">
-                                                    <i className="fas fa-user me-2" style={{ color: '#4680ff', marginRight: '8px' }}></i>
-                                                    Customer Info
-                                                </Nav.Link>
-                                            </Nav.Item>
                                             <Nav.Item>
                                                 <Nav.Link eventKey="order">
                                                     <i
                                                         className="fas fa-shopping-cart me-2"
                                                         style={{ color: '#4680ff', marginRight: '8px' }}
                                                     ></i>
-                                                    Order Details
+                                                    Customer / Order
                                                 </Nav.Link>
                                             </Nav.Item>
                                             <Nav.Item>
@@ -840,12 +848,14 @@ function ViewOrderModal({ show, handleClose, orderData }) {
 
                                 <Tab.Content>
                                     {/* Customer Info Tab */}
-                                    <Tab.Pane eventKey="customer">
-                                        <div className="p-3" style={{ padding: '10px' }}>
-                                            <h5>Customer Information</h5>
+
+                                    {/* Order Details Tab */}
+                                    <Tab.Pane eventKey="order">
+                                        <div className="p-3" style={{ padding: '20px' }}>
+                                            <h5>Customer / Order Information</h5>
                                             <hr />
                                             <Row>
-                                                <Col md={6}>
+                                                <Col md={12}>
                                                     <p>
                                                         <strong>Customer Name:</strong> {orderData.user.firstName} {orderData.user.lastName}
                                                     </p>
@@ -856,30 +866,9 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                                         <strong>Mobile:</strong> {orderData.user.mobile || 'N/A'}
                                                     </p>
                                                 </Col>
-                                                <Col md={6}>
-                                                    <p>
-                                                        <strong>Order Date:</strong>{' '}
-                                                        {new Date(orderData.createdAt).toLocaleDateString('en-GB')}
-                                                    </p>
-                                                    <p>
-                                                        <strong>Order Time:</strong>{' '}
-                                                        {new Date(orderData.createdAt).toLocaleTimeString('en-GB')}
-                                                    </p>
-                                                    <p>
-                                                        <strong>Customer ID:</strong> {orderData.user.id}
-                                                    </p>
-                                                </Col>
-                                            </Row>
-                                        </div>
-                                    </Tab.Pane>
+                                                
 
-                                    {/* Order Details Tab */}
-                                    <Tab.Pane eventKey="order">
-                                        <div className="p-3" style={{ padding: '20px' }}>
-                                            <h5>Order Information</h5>
-                                            <hr />
-                                            <Row>
-                                                <Col xs={12} md={3} className="mb-3">
+                                                <Col xs={12} md={4} className="mb-3">
                                                     <div
                                                         className="text-center p-3"
                                                         style={{
@@ -898,7 +887,35 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                                         </p>
                                                     </div>
                                                 </Col>
-                                                <Col xs={12} md={3} className="mb-3">
+                                              
+                                                <Col xs={12} md={4} className="mb-3">
+                                                    <div
+                                                        className="text-center p-3"
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e9ecef',
+                                                            padding: '20px'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className="fas fa-credit-card text-primary mb-2"
+                                                            style={{ fontSize: '1.5rem' }}
+                                                        ></i>
+                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                                                            Invoice Number
+                                                        </h6>
+                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                                                            {orderData.orderItems.map(({ invoiceNumber }) => {
+                                                                return (
+                                                                    <p>{invoiceNumber}</p>
+                                                                );
+                                                            })}
+                                                        </p>
+                                                    </div>
+                                                </Col>
+
+                                                <Col xs={12} md={4} className="mb-3">
                                                     <div
                                                         className="text-center p-3"
                                                         style={{
@@ -920,53 +937,7 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                                         </p>
                                                     </div>
                                                 </Col>
-                                                <Col xs={12} md={3} className="mb-3">
-                                                    <div
-                                                        className="text-center p-3"
-                                                        style={{
-                                                            backgroundColor: '#f8f9fa',
-                                                            borderRadius: '8px',
-                                                            border: '1px solid #e9ecef',
-                                                            padding: '20px'
-                                                        }}
-                                                    >
-                                                        <i
-                                                            className="fas fa-credit-card text-primary mb-2"
-                                                            style={{ fontSize: '1.5rem' }}
-                                                        ></i>
-                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                            Payment Method
-                                                        </h6>
-                                                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                            {orderData.paymentMethod || 'N/A'}
-                                                        </p>
-                                                    </div>
-                                                </Col>
-                                                <Col xs={12} md={3} className="mb-3">
-                                                    <div
-                                                        className="text-center p-3"
-                                                        style={{
-                                                            backgroundColor: '#f8f9fa',
-                                                            borderRadius: '8px',
-                                                            border: '1px solid #e9ecef',
-                                                            padding: '20px'
-                                                        }}
-                                                    >
-                                                        <i
-                                                            className="fas fa-dollar-sign text-success mb-2"
-                                                            style={{ fontSize: '1.5rem' }}
-                                                        ></i>
-                                                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                            Total Amount
-                                                        </h6>
-                                                        <p
-                                                            className="mb-0"
-                                                            style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}
-                                                        >
-                                                            {orderData.price} {orderData.currency || '$'}
-                                                        </p>
-                                                    </div>
-                                                </Col>
+                                              
                                             </Row>
                                         </div>
                                     </Tab.Pane>

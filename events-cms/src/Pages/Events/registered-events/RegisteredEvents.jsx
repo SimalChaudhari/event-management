@@ -13,6 +13,7 @@ import '../../../assets/css/register.css'; // Import the CSS file
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
 import AddRegisterEventModal from './modal/AddRegisterEventModal';
+import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -179,53 +180,7 @@ function atable(registrations, handleView, handleAddRegisterEvent) {
                 data: null,
                 title: 'Event Schedule',
                 render: function (data, type, row) {
-                    if (type === 'sort') {
-                        return row.event.startDate + ' ' + (row.event.startTime || '');
-                    }
-
-                    const startDate = new Date(row.event.startDate);
-                    const endDate = new Date(row.event.endDate);
-                    const today = new Date();
-                    const tomorrow = new Date(today);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-
-                    let startDateDisplay;
-                    if (startDate.toDateString() === today.toDateString()) {
-                        startDateDisplay = 'Today';
-                    } else if (startDate.toDateString() === tomorrow.toDateString()) {
-                        startDateDisplay = 'Tomorrow';
-                    } else {
-                        startDateDisplay = startDate.toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                        });
-                    }
-
-                    const endDateDisplay = endDate.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-
-                    const startTime = row.event.startTime ? formatTime(row.event.startTime) : '';
-                    const endTime = row.event.endTime ? formatTime(row.event.endTime) : '';
-
-                    return `
-                        <div class="event-schedule-inline">
-                            <div class="schedule-time">
-                                <i class="feather icon-calendar text-primary"></i>
-                                <span class="date-range">
-                                    ${startDateDisplay} ${startTime ? `at ${startTime}` : ''} 
-                                    <i class="feather icon-arrow-right mx-2"></i> 
-                                    ${endDateDisplay} ${endTime ? `at ${endTime}` : ''}
-                                </span>
-                            </div>
-                            <div class="duration-badge mt-1">
-                                ${calculateDuration(startDate, endDate)}
-                            </div>
-                        </div>
-                    `;
+                    return formatDateTimeForTable(row.event.startDate, row.event.startTime);
                 }
             },
 
