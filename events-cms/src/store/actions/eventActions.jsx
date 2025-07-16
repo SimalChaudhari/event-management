@@ -1,6 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import {  EVENT_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from "../constants/actionTypes";
+import {  EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from "../constants/actionTypes";
 
 export const eventList = () => async (dispatch) => {
     try {
@@ -162,6 +162,20 @@ export const removeEventDocument = (eventId, documentPath) => async (dispatch) =
         toast.error(errorMessage || 'Error removing document');
     }
     return false;
+};
+
+export const galleryList = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/gallery');
+        dispatch({
+            type: GALLERY_LIST,
+            payload: response.data,
+        });
+        return true;
+    } catch (error) {
+        console.error('Error fetching gallery:', error);
+        throw error;    
+    }
 };
 
 

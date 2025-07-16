@@ -1,7 +1,8 @@
-import { EVENT_LIST, PARTICIPATED_EVENTS,UPCOMING_EVENT_LIST } from "../constants/actionTypes";
+import { EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS,UPCOMING_EVENT_LIST } from "../constants/actionTypes";
 
 const initialState = {
     event: [],
+    galleryList: [],
     eventByID: '',
     participatedEvents: []  ,
     upcomingEvents: [],
@@ -19,6 +20,11 @@ const eventReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 participatedEvents: payload
+            };
+        case GALLERY_LIST:
+            return {
+                ...state,
+                galleryList: payload
             };
         case UPCOMING_EVENT_LIST:
             return {

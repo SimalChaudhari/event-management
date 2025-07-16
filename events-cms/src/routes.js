@@ -24,6 +24,7 @@ const eventComponents = {
   List: React.lazy(() => import('./Pages/Events/all-events/EventView.jsx')),
   Upcoming: React.lazy(() => import('./Pages/Events/upcoming-events/UpcomingEvents.jsx')),
   Registered: React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx')),
+  Gallery: React.lazy(() => import('./Pages/Events/Gallery/GalleryPage.jsx')),
   Categories: React.lazy(() => import('./Pages/Events/categories/Categories.jsx')),
 };
 
@@ -126,6 +127,12 @@ const eventRoutes = [
     exact: true,
     name: 'Registered Events',
     component: eventComponents.Registered
+  },
+  {
+    path: '/events/gallery',
+    exact: true,
+    name: 'Gallery',
+    component: eventComponents.Gallery
   },
   {
     path: '/categories',

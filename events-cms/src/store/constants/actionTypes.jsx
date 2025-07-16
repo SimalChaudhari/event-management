@@ -1,6 +1,7 @@
 export const AUTH_DATA = 'AUTH_DATA';
 export const USER_LIST = 'USER_LIST';
 export const EVENT_LIST = 'EVENT_LIST';
+export const GALLERY_LIST = 'GALLERY_LIST';
 export const PARTICIPATED_EVENTS = 'PARTICIPATED_EVENTS';
 export const UPCOMING_EVENT_LIST = 'UPCOMING_EVENT_LIST';
 export const ORDER_LIST = 'ORDER_LIST';

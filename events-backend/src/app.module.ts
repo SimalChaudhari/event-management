@@ -22,6 +22,7 @@ import { FeedbackModule } from 'feedback/feedback.module';
 import { CouponModule } from 'coupon/coupon.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CategoryModule } from 'category/category.module';
+import { GalleryModule } from 'gallery/gallery.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -41,6 +42,7 @@ console.log(join(__dirname, '..', 'uploads'))
     AuthModule,
     SettingModule,
     UserModule,
+    GalleryModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     CacheModule.register({
       isGlobal: true,

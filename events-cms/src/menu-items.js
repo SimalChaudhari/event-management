@@ -58,6 +58,7 @@ const chartData = {
                         }
                     ]
                 },
+              
                 {
                     id: 'categories',
                     title: 'Categories',
@@ -89,6 +90,13 @@ const chartData = {
                     type: 'item',
                     icon: 'feather icon-credit-card',
                     url: '/withrawal'
+                },
+                {
+                    id: 'gallery',
+                    title: 'Gallery',
+                    type: 'item',
+                    icon: 'feather icon-image',
+                    url: '/events/gallery'
                 },
             ]
         },
