@@ -24,9 +24,14 @@ const eventComponents = {
   List: React.lazy(() => import('./Pages/Events/all-events/EventView.jsx')),
   Upcoming: React.lazy(() => import('./Pages/Events/upcoming-events/UpcomingEvents.jsx')),
   Registered: React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx')),
-  Gallery: React.lazy(() => import('./Pages/Events/Gallery/GalleryPage.jsx')),
   Categories: React.lazy(() => import('./Pages/Events/categories/Categories.jsx')),
 };
+
+const MediaManagerComponents = {
+  Gallery: React.lazy(() => import('./Pages/MediaManager/Gallery/GalleryPage.jsx')),
+  BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx'))
+};
+
 
 /**
  * Transaction related components
@@ -55,7 +60,6 @@ const userComponents = {
 const settingsComponents = {
   TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
   PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx')),
-  BannerManagement: React.lazy(() => import('./Pages/Settings/Banner/BannerManagement.jsx'))
 };
 
 /**
@@ -128,18 +132,28 @@ const eventRoutes = [
     name: 'Registered Events',
     component: eventComponents.Registered
   },
-  {
-    path: '/events/gallery',
-    exact: true,
-    name: 'Gallery',
-    component: eventComponents.Gallery
-  },
+
   {
     path: '/categories',
     exact: true,
     name: 'Categories List',
     component: eventComponents.Categories
   },
+];
+
+const MediaManagerRoutes = [
+  {
+    path: '/media-manager/gallery',
+    exact: true,
+    name: 'Gallery',
+    component: MediaManagerComponents.Gallery
+  },
+  {
+    path: '/media-manager/banner-management',
+    exact: true,
+    name: 'Banner Management',
+    component: MediaManagerComponents.BannerManagement
+  }
 ];
 
 /**
@@ -192,13 +206,8 @@ const settingsRoutes = [
     exact: true,
     name: 'Privacy Policy',
     component: settingsComponents.PrivacyPolicy
-  },
-  {
-    path: '/settings/banner-management',
-    exact: true,
-    name: 'Banner Management',
-    component: settingsComponents.BannerManagement
   }
+
 ];
 
 /**
@@ -209,6 +218,7 @@ const routes = [
   ...dashboardRoutes,
   ...userRoutes,
   ...eventRoutes,
+  ...MediaManagerRoutes,
   ...settingsRoutes,
   ...transactionRoutes,
   ...demoRoutes

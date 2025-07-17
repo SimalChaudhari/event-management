@@ -91,13 +91,29 @@ const chartData = {
                     icon: 'feather icon-credit-card',
                     url: '/withrawal'
                 },
+            
+            ]
+        },
+        {
+            id: 'media-manager',
+            title: 'Media Manager',
+            type: 'group',
+            icon: 'icon-ui',
+            children: [
                 {
                     id: 'gallery',
                     title: 'Gallery',
                     type: 'item',
                     icon: 'feather icon-image',
-                    url: '/events/gallery'
+                    url: '/media-manager/gallery'
                 },
+                {
+                    id: 'banners',
+                    title: 'Banners',
+                    type: 'item',
+                    icon: 'feather icon-image',
+                    url: '/media-manager/banner-management'
+                }
             ]
         },
         {
@@ -149,13 +165,7 @@ const chartData = {
                           
                             url: '/settings/privacy-policy'
                         },
-                        {
-                            id: 'banner-management',
-                            title: 'Banner Management',
-                            type: 'item',
-                          
-                            url: '/settings/banner-management'
-                        }
+                     
                     ]
                 }
             ]
