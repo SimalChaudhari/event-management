@@ -93,6 +93,9 @@ export class EventDto {
   categoryIds?: string;
 
   @IsOptional()
+  exhibitorIds?: string; // Add this field
+
+  @IsOptional()
   speakerIds?: string;
   originalImages: any;
   originalDocuments: any;

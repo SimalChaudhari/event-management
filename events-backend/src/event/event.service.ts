@@ -8,7 +8,7 @@ import {
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
-import { Event } from './event.entity';
+import { Event, EventExhibitor } from './event.entity';
 import { Between, Not } from 'typeorm';
 import { Speaker } from 'speaker/speaker.entity';
 import { EventSpeaker, EventCategory } from './event-speaker.entity';
@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import { getEventColor } from 'utils/event-color.util';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
+import { Exhibitor } from '../exhibitor/exhibitor.entity';
 
 @Injectable()
 export class EventService {
@@ -28,10 +29,14 @@ export class EventService {
     private eventSpeakerRepository: Repository<EventSpeaker>,
     @InjectRepository(EventCategory)
     private eventCategoryRepository: Repository<EventCategory>,
+    @InjectRepository(EventExhibitor)
+    private eventExhibitorRepository: Repository<EventExhibitor>,
     @InjectRepository(Speaker)
     private speakerRepository: Repository<Speaker>,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
+    @InjectRepository(Exhibitor)
+    private exhibitorRepository: Repository<Exhibitor>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(FavoriteEvent)
@@ -77,10 +82,25 @@ export class EventService {
       }
     }
 
+    // Validate exhibitor IDs if provided
+    if (eventDto.exhibitorIds) {
+      const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
+      for (const exhibitorId of exhibitorIdsArray) {
+        const exhibitorExists = await this.exhibitorRepository.findOne({
+          where: { id: exhibitorId.trim() },
+        });
+        if (!exhibitorExists) {
+          validationErrors.push(
+            `Exhibitor with ID "${exhibitorId}" does not exist`,
+          );
+        }
+      }
+    }
+
     // If there are validation errors, throw them all at once
     if (validationErrors.length > 0) {
       throw new BadRequestException({
-        message: 'Invalid Category or Speaker',
+        message: 'Invalid Category, Speaker, or Exhibitor',
         errors: validationErrors,
       });
     }
@@ -158,6 +178,19 @@ export class EventService {
           eventSpeaker.eventId = savedEvent.id;
           eventSpeaker.speakerId = speakerId.trim();
           await this.eventSpeakerRepository.save(eventSpeaker);
+        }),
+      );
+    }
+
+    // Create exhibitor associations if exhibitorIds are provided
+    if (eventDto.exhibitorIds) {
+      const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
+      await Promise.all(
+        exhibitorIdsArray.map(async (exhibitorId) => {
+          const eventExhibitor = new EventExhibitor();
+          eventExhibitor.eventId = savedEvent.id;
+          eventExhibitor.exhibitorId = exhibitorId.trim();
+          await this.eventExhibitorRepository.save(eventExhibitor);
         }),
       );
     }
@@ -244,7 +277,13 @@ export class EventService {
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
       .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
       .leftJoinAndSelect('event.category', 'eventCategory')
-      .leftJoinAndSelect('eventCategory.category', 'category');
+      .leftJoinAndSelect('eventCategory.category', 'category')
+      .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
+      .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+      .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+      .leftJoinAndSelect('event.galleries', 'galleries')
+      .andWhere('exhibitor.isActive = :isActive', { isActive: true }); // Add this filter
+
 
     // First, always filter for upcoming events if category is provided
     if (filters.category) {
@@ -297,7 +336,7 @@ export class EventService {
     const eventsWithAttendance = await Promise.all(
       events.map(async (event) => {
         const attendanceCount = await this.getEventAttendanceCount(event.id);
-        const { eventSpeakers, category, ...eventData } = event;
+        const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
 
         // Check if event is favorited by user
         let isFavorite = false;
@@ -319,6 +358,10 @@ export class EventService {
           color: getEventColor(event.type),
           speakersData: eventSpeakers.map((es) => es.speaker),
           categoriesData: category?.map((ec) => ec.category) || [],
+          exhibitorsData: eventExhibitors.map((ee) => ({
+            ...ee.exhibitor,
+            promotionalOffers: ee.exhibitor.promotionalOffers || []
+          })),
           attendanceCount: attendanceCount,
           isFavorite: isFavorite,
           searchFields: matchedFields, // Add matched fields to response
@@ -350,12 +393,17 @@ export class EventService {
       .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
       .leftJoinAndSelect('event.category', 'eventCategory')
       .leftJoinAndSelect('eventCategory.category', 'category')
+      .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
+      .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+      .leftJoinAndSelect('event.galleries', 'galleries')
+      .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
       .where('event.id = :id', { id })
+      .andWhere('exhibitor.isActive = :isActive', { isActive: true }) // Add this filter
       .getOne();
 
     if (!event) throw new NotFoundException('Event not found!');
 
-    const { eventSpeakers, category, ...eventData } = event;
+    const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
 
     const attendanceCount = await this.getEventAttendanceCount(id);
 
@@ -373,6 +421,10 @@ export class EventService {
       color: getEventColor(event.type),
       speakers: eventSpeakers.map((es) => es.speaker),
       categories: category?.map((ec) => ec.category) || [],
+      exhibitors: eventExhibitors.map((ee) => ({
+        ...ee.exhibitor,
+        promotionalOffers: ee.exhibitor.promotionalOffers || []
+      })),
       attendanceCount: attendanceCount,
       isFavorite: isFavorite,
     };
@@ -423,10 +475,25 @@ export class EventService {
       }
     }
 
+    // Validate exhibitor IDs if provided
+    if (eventDto.exhibitorIds) {
+      const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
+      for (const exhibitorId of exhibitorIdsArray) {
+        const exhibitorExists = await this.exhibitorRepository.findOne({
+          where: { id: exhibitorId.trim() },
+        });
+        if (!exhibitorExists) {
+          validationErrors.push(
+            `Exhibitor with ID "${exhibitorId}" does not exist`,
+          );
+        }
+      }
+    }
+
     // If there are validation errors, throw them all at once
     if (validationErrors.length > 0) {
       throw new BadRequestException({
-        message: 'Invalid Category or Speaker',
+        message: 'Invalid Category, Speaker, or Exhibitor',
         errors: validationErrors,
       });
     }
@@ -495,42 +562,75 @@ export class EventService {
     Object.assign(event, eventDto);
     const updatedEvent = await this.eventRepository.save(event);
 
-    // Delete existing associations
-    await this.eventSpeakerRepository.delete({ eventId: id });
-    await this.eventCategoryRepository.delete({ eventId: id });
-
-    // Create new category associations if categoryIds are provided
-    if (eventDto.categoryIds) {
-      const categoryIdsArray = eventDto.categoryIds.split(',');
-      await Promise.all(
-        categoryIdsArray.map(async (categoryId) => {
-          const eventCategory = new EventCategory();
-          eventCategory.eventId = id;
-          eventCategory.categoryId = categoryId.trim();
-          await this.eventCategoryRepository.save(eventCategory);
-        }),
-      );
+    // Handle associations - only update what's provided
+    if (eventDto.categoryIds !== undefined) {
+      // Delete existing category associations
+      await this.eventCategoryRepository.delete({ eventId: id });
+      
+      // Create new category associations if categoryIds are provided
+      if (eventDto.categoryIds) {
+        const categoryIdsArray = eventDto.categoryIds.split(',');
+        await Promise.all(
+          categoryIdsArray.map(async (categoryId) => {
+            const eventCategory = new EventCategory();
+            eventCategory.eventId = id;
+            eventCategory.categoryId = categoryId.trim();
+            await this.eventCategoryRepository.save(eventCategory);
+          }),
+        );
+      }
     }
 
-    // Create new speaker associations if speakerIds are provided
-    if (eventDto.speakerIds) {
-      const speakerIdsArray = eventDto.speakerIds.split(',');
-      await Promise.all(
-        speakerIdsArray.map(async (speakerId) => {
-          const speakerExists = await this.speakerRepository.findOne({
-            where: { id: speakerId.trim() },
-          });
+    if (eventDto.speakerIds !== undefined) {
+      // Delete existing speaker associations
+      await this.eventSpeakerRepository.delete({ eventId: id });
+      
+      // Create new speaker associations if speakerIds are provided
+      if (eventDto.speakerIds) {
+        const speakerIdsArray = eventDto.speakerIds.split(',');
+        await Promise.all(
+          speakerIdsArray.map(async (speakerId) => {
+            const speakerExists = await this.speakerRepository.findOne({
+              where: { id: speakerId.trim() },
+            });
 
-          if (!speakerExists) {
-            throw new BadRequestException('Invalid speaker ID');
-          }
+            if (!speakerExists) {
+              throw new BadRequestException('Invalid speaker ID');
+            }
 
-          const eventSpeaker = new EventSpeaker();
-          eventSpeaker.eventId = id;
-          eventSpeaker.speakerId = speakerId.trim();
-          await this.eventSpeakerRepository.save(eventSpeaker);
-        }),
-      );
+            const eventSpeaker = new EventSpeaker();
+            eventSpeaker.eventId = id;
+            eventSpeaker.speakerId = speakerId.trim();
+            await this.eventSpeakerRepository.save(eventSpeaker);
+          }),
+        );
+      }
+    }
+
+    if (eventDto.exhibitorIds !== undefined) {
+      // Delete existing exhibitor associations
+      await this.eventExhibitorRepository.delete({ eventId: id });
+      
+      // Create new exhibitor associations if exhibitorIds are provided
+      if (eventDto.exhibitorIds) {
+        const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
+        await Promise.all(
+          exhibitorIdsArray.map(async (exhibitorId) => {
+            const exhibitorExists = await this.exhibitorRepository.findOne({
+              where: { id: exhibitorId.trim() },
+            });
+
+            if (!exhibitorExists) {
+              throw new BadRequestException('Invalid exhibitor ID');
+            }
+
+            const eventExhibitor = new EventExhibitor();
+            eventExhibitor.eventId = id;
+            eventExhibitor.exhibitorId = exhibitorId.trim();
+            await this.eventExhibitorRepository.save(eventExhibitor);
+          }),
+        );
+      }
     }
 
     return updatedEvent;

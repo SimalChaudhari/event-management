@@ -2,11 +2,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Event } from 'event/event.entity';
 import { Like } from 'typeorm';
+import { Gallery } from './gallery.entity';
+import { GalleryDto, UpdateGalleryDto } from './gallery.dto';
+import * as fs from 'fs';
+import path from 'path';
 
 export interface GalleryItem {
   type: 'image' | 'document';
@@ -25,6 +30,11 @@ export class GalleryService {
   constructor(
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+
+    @InjectRepository(Gallery)
+    private galleryRepository: Repository<Gallery>,
+
+
   ) {}
 
   async getAllGalleryItems(filters: {
@@ -151,5 +161,166 @@ export class GalleryService {
     };
   }
 
+  // Events Gallery
+
+  async createOrUpdateGallery(galleryDto: GalleryDto) {
+    try {
+      // Check if gallery already exists for this event
+      const existingGallery = await this.galleryRepository.findOne({
+        where: { eventId: galleryDto.eventId },
+      });
+      
+      if (existingGallery) {
+        // Delete previous images from upload folder
+        if (existingGallery.galleryImages && existingGallery.galleryImages.length > 0) {
+          await this.deleteFilesFromFolder(existingGallery.galleryImages);
+        }
+        
+        // Update existing gallery with new data (replace old images)
+        existingGallery.title = galleryDto.title;
+        existingGallery.galleryImages = galleryDto.galleryImages || [];
+        
+        const result = await this.galleryRepository.save(existingGallery);
+        return { message: 'Gallery updated successfully', data: result };
+      }
+
+      // Create new gallery if none exists
+      const gallery = this.galleryRepository.create(galleryDto);
+      const result = await this.galleryRepository.save(gallery);
+      return { message: 'Gallery created successfully', data: result };
+    } catch (error: any) {
+      throw new InternalServerErrorException('Error creating or updating gallery', error.message);
+    }
+  }
+
+  async getAllGalleries() {
+    return await this.galleryRepository.find({
+      relations: ['event'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getGalleryById(id: string) {
+    const gallery = await this.galleryRepository.findOne({
+      where: { id },
+      relations: ['event'],
+    });
+    if (!gallery) {
+      throw new NotFoundException('Gallery not found');
+    }
+    return gallery;
+  }
+
+  // DELETE GALLERY COMPLETELY
+  async deleteGallery(id: string) {
+    try {
+      const gallery = await this.galleryRepository.findOne({ 
+        where: { id },
+        relations: ['event']
+      });
+      if (!gallery) {
+        throw new NotFoundException('Gallery not found');
+      }
+
+      // Delete all images from filesystem
+      if (gallery.galleryImages && gallery.galleryImages.length > 0) {
+        await this.deleteFilesFromFolder(gallery.galleryImages);
+      }
+
+      // Delete gallery from database
+      await this.galleryRepository.remove(gallery);
+      return { message: 'Gallery deleted successfully' };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Error deleting gallery', error.message);
+    }
+  }
+
+  // DELETE SPECIFIC IMAGE FROM GALLERY
+  async deleteSpecificGalleryImage(galleryId: string, imagePath: string): Promise<{ message: string; data: Gallery }> {
+    try {
+      const gallery = await this.galleryRepository.findOne({ where: { id: galleryId } });
+      if (!gallery) {
+        throw new NotFoundException('Gallery not found');
+      }
+
+      if (!gallery.galleryImages || !gallery.galleryImages.includes(imagePath)) {
+        throw new NotFoundException('Image not found in this gallery');
+      }
+
+      // Delete file from filesystem
+      await this.deleteFileFromFolder(imagePath);
+
+      // Remove from database
+      const updatedImages = gallery.galleryImages.filter(img => img !== imagePath);
+      gallery.galleryImages = updatedImages;
+      const result = await this.galleryRepository.save(gallery);
+
+      return { message: 'Gallery image deleted successfully', data: result };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Error deleting gallery image', error.message);
+    }
+  }
+
+
+
+  // CLEAR ALL IMAGES FROM GALLERY
+  async clearAllGalleryImages(galleryId: string): Promise<{ message: string; data: Gallery }> {
+    try {
+      const gallery = await this.galleryRepository.findOne({ where: { id: galleryId } });
+      if (!gallery) {
+        throw new NotFoundException('Gallery not found');
+      }
+
+      // Delete all files from filesystem
+      if (gallery.galleryImages && gallery.galleryImages.length > 0) {
+        await this.deleteFilesFromFolder(gallery.galleryImages);
+      }
+
+      // Clear all images in database
+      gallery.galleryImages = [];
+      const result = await this.galleryRepository.save(gallery);
+
+      return { message: 'All gallery images cleared successfully', data: result };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Error clearing gallery images', error.message);
+    }
+  }
+
+
+  // HELPER METHODS FOR FILE DELETION
+  private async deleteFileFromFolder(imagePath: string): Promise<void> {
+    try {
+      if (!imagePath) return;
+      const filePath = path.join(process.cwd(), imagePath);
+      console.log('Deleting file:', filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`File deleted: ${filePath}`);
+      } else {
+        console.log(`File not found: ${filePath}`);
+      }
+    } catch (error) {
+      console.error(`Error deleting file ${imagePath}:`, error);
+    }
+  }
+
+  private async deleteFilesFromFolder(imagePaths: string[]): Promise<void> {
+    try {
+      for (const imagePath of imagePaths) {
+        await this.deleteFileFromFolder(imagePath);
+      }
+    } catch (error) {
+      console.error('Error deleting files:', error);
+    }
+  }
 
 }

@@ -87,6 +87,10 @@ export class RegisterEventService {
           'event.eventSpeakers.speaker',
           'event.category', // Add this
           'event.category.category', // Add this
+          'event.galleries',
+          'event.eventExhibitors',
+          'event.eventExhibitors.exhibitor',
+          'event.eventExhibitors.exhibitor.promotionalOffers',
           'order',
         ],
       });
@@ -100,7 +104,11 @@ export class RegisterEventService {
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
           'event.category', // Add this
-          'event.category.category', // Add this
+          'event.category.category', // Add this\
+          'event.galleries',
+          'event.eventExhibitors',
+          'event.eventExhibitors.exhibitor',
+          'event.eventExhibitors.exhibitor.promotionalOffers',
           'order',
         ],
       });
@@ -123,18 +131,30 @@ export class RegisterEventService {
         const speakers =
           registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
 
+          
         // Extract categories
         const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-        const { eventSpeakers, category, ...restEvent } = registerEvent.event || {};
+
+        // Extract exhibitors (only active ones)
+        const exhibitors = registerEvent.event?.eventExhibitors
+          ?.filter((ee) => ee.exhibitor.isActive)
+          ?.map((ee) => ({
+            ...ee.exhibitor,
+            promotionalOffers: ee.exhibitor.promotionalOffers || []
+          })) || [];
+
+        const { eventSpeakers, category, eventExhibitors, ...restEvent } = registerEvent.event || {};
         const event = {
           ...restEvent,
           color: getEventColor(registerEvent.event?.type),
           speakers,
-          categories, // Add categories here
+          categories,
+          exhibitors, // Add exhibitors here
           attendanceCount: attendanceCount,
           isFavorite: isFavorite,
         };
+
 
         const { firstName, lastName, email, mobile } = registerEvent.user || {};
         const cleanedUser = { firstName, lastName, email, mobile };
@@ -184,6 +204,10 @@ export class RegisterEventService {
         'event.eventSpeakers.speaker',
         'event.category', // Add this
         'event.category.category', // Add this
+        'event.galleries',
+        'event.eventExhibitors',
+        'event.eventExhibitors.exhibitor',
+        'event.eventExhibitors.exhibitor.promotionalOffers',
         'order',
       ],
     });
@@ -208,21 +232,31 @@ export class RegisterEventService {
     const speakers =
       registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
 
-    // Extract categories
-    const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+   // Extract categories
+   const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-    // 🧼 Clean up event object (remove eventSpeakers and category)
-    const { eventSpeakers, category, ...restEvent } = registerEvent.event || {};
+   // Extract exhibitors (only active ones)
+   const exhibitors = registerEvent.event?.eventExhibitors
+     ?.filter((ee) => ee.exhibitor.isActive)
+     ?.map((ee) => ({
+       ...ee.exhibitor,
+       promotionalOffers: ee.exhibitor.promotionalOffers || []
+     })) || [];
 
-    // ✅ Replace with clean speakers and categories
-    const event = {
-      ...restEvent,
-      color: getEventColor(registerEvent.event?.type),
-      speakers,
-      categories, // Add categories here
-      attendanceCount: attendanceCount,
-      isFavorite: isFavorite,
-    };
+   // 🧼 Clean up event object (remove eventSpeakers, category, and eventExhibitors)
+   const { eventSpeakers, category, eventExhibitors, ...restEvent } = registerEvent.event || {};
+
+   // ✅ Replace with clean speakers, categories, and exhibitors
+   const event = {
+     ...restEvent,
+     color: getEventColor(registerEvent.event?.type),
+     speakers,
+     categories,
+     exhibitors, // Add exhibitors here
+     attendanceCount: attendanceCount,
+     isFavorite: isFavorite,
+   };
+
 
     // 🧼 Clean up user object, showing only specific fields
     const { firstName, lastName, email, mobile } = registerEvent.user || {};
