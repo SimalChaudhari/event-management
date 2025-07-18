@@ -40,6 +40,7 @@ export class EventController {
     FileFieldsInterceptor([
       { name: 'images', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
+      { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -47,6 +48,8 @@ export class EventController {
             cb(null, './uploads/event/images');
           } else if (file.fieldname === 'documents') {
             cb(null, './uploads/event/documents');
+          } else if (file.fieldname === 'floorPlan') {
+            cb(null, './uploads/event/floorPlan'); // New directory for floor plan
           } else {
             cb(null, './uploads/event/images'); // Default
           }
@@ -61,6 +64,8 @@ export class EventController {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
+        } else if (file.fieldname === 'floorPlan' && file.mimetype.startsWith('image/')) {
+          cb(null, true);
         } else {
           cb(new Error('Invalid file type for field'), false);
         }
@@ -69,7 +74,7 @@ export class EventController {
   )
   async createEvent(
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[] },
+    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], floorPlan?: Express.Multer.File[] },
     @Res() response: Response,
   ) {
     try {
@@ -84,6 +89,11 @@ export class EventController {
           (doc) => `uploads/event/documents/${doc.filename}`,
         );
       }
+
+     // Handle floor plan
+     if (files.floorPlan && files.floorPlan.length > 0) {
+      eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
+    }
 
       await this.eventService.createEvent(eventDto);
 
@@ -119,6 +129,24 @@ export class EventController {
             'uploads',
             'event',
             'documents',
+            file.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
+
+       // Clean up floor plan if error occurs
+       if (files.floorPlan && files.floorPlan.length > 0) {
+        files.floorPlan.forEach((file) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'event',
+            'floorPlan',
             file.filename,
           );
           if (fs.existsSync(uploadedPath)) {
@@ -178,6 +206,7 @@ export class EventController {
     FileFieldsInterceptor([
       { name: 'images', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
+      { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -185,6 +214,8 @@ export class EventController {
             cb(null, './uploads/event/images');
           } else if (file.fieldname === 'documents') {
             cb(null, './uploads/event/documents');
+          } else if (file.fieldname === 'floorPlan') {
+            cb(null, './uploads/event/floorPlan'); // New directory for floor plan
           } else {
             cb(null, './uploads/event/images'); // Default
           }
@@ -199,6 +230,8 @@ export class EventController {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
+        } else if (file.fieldname === 'floorPlan' && file.mimetype.startsWith('image/')) {
+          cb(null, true);
         } else {
           cb(new Error('Invalid file type for field'), false);
         }
@@ -208,7 +241,7 @@ export class EventController {
   async updateEvent(
     @Param('id') id: string,
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[] },
+    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], floorPlan?: Express.Multer.File[] },
     @Res() response: Response,
   ) {
     // First get the event
@@ -250,6 +283,23 @@ export class EventController {
           }
         });
       }
+        // Clean up floor plan if event not found
+        if (files.floorPlan) {
+          files.floorPlan.forEach((file) => {
+            const uploadedPath = path.join(
+              __dirname,
+              '..',
+              '..',
+              'uploads',
+              'event',
+              'floorPlan',
+              file.filename,
+            );
+            if (fs.existsSync(uploadedPath)) {
+              fs.unlinkSync(uploadedPath);
+            }
+          });
+        }
       throw new NotFoundException('Event not found');
     }
 
@@ -302,6 +352,11 @@ export class EventController {
         eventDto.documents = allDocuments;
       }
 
+        // Handle floor plan
+        if (files.floorPlan && files.floorPlan.length > 0) {
+          eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
+        }
+
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
 
       return response.status(200).json({
@@ -339,7 +394,22 @@ export class EventController {
           if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
         });
       }
-      throw error;
+     // Clean up floor plan if error occurs
+     if (files.floorPlan) {
+      files.floorPlan.forEach((file) => {
+        const uploadedPath = path.join(
+          __dirname,
+          '..',
+          '..',
+          'uploads',
+          'event',
+          'floorPlan',
+          file.filename,
+        );
+        if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+      });
+    }
+    throw error;
     }
   }
 

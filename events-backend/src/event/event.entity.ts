@@ -16,14 +16,14 @@ import { Feedback } from 'feedback/feedback.entity';
 import { Category } from 'category/category.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Gallery } from 'gallery/gallery.entity';
+import { EventStamp } from 'eventStamp/eventStamp.entity';
+import { Survey } from 'survey/survey.entity';
 
 export enum EventType {
   Physical = 'Physical',
   Virtual = 'Virtual',
   Hybrid = 'Hybrid',
 }
-
-
 
 @Entity('events')
 export class Event {
@@ -50,6 +50,9 @@ export class Event {
 
   @Column({ type: 'varchar', nullable: true })
   location?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  exhibitorDescription?: string;
 
   @Column({ type: 'varchar', nullable: true })
   venue?: string;
@@ -80,6 +83,10 @@ export class Event {
   @Column({ type: 'varchar', length: 10, default: 'USD', nullable: true })
   currency?: string;
 
+  // Floor plan - single image
+  @Column({ type: 'varchar', nullable: true })
+  floorPlan?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 
@@ -109,11 +116,15 @@ export class Event {
   @OneToMany(() => Gallery, (gallery) => gallery.event)
   galleries?: Gallery[];
 
-
+  // Event Stamp relationship
+  @OneToMany(() => EventStamp, (eventStamp) => eventStamp.event)
+  eventStamps?: EventStamp[];
 
   // Exhibitor relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.event)
   eventExhibitors!: EventExhibitor[];
+
+
 }
 
 @Entity('event_exhibitor')
@@ -131,7 +142,6 @@ export class EventExhibitor {
     onDelete: 'CASCADE',
   })
   event?: Event;
-
 
   @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventExhibitors)
   exhibitor!: Exhibitor;

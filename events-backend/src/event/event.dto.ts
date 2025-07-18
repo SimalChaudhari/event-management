@@ -56,6 +56,10 @@ export class EventDto {
 
   @IsOptional()
   @IsString()
+  exhibitorDescription?: string;
+
+  @IsOptional()
+  @IsString()
   venue?: string;
 
   @IsOptional()
@@ -94,6 +98,11 @@ export class EventDto {
 
   @IsOptional()
   exhibitorIds?: string; // Add this field
+  
+  // Floor plan - single image
+  @IsOptional()
+  @IsString()
+  floorPlan?: string;
 
   @IsOptional()
   speakerIds?: string;

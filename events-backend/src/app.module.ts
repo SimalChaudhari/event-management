@@ -25,6 +25,8 @@ import { CategoryModule } from 'category/category.module';
 import { GalleryModule } from 'gallery/gallery.module';
 import { ExhibitorModule } from 'exhibitor/exhibitor.module';
 import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.module';
+import { EventStampModule } from 'eventStamp/eventStamp.module';
+import { SurveyModule } from 'survey/survey.module';
 console.log(join(__dirname, '..', 'uploads'))
 @Module({
   imports: [
@@ -48,6 +50,8 @@ console.log(join(__dirname, '..', 'uploads'))
     ExhibitorModule,
     GalleryModule,
     PromotionalOfferModule,
+    EventStampModule,
+    SurveyModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     CacheModule.register({
       isGlobal: true,

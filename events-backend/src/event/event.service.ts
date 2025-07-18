@@ -282,8 +282,9 @@ export class EventService {
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
       .leftJoinAndSelect('event.galleries', 'galleries')
-      .andWhere('exhibitor.isActive = :isActive', { isActive: true }); // Add this filter
-
+      .leftJoinAndSelect('event.eventStamps', 'eventStamp')
+      // .leftJoinAndSelect('event.surveys', 'surveys');
+    // .andWhere('exhibitor.isActive = :isActive', { isActive: true }); // Add this filter
 
     // First, always filter for upcoming events if category is provided
     if (filters.category) {
@@ -316,7 +317,6 @@ export class EventService {
       queryBuilder.andWhere('event.type = :type', { type: filters.type });
     }
 
-
     // Category filter - using TypeORM's built-in join approach
     if (filters.category) {
       const categoryName = filters.category.toLowerCase();
@@ -336,7 +336,13 @@ export class EventService {
     const eventsWithAttendance = await Promise.all(
       events.map(async (event) => {
         const attendanceCount = await this.getEventAttendanceCount(event.id);
-        const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
+        const {
+          eventSpeakers,
+          category,
+          eventStamps,
+          eventExhibitors,
+          ...eventData
+        } = event;
 
         // Check if event is favorited by user
         let isFavorite = false;
@@ -353,15 +359,24 @@ export class EventService {
           matchedFields = this.findMatchedFields(event, filters.keyword);
         }
 
+        const { exhibitorDescription, ...eventFiltered } = eventData;
+        // Convert eventStamps array to single object
+        const eventStampData =
+          eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
+
         return {
-          ...eventData,
+          ...eventFiltered,
           color: getEventColor(event.type),
           speakersData: eventSpeakers.map((es) => es.speaker),
           categoriesData: category?.map((ec) => ec.category) || [],
-          exhibitorsData: eventExhibitors.map((ee) => ({
-            ...ee.exhibitor,
-            promotionalOffers: ee.exhibitor.promotionalOffers || []
-          })),
+          exhibitorsData: {
+            exhibitorDescription: exhibitorDescription || '',
+            exhibitors: eventExhibitors.map((ee) => ({
+              ...ee.exhibitor,
+              promotionalOffers: ee.exhibitor.promotionalOffers || [],
+            })),
+          },
+          eventStamps: eventStampData, // Single object instead of array
           attendanceCount: attendanceCount,
           isFavorite: isFavorite,
           searchFields: matchedFields, // Add matched fields to response
@@ -397,13 +412,14 @@ export class EventService {
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('event.galleries', 'galleries')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+      .leftJoinAndSelect('event.eventStamps', 'eventStamp')
       .where('event.id = :id', { id })
-      .andWhere('exhibitor.isActive = :isActive', { isActive: true }) // Add this filter
+      // .andWhere('exhibitor.isActive = :isActive', { isActive: true }) // Add this filter
       .getOne();
 
     if (!event) throw new NotFoundException('Event not found!');
 
-    const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
+    const { eventSpeakers, category, eventExhibitors,eventStamps, ...eventData } = event;
 
     const attendanceCount = await this.getEventAttendanceCount(id);
 
@@ -416,15 +432,24 @@ export class EventService {
       isFavorite = !!favorite;
     }
 
+    const { exhibitorDescription, ...eventFiltered } = eventData;
+    const eventStampData =
+    eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
+
+
     return {
-      ...eventData,
+      ...eventFiltered,
       color: getEventColor(event.type),
       speakers: eventSpeakers.map((es) => es.speaker),
       categories: category?.map((ec) => ec.category) || [],
-      exhibitors: eventExhibitors.map((ee) => ({
-        ...ee.exhibitor,
-        promotionalOffers: ee.exhibitor.promotionalOffers || []
-      })),
+      exhibitors: {
+        exhibitorDescription: exhibitorDescription || '',
+        exhibitors: eventExhibitors.map((ee) => ({
+          ...ee.exhibitor,
+          promotionalOffers: ee.exhibitor.promotionalOffers || [],
+        })),
+      },
+      eventStamps: eventStampData, // Single object instead of array
       attendanceCount: attendanceCount,
       isFavorite: isFavorite,
     };
@@ -566,7 +591,7 @@ export class EventService {
     if (eventDto.categoryIds !== undefined) {
       // Delete existing category associations
       await this.eventCategoryRepository.delete({ eventId: id });
-      
+
       // Create new category associations if categoryIds are provided
       if (eventDto.categoryIds) {
         const categoryIdsArray = eventDto.categoryIds.split(',');
@@ -584,7 +609,7 @@ export class EventService {
     if (eventDto.speakerIds !== undefined) {
       // Delete existing speaker associations
       await this.eventSpeakerRepository.delete({ eventId: id });
-      
+
       // Create new speaker associations if speakerIds are provided
       if (eventDto.speakerIds) {
         const speakerIdsArray = eventDto.speakerIds.split(',');
@@ -610,7 +635,7 @@ export class EventService {
     if (eventDto.exhibitorIds !== undefined) {
       // Delete existing exhibitor associations
       await this.eventExhibitorRepository.delete({ eventId: id });
-      
+
       // Create new exhibitor associations if exhibitorIds are provided
       if (eventDto.exhibitorIds) {
         const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
@@ -658,6 +683,14 @@ export class EventService {
           fs.unlinkSync(filePath);
         }
       });
+    }
+
+    // Delete floor plan if it exists
+    if (event.floorPlan) {
+      const filePath = path.resolve(event.floorPlan);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
 
     await this.eventRepository.remove(event);
