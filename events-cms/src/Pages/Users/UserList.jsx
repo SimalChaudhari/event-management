@@ -12,6 +12,7 @@ import AddUserModal from './components/AddUserModal';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import ViewUserModal from './components/ViewUserModal';
+import { useNavigate } from 'react-router-dom';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -159,7 +160,7 @@ const UserList = () => {
     const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
     const [showModal, setShowModal] = React.useState(false);
     const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
-
+    const navigate = useNavigate();
     const [editData, setEditData] = React.useState(null);
 
     const [viewData, setViewData] = React.useState(null); // State for user data to view
@@ -173,19 +174,16 @@ const UserList = () => {
     };
 
     const handleViewUser = (userData) => {
-        setViewData(userData);
-        setShowViewModal(true);
+        navigate(`/users/view-user/${userData.id}`);
       };
     
 
     const handleAddUser = () => {
-        setEditData(null);
-        setShowModal(true);
+        navigate(`/users/add-user`);
     };
 
     const handleEditUser = (userData) => {
-        setEditData(userData);
-        setShowModal(true);
+        navigate(`/users/edit-user/${userData.id}`);
     };
 
     const handleDeleteUser = (userId) => {

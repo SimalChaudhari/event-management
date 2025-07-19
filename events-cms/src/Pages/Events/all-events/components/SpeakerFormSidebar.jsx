@@ -9,12 +9,17 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
             backdrop={false} // disables dimming the background
             keyboard={false} // optional: disables ESC to close
             centered
+            size="lg"
+            style={{
+                zIndex: 9999
+            }}
+            dialogClassName="speaker-modal"
         >
             <Modal.Header>
                 <Modal.Title>Add New Speaker</Modal.Title>
             </Modal.Header>
             <Modal.Body>
-                <Row>
+                <Row cla>
                     <Col sm={6}>
                         <div className="form-group fill">
                             <label className="floating-label" htmlFor="name">

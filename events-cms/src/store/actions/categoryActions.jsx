@@ -18,6 +18,15 @@ export const categoryList = () => async (dispatch) => {
     return false;
 };
 
+export const categoryById = (id) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/categories/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+}
+
 // Create new category
 export const createCategory = (data) => async (dispatch) => {
     try {

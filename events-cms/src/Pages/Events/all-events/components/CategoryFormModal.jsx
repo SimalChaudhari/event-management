@@ -9,6 +9,11 @@ const CategoryFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
             backdrop={false}
             keyboard={false}
             centered
+            size="lg"
+            style={{
+                zIndex: 9999
+            }}
+            dialogClassName="speaker-modal"
         >
             <Modal.Header>
                 <Modal.Title>Add New Category</Modal.Title>

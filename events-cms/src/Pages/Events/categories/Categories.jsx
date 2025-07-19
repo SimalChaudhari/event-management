@@ -8,7 +8,7 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { categoryList, deleteCategory } from '../../../store/actions/categoryActions';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import AddCategoryModal from './components/AddCategoryModal';
@@ -164,10 +164,10 @@ const Categories = () => {
     const [showViewModal, setShowViewModal] = React.useState(false);
     const [editData, setEditData] = React.useState(null);
     const [viewData, setViewData] = React.useState(null);
+    const navigate = useNavigate();
 
     const handleView = (data) => {
-        setViewData(data);
-        setShowViewModal(true);
+        navigate(`/events/view-category/${data.id}`);
     };
 
     const destroyTable = () => {
@@ -197,13 +197,11 @@ const Categories = () => {
     }, [categories]);
 
     const handleAddCategory = () => {
-        setEditData(null);
-        setShowModal(true);
+        navigate(`/events/add-category`);
     };
 
     const handleEdit = (data) => {
-        setEditData(data);
-        setShowModal(true);
+        navigate(`/events/edit-category/${data.id}`);
     };
 
     const handleDelete = (categoryId) => {

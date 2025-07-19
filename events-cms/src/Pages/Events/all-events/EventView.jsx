@@ -9,7 +9,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { eventDelete, eventList } from '../../../store/actions/eventActions';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import AddEventModal from './components/AddEventModal';
@@ -273,10 +273,10 @@ const EventView = () => {
 
     const [viewData, setViewData] = React.useState(null); // State for user data to view
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+    const navigate = useNavigate();
 
     const handleView = (data) => {
-        setViewData(data);
-        setShowViewModal(true);
+        navigate(`/events/view-event/${data.id}`);
     };
 
     const destroyTable = () => {
@@ -314,13 +314,11 @@ const EventView = () => {
     }, [location.pathname]);
 
     const handleAddEvent = () => {
-        setEditData(null);
-        setShowModal(true);
+      navigate('/events/add-event');
     };
 
     const handleEdit = (data) => {
-        setEditData(data);
-        setShowModal(true);
+        navigate(`/events/edit-event/${data.id}`);
     };
 
     const handleDelete = (eventId) => {

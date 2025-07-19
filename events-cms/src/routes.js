@@ -25,6 +25,14 @@ const eventComponents = {
   Upcoming: React.lazy(() => import('./Pages/Events/upcoming-events/UpcomingEvents.jsx')),
   Registered: React.lazy(() => import('./Pages/Events/registered-events/RegisteredEvents.jsx')),
   Categories: React.lazy(() => import('./Pages/Events/categories/Categories.jsx')),
+  AddCategory: React.lazy(() => import('./Pages/Events/categories/AddCategoryPage.jsx')),
+  ViewCategory: React.lazy(() => import('./Pages/Events/categories/ViewCategoryPage.jsx')),
+  EditCategory: React.lazy(() => import('./Pages/Events/categories/AddCategoryPage.jsx')),
+
+  AddEvent: React.lazy(() => import('./Pages/Events/all-events/components/AddEventPage.jsx')),
+  ViewEvent: React.lazy(() => import('./Pages/Events/all-events/components/ViewEventPage.jsx')),
+  AddRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
+  ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx')),
 };
 
 const MediaManagerComponents = {
@@ -50,7 +58,16 @@ const transactionComponents = {
 const userComponents = {
   Profile: React.lazy(() => import('./Pages/Settings/Profile/Profile.jsx')),
   List: React.lazy(() => import('./Pages/Users/UserList.jsx')),
-  Speakers: React.lazy(() => import('./Pages/Speakers/Speakers.jsx'))
+  AddUser: React.lazy(() => import('./Pages/Users/AddUserPage.jsx')),
+  ViewUser: React.lazy(() => import('./Pages/Users/ViewUserPage.jsx')),
+  EditUser: React.lazy(() => import('./Pages/Users/AddUserPage.jsx')),
+
+};
+
+const speakerComponents = {
+  List: React.lazy(() => import('./Pages/Speakers/Speakers.jsx')),
+  AddSpeaker: React.lazy(() => import('./Pages/Speakers/AddSpeakerPage.jsx')),
+  ViewSpeaker: React.lazy(() => import('./Pages/Speakers/ViewSpeakerPage.jsx'))
 };
 
 /**
@@ -100,14 +117,53 @@ const userRoutes = [
     name: 'Profile List',
     component: userComponents.Profile
   },
+  {
+    path: '/users/add-user',
+    exact: true,
+    name: 'Add User',
+    component: userComponents.AddUser
+  },
+  {
+    path: '/users/edit-user/:id',
+    exact: true,
+    name: 'Edit User',
+    component: userComponents.AddUser
+  },
+  {
+    path: '/users/view-user/:id',
+    exact: true,
+    name: 'View User',
+    component: userComponents.ViewUser
+  }
+];
 
+const speakerRoutes = [
   {
     path: '/speakers',
     exact: true,
     name: 'Speakers List',
-    component: userComponents.Speakers
+    component: speakerComponents.List
+  },
+  {
+    path: '/speakers/add-speaker',
+    exact: true,
+    name: 'Add Speaker',
+    component: speakerComponents.AddSpeaker
+  },
+  {
+    path: '/speakers/edit-speaker/:id',
+    exact: true,
+    name: 'Edit Speaker',
+    component: speakerComponents.AddSpeaker
+  },
+  {
+    path: '/speakers/view-speaker/:id',
+    exact: true,
+    name: 'View Speaker',
+    component: speakerComponents.ViewSpeaker
   }
 ];
+
 
 /**
  * Event management routes configuration
@@ -121,6 +177,24 @@ const eventRoutes = [
     component: eventComponents.List
   },
   {
+    path: '/events/add-event',
+    exact: true,
+    name: 'Add Event',
+    component: eventComponents.AddEvent
+  },
+  {
+    path: '/events/edit-event/:id',
+    exact: true,
+    name: 'Edit Event',
+    component: eventComponents.AddEvent
+  },
+  {
+    path: '/events/view-event/:id',
+    exact: true,
+    name: 'View Event',
+    component: eventComponents.ViewEvent
+  },
+  {
     path: '/events/upcoming',
     exact: true,
     name: 'Upcoming Events',
@@ -132,6 +206,18 @@ const eventRoutes = [
     name: 'Registered Events',
     component: eventComponents.Registered
   },
+  {
+    path: '/events/add-register-event',
+    exact: true,
+    name: 'Add Register Event',
+    component: eventComponents.AddRegisterEvent
+  },
+  {
+    path: '/events/view-register-event/:id',
+    exact: true,
+    name: 'View Register Event',
+    component: eventComponents.ViewRegisterEvent
+  },
 
   {
     path: '/categories',
@@ -139,6 +225,25 @@ const eventRoutes = [
     name: 'Categories List',
     component: eventComponents.Categories
   },
+  {
+    path: '/events/add-category',
+    exact: true,
+    name: 'Add Category',
+    component: eventComponents.AddCategory
+  },
+  {
+    path: '/events/edit-category/:id',
+    exact: true,
+    name: 'Edit Category',
+    component: eventComponents.AddCategory
+  },
+  {
+    path: '/events/view-category/:id',
+    exact: true,
+    name: 'View Category',
+    component: eventComponents.ViewCategory
+  },
+
 ];
 
 const MediaManagerRoutes = [
@@ -219,6 +324,7 @@ const routes = [
   ...userRoutes,
   ...eventRoutes,
   ...MediaManagerRoutes,
+  ...speakerRoutes,
   ...settingsRoutes,
   ...transactionRoutes,
   ...demoRoutes

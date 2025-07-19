@@ -8,7 +8,7 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { speakerList, deleteSpeaker } from '../../store/actions/speakerActions';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import AddSpeakerModal from './components/AddSpeakerModal';
@@ -171,14 +171,14 @@ const Speakers = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const navigate = useNavigate();
 
     const [showViewModal, setShowViewModal] = React.useState(false);
     const [editData, setEditData] = React.useState(null);
     const [viewData, setViewData] = React.useState(null);
 
     const handleView = (data) => {
-        setViewData(data);
-        setShowViewModal(true);
+        navigate(`/speakers/view-speaker/${data.id}`);
     };
 
     const destroyTable = () => {
@@ -208,13 +208,11 @@ const Speakers = () => {
     }, [speakers]);
 
     const handleAddSpeaker = () => {
-        setEditData(null);
-        setShowModal(true);
+        navigate(`/speakers/add-speaker`);
     };
 
     const handleEdit = (data) => {
-        setEditData(data);
-        setShowModal(true);
+        navigate(`/speakers/edit-speaker/${data.id}`);  
     };
 
     const handleDelete = (speakerId) => {

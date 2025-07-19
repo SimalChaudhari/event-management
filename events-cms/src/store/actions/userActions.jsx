@@ -18,6 +18,15 @@ export const userList = () => async (dispatch) => {
     return false; // Return false for any errors
 };
 
+export const userById = (id) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/users/get/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+}
+
 export const createUser = (data) => async (dispatch) => {
     try {
         const response = await axiosInstance.post('/auth/register-admin', data);

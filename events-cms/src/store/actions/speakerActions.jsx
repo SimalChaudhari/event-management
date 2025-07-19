@@ -18,6 +18,15 @@ export const speakerList = () => async (dispatch) => {
     return false;
 };
 
+export const speakerById = (id) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/speakers/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+}
+
 // Create new speaker
 export const createSpeaker = (data) => async (dispatch) => {
     try {

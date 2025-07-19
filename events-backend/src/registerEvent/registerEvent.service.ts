@@ -32,7 +32,8 @@ export class RegisterEventService {
     userId: string,
     createRegisterEventDto: CreateRegisterEventDto,
   ): Promise<RegisterEvent> {
-    const { eventId, type, registerCode, isCreatedByAdmin } = createRegisterEventDto;
+    const { eventId, type, registerCode, isCreatedByAdmin } =
+      createRegisterEventDto;
 
     const event = await this.eventRepository.findOne({
       where: { id: eventId },
@@ -70,13 +71,14 @@ export class RegisterEventService {
       orderId: isCreatedByAdmin ? undefined : createRegisterEventDto.orderId,
     };
 
-    const registerEvent = this.registerEventRepository.create(registerEventData);
+    const registerEvent =
+      this.registerEventRepository.create(registerEventData);
     return await this.registerEventRepository.save(registerEvent);
   }
 
   async findAll(userId: string, role: string) {
     let registerEvents;
-  
+
     if (role === 'admin') {
       // 🧑‍💼 Admin can see all register events
       registerEvents = await this.registerEventRepository.find({
@@ -88,6 +90,7 @@ export class RegisterEventService {
           'event.category', // Add this
           'event.category.category', // Add this
           'event.galleries',
+          'event.eventStamps',
           'event.eventExhibitors',
           'event.eventExhibitors.exhibitor',
           'event.eventExhibitors.exhibitor.promotionalOffers',
@@ -113,53 +116,75 @@ export class RegisterEventService {
         ],
       });
     }
-  
+
     // Add attendance count and favorite status to each registered event
     const registerEventsWithAttendance = await Promise.all(
       registerEvents.map(async (registerEvent) => {
-        const attendanceCount = registerEvent.eventId ? await this.getEventAttendanceCount(registerEvent.eventId) : 0;
-        
+        const attendanceCount = registerEvent.eventId
+          ? await this.getEventAttendanceCount(registerEvent.eventId)
+          : 0;
+
         // Check if event is favorited by the user
         let isFavorite = false;
         if (registerEvent.userId) {
           const favorite = await this.favoriteEventRepository.findOne({
-            where: { userId: registerEvent.userId, eventId: registerEvent.eventId }
+            where: {
+              userId: registerEvent.userId,
+              eventId: registerEvent.eventId,
+            },
           });
           isFavorite = !!favorite;
         }
-        
+
         const speakers =
           registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
 
-          
         // Extract categories
-        const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+        const categories =
+          registerEvent.event?.category?.map((ec) => ec.category) || [];
 
+        const eventStamps = registerEvent.event?.eventStamps || [];
 
-        // Extract exhibitors (only active ones)
-        const exhibitors = registerEvent.event?.eventExhibitors
-          ?.filter((ee) => ee.exhibitor.isActive)
-          ?.map((ee) => ({
-            ...ee.exhibitor,
-            promotionalOffers: ee.exhibitor.promotionalOffers || []
-          })) || [];
+        const eventStampData =
+        eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
+    
 
-        const { eventSpeakers, category, eventExhibitors, ...restEvent } = registerEvent.event || {};
+        const {
+          eventSpeakers,
+          category,
+          eventExhibitors,
+          exhibitorDescription,
+          ...restEvent
+        } = registerEvent.event || {};
         const event = {
           ...restEvent,
           color: getEventColor(registerEvent.event?.type),
           speakers,
           categories,
-          exhibitors, // Add exhibitors here
+          eventStamps: eventStampData,
+          exhibitorsData: {
+            exhibitorDescription: exhibitorDescription || '',
+            exhibitors:
+              registerEvent.event?.eventExhibitors
+                ?.filter((ee) => ee.exhibitor.isActive)
+
+                ?.map((ee) => ({
+                  ...ee.exhibitor,
+                  promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                })) || [],
+          },
           attendanceCount: attendanceCount,
           isFavorite: isFavorite,
         };
 
-
         const { firstName, lastName, email, mobile } = registerEvent.user || {};
         const cleanedUser = { firstName, lastName, email, mobile };
 
-        const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
+        const {
+          orderId: _,
+          eventId: __,
+          ...cleanRegisterEvent
+        } = registerEvent;
 
         return {
           ...cleanRegisterEvent,
@@ -167,9 +192,9 @@ export class RegisterEventService {
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
         };
-      })
+      }),
     );
-  
+
     return {
       success: true,
       message:
@@ -180,12 +205,11 @@ export class RegisterEventService {
       data: registerEventsWithAttendance,
     };
   }
-  
 
   // Get event attendance count
   async getEventAttendanceCount(eventId: string): Promise<number> {
     const count = await this.registerEventRepository.count({
-      where: { eventId: eventId }
+      where: { eventId: eventId },
     });
     return count;
   }
@@ -194,9 +218,9 @@ export class RegisterEventService {
     // Query to find the specific register event, ensuring it belongs to the current user
     const registerEvent = await this.registerEventRepository.findOne({
       where:
-      role === 'admin'
-        ? { id } // 🧑‍💼 Admin can fetch any
-        : { id, user: { id: userId } }, // 👤 User can fetch only their own
+        role === 'admin'
+          ? { id } // 🧑‍💼 Admin can fetch any
+          : { id, user: { id: userId } }, // 👤 User can fetch only their own
       relations: [
         'user',
         'event',
@@ -205,6 +229,7 @@ export class RegisterEventService {
         'event.category', // Add this
         'event.category.category', // Add this
         'event.galleries',
+        'event.eventStamps',
         'event.eventExhibitors',
         'event.eventExhibitors.exhibitor',
         'event.eventExhibitors.exhibitor.promotionalOffers',
@@ -217,13 +242,15 @@ export class RegisterEventService {
     }
 
     // Get attendance count for this event
-    const attendanceCount = registerEvent.eventId ? await this.getEventAttendanceCount(registerEvent.eventId) : 0;
+    const attendanceCount = registerEvent.eventId
+      ? await this.getEventAttendanceCount(registerEvent.eventId)
+      : 0;
 
     // Check if event is favorited by the user
     let isFavorite = false;
     if (registerEvent.userId) {
       const favorite = await this.favoriteEventRepository.findOne({
-        where: { userId: registerEvent.userId, eventId: registerEvent.eventId }
+        where: { userId: registerEvent.userId, eventId: registerEvent.eventId },
       });
       isFavorite = !!favorite;
     }
@@ -232,31 +259,40 @@ export class RegisterEventService {
     const speakers =
       registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
 
-   // Extract categories
-   const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+    // Extract categories
+    const categories =
+      registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-   // Extract exhibitors (only active ones)
-   const exhibitors = registerEvent.event?.eventExhibitors
-     ?.filter((ee) => ee.exhibitor.isActive)
-     ?.map((ee) => ({
-       ...ee.exhibitor,
-       promotionalOffers: ee.exhibitor.promotionalOffers || []
-     })) || [];
+    // Extract exhibitors (only active ones)
+    const exhibitors =
+      registerEvent.event?.eventExhibitors
+        ?.filter((ee) => ee.exhibitor.isActive)
+        ?.map((ee) => ({
+          ...ee.exhibitor,
+          promotionalOffers: ee.exhibitor.promotionalOffers || [],
+        })) || [];
 
-   // 🧼 Clean up event object (remove eventSpeakers, category, and eventExhibitors)
-   const { eventSpeakers, category, eventExhibitors, ...restEvent } = registerEvent.event || {};
+    // 🧼 Clean up event object (remove eventSpeakers, category, and eventExhibitors)
+    const { eventSpeakers, category, eventExhibitors, exhibitorDescription, eventStamps, ...restEvent } =
+      registerEvent.event || {};
 
-   // ✅ Replace with clean speakers, categories, and exhibitors
-   const event = {
-     ...restEvent,
-     color: getEventColor(registerEvent.event?.type),
-     speakers,
-     categories,
-     exhibitors, // Add exhibitors here
-     attendanceCount: attendanceCount,
-     isFavorite: isFavorite,
-   };
+    const eventStampData =
+    eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
 
+    // ✅ Replace with clean speakers, categories, and exhibitors
+    const event = {
+      ...restEvent,
+      color: getEventColor(registerEvent.event?.type),
+      speakers,
+      categories,
+      exhibitorsData: {
+        exhibitorDescription: exhibitorDescription || '',
+        exhibitors: exhibitors,
+      },
+      eventStamps :eventStampData,
+      attendanceCount: attendanceCount,
+      isFavorite: isFavorite,
+    };
 
     // 🧼 Clean up user object, showing only specific fields
     const { firstName, lastName, email, mobile } = registerEvent.user || {};

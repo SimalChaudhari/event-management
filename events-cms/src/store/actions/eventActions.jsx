@@ -1,6 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import {  EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from "../constants/actionTypes";
+import {  EVENT_BY_ID, EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from "../constants/actionTypes";
 
 export const eventList = () => async (dispatch) => {
     try {
@@ -17,6 +17,20 @@ export const eventList = () => async (dispatch) => {
     }
     return false; // Return false for any errors
 };
+
+export const eventById = (id) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/events/${id}`);
+        dispatch({
+            type: EVENT_BY_ID,
+            payload: response.data,
+        });
+        return response.data;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message ;
+        toast.error(errorMessage);
+    }
+}
 
 export const upcomingEventList = () => async (dispatch) => {
     try {
@@ -88,6 +102,15 @@ export const participatedEvents = () => async (dispatch) => {
     }
     return false; // Return false for any errors
 };
+
+export const registerEventById = (id) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/register-events/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+}
 
 
 

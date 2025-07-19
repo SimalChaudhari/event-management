@@ -8,7 +8,7 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { participatedEvents } from '../../../store/actions/eventActions'; // You'll need to create this
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/register.css'; // Import the CSS file
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
@@ -313,7 +313,7 @@ const RegisteredEvents = () => {
     const registrations = useSelector((state) => state.event.participatedEvents.data || []);
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
-
+    const navigate = useNavigate();
     // Add state for view modal
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewData, setViewData] = useState(null);
@@ -323,13 +323,12 @@ const RegisteredEvents = () => {
 
     // Add handler for view button
     const handleView = (registration) => {
-        setViewData(registration);
-        setShowViewModal(true);
+        navigate(`/events/view-register-event/${registration.id}`);
     };
 
     // Add handler for Add Register Event button
     const handleAddRegisterEvent = () => {
-        setShowAddRegisterModal(true);
+        navigate(`/events/add-register-event`);
     };
 
     const destroyTable = () => {
