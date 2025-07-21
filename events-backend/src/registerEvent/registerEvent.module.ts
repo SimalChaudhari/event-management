@@ -8,10 +8,11 @@ import { Event, EventExhibitor } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
+import { UserEntity } from 'user/users.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, Event, Order, FavoriteEvent,EventExhibitor,Exhibitor]),
+        TypeOrmModule.forFeature([RegisterEvent, Event, Order, FavoriteEvent,EventExhibitor,Exhibitor,UserEntity]),
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

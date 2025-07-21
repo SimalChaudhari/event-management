@@ -104,8 +104,19 @@ export class EventDto {
   @IsString()
   floorPlan?: string;
 
+    // Event Stamp fields
+    @IsOptional()
+    @IsString()
+    eventStampDescription?: string;
+  
+    @IsOptional()
+    eventStampImages?: string[];
+
   @IsOptional()
   speakerIds?: string;
   originalImages: any;
   originalDocuments: any;
+  originalEventStampImages: any;
+  originalFloorPlan: any;
 }
+

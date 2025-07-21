@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import { RegisterEventService } from './registerEvent.service';
-import { CreateRegisterEventDto } from './registerEvent.dto';
+import { CreateRegisterEventDto, UpdateRegisterEventDto } from './registerEvent.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { RolesGuard } from 'jwt/roles.guard';
+import { Roles } from 'jwt/roles.decorator';
+import { UserRole } from 'user/users.entity';
 
 @Controller('api/register-events')
 @UseGuards(JwtAuthGuard)
@@ -39,6 +42,49 @@ export class RegisterEventController {
 
     return this.registerEventService.createRegisterEvent(userId, createRegisterEventDto);
   }
+
+  // Admin can update any registration
+  @Put('admin/update/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async adminUpdateRegisterEvent(
+    @Param('id') id: string,
+    @Body() updateRegisterEventDto: UpdateRegisterEventDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const updatedRegistration = await this.registerEventService.adminUpdateRegisterEvent(id, updateRegisterEventDto);
+      
+      return response.status(200).json({
+        success: true,
+        message: 'Registration updated successfully',
+        data: updatedRegistration,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Admin can delete any registration
+  @Delete('admin/delete/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async adminDeleteRegisterEvent(
+    @Param('id') id: string,
+    @Res() response: Response,
+  ) {
+    try {
+      await this.registerEventService.adminDeleteRegisterEvent(id);
+      
+      return response.status(200).json({
+        success: true,
+        message: 'Registration deleted successfully',
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
   
   @Get('all')
   async getAll(@Req() req: Request) {

@@ -23,6 +23,7 @@ import { Exhibitor } from 'exhibitor/exhibitor.entity';
       signOptions: { }, // Set your token expiration
     }),
     OrderModule, // Import the OrderModule
+  
   ],
     providers: [EventService],
     controllers: [EventController],

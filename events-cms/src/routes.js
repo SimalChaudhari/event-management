@@ -32,6 +32,7 @@ const eventComponents = {
   AddEvent: React.lazy(() => import('./Pages/Events/all-events/components/AddEventPage.jsx')),
   ViewEvent: React.lazy(() => import('./Pages/Events/all-events/components/ViewEventPage.jsx')),
   AddRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
+  EditRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
   ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx')),
 };
 
@@ -210,6 +211,13 @@ const eventRoutes = [
     path: '/events/add-register-event',
     exact: true,
     name: 'Add Register Event',
+    component: eventComponents.AddRegisterEvent
+  },
+
+  {
+    path: '/events/edit-register-event/:id',
+    exact: true,
+    name: 'Edit Register Event',
     component: eventComponents.AddRegisterEvent
   },
   {

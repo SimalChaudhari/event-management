@@ -7,12 +7,13 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { participatedEvents } from '../../../store/actions/eventActions'; // You'll need to create this
+import { participatedEvents, adminDeleteRegisterEvent } from '../../../store/actions/eventActions';
 import { useLocation, useNavigate } from 'react-router-dom';
-import '../../../assets/css/register.css'; // Import the CSS file
+import '../../../assets/css/register.css';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
 import AddRegisterEventModal from './modal/AddRegisterEventModal';
+import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 
 // @ts-ignore
@@ -28,7 +29,7 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(registrations, handleView, handleAddRegisterEvent) {
+function atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -214,6 +215,18 @@ function atable(registrations, handleView, handleAddRegisterEvent) {
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
+                            <button type="button" class="btn btn-icon btn-warning edit-btn" data-id="${
+                                row.id
+                            }" title="Edit Registration" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-icon btn-danger delete-btn" data-id="${
+                                row.id
+                            }" title="Delete Registration" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-trash-2"></i>
+                            </button>
                             ${
                                 row.receiptUrl
                                     ? `
@@ -281,12 +294,30 @@ function atable(registrations, handleView, handleAddRegisterEvent) {
                 }
             });
 
+            // Add event listener for edit button
+            $(document).on('click', '.edit-btn', function () {
+                const registrationId = $(this).data('id');
+                const registration = registrations.find((reg) => reg.id === registrationId);
+                if (registration) {
+                    handleEdit(registration);
+                }
+            });
+
+            // Add event listener for delete button
+            $(document).on('click', '.delete-btn', function () {
+                const registrationId = $(this).data('id');
+                const registration = registrations.find((reg) => reg.id === registrationId);
+                if (registration) {
+                    handleDelete(registration);
+                }
+            });
+
             // Add button initialization
             if (!$('#addRegisterEventBtn').length) {
                 $('.add-register-event-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addRegisterEventBtn">
                         <i class="feather icon-plus mr-1"></i>
-                        Add Register Event
+                        Add
                     </button>
                 `);
 
@@ -314,6 +345,7 @@ const RegisteredEvents = () => {
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
+    
     // Add state for view modal
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewData, setViewData] = useState(null);
@@ -321,9 +353,50 @@ const RegisteredEvents = () => {
     // Add state for Add Register Event modal
     const [showAddRegisterModal, setShowAddRegisterModal] = useState(false);
 
+    // Delete modal states
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [registrationToDelete, setRegistrationToDelete] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
     // Add handler for view button
     const handleView = (registration) => {
         navigate(`/events/view-register-event/${registration.id}`);
+    };
+
+    const handleEdit = (registration) => {
+        navigate(`/events/edit-register-event/${registration.id}`);
+    };
+
+    // Handle delete button click
+    const handleDelete = (registration) => {
+        setRegistrationToDelete(registration);
+        setShowDeleteModal(true);
+    };
+
+    // Handle delete confirmation
+    const handleDeleteConfirm = async () => {
+        if (!registrationToDelete) return;
+        
+        setDeleteLoading(true);
+        try {
+            const success = await dispatch(adminDeleteRegisterEvent(registrationToDelete.id));
+            if (success) {
+                setShowDeleteModal(false);
+                setRegistrationToDelete(null);
+                // Refresh the data
+                dispatch(participatedEvents());
+            }
+        } catch (error) {
+            console.error('Error deleting registration:', error);
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    // Handle cancel delete
+    const handleCancelDelete = () => {
+        setShowDeleteModal(false);
+        setRegistrationToDelete(null);
     };
 
     // Add handler for Add Register Event button
@@ -342,7 +415,7 @@ const RegisteredEvents = () => {
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(registrations) && registrations.length >= 0) {
-            const table = atable(registrations, handleView, handleAddRegisterEvent);
+            const table = atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent);
             setCurrentTable(table);
         }
     };
@@ -366,31 +439,42 @@ const RegisteredEvents = () => {
     }, [location.pathname]);
 
     return (
-        <Row>
-            <RegisterEventModal show={showViewModal} onHide={() => setShowViewModal(false)} eventData={viewData} />
+        <>
+            <Row>
+                <RegisterEventModal show={showViewModal} onHide={() => setShowViewModal(false)} eventData={viewData} />
 
-            <AddRegisterEventModal show={showAddRegisterModal} onHide={() => setShowAddRegisterModal(false)} />
+                <AddRegisterEventModal show={showAddRegisterModal} onHide={() => setShowAddRegisterModal(false)} />
 
-            <Col sm={12} className="btn-page">
-                <Card className="event-list">
-                    <Card.Body>
-                        <Table striped hover responsive id="data-table-zero">
-                            <thead>
-                                <tr>
-                                    <th>Registered By</th>
-                                    <th>User Type</th>
-                                    <th>Event Name / Date</th>
-                                    <th>Location / Venue / Country</th>
-                                    <th>Event Schedule</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                        </Table>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+                <Col sm={12} className="btn-page">
+                    <Card className="event-list">
+                        <Card.Body>
+                            <Table striped hover responsive id="data-table-zero">
+                                <thead>
+                                    <tr>
+                                        <th>Registered By</th>
+                                        <th>User Type</th>
+                                        <th>Event Name / Date</th>
+                                        <th>Location / Venue / Country</th>
+                                        <th>Event Schedule</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                show={showDeleteModal}
+                onHide={handleCancelDelete}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Registration"
+                isLoading={deleteLoading}
+            />
+        </>
     );
 };
 

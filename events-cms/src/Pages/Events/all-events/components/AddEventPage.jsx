@@ -4,7 +4,7 @@ import Select from 'react-select';
 import { useDispatch } from 'react-redux';
 import { useParams, useHistory, useNavigate } from 'react-router-dom';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
-import { createEvent, editEvent, eventById } from '../../../../store/actions/eventActions';
+import { createEvent, editEvent, eventById, eventGetStamp, exhibitorGet, removeEventFloorPlan, removeEventStampImage } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
@@ -14,11 +14,11 @@ import SpeakerFormModal from '../components/SpeakerFormSidebar';
 import CategoryFormModal from '../components/CategoryFormModal';
 import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { createCategory } from '../../../../store/actions/categoryActions';
-import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
+import { removeEventImage, removeEventDocument, createEventStamp } from '../../../../store/actions/eventActions';
 
 function AddEventPage() {
     const dispatch = useDispatch();
-    const { id } = useParams(); // Edit mode के लिए
+    const { id } = useParams(); // Edit mode 
     const { fetchEvent } = FetchEventData();
     const [tempLatLng, setTempLatLng] = useState(null);
     const [display, setDisplay] = useState(null);
@@ -44,7 +44,13 @@ function AddEventPage() {
         speakerIds: [],
         categoryIds: [],
         latitude: '',
-        longitude: ''
+        longitude: '',
+        // new
+        floorPlan: null,
+        exhibitorIds: [],
+        // Remove eventStampIds and add new fields
+        eventStampDescription: '',
+        eventStampImages: []
     });
     const [showMapModal, setShowMapModal] = useState(false);
 
@@ -75,6 +81,14 @@ function AddEventPage() {
         name: '',
         description: ''
     });
+
+    const [exhibitorList, setExhibitorList] = useState([]);
+  
+    // Add new states for event stamp
+    const [eventStampImagePreviewUrls, setEventStampImagePreviewUrls] = useState([]);
+
+    // Add floor plan preview state
+    const [floorPlanPreview, setFloorPlanPreview] = useState(null);
 
     // Fetch current location
     const getCurrentLocation = () => {
@@ -107,9 +121,10 @@ function AddEventPage() {
             const loadEventData = async () => {
                 try {
                     const response = await dispatch(eventById(id));
+             
                     if (response?.data) {
                         const editData = response.data;
-                        
+
                         // Handle speakers data
                         let speakerIds = [];
                         if (editData.speakers) {
@@ -126,6 +141,14 @@ function AddEventPage() {
                             categoryIds = editData.categoriesData.map((category) => category.id);
                         }
 
+                        
+                        // Handle exhibitors
+                        let exhibitorIds = [];
+                        if (editData.exhibitors) {
+                            console.log(editData,"editData.exhibitors")
+                            exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
+                        } 
+
                         // Handle images
                         let imagesData = [];
                         let previewUrls = [];
@@ -135,7 +158,7 @@ function AddEventPage() {
                                 previewUrls = [`${API_URL}/${editData.images.replace(/\\/g, '/')}`];
                             } else if (Array.isArray(editData.images)) {
                                 imagesData = editData.images;
-                                previewUrls = editData.images.map(img => {
+                                previewUrls = editData.images.map((img) => {
                                     if (typeof img === 'string') {
                                         if (img.startsWith('http')) {
                                             return img;
@@ -156,7 +179,7 @@ function AddEventPage() {
                                 documentPreviewUrls = [`${API_URL}/${editData.documents.replace(/\\/g, '/')}`];
                             } else if (Array.isArray(editData.documents)) {
                                 documentsData = editData.documents;
-                                documentPreviewUrls = editData.documents.map(doc => {
+                                documentPreviewUrls = editData.documents.map((doc) => {
                                     if (typeof doc === 'string') {
                                         if (doc.startsWith('http')) {
                                             return doc;
@@ -168,12 +191,46 @@ function AddEventPage() {
                             }
                         }
 
-                        setFormData({
+                        // Handle floor plan
+                        let floorPlanData = null;
+                        let floorPlanPreviewUrl = null;
+                        if (editData.floorPlan) {
+                            if (typeof editData.floorPlan === 'string') {
+                                floorPlanData = editData.floorPlan;
+                                floorPlanPreviewUrl = `${API_URL}/${editData.floorPlan.replace(/\\/g, '/')}`;
+                            }
+                        }
+
+                        // Handle event stamps - Updated to match API response structure
+                        let eventStampDescription = '';
+                        let eventStampImagesData = [];
+                        let eventStampImagePreviewUrls = [];
+                        
+                        if (editData.eventStamps) {
+                            // Handle event stamp description
+                            eventStampDescription = editData.eventStamps.description || '';
+                            
+                            // Handle event stamp images
+                            if (editData.eventStamps.images && Array.isArray(editData.eventStamps.images)) {
+                                eventStampImagesData = editData.eventStamps.images;
+                                eventStampImagePreviewUrls = editData.eventStamps.images.map((img) => {
+                                    if (typeof img === 'string') {
+                                        if (img.startsWith('http')) {
+                                            return img;
+                                        }
+                                        return `${API_URL}/${img.replace(/\\/g, '/')}`;
+                                    }
+                                    return img;
+                                });
+                            }
+                        }
+
+                        const formDataToSet = {
                             name: editData.name || '',
                             description: editData.description || '',
-                            startDate: editData.startDate || '',
+                            startDate: editData.startDate ? editData.startDate.split('T')[0] : '',
                             startTime: editData.startTime || '',
-                            endDate: editData.endDate || '',
+                            endDate: editData.endDate ? editData.endDate.split('T')[0] : '',
                             endTime: editData.endTime || '',
                             location: editData.location || '',
                             venue: editData.venue || '',
@@ -186,13 +243,22 @@ function AddEventPage() {
                             price: editData.price || '',
                             currency: editData.currency || '',
                             speakerIds: speakerIds,
-                            categoryIds: categoryIds
-                        });
-                        
+                            categoryIds: categoryIds,
+                            floorPlan: floorPlanData,
+                            exhibitorIds: exhibitorIds,
+                            eventStampDescription: eventStampDescription,
+                            eventStampImages: eventStampImagesData
+                        };
+
+                    
+
+                        setFormData(formDataToSet);
                         setImagePreviewUrls(previewUrls);
                         setDocumentPreviewUrls(documentPreviewUrls);
+                        setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
                         setRemovedImages([]);
                         setRemovedDocuments([]);
+                        setFloorPlanPreview(floorPlanPreviewUrl);
                     }
                 } catch (error) {
                     console.error('Error loading event data:', error);
@@ -205,17 +271,17 @@ function AddEventPage() {
     // Image removal function
     const handleRemoveImage = async (indexToRemove) => {
         const imageToRemove = formData.images[indexToRemove];
-        
+
         if (typeof imageToRemove === 'string' && id) {
             try {
                 const updatedImages = await dispatch(removeEventImage(id, imageToRemove));
                 if (updatedImages) {
-                    setFormData(prev => ({
+                    setFormData((prev) => ({
                         ...prev,
                         images: updatedImages
                     }));
-                    
-                    const newPreviewUrls = updatedImages.map(img => 
+
+                    const newPreviewUrls = updatedImages.map((img) =>
                         img.startsWith('http') ? img : `${API_URL}/${img.replace(/\\/g, '/')}`
                     );
                     setImagePreviewUrls(newPreviewUrls);
@@ -224,31 +290,32 @@ function AddEventPage() {
                 console.error('Error removing image:', error);
             }
         } else {
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 images: prev.images.filter((_, index) => index !== indexToRemove)
             }));
-            
-            setImagePreviewUrls(prev => 
-                prev.filter((_, index) => index !== indexToRemove)
-            );
+
+            setImagePreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
         }
     };
+
+
+  
 
     // Document removal function
     const handleRemoveDocument = async (indexToRemove) => {
         const documentToRemove = formData.documents[indexToRemove];
-        
+
         if (typeof documentToRemove === 'string' && id) {
             try {
                 const updatedDocuments = await dispatch(removeEventDocument(id, documentToRemove));
                 if (updatedDocuments) {
-                    setFormData(prev => ({
+                    setFormData((prev) => ({
                         ...prev,
                         documents: updatedDocuments
                     }));
-                    
-                    const newPreviewUrls = updatedDocuments.map(doc => 
+
+                    const newPreviewUrls = updatedDocuments.map((doc) =>
                         doc.startsWith('http') ? doc : `${API_URL}/${doc.replace(/\\/g, '/')}`
                     );
                     setDocumentPreviewUrls(newPreviewUrls);
@@ -257,77 +324,77 @@ function AddEventPage() {
                 console.error('Error removing document:', error);
             }
         } else {
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 documents: prev.documents.filter((_, index) => index !== indexToRemove)
             }));
-            
-            setDocumentPreviewUrls(prev => 
-                prev.filter((_, index) => index !== indexToRemove)
-            );
+
+            setDocumentPreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
         }
     };
 
     // Handle form changes
     const handleChange = (e) => {
         const { name, value, type, files } = e.target;
-        
+
         if (type === 'file') {
             const newFiles = Array.from(files);
-            
+
             if (name === 'images') {
-                const validFiles = newFiles.filter(file => {
-                    const isValidType = file.type.startsWith('image/');
-                    const isValidSize = file.size <= 5 * 1024 * 1024;
-                    
+                const validFiles = newFiles.filter((file) => {
+                    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                    const isValidType = allowedImageTypes.includes(file.type);
+                    const isValidSize = file.size <= 50 * 1024 * 1024;
+
                     if (!isValidType) {
-                        alert(`${file.name} is not a valid image file.`);
+                        alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
                     }
                     if (!isValidSize) {
-                        alert(`${file.name} is too large. Maximum size is 5MB.`);
+                        alert(`${file.name} is too large. Maximum size is 50MB.`);
                     }
-                    
+
                     return isValidType && isValidSize;
                 });
-                
-                const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
-                
-                setFormData(prev => ({
+
+                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+                setFormData((prev) => ({
                     ...prev,
                     images: [...prev.images, ...validFiles]
                 }));
-                
-                setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+
+                setImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
             } else if (name === 'documents') {
-                const validFiles = newFiles.filter(file => {
-                    const isValidType = file.type === 'application/pdf' || 
-                                     file.type === 'application/msword' ||
-                                     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                                     file.type === 'application/vnd.ms-excel' ||
-                                     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                const validFiles = newFiles.filter((file) => {
+                    const isValidType =
+                        file.type === 'application/pdf' ||
+                        file.type === 'application/msword' ||
+                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                        file.type === 'application/vnd.ms-excel' ||
+                        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                     const isValidSize = file.size <= 10 * 1024 * 1024;
-                    
+
                     if (!isValidType) {
                         alert(`${file.name} is not a valid document file. Supported: PDF, DOC, DOCX, XLS, XLSX`);
                     }
                     if (!isValidSize) {
                         alert(`${file.name} is too large. Maximum size is 10MB.`);
                     }
-                    
+
                     return isValidType && isValidSize;
                 });
-                
-                const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
-                
-                setFormData(prev => ({
+
+                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+                setFormData((prev) => ({
                     ...prev,
                     documents: [...prev.documents, ...validFiles]
                 }));
-                
-                setDocumentPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+
+                setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
             }
         } else {
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 [name]: value
             }));
@@ -342,29 +409,30 @@ function AddEventPage() {
     const handleDrop = (e) => {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
-        
-        const validFiles = files.filter(file => {
-            const isValidType = file.type.startsWith('image/');
-            const isValidSize = file.size <= 5 * 1024 * 1024;
-            
+
+        const validFiles = files.filter((file) => {
+            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            const isValidType = allowedImageTypes.includes(file.type);
+            const isValidSize = file.size <= 50 * 1024 * 1024;
+
             if (!isValidType) {
-                alert(`${file.name} is not a valid image file.`);
+                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
             }
             if (!isValidSize) {
-                alert(`${file.name} is too large. Maximum size is 5MB.`);
+                alert(`${file.name} is too large. Maximum size is 50MB.`);
             }
-            
+
             return isValidType && isValidSize;
         });
-        
-        const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
-        
-        setFormData(prev => ({
+
+        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+        setFormData((prev) => ({
             ...prev,
             images: [...prev.images, ...validFiles]
         }));
-        
-        setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+
+        setImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
     };
 
     const handleDocumentDragOver = (e) => {
@@ -374,33 +442,34 @@ function AddEventPage() {
     const handleDocumentDrop = (e) => {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
-        
-        const validFiles = files.filter(file => {
-            const isValidType = file.type === 'application/pdf' || 
-                             file.type === 'application/msword' ||
-                             file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                             file.type === 'application/vnd.ms-excel' ||
-                             file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+        const validFiles = files.filter((file) => {
+            const isValidType =
+                file.type === 'application/pdf' ||
+                file.type === 'application/msword' ||
+                file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                file.type === 'application/vnd.ms-excel' ||
+                file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
             const isValidSize = file.size <= 10 * 1024 * 1024;
-            
+
             if (!isValidType) {
                 alert(`${file.name} is not a valid document file.`);
             }
             if (!isValidSize) {
                 alert(`${file.name} is too large. Maximum size is 10MB.`);
             }
-            
+
             return isValidType && isValidSize;
         });
-        
-        const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
-        
-        setFormData(prev => ({
+
+        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+        setFormData((prev) => ({
             ...prev,
             documents: [...prev.documents, ...validFiles]
         }));
-        
-        setDocumentPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+
+        setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
     };
 
     // Reset form data
@@ -423,7 +492,12 @@ function AddEventPage() {
             speakerIds: [],
             categoryIds: [],
             latitude: '',
-            longitude: ''
+            longitude: '',
+            floorPlan: null,
+            exhibitorIds: [],
+            // Update event stamp fields
+            eventStampDescription: '',
+            eventStampImages: []
         });
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
@@ -431,6 +505,14 @@ function AddEventPage() {
         setRemovedDocuments([]);
         setUploadProgress({});
         setDocumentUploadProgress({});
+        // Remove old event stamp states
+        // setNewEventStamp({
+        //     description: '',
+        //     images: []
+        // });
+        // setEventStampImages([]);
+        // Add new event stamp state
+        setEventStampImagePreviewUrls([]);
     };
 
     // Load countries, speakers, and categories
@@ -473,6 +555,9 @@ function AddEventPage() {
     useEffect(() => {
         fetchSpeakers();
         fetchCategories();
+
+        fetchExhibitors();
+        // fetchEventStamps(); // नया API call
     }, []);
 
     // Handle speaker and category selection
@@ -492,7 +577,7 @@ function AddEventPage() {
         }));
     };
 
-    // Handle form submission
+    // Handle form submission - Updated to handle event stamps correctly
     const handleSubmit = async (e) => {
         e.preventDefault();
         const formDataToSend = new FormData();
@@ -517,6 +602,25 @@ function AddEventPage() {
             } else if (key === 'categoryIds') {
                 const categoriesArray = Array.isArray(dataToSend.categoryIds) ? dataToSend.categoryIds : [];
                 formDataToSend.append('categoryIds', categoriesArray.join(','));
+            } else if (key === 'exhibitorIds') {
+                const exhibitorsArray = Array.isArray(dataToSend.exhibitorIds) ? dataToSend.exhibitorIds : [];
+                formDataToSend.append('exhibitorIds', exhibitorsArray.join(','));
+            } else if (key === 'eventStampDescription') {
+                // Handle event stamp description
+                formDataToSend.append('eventStampDescription', dataToSend[key]);
+            } else if (key === 'eventStampImages') {
+                // Handle event stamp images
+                if (dataToSend[key] && Array.isArray(dataToSend[key])) {
+                    dataToSend[key].forEach((file) => {
+                        if (file instanceof File) {
+                            formDataToSend.append('eventStampImages', file);
+                        }
+                    });
+                }
+            } else if (key === 'floorPlan') {
+                if (dataToSend[key] instanceof File) {
+                    formDataToSend.append('floorPlan', dataToSend[key]);
+                }
             } else if (key === 'images') {
                 if (dataToSend[key] && Array.isArray(dataToSend[key])) {
                     dataToSend[key].forEach((file) => {
@@ -555,6 +659,15 @@ function AddEventPage() {
                     }
                 });
             }
+
+            // Handle existing event stamp images for edit mode
+            if (formData.eventStampImages && formData.eventStampImages.length > 0) {
+                formData.eventStampImages.forEach((image) => {
+                    if (typeof image === 'string') {
+                        formDataToSend.append('originalEventStampImages', image);
+                    }
+                });
+            }
         }
 
         try {
@@ -582,9 +695,7 @@ function AddEventPage() {
         value: speaker.id
     }));
 
-    const selectedSpeakerOptions = speakerOptions.filter((option) => 
-        formData.speakerIds && formData.speakerIds.includes(option.value)
-    );
+    const selectedSpeakerOptions = speakerOptions.filter((option) => formData.speakerIds && formData.speakerIds.includes(option.value));
 
     const categoryOptions = categoryList.map((category) => ({
         label: category.name,
@@ -690,6 +801,153 @@ function AddEventPage() {
         );
     };
 
+    // Floor plan handling
+    const handleFloorPlanChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            const isValidType = allowedImageTypes.includes(file.type);
+            const isValidSize = file.size <= 50 * 1024 * 1024;
+
+            if (!isValidType) {
+                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
+                return;
+            }
+            if (!isValidSize) {
+                alert(`${file.name} is too large. Maximum size is 50MB.`);
+                return;
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                floorPlan: file
+            }));
+            setFloorPlanPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleRemoveFloorPlan = async () =>    {
+        const response = await dispatch(removeEventFloorPlan(id));
+        if (response.success) {
+            setFormData((prev) => ({
+                ...prev,
+                floorPlan: null
+            }));
+            setFloorPlanPreview(null);
+        }   
+    }
+
+
+    // Exhibitor handling
+    const handleExhibitorSelect = (selectedOptions) => {
+        const selectedIds = selectedOptions.map((option) => option.value);
+        setFormData((prev) => ({
+            ...prev,
+            exhibitorIds: selectedIds
+        }));
+    };
+
+    // Event stamp handling
+    // Remove event stamp related functions
+    // const handleEventStampSelect = (selectedOptions) => {
+    //     const selectedIds = selectedOptions.map((option) => option.value);
+    //     setFormData((prev) => ({
+    //         ...prev,
+    //         eventStampIds: selectedIds
+    //     }));
+    // };
+
+    // const handleAddEventStamp = async () => {
+    //     // Remove this function
+    // };
+
+    // const handleRemoveEventStamp = (index) => {
+    //     // Remove this function
+    // };
+
+    // const fetchEventStamps = async () => {
+    //     // Remove this function
+    // };
+
+    // Add new event stamp handling functions
+    const handleEventStampDescriptionChange = (e) => {
+        const { value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            eventStampDescription: value
+        }));
+    };
+
+    const handleEventStampImagesChange = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = files.filter((file) => {
+            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            const isValidType = allowedImageTypes.includes(file.type);
+            const isValidSize = file.size <= 50 * 1024 * 1024;
+
+            if (!isValidType) {
+                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
+            }
+            if (!isValidSize) {
+                alert(`${file.name} is too large. Maximum size is 50MB.`);
+            }
+
+            return isValidType && isValidSize;
+        });
+
+        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+        setFormData((prev) => ({
+            ...prev,
+            eventStampImages: [...prev.eventStampImages, ...validFiles]
+        }));
+
+        setEventStampImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+    };
+
+    const handleRemoveEventStampImage = async (indexToRemove) => {
+        const imageToRemove = formData.eventStampImages[indexToRemove];
+
+        if (typeof imageToRemove === 'string' && id) {
+            try {
+                const updatedImages = await dispatch(removeEventStampImage(id, imageToRemove));
+                if (updatedImages) {
+                    setFormData((prev) => ({
+                        ...prev,
+                        eventStampImages: updatedImages
+                    }));
+
+                    const newPreviewUrls = updatedImages.map((img) =>
+                        img.startsWith('http') ? img : `${API_URL}/${img.replace(/\\/g, '/')}`
+                    );
+                    setEventStampImagePreviewUrls(newPreviewUrls);
+                }
+            } catch (error) {
+                console.error('Error removing image:', error);
+            }
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                images: prev.images.filter((_, index) => index !== indexToRemove)
+            }));
+
+            setImagePreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+        }
+    
+    };
+
+    const fetchExhibitors = async () => {
+        try {
+            const response = await dispatch(exhibitorGet());
+
+            setExhibitorList(response.data);
+        } catch (error) {
+            console.error('Error fetching exhibitors:', error);
+        }
+    };
+
+
+
     return (
         <Container fluid>
             <div className="row">
@@ -698,12 +956,9 @@ function AddEventPage() {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Event' : 'Add Event'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={() => navigate('/events/event-list')}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
-                                    Back to Events
+                                <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                    Back
                                 </Button>
                             </div>
                         </div>
@@ -920,6 +1175,22 @@ function AddEventPage() {
                                     </Col>
 
                                     <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="description">
+                                                Event Description (Optional)
+                                            </label>
+                                            <textarea
+                                                className="form-control"
+                                                name="description"
+                                                value={formData.description}
+                                                onChange={handleChange}
+                                                placeholder="Enter event description..."
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={12}>
                                         <div className="form-group d-flex align-items-center">
                                             <div style={{ flex: 1 }}>
                                                 <label>{id ? 'Update Speakers' : 'Select Speakers'}</label>
@@ -930,7 +1201,7 @@ function AddEventPage() {
                                                     options={speakerOptions}
                                                     value={selectedSpeakerOptions}
                                                     onChange={handleSpeakerSelect}
-                                                    placeholder={id ? "Update speakers..." : "Choose speakers..."}
+                                                    placeholder={id ? 'Update speakers...' : 'Choose speakers...'}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
@@ -973,7 +1244,7 @@ function AddEventPage() {
                                             onClose={() => setShowCategoryModal(false)}
                                             onChange={(e) => {
                                                 const { name, value } = e.target;
-                                                setNewCategory(prev => ({
+                                                setNewCategory((prev) => ({
                                                     ...prev,
                                                     [name]: value
                                                 }));
@@ -993,7 +1264,7 @@ function AddEventPage() {
                                                     options={categoryOptions}
                                                     value={selectedCategoryOptions}
                                                     onChange={handleCategorySelect}
-                                                    placeholder={id ? "Update categories..." : "Choose categories..."}
+                                                    placeholder={id ? 'Update categories...' : 'Choose categories...'}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
@@ -1023,27 +1294,316 @@ function AddEventPage() {
                                             )}
                                         </div>
                                     </Col>
+
+                                    <Col sm={12}>
+                                        <div className="form-group d-flex align-items-center">
+                                            <div style={{ flex: 1 }}>
+                                                <label>Select Exhibitors (Optional)</label>
+                                                <Select
+                                                    isMulti
+                                                    options={exhibitorList.map((exhibitor) => ({
+                                                        label: exhibitor.name,
+                                                        value: exhibitor.id
+                                                    }))}
+                                                    value={exhibitorList
+                                                        .filter((exhibitor) => formData.exhibitorIds.includes(String(exhibitor.id))) // Convert to string for comparison
+                                                        .map((exhibitor) => ({
+                                                            label: exhibitor.name,
+                                                            value: exhibitor.id
+                                                        }))}
+                                                    onChange={handleExhibitorSelect}
+                                                    placeholder="Choose exhibitors..."
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999
+                                                        }),
+                                                        menuPortal: (base) => ({
+                                                            ...base,
+                                                            zIndex: 10000
+                                                        })
+                                                    }}
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                />
+                                            </div>
+                                        </div>
+                                    </Col>
+
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="description">
-                                                Description
+                                            <label className="floating-label" htmlFor="eventStampDescription">
+                                                Event Stamp Description (Optional)
                                             </label>
                                             <textarea
                                                 className="form-control"
-                                                name="description"
-                                                value={formData.description}
-                                                onChange={handleChange}
-                                                placeholder="Event Description"
+                                                name="eventStampDescription"
+                                                value={formData.eventStampDescription}
+                                                onChange={handleEventStampDescriptionChange}
+                                                placeholder="Enter event stamp description..."
                                                 rows={3}
                                             />
                                         </div>
                                     </Col>
+
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <Badge bg="info"> <span>Images </span> {formData.images.length}/10</Badge>
-                                            
+                                            <Badge bg="info">
+                                                <span>Event Stamp Images (Optional) </span> {formData.eventStampImages.length}/5
+                                            </Badge>
+
+                                            {/* Drag and Drop Zone for Event Stamp Images */}
+                                            <div
+                                                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
+                                                onDragOver={handleDragOver}
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    const files = Array.from(e.dataTransfer.files);
+                                                    const validFiles = files.filter((file) => {
+                                                        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                                                        const isValidType = allowedImageTypes.includes(file.type);
+                                                        const isValidSize = file.size <= 50 * 1024 * 1024;
+
+                                                        if (!isValidType) {
+                                                            alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
+                                                        }
+                                                        if (!isValidSize) {
+                                                            alert(`${file.name} is too large. Maximum size is 50MB.`);
+                                                        }
+
+                                                        return isValidType && isValidSize;
+                                                    });
+
+                                                    const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        eventStampImages: [...prev.eventStampImages, ...validFiles]
+                                                    }));
+
+                                                    setEventStampImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+                                                }}
+                                                style={{
+                                                    border: '2px dashed #ccc',
+                                                    borderRadius: '8px',
+                                                    padding: '20px',
+                                                    textAlign: 'center',
+                                                    backgroundColor: '#f9f9f9',
+                                                    marginBottom: '10px',
+                                                    minHeight: '120px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <div className="mb-3">
+                                                    <i className="fas fa-stamp fa-3x text-muted"></i>
+                                                </div>
+                                                <p
+                                                    className="text-muted mb-2"
+                                                    style={{
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.4',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
+                                                    Drag and drop event stamp images here, or click to select files
+                                                </p>
+                                                <p
+                                                    className="text-muted small"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.3',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
+                                                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 5 images.
+                                                </p>
+                                                <input
+                                                    type="file"
+                                                    className="form-control"
+                                                    name="eventStampImages"
+                                                    onChange={handleEventStampImagesChange}
+                                                    accept="image/*"
+                                                    multiple
+                                                    style={{ display: 'none' }}
+                                                    id="eventStampImageInput"
+                                                />
+                                                <Button
+                                                    variant="outline-primary"
+                                                    onClick={() => document.getElementById('eventStampImageInput').click()}
+                                                    style={{ marginTop: '10px' }}
+                                                >
+                                                    Choose Event Stamp Images
+                                                </Button>
+                                            </div>
+
+                                            {/* Event Stamp Image Preview Grid */}
+                                            {formData.eventStampImages && formData.eventStampImages.length > 0 && (
+                                                <div className="mt-3">
+                                                    <h6
+                                                        style={{
+                                                            fontSize: '16px',
+                                                            fontWeight: '600',
+                                                            marginBottom: '15px',
+                                                            color: '#333'
+                                                        }}
+                                                    >
+                                                        Selected Event Stamp Images ({formData.eventStampImages.length})
+                                                    </h6>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                            gap: '15px',
+                                                            marginTop: '10px'
+                                                        }}
+                                                    >
+                                                        {formData.eventStampImages.map((image, index) => {
+                                                            let imageSrc = '';
+                                                            let isExistingImage = false;
+
+                                                            if (typeof image === 'string') {
+                                                                isExistingImage = true;
+                                                                if (image.startsWith('http')) {
+                                                                    imageSrc = image;
+                                                                } else {
+                                                                    imageSrc = `${API_URL}/${image.replace(/\\/g, '/')}`;
+                                                                }
+                                                            } else if (image instanceof File) {
+                                                                imageSrc = eventStampImagePreviewUrls[index] || URL.createObjectURL(image);
+                                                            } else {
+                                                                imageSrc = eventStampImagePreviewUrls[index] || '';
+                                                            }
+
+                                                            return (
+                                                                <div
+                                                                    key={index}
+                                                                    style={{
+                                                                        position: 'relative',
+                                                                        borderRadius: '8px',
+                                                                        overflow: 'hidden',
+                                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                                        transition: 'transform 0.2s ease',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                                                                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                                                >
+                                                                    <img
+                                                                        src={imageSrc}
+                                                                        alt={`Event Stamp ${index + 1}`}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            height: '140px',
+                                                                            objectFit: 'cover',
+                                                                            display: 'block'
+                                                                        }}
+                                                                        onError={(e) => {
+                                                                            console.error('Image failed to load:', imageSrc);
+                                                                            e.target.style.display = 'none';
+                                                                        }}
+                                                                    />
+
+                                                                    {/* Image Controls */}
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            top: '8px',
+                                                                            right: '8px',
+                                                                            display: 'flex',
+                                                                            gap: '4px'
+                                                                        }}
+                                                                    >
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="danger"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleRemoveEventStampImage(index);
+                                                                            }}
+                                                                            style={{
+                                                                                padding: '4px 8px',
+                                                                                fontSize: '12px',
+                                                                                borderRadius: '50%',
+                                                                                width: '28px',
+                                                                                height: '28px',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center'
+                                                                            }}
+                                                                        >
+                                                                            ×
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    {/* Image Info */}
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            bottom: '0',
+                                                                            left: '0',
+                                                                            right: '0',
+                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
+                                                                            color: 'white',
+                                                                            padding: '6px 8px',
+                                                                            fontSize: '11px',
+                                                                            textAlign: 'center',
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis'
+                                                                        }}
+                                                                    >
+                                                                        {isExistingImage
+                                                                            ? 'Existing'
+                                                                            : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
+                                                                    </div>
+
+                                                                    {/* Image Index Badge */}
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            top: '8px',
+                                                                            left: '8px',
+                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
+                                                                            color: 'white',
+                                                                            padding: '4px 8px',
+                                                                            borderRadius: '12px',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 'bold',
+                                                                            minWidth: '20px',
+                                                                            textAlign: 'center'
+                                                                        }}
+                                                                    >
+                                                                        {index + 1}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Col>
+
+                             
+
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <Badge bg="info">
+                                                {' '}
+                                                <span>Images </span> {formData.images.length}/10
+                                            </Badge>
+
                                             {/* Drag and Drop Zone */}
-                                            <div 
+                                            <div
                                                 className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
                                                 onDragOver={handleDragOver}
                                                 onDrop={handleDrop}
@@ -1064,34 +1624,40 @@ function AddEventPage() {
                                                 <div className="mb-3">
                                                     <i className="fas fa-cloud-upload-alt fa-3x text-muted"></i>
                                                 </div>
-                                                <p className="text-muted mb-2" style={{ 
-                                                    fontSize: '14px',
-                                                    lineHeight: '1.4',
-                                                    maxWidth: '100%',
-                                                    wordWrap: 'break-word'
-                                                }}>
+                                                <p
+                                                    className="text-muted mb-2"
+                                                    style={{
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.4',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
                                                     Drag and drop images here, or click to select files
                                                 </p>
-                                                <p className="text-muted small" style={{ 
-                                                    fontSize: '12px',
-                                                    lineHeight: '1.3',
-                                                    maxWidth: '100%',
-                                                    wordWrap: 'break-word'
-                                                }}>
+                                                <p
+                                                    className="text-muted small"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.3',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
                                                     Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 10 images.
                                                 </p>
-                                                <input 
-                                                    type="file" 
-                                                    className="form-control" 
-                                                    name="images" 
-                                                    onChange={handleChange} 
-                                                    accept="image/*" 
+                                                <input
+                                                    type="file"
+                                                    className="form-control"
+                                                    name="images"
+                                                    onChange={handleChange}
+                                                    accept="image/*"
                                                     multiple
                                                     style={{ display: 'none' }}
                                                     id="imageInput"
                                                 />
-                                                <Button 
-                                                    variant="outline-primary" 
+                                                <Button
+                                                    variant="outline-primary"
                                                     onClick={() => document.getElementById('imageInput').click()}
                                                     style={{ marginTop: '10px' }}
                                                 >
@@ -1102,24 +1668,28 @@ function AddEventPage() {
                                             {/* Image Preview Grid */}
                                             {formData.images && formData.images.length > 0 && (
                                                 <div className="mt-3">
-                                                    <h6 style={{ 
-                                                        fontSize: '16px',
-                                                        fontWeight: '600',
-                                                        marginBottom: '15px',
-                                                        color: '#333'
-                                                    }}>
+                                                    <h6
+                                                        style={{
+                                                            fontSize: '16px',
+                                                            fontWeight: '600',
+                                                            marginBottom: '15px',
+                                                            color: '#333'
+                                                        }}
+                                                    >
                                                         Selected Images ({formData.images.length})
                                                     </h6>
-                                                    <div style={{ 
-                                                        display: 'grid', 
-                                                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                                                        gap: '15px',
-                                                        marginTop: '10px'
-                                                    }}>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                            gap: '15px',
+                                                            marginTop: '10px'
+                                                        }}
+                                                    >
                                                         {formData.images.map((image, index) => {
                                                             let imageSrc = '';
                                                             let isExistingImage = false;
-                                                            
+
                                                             if (typeof image === 'string') {
                                                                 isExistingImage = true;
                                                                 if (image.startsWith('http')) {
@@ -1132,25 +1702,27 @@ function AddEventPage() {
                                                             } else {
                                                                 imageSrc = imagePreviewUrls[index] || '';
                                                             }
-                                                            
+
                                                             return (
-                                                                <div key={index} style={{ 
-                                                                    position: 'relative',
-                                                                    borderRadius: '8px',
-                                                                    overflow: 'hidden',
-                                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                                                    transition: 'transform 0.2s ease',
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                                                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                                <div
+                                                                    key={index}
+                                                                    style={{
+                                                                        position: 'relative',
+                                                                        borderRadius: '8px',
+                                                                        overflow: 'hidden',
+                                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                                        transition: 'transform 0.2s ease',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                                                                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                                                                 >
                                                                     <img
                                                                         src={imageSrc}
                                                                         alt={`Event ${index + 1}`}
-                                                                        style={{ 
-                                                                            width: '100%', 
-                                                                            height: '140px', 
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            height: '140px',
                                                                             objectFit: 'cover',
                                                                             display: 'block'
                                                                         }}
@@ -1159,15 +1731,17 @@ function AddEventPage() {
                                                                             e.target.style.display = 'none';
                                                                         }}
                                                                     />
-                                                                    
+
                                                                     {/* Image Controls */}
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: '8px',
-                                                                        right: '8px',
-                                                                        display: 'flex',
-                                                                        gap: '4px'
-                                                                    }}>
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            top: '8px',
+                                                                            right: '8px',
+                                                                            display: 'flex',
+                                                                            gap: '4px'
+                                                                        }}
+                                                                    >
                                                                         <Button
                                                                             size="sm"
                                                                             variant="danger"
@@ -1175,8 +1749,8 @@ function AddEventPage() {
                                                                                 e.stopPropagation();
                                                                                 handleRemoveImage(index);
                                                                             }}
-                                                                            style={{ 
-                                                                                padding: '4px 8px', 
+                                                                            style={{
+                                                                                padding: '4px 8px',
                                                                                 fontSize: '12px',
                                                                                 borderRadius: '50%',
                                                                                 width: '28px',
@@ -1189,61 +1763,73 @@ function AddEventPage() {
                                                                             ×
                                                                         </Button>
                                                                     </div>
-                                                                    
+
                                                                     {/* Image Info */}
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        bottom: '0',
-                                                                        left: '0',
-                                                                        right: '0',
-                                                                        backgroundColor: 'rgba(0,0,0,0.8)',
-                                                                        color: 'white',
-                                                                        padding: '6px 8px',
-                                                                        fontSize: '11px',
-                                                                        textAlign: 'center',
-                                                                        whiteSpace: 'nowrap',
-                                                                        overflow: 'hidden',
-                                                                        textOverflow: 'ellipsis'
-                                                                    }}>
-                                                                        {isExistingImage ? 'Existing' : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            bottom: '0',
+                                                                            left: '0',
+                                                                            right: '0',
+                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
+                                                                            color: 'white',
+                                                                            padding: '6px 8px',
+                                                                            fontSize: '11px',
+                                                                            textAlign: 'center',
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis'
+                                                                        }}
+                                                                    >
+                                                                        {isExistingImage
+                                                                            ? 'Existing'
+                                                                            : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
                                                                     </div>
-                                                                    
+
                                                                     {/* Image Index Badge */}
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: '8px',
-                                                                        left: '8px',
-                                                                        backgroundColor: 'rgba(0,0,0,0.8)',
-                                                                        color: 'white',
-                                                                        padding: '4px 8px',
-                                                                        borderRadius: '12px',
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 'bold',
-                                                                        minWidth: '20px',
-                                                                        textAlign: 'center'
-                                                                    }}>
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'absolute',
+                                                                            top: '8px',
+                                                                            left: '8px',
+                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
+                                                                            color: 'white',
+                                                                            padding: '4px 8px',
+                                                                            borderRadius: '12px',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 'bold',
+                                                                            minWidth: '20px',
+                                                                            textAlign: 'center'
+                                                                        }}
+                                                                    >
                                                                         {index + 1}
                                                                     </div>
                                                                 </div>
                                                             );
                                                         })}
                                                     </div>
-                                                    
+
                                                     {/* Reorder Instructions */}
                                                     {formData.images.length > 1 && (
-                                                        <div className="mt-3" style={{
-                                                            padding: '10px',
-                                                            backgroundColor: '#f8f9fa',
-                                                            borderRadius: '6px',
-                                                            border: '1px solid #e9ecef'
-                                                        }}>
-                                                            <small className="text-muted" style={{
-                                                                fontSize: '12px',
-                                                                lineHeight: '1.4',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '6px'
-                                                            }}>
+                                                        <div
+                                                            className="mt-3"
+                                                            style={{
+                                                                padding: '10px',
+                                                                backgroundColor: '#f8f9fa',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid #e9ecef'
+                                                            }}
+                                                        >
+                                                            <small
+                                                                className="text-muted"
+                                                                style={{
+                                                                    fontSize: '12px',
+                                                                    lineHeight: '1.4',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px'
+                                                                }}
+                                                            >
                                                                 <span>💡</span>
                                                                 <span>First image will be the main event image. Drag to reorder.</span>
                                                             </small>
@@ -1255,10 +1841,13 @@ function AddEventPage() {
                                     </Col>
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <Badge bg="info"> <span>Documents </span> {formData.documents.length}/10</Badge>
-                                
+                                            <Badge bg="info">
+                                                {' '}
+                                                <span>Documents </span> {formData.documents.length}/10
+                                            </Badge>
+
                                             {/* Drag and Drop Zone for Documents */}
-                                            <div 
+                                            <div
                                                 className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
                                                 onDragOver={handleDocumentDragOver}
                                                 onDrop={handleDocumentDrop}
@@ -1279,34 +1868,40 @@ function AddEventPage() {
                                                 <div className="mb-3">
                                                     <i className="fas fa-file-alt fa-3x text-muted"></i>
                                                 </div>
-                                                <p className="text-muted mb-2" style={{ 
-                                                    fontSize: '14px',
-                                                    lineHeight: '1.4',
-                                                    maxWidth: '100%',
-                                                    wordWrap: 'break-word'
-                                                }}>
+                                                <p
+                                                    className="text-muted mb-2"
+                                                    style={{
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.4',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
                                                     Drag and drop documents here, or click to select files
                                                 </p>
-                                                <p className="text-muted small" style={{ 
-                                                    fontSize: '12px',
-                                                    lineHeight: '1.3',
-                                                    maxWidth: '100%',
-                                                    wordWrap: 'break-word'
-                                                }}>
+                                                <p
+                                                    className="text-muted small"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.3',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
                                                     Supported formats: PDF, DOC, DOCX, XLS, XLSX. Max size: 10MB per file. Max 10 files.
                                                 </p>
-                                                <input 
-                                                    type="file" 
-                                                    className="form-control" 
-                                                    name="documents" 
-                                                    onChange={handleChange} 
-                                                    accept=".pdf,.doc,.docx,.xls,.xlsx" 
+                                                <input
+                                                    type="file"
+                                                    className="form-control"
+                                                    name="documents"
+                                                    onChange={handleChange}
+                                                    accept=".pdf,.doc,.docx,.xls,.xlsx"
                                                     multiple
                                                     style={{ display: 'none' }}
                                                     id="documentInput"
                                                 />
-                                                <Button 
-                                                    variant="outline-primary" 
+                                                <Button
+                                                    variant="outline-primary"
                                                     onClick={() => document.getElementById('documentInput').click()}
                                                     style={{ marginTop: '10px' }}
                                                 >
@@ -1317,24 +1912,28 @@ function AddEventPage() {
                                             {/* Document Preview List */}
                                             {formData.documents && formData.documents.length > 0 && (
                                                 <div className="mt-3">
-                                                    <h6 style={{ 
-                                                        fontSize: '16px',
-                                                        fontWeight: '600',
-                                                        marginBottom: '15px',
-                                                        color: '#333'
-                                                    }}>
+                                                    <h6
+                                                        style={{
+                                                            fontSize: '16px',
+                                                            fontWeight: '600',
+                                                            marginBottom: '15px',
+                                                            color: '#333'
+                                                        }}
+                                                    >
                                                         Selected Documents ({formData.documents.length})
                                                     </h6>
-                                                    <div style={{ 
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        gap: '12px',
-                                                        marginTop: '10px'
-                                                    }}>
+                                                    <div
+                                                        style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '12px',
+                                                            marginTop: '10px'
+                                                        }}
+                                                    >
                                                         {formData.documents.map((document, index) => {
                                                             let documentSrc = '';
                                                             let isExistingDocument = false;
-                                                            
+
                                                             if (typeof document === 'string') {
                                                                 isExistingDocument = true;
                                                                 if (document.startsWith('http')) {
@@ -1345,61 +1944,72 @@ function AddEventPage() {
                                                             } else if (document instanceof File) {
                                                                 documentSrc = documentPreviewUrls[index] || URL.createObjectURL(document);
                                                             }
-                                                            
-                                                            const fileName = typeof document === 'string' ? document.split('/').pop() : document.name;
-                                                            
+
+                                                            const fileName =
+                                                                typeof document === 'string' ? document.split('/').pop() : document.name;
+
                                                             return (
-                                                                <div key={index} style={{ 
-                                                                    display: 'flex', 
-                                                                    alignItems: 'center',
-                                                                    padding: '12px',
-                                                                    border: '1px solid #e9ecef',
-                                                                    borderRadius: '8px',
-                                                                    backgroundColor: '#ffffff',
-                                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                                                    transition: 'all 0.2s ease'
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                                                                    e.currentTarget.style.transform = 'translateY(-1px)';
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                                                                    e.currentTarget.style.transform = 'translateY(0)';
-                                                                }}
+                                                                <div
+                                                                    key={index}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        padding: '12px',
+                                                                        border: '1px solid #e9ecef',
+                                                                        borderRadius: '8px',
+                                                                        backgroundColor: '#ffffff',
+                                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                                                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                                                                        e.currentTarget.style.transform = 'translateY(0)';
+                                                                    }}
                                                                 >
                                                                     <div style={{ marginRight: '12px', flexShrink: 0 }}>
                                                                         <i className="fas fa-file-pdf fa-2x text-danger"></i>
                                                                     </div>
-                                                                    
+
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div style={{ 
-                                                                            fontWeight: '600',
-                                                                            fontSize: '14px',
-                                                                            color: '#333',
-                                                                            whiteSpace: 'nowrap',
-                                                                            overflow: 'hidden',
-                                                                            textOverflow: 'ellipsis',
-                                                                            marginBottom: '2px'
-                                                                        }}>
+                                                                        <div
+                                                                            style={{
+                                                                                fontWeight: '600',
+                                                                                fontSize: '14px',
+                                                                                color: '#333',
+                                                                                whiteSpace: 'nowrap',
+                                                                                overflow: 'hidden',
+                                                                                textOverflow: 'ellipsis',
+                                                                                marginBottom: '2px'
+                                                                            }}
+                                                                        >
                                                                             {fileName}
                                                                         </div>
-                                                                        <div style={{ 
-                                                                            fontSize: '12px', 
-                                                                            color: '#666',
-                                                                            whiteSpace: 'nowrap',
-                                                                            overflow: 'hidden',
-                                                                            textOverflow: 'ellipsis'
-                                                                        }}>
-                                                                            {isExistingDocument ? 'Existing Document' : `${(document.size / 1024 / 1024).toFixed(1)}MB`}
+                                                                        <div
+                                                                            style={{
+                                                                                fontSize: '12px',
+                                                                                color: '#666',
+                                                                                whiteSpace: 'nowrap',
+                                                                                overflow: 'hidden',
+                                                                                textOverflow: 'ellipsis'
+                                                                            }}
+                                                                        >
+                                                                            {isExistingDocument
+                                                                                ? 'Existing Document'
+                                                                                : `${(document.size / 1024 / 1024).toFixed(1)}MB`}
                                                                         </div>
                                                                     </div>
-                                                                    
-                                                                    <div style={{ 
-                                                                        display: 'flex', 
-                                                                        gap: '6px',
-                                                                        flexShrink: 0
-                                                                    }}>
+
+                                                                    <div
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            gap: '6px',
+                                                                            flexShrink: 0
+                                                                        }}
+                                                                    >
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline-primary"
@@ -1431,16 +2041,94 @@ function AddEventPage() {
                                             )}
                                         </div>
                                     </Col>
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <Badge bg="info">
+                                                {' '}
+                                                <span>Floor Plan (Optional) </span> {floorPlanPreview ? 'Selected' : 'Not Selected'}
+                                            </Badge>
+
+                                            {/* Floor Plan Section */}
+                                            <div className="form-group fill">
+                                                <div
+                                                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center mt-2"
+                                                    style={{
+                                                        border: '2px dashed #ccc',
+                                                        borderRadius: '8px',
+                                                        padding: '20px',
+                                                        textAlign: 'center',
+                                                        backgroundColor: '#f9f9f9',
+                                                        marginBottom: '10px',
+                                                        minHeight: '120px',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    {floorPlanPreview && formData.floorPlan ? (
+                                                        <div style={{ width: '100%', maxWidth: '300px' }}>
+                                                            <img
+                                                                src={floorPlanPreview}
+                                                                alt="Floor Plan Preview"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: 'auto',
+                                                                    borderRadius: '8px',
+                                                                    marginBottom: '10px'
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                variant="danger"
+                                                                size="sm"
+                                                                onClick={handleRemoveFloorPlan}
+                                                                style={{ marginRight: '10px' }}
+                                                            >
+                                                                Remove Floor Plan
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="mb-3">
+                                                                <i className="fas fa-building fa-3x text-muted"></i>
+                                                            </div>
+                                                            <p className="text-muted mb-2">Upload floor plan image (Optional)</p>
+                                                            <p className="text-muted small">
+                                                                Supported formats: JPG, PNG, GIF. Max size: 5MB.
+                                                            </p>
+                                                            <input
+                                                                type="file"
+                                                                className="form-control"
+                                                                name="floorPlan"
+                                                                onChange={handleFloorPlanChange}
+                                                                accept="image/*"
+                                                                style={{ display: 'none' }}
+                                                                id="floorPlanInput"
+                                                            />
+                                                            <Button
+                                                                variant="outline-primary"
+                                                                onClick={() => document.getElementById('floorPlanInput').click()}
+                                                                style={{ marginTop: '10px' }}
+                                                            >
+                                                                Choose Floor Plan
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+
+                                    {/* Event Stamp Modal */}
+                                    {/* Remove the EventStampFormModal import and usage */}
+                                    {/* <EventStampFormModal ... /> */}
                                 </Row>
-                                
+
                                 {/* Form Actions */}
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button 
-                                                variant="secondary" 
-                                                onClick={() => navigate('/events/event-list')}
-                                            >
+                                            <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
                                                 Cancel
                                             </Button>
                                             <Button variant="primary" type="submit">

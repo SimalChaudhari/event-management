@@ -15,6 +15,7 @@ import {
   NotFoundException,
   UploadedFiles,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -32,7 +33,9 @@ import { UserRole } from 'user/users.entity';
 @Controller('api/events')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EventController {
-  constructor(private readonly eventService: EventService) {}
+  constructor(private readonly eventService: EventService,
+
+  ) {}
 
   @Post('create')
   @Roles(UserRole.Admin)
@@ -41,6 +44,8 @@ export class EventController {
       { name: 'images', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
+      { name: 'eventStampImages', maxCount: 10 }, // Add event stamp images
+
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -50,6 +55,8 @@ export class EventController {
             cb(null, './uploads/event/documents');
           } else if (file.fieldname === 'floorPlan') {
             cb(null, './uploads/event/floorPlan'); // New directory for floor plan
+          } else if (file.fieldname === 'eventStampImages') {
+            cb(null, './uploads/eventStamps/images'); // Event stamp images
           } else {
             cb(null, './uploads/event/images'); // Default
           }
@@ -60,27 +67,42 @@ export class EventController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (file.fieldname === 'images' && file.mimetype.startsWith('image/')) {
+
+        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+     
+        if (file.fieldname === 'images' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
-        } else if (file.fieldname === 'floorPlan' && file.mimetype.startsWith('image/')) {
+        } else if (file.fieldname === 'floorPlan' && allowedImageTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else if (file.fieldname === 'eventStampImages' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new Error('Invalid file type for field'), false);
+          cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
         }
       },
     }),
   )
   async createEvent(
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], floorPlan?: Express.Multer.File[] },
+    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], 
+      floorPlan?: Express.Multer.File[],
+      eventStampImages?: Express.Multer.File[]
+    
+    },
     @Res() response: Response,
   ) {
     try {
       if (files.images && files.images.length > 0) {
         eventDto.images = files.images.map(
           (img) => `uploads/event/images/${img.filename}`,
+        );
+      }
+
+      if (files.eventStampImages && files.eventStampImages.length > 0) {
+        eventDto.eventStampImages = files.eventStampImages.map(
+          (img) => `uploads/eventStamps/images/${img.filename}`,
         );
       }
 
@@ -95,7 +117,8 @@ export class EventController {
       eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
     }
 
-      await this.eventService.createEvent(eventDto);
+    const savedEvent = await this.eventService.createEvent(eventDto);
+
 
       return response.status(201).json({
         success: true,
@@ -155,6 +178,24 @@ export class EventController {
         });
       }
 
+         // Clean up event stamp images if error occurs
+         if (files.eventStampImages && files.eventStampImages.length > 0) {
+          files.eventStampImages.forEach((file) => {
+            const uploadedPath = path.join(
+              __dirname,
+              '..',
+              '..',
+              'uploads',
+              'eventStamps',
+              'images',
+              file.filename,
+            );
+            if (fs.existsSync(uploadedPath)) {
+              fs.unlinkSync(uploadedPath);
+            }
+          });
+        }
+
       throw error;
     }
   }
@@ -207,6 +248,7 @@ export class EventController {
       { name: 'images', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
+      { name: 'eventStampImages', maxCount: 10 }, // Add event stamp images
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -216,6 +258,8 @@ export class EventController {
             cb(null, './uploads/event/documents');
           } else if (file.fieldname === 'floorPlan') {
             cb(null, './uploads/event/floorPlan'); // New directory for floor plan
+          } else if (file.fieldname === 'eventStampImages') {
+            cb(null, './uploads/eventStamps/images'); // Event stamp images
           } else {
             cb(null, './uploads/event/images'); // Default
           }
@@ -226,22 +270,32 @@ export class EventController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (file.fieldname === 'images' && file.mimetype.startsWith('image/')) {
-          cb(null, true);
-        } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
-          cb(null, true);
-        } else if (file.fieldname === 'floorPlan' && file.mimetype.startsWith('image/')) {
-          cb(null, true);
-        } else {
-          cb(new Error('Invalid file type for field'), false);
-        }
-      },
-    }),
-  )
+
+      const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+     
+       if (file.fieldname === 'images' && allowedImageTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else if (file.fieldname === 'floorPlan' && allowedImageTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else if (file.fieldname === 'eventStampImages' && allowedImageTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
+      }
+    },
+  }),
+)
   async updateEvent(
     @Param('id') id: string,
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], floorPlan?: Express.Multer.File[] },
+    @UploadedFiles() files: { 
+      images?: Express.Multer.File[], 
+      documents?: Express.Multer.File[], 
+      floorPlan?: Express.Multer.File[],
+      eventStampImages?: Express.Multer.File[] // Add this
+    },
     @Res() response: Response,
   ) {
     // First get the event
@@ -300,6 +354,23 @@ export class EventController {
             }
           });
         }
+      // Clean up event stamp images if event not found
+      if (files.eventStampImages) {
+        files.eventStampImages.forEach((file) => {
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'eventStamps',
+            'images',
+            file.filename,
+          );
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
       throw new NotFoundException('Event not found');
     }
 
@@ -352,12 +423,42 @@ export class EventController {
         eventDto.documents = allDocuments;
       }
 
-        // Handle floor plan
-        if (files.floorPlan && files.floorPlan.length > 0) {
-          eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
-        }
+      // Handle floor plan - single image only
+      if (files.floorPlan && files.floorPlan.length > 0) {
+        // New floor plan uploaded - replace existing
+        eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
+      } else if (eventDto.originalFloorPlan) {
+        // Keep existing floor plan if no new one uploaded
+        eventDto.floorPlan = eventDto.originalFloorPlan;
+      }
+      // If neither new upload nor original, floorPlan will be null/undefined
+
+      // Handle event stamp images - combine existing and new images
+      const allEventStampImages = [];
+      
+      // Add existing event stamp images from originalEventStampImages field
+      if (eventDto.originalEventStampImages) {
+        const originalEventStampImages = Array.isArray(eventDto.originalEventStampImages) 
+          ? eventDto.originalEventStampImages 
+          : [eventDto.originalEventStampImages];
+        allEventStampImages.push(...originalEventStampImages);
+      }
+      
+      // Add new uploaded event stamp images
+      if (files.eventStampImages && files.eventStampImages.length > 0) {
+        const newEventStampImages = files.eventStampImages.map(
+          (img) => `uploads/eventStamps/images/${img.filename}`,
+        );
+        allEventStampImages.push(...newEventStampImages);
+      }
+      
+      // Set the combined event stamp images
+      if (allEventStampImages.length > 0) {
+        eventDto.eventStampImages = allEventStampImages;
+      }
 
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
+
 
       return response.status(200).json({
         success: true,
@@ -409,9 +510,25 @@ export class EventController {
         if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
       });
     }
-    throw error;
+    // Clean up event stamp images if error occurs
+    if (files.eventStampImages) {
+      files.eventStampImages.forEach((file) => {
+        const uploadedPath = path.join(
+          __dirname,
+          '..',
+          '..',
+          'uploads',
+          'eventStamps',
+          'images',
+          file.filename,
+        );
+        if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+      });
     }
+
+    throw error;
   }
+}
 
   @Delete('delete/:id')
   @Roles(UserRole.Admin)
@@ -501,5 +618,81 @@ export class EventController {
     }
   }
 
+    // Remove individual event stamp image
+    @Delete('event-stamps/images/:id')
+    @Roles(UserRole.Admin)
+    async removeEventStampImage(
+      @Param('id') id: string,
+      @Body() body: { imagePath: string },
+      @Res() response: Response,
+    ) {
+      try {
+        const event = await this.eventService.getEventEntityById(id);
+        if (!event) {
+          throw new NotFoundException('Event not found');
+        }
+  
+        const { imagePath } = body;
+  
+        // Check if image exists in event
+        if (!event.eventStampImages || !event.eventStampImages.includes(imagePath)) {
+          throw new NotFoundException('Event stamp image not found in this event');
+        }
+  
+        // Remove image from filesystem
+        const fullPath = path.join(__dirname, '..', '..', imagePath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+  
+        // Remove image from database using new method
+        const updatedEventStampImages = event.eventStampImages.filter(img => img !== imagePath);
+        await this.eventService.updateEventStampImages(id, updatedEventStampImages);
+  
+        return response.status(200).json({
+          success: true,
+          message: 'Event stamp image removed successfully',
+          data: { eventStampImages: updatedEventStampImages }
+        });
+      } catch (error) {
+        throw error;
+      }
+    }
+  
 
+    // Remove floor plan
+    @Delete('floor-plan/:id')
+    @Roles(UserRole.Admin)
+    async removeEventFloorPlan(
+      @Param('id') id: string,
+      @Res() response: Response,
+    ) {
+      try {
+        const event = await this.eventService.getEventEntityById(id);
+        if (!event) {
+          throw new NotFoundException('Event not found');
+        }
+    
+        if (!event.floorPlan) {
+          throw new NotFoundException('Floor plan not found in this event');
+        }
+    
+        // Delete floor plan from filesystem
+        const fullPath = path.join(__dirname, '..', '..', event.floorPlan);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+    
+        // Remove floor plan from database (set to empty string)
+        await this.eventService.updateEventFloorPlan(id, null);
+    
+        return response.status(200).json({
+          success: true,
+          message: 'Floor plan removed successfully',
+          data: { floorPlan: "" }
+        });
+      } catch (error) {
+        throw error;
+      }
+    }
 }

@@ -41,6 +41,7 @@ export class EventService {
     private registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(FavoriteEvent)
     private favoriteEventRepository: Repository<FavoriteEvent>,
+  
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -282,10 +283,7 @@ export class EventService {
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
       .leftJoinAndSelect('event.galleries', 'galleries')
-      .leftJoinAndSelect('event.eventStamps', 'eventStamp')
-      // .leftJoinAndSelect('event.surveys', 'surveys');
-    // .andWhere('exhibitor.isActive = :isActive', { isActive: true }); // Add this filter
-
+  
     // First, always filter for upcoming events if category is provided
     if (filters.category) {
       const today = new Date();
@@ -339,8 +337,9 @@ export class EventService {
         const {
           eventSpeakers,
           category,
-          eventStamps,
           eventExhibitors,
+          eventStampDescription,
+          eventStampImages,
           ...eventData
         } = event;
 
@@ -361,14 +360,15 @@ export class EventService {
 
         const { exhibitorDescription, ...eventFiltered } = eventData;
         // Convert eventStamps array to single object
-        const eventStampData =
-          eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
-
-        return {
+         return {
           ...eventFiltered,
           color: getEventColor(event.type),
           speakersData: eventSpeakers.map((es) => es.speaker),
           categoriesData: category?.map((ec) => ec.category) || [],
+          eventStamps:{
+            description:event.eventStampDescription,
+            images:event.eventStampImages
+          },
           exhibitorsData: {
             exhibitorDescription: exhibitorDescription || '',
             exhibitors: eventExhibitors.map((ee) => ({
@@ -376,7 +376,7 @@ export class EventService {
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
             })),
           },
-          eventStamps: eventStampData, // Single object instead of array
+  
           attendanceCount: attendanceCount,
           isFavorite: isFavorite,
           searchFields: matchedFields, // Add matched fields to response
@@ -412,14 +412,14 @@ export class EventService {
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('event.galleries', 'galleries')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-      .leftJoinAndSelect('event.eventStamps', 'eventStamp')
+     
       .where('event.id = :id', { id })
       // .andWhere('exhibitor.isActive = :isActive', { isActive: true }) // Add this filter
       .getOne();
 
     if (!event) throw new NotFoundException('Event not found!');
 
-    const { eventSpeakers, category, eventExhibitors,eventStamps, ...eventData } = event;
+    const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
 
     const attendanceCount = await this.getEventAttendanceCount(id);
 
@@ -432,9 +432,7 @@ export class EventService {
       isFavorite = !!favorite;
     }
 
-    const { exhibitorDescription, ...eventFiltered } = eventData;
-    const eventStampData =
-    eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
+    const { exhibitorDescription,eventStampDescription,eventStampImages, ...eventFiltered } = eventData;
 
 
     return {
@@ -442,6 +440,10 @@ export class EventService {
       color: getEventColor(event.type),
       speakers: eventSpeakers.map((es) => es.speaker),
       categories: category?.map((ec) => ec.category) || [],
+      eventStamps:{
+        description:event.eventStampDescription,
+        images:event.eventStampImages
+      },
       exhibitors: {
         exhibitorDescription: exhibitorDescription || '',
         exhibitors: eventExhibitors.map((ee) => ({
@@ -449,7 +451,7 @@ export class EventService {
           promotionalOffers: ee.exhibitor.promotionalOffers || [],
         })),
       },
-      eventStamps: eventStampData, // Single object instead of array
+  
       attendanceCount: attendanceCount,
       isFavorite: isFavorite,
     };
@@ -658,6 +660,8 @@ export class EventService {
       }
     }
 
+
+
     return updatedEvent;
   }
 
@@ -716,6 +720,37 @@ export class EventService {
     if (!event) throw new NotFoundException('Event not found!');
 
     event.documents = documents;
+    return await this.eventRepository.save(event);
+  }
+
+  async updateEventStampImages(
+    id: string,
+    eventStampImages: string[],
+  ): Promise<Partial<Event>> {
+    const event = await this.eventRepository.findOne({ where: { id } });
+    if (!event) throw new NotFoundException('Event not found!');
+
+    event.eventStampImages = eventStampImages;
+    return await this.eventRepository.save(event);
+  }
+
+  async updateEventFloorPlan(
+    id: string,
+    floorPlan: string | null,
+  ): Promise<Partial<Event>> {
+    const event = await this.eventRepository.findOne({ where: { id } });
+    if (!event) throw new NotFoundException('Event not found!');
+  
+    // Delete existing floor plan from filesystem if it exists
+    if (event.floorPlan) {
+      const existingFloorPlanPath = path.resolve(event.floorPlan);
+      if (fs.existsSync(existingFloorPlanPath)) {
+        fs.unlinkSync(existingFloorPlanPath);
+      }
+    }
+  
+    // Update floor plan in database - set to empty string instead of null
+    event.floorPlan = floorPlan === null ? "" : floorPlan;
     return await this.eventRepository.save(event);
   }
 }

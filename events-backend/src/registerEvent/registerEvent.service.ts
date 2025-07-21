@@ -6,11 +6,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RegisterEvent } from './registerEvent.entity';
-import { CreateRegisterEventDto } from './registerEvent.dto';
+import {
+  CreateRegisterEventDto,
+  UpdateRegisterEventDto,
+} from './registerEvent.dto';
 import { Event } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
+import { UserEntity } from 'user/users.entity';
 
 @Injectable()
 export class RegisterEventService {
@@ -26,6 +30,9 @@ export class RegisterEventService {
 
     @InjectRepository(FavoriteEvent)
     private readonly favoriteEventRepository: Repository<FavoriteEvent>,
+
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
   ) {}
 
   async createRegisterEvent(
@@ -90,7 +97,7 @@ export class RegisterEventService {
           'event.category', // Add this
           'event.category.category', // Add this
           'event.galleries',
-          'event.eventStamps',
+
           'event.eventExhibitors',
           'event.eventExhibitors.exhibitor',
           'event.eventExhibitors.exhibitor.promotionalOffers',
@@ -143,25 +150,26 @@ export class RegisterEventService {
         const categories =
           registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-        const eventStamps = registerEvent.event?.eventStamps || [];
-
-        const eventStampData =
-        eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
-    
-
         const {
           eventSpeakers,
           category,
           eventExhibitors,
           exhibitorDescription,
+          eventStampDescription,
+          eventStampImages,
           ...restEvent
         } = registerEvent.event || {};
+
         const event = {
           ...restEvent,
           color: getEventColor(registerEvent.event?.type),
           speakers,
           categories,
-          eventStamps: eventStampData,
+          eventStamps: {
+            description: registerEvent.event?.eventStampDescription,
+            images: registerEvent.event?.eventStampImages,
+          },
+
           exhibitorsData: {
             exhibitorDescription: exhibitorDescription || '',
             exhibitors:
@@ -177,8 +185,8 @@ export class RegisterEventService {
           isFavorite: isFavorite,
         };
 
-        const { firstName, lastName, email, mobile } = registerEvent.user || {};
-        const cleanedUser = { firstName, lastName, email, mobile };
+        const { firstName, lastName, email, mobile,id } = registerEvent.user || {};
+        const cleanedUser = { firstName, lastName, email, mobile ,id};
 
         const {
           orderId: _,
@@ -214,13 +222,13 @@ export class RegisterEventService {
     return count;
   }
 
-  async findOne(id: string, userId: string, role: string) {
+  async findOne(registrationId: string, userId: string, role: string) {
     // Query to find the specific register event, ensuring it belongs to the current user
     const registerEvent = await this.registerEventRepository.findOne({
       where:
         role === 'admin'
-          ? { id } // 🧑‍💼 Admin can fetch any
-          : { id, user: { id: userId } }, // 👤 User can fetch only their own
+          ? { id: registrationId } // 🧑‍💼 Admin can fetch any
+          : { id: registrationId, user: { id: userId } }, // 👤 User can fetch only their own
       relations: [
         'user',
         'event',
@@ -229,7 +237,6 @@ export class RegisterEventService {
         'event.category', // Add this
         'event.category.category', // Add this
         'event.galleries',
-        'event.eventStamps',
         'event.eventExhibitors',
         'event.eventExhibitors.exhibitor',
         'event.eventExhibitors.exhibitor.promotionalOffers',
@@ -273,11 +280,15 @@ export class RegisterEventService {
         })) || [];
 
     // 🧼 Clean up event object (remove eventSpeakers, category, and eventExhibitors)
-    const { eventSpeakers, category, eventExhibitors, exhibitorDescription, eventStamps, ...restEvent } =
-      registerEvent.event || {};
-
-    const eventStampData =
-    eventStamps && eventStamps.length > 0 ? eventStamps[0] : null;
+    const {
+      eventSpeakers,
+      category,
+      eventExhibitors,
+      exhibitorDescription,
+      eventStampDescription,
+      eventStampImages,
+      ...restEvent
+    } = registerEvent.event || {};
 
     // ✅ Replace with clean speakers, categories, and exhibitors
     const event = {
@@ -285,19 +296,23 @@ export class RegisterEventService {
       color: getEventColor(registerEvent.event?.type),
       speakers,
       categories,
+      eventStamps: {
+        description: registerEvent.event?.eventStampDescription,
+        images: registerEvent.event?.eventStampImages,
+      },
       exhibitorsData: {
         exhibitorDescription: exhibitorDescription || '',
         exhibitors: exhibitors,
       },
-      eventStamps :eventStampData,
+
       attendanceCount: attendanceCount,
       isFavorite: isFavorite,
     };
 
     // 🧼 Clean up user object, showing only specific fields
-    const { firstName, lastName, email, mobile } = registerEvent.user || {};
+    const { firstName, lastName, email, mobile,id} = registerEvent.user || {};
 
-    const cleanedUser = { firstName, lastName, email, mobile };
+    const cleanedUser = { firstName, lastName, email, mobile ,id};
     // 🧼 Exclude `userId` and `eventId` from the `registerEvent` data
     const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
 
@@ -312,5 +327,91 @@ export class RegisterEventService {
         isCreatedByAdmin: registerEvent.isCreatedByAdmin,
       },
     };
+  }
+
+  // Admin can update any registration
+  async adminUpdateRegisterEvent(
+    id: string,
+    updateRegisterEventDto: UpdateRegisterEventDto,
+  ): Promise<RegisterEvent> {
+    const registration = await this.registerEventRepository.findOne({
+      where: { id },
+      relations: ['user', 'event'],
+    });
+
+    if (!registration) {
+      throw new NotFoundException('Registration not found');
+    }
+
+    // Update user if provided
+    if (updateRegisterEventDto.userId !== undefined) {
+      // Check if the new user exists
+      const newUser = await this.userRepository.findOne({
+        where: { id: updateRegisterEventDto.userId },
+      });
+      console.log('New User:', newUser);
+      if (!newUser) {
+        throw new NotFoundException('User not found');
+      }
+      registration.userId = updateRegisterEventDto.userId;
+      registration.user = newUser; // Add this line to update the relation
+    }
+
+    // Update event if provided
+    if (updateRegisterEventDto.eventId !== undefined) {
+      // Check if the new event exists
+      const newEvent = await this.eventRepository.findOne({
+        where: { id: updateRegisterEventDto.eventId },
+      });
+      console.log('New Event:', newEvent);
+      if (!newEvent) {
+        throw new NotFoundException('Event not found');
+      }
+      registration.eventId = updateRegisterEventDto.eventId;
+      registration.event = newEvent; // Add this line to update the relation
+    }
+
+    // Update other fields
+    if (updateRegisterEventDto.type !== undefined) {
+      registration.type = updateRegisterEventDto.type;
+    }
+    if (updateRegisterEventDto.registerCode !== undefined) {
+      registration.registerCode = updateRegisterEventDto.registerCode;
+    }
+    if (updateRegisterEventDto.isCreatedByAdmin !== undefined) {
+      registration.isCreatedByAdmin = updateRegisterEventDto.isCreatedByAdmin;
+    }
+    if (updateRegisterEventDto.orderId !== undefined) {
+      registration.orderId = updateRegisterEventDto.orderId;
+    }
+
+    // Save the updated registration
+    const updatedRegistration =
+      await this.registerEventRepository.save(registration);
+
+    // Fetch the updated registration with fresh relations
+    const freshRegistration = await this.registerEventRepository.findOne({
+      where: { id: updatedRegistration.id },
+      relations: ['user', 'event'],
+    });
+
+    if (!freshRegistration) {
+      throw new NotFoundException('Updated registration not found');
+    }
+
+    return freshRegistration;
+  }
+
+  // Admin can delete any registration
+  async adminDeleteRegisterEvent(id: string): Promise<void> {
+    const registration = await this.registerEventRepository.findOne({
+      where: { id },
+    });
+
+    if (!registration) {
+      throw new NotFoundException('Registration not found');
+    }
+
+    await this.registerEventRepository.remove(registration);
   }
 }

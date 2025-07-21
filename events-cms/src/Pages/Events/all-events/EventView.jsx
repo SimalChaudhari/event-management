@@ -222,7 +222,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                 $('.add-event-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addEventBtn">
                         <i class="feather icon-plus mr-1"></i>
-                        Add Event
+                        Add
                     </button>
                 `);
 

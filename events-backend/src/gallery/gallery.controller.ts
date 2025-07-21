@@ -101,10 +101,11 @@ export class GalleryController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (file.fieldname === 'galleryImages' && file.mimetype.startsWith('image/')) {
+        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (file.fieldname === 'galleryImages' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new Error('Invalid file type. Only images are allowed.'), false);
+          cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF.`), false);
         }
       },
     }),

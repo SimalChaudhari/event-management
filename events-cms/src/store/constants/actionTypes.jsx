@@ -11,6 +11,8 @@ export const SPEAKER_LIST = 'SPEAKER_LIST';
 export const TERMS_CONDITIONS = 'TERMS_CONDITIONS';
 export const PRIVACY_POLICY = 'PRIVACY_POLICY';
 
+export const EXHIBITOR_LIST = 'EXHIBITOR_LIST';
+
 // Category Action Types
 export const CATEGORY_LIST = 'CATEGORY_LIST';
 export const CREATE_CATEGORY = 'CREATE_CATEGORY';

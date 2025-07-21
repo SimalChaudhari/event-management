@@ -16,8 +16,6 @@ import { Feedback } from 'feedback/feedback.entity';
 import { Category } from 'category/category.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Gallery } from 'gallery/gallery.entity';
-import { EventStamp } from 'eventStamp/eventStamp.entity';
-import { Survey } from 'survey/survey.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -117,9 +115,11 @@ export class Event {
   galleries?: Gallery[];
 
   // Event Stamp relationship
-  @OneToMany(() => EventStamp, (eventStamp) => eventStamp.event)
-  eventStamps?: EventStamp[];
+  @Column({ type: 'text', nullable: true })
+  eventStampDescription?: string;
 
+  @Column('simple-array', { nullable: true })
+  eventStampImages?: string[];
   // Exhibitor relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.event)
   eventExhibitors!: EventExhibitor[];

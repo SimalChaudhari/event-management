@@ -1051,10 +1051,10 @@ const ViewEventPage = () => {
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
                     <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View Event</h4>
+                        <h4 className="card-title">View</h4>
                         <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                            Back to Events
+                            Back
                         </Button>
                     </div>
                     <hr />

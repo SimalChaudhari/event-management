@@ -38,3 +38,13 @@ export class CreateRegisterEventDto {
   isCreatedByAdmin?: boolean = false;
 
 }
+// ... existing code ...
+
+export class UpdateRegisterEventDto {
+  userId?: string;
+  eventId?: string;
+  type?: 'Attendee' | 'Exhibitor';
+  registerCode?: string;
+  isCreatedByAdmin?: boolean;
+  orderId?: string;
+}
