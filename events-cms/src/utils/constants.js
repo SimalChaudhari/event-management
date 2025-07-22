@@ -55,7 +55,7 @@ export const MEDIA_MANAGER_PATHS = {
 };
 
 export const SETTINGS_PATHS = {
-    TERMS_AND_CONDITIONS: '/settings/terms-and-conditions',
+    TERMS_AND_CONDITIONS: '/settings/terms-conditions',
     PRIVACY_POLICY: '/settings/privacy-policy'
 };
 
