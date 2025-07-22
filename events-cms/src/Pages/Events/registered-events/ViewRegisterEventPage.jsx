@@ -5,6 +5,7 @@ import { useDispatch } from 'react-redux';
 import { registerEventById } from '../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../configs/env';
 import DateTimeFormatter from '../../../components/dateTime/DateTimeFormatter';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 // Google Maps API Key
 const GOOGLE_API_KEY = 'AIzaSyAh43XIafkwl_7xaqeES90e8FQWqhN4DEc';
@@ -47,7 +48,17 @@ const GoogleMap = ({ latitude, longitude, eventName, location }) => {
 
     if (!latitude || !longitude) {
         return (
-            <div style={{ height: '300px', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+            <div
+                style={{
+                    height: '300px',
+                    backgroundColor: '#f8f9fa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef'
+                }}
+            >
                 <div className="text-center">
                     <i className="fas fa-map-marker-alt text-muted" style={{ fontSize: '3rem', marginBottom: '10px' }}></i>
                     <p className="text-muted mb-0">No coordinates available</p>
@@ -59,7 +70,9 @@ const GoogleMap = ({ latitude, longitude, eventName, location }) => {
     return (
         <div id="map" style={{ height: '300px', width: '100%', borderRadius: '8px', border: '1px solid #e9ecef', overflow: 'hidden' }}>
             {!mapLoaded && (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
+                <div
+                    style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}
+                >
                     <div className="text-center">
                         <div className="spinner-border text-primary" role="status">
                             <span className="visually-hidden">Loading...</span>
@@ -77,7 +90,7 @@ const ViewRegisterEventPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [eventData, setEventData] = useState(null);
-    console.log(eventData,"eventData");
+    console.log(eventData, 'eventData');
     const [loading, setLoading] = useState(true);
 
     // For image modals
@@ -112,7 +125,7 @@ const ViewRegisterEventPage = () => {
                 setLoading(false);
             }
         };
-        
+
         if (id) {
             loadRegisterEventData();
         }
@@ -540,12 +553,7 @@ const ViewRegisterEventPage = () => {
                         }}
                     />
                 </div>
-                <Button
-                    variant="outline-primary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => window.open(floorPlanSrc, '_blank')}
-                >
+                <Button variant="outline-primary" size="sm" className="mt-3" onClick={() => window.open(floorPlanSrc, '_blank')}>
                     <i className="fas fa-external-link-alt me-2"></i>
                     Open in New Tab
                 </Button>
@@ -567,7 +575,14 @@ const ViewRegisterEventPage = () => {
                             {gallery.title} <Badge bg="info">{gallery.galleryImages?.length || 0}</Badge>
                         </h5>
                         <hr />
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                                gap: '10px',
+                                marginTop: '10px'
+                            }}
+                        >
                             {gallery.galleryImages?.map((image, index) => {
                                 const imageSrc = getImageSrc(image);
 
@@ -593,16 +608,18 @@ const ViewRegisterEventPage = () => {
                                                 e.target.style.display = 'none';
                                             }}
                                         />
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '5px',
-                                            right: '5px',
-                                            backgroundColor: 'rgba(0,0,0,0.7)',
-                                            color: 'white',
-                                            padding: '2px 6px',
-                                            borderRadius: '50%',
-                                            fontSize: '10px'
-                                        }}>
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '5px',
+                                                right: '5px',
+                                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                                color: 'white',
+                                                padding: '2px 6px',
+                                                borderRadius: '50%',
+                                                fontSize: '10px'
+                                            }}
+                                        >
                                             <i className="fas fa-search-plus"></i>
                                         </div>
                                     </div>
@@ -626,9 +643,7 @@ const ViewRegisterEventPage = () => {
                 {eventData.event.exhibitorsData.exhibitorDescription && (
                     <div className="mb-4">
                         <h6>Exhibitor Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
-                            {eventData.event.exhibitorsData.exhibitorDescription}
-                        </p>
+                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.event.exhibitorsData.exhibitorDescription}</p>
                         <hr />
                     </div>
                 )}
@@ -642,9 +657,7 @@ const ViewRegisterEventPage = () => {
                             </div>
 
                             <div className="exhibitor-info">
-                                {exhibitor.companyDescription && (
-                                    <p className="exhibitor-description">{exhibitor.companyDescription}</p>
-                                )}
+                                {exhibitor.companyDescription && <p className="exhibitor-description">{exhibitor.companyDescription}</p>}
 
                                 <div className="exhibitor-contact">
                                     {exhibitor.email && (
@@ -673,7 +686,13 @@ const ViewRegisterEventPage = () => {
                                 {exhibitor.eventImages?.length > 0 && (
                                     <div className="mt-3">
                                         <h6>Event Images</h6>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+                                        <div
+                                            style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                                                gap: '8px'
+                                            }}
+                                        >
                                             {exhibitor.eventImages.map((image, index) => (
                                                 <img
                                                     key={index}
@@ -697,7 +716,13 @@ const ViewRegisterEventPage = () => {
                                                         <img
                                                             src={getImageSrc(offer.image)}
                                                             alt={offer.title}
-                                                            style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px', marginRight: '10px' }}
+                                                            style={{
+                                                                width: '50px',
+                                                                height: '50px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: '4px',
+                                                                marginRight: '10px'
+                                                            }}
                                                         />
                                                     )}
                                                     <div>
@@ -730,20 +755,18 @@ const ViewRegisterEventPage = () => {
             <div>
                 <h5>Event Stamps</h5>
                 <hr />
-                
-                {eventData.event.eventStamps.description && (
-                    <div className="mb-3">
-                        <h6>Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
-                            {eventData.event.eventStamps.description}
-                        </p>
-                    </div>
-                )}
 
                 {eventData.event.eventStamps.images?.length > 0 && (
                     <div>
                         <h6>Stamp Images</h6>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                                gap: '10px',
+                                marginTop: '10px'
+                            }}
+                        >
                             {eventData.event.eventStamps.images.map((image, index) => {
                                 const imageSrc = getImageSrc(image);
 
@@ -769,22 +792,31 @@ const ViewRegisterEventPage = () => {
                                                 e.target.style.display = 'none';
                                             }}
                                         />
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '5px',
-                                            right: '5px',
-                                            backgroundColor: 'rgba(0,0,0,0.7)',
-                                            color: 'white',
-                                            padding: '2px 6px',
-                                            borderRadius: '50%',
-                                            fontSize: '10px'
-                                        }}>
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '5px',
+                                                right: '5px',
+                                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                                color: 'white',
+                                                padding: '2px 6px',
+                                                borderRadius: '50%',
+                                                fontSize: '10px'
+                                            }}
+                                        >
                                             <i className="fas fa-search-plus"></i>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {eventData.event.eventStamps.description && (
+                    <div className="mb-3 mt-3">
+                        <h6>Description</h6>
+                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}> {eventData.event.eventStamps.description}</p>
                     </div>
                 )}
             </div>
@@ -832,8 +864,8 @@ const ViewRegisterEventPage = () => {
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
                     <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View Register Event</h4>
-                        <Button variant="secondary" onClick={() => navigate('/events/registered')}>
+                        <h4 className="card-title">View</h4>
+                        <Button variant="secondary" onClick={() => navigate(EVENT_PATHS.REGISTERED_EVENTS)}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                             Back
                         </Button>
@@ -873,8 +905,8 @@ const ViewRegisterEventPage = () => {
                             <Col md={6}>
                                 <p className="mb-2">
                                     <strong>User Type:</strong>
-                                    <span 
-                                        className="badge ml-2" 
+                                    <span
+                                        className="badge ml-2"
                                         style={{
                                             backgroundColor: eventData.type === 'exhibitor' ? 'rgb(162, 209, 231)' : 'rgb(223, 228, 165)',
                                             color: 'rgb(14, 13, 13)',
@@ -886,9 +918,14 @@ const ViewRegisterEventPage = () => {
                                 </p>
                                 <p className="mb-2">
                                     <strong>Registration Status:</strong>
-                                    <Badge 
-                                        bg={eventData.status === 'Success' ? 'success' : 
-                                            eventData.status === 'Withdraw' ? 'danger' : 'warning'}
+                                    <Badge
+                                        bg={
+                                            eventData.status === 'Success'
+                                                ? 'success'
+                                                : eventData.status === 'Withdraw'
+                                                ? 'danger'
+                                                : 'warning'
+                                        }
                                         className="ml-2"
                                     >
                                         {eventData.status}
@@ -977,37 +1014,223 @@ const ViewRegisterEventPage = () => {
                                 <div className="p-3" style={{ padding: '10px' }}>
                                     <h5>Event Information</h5>
                                     <hr />
-                                    <Row>
+                                    <Row className="g-4">
                                         <Col md={6}>
-                                            <p>
-                                                <strong>Event Name:</strong> {eventData.event?.name}
-                                            </p>
-                                            <p>
-                                                <strong>Event Type:</strong> {eventData.event?.type || 'N/A'}
-                                            </p>
-                                            <p>
-                                                <strong>Start Date:</strong> <DateTimeFormatter date={eventData.event?.startDate} time={eventData.event?.startTime} />
-                                            </p>
-                                            <p>
-                                                <strong>End Date:</strong> <DateTimeFormatter date={eventData.event?.endDate} time={eventData.event?.endTime} />
-                                            </p>
-                                        </Col>
-                                        <Col md={6}>
-                                            <p>
-                                                <strong>Categories:</strong>
-                                            </p>
-                                            {renderCategories()}
-                                            <p className="mt-3">
-                                                <strong>Description:</strong>
-                                            </p>
-                                            <p
+                                            {/* Event Basic Details Card */}
+                                            <div
                                                 style={{
-                                                    textAlign: 'justify',
-                                                    lineHeight: '1.5'
+                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                                                    borderRadius: '15px',
+                                                    padding: '25px',
+                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
+                                                    height: '100%'
                                                 }}
                                             >
-                                                {eventData.event?.description}
-                                            </p>
+                                                <h6
+                                                    style={{
+                                                        color: '#4680ff',
+                                                        fontWeight: '600',
+                                                        marginBottom: '20px',
+                                                        fontSize: '1.1rem',
+                                                        borderBottom: '2px solid #e9ecef',
+                                                        paddingBottom: '10px'
+                                                    }}
+                                                >
+                                                    Basic Details
+                                                </h6>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Event Name
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '1.1rem',
+                                                            color: '#2c3e50',
+                                                            fontWeight: '600',
+                                                            lineHeight: '1.4'
+                                                        }}
+                                                    >
+                                                        {eventData.event.name}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Event Type
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            display: 'inline-block',
+                                                            padding: '6px 12px',
+                                                            backgroundColor: eventData.event.type ? '#e8f4fd' : '#f8f9fa',
+                                                            color: eventData.event.type ? '#0066cc' : '#6c757d',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: '500',
+                                                            border: `1px solid ${eventData.event.type ? '#b3d9ff' : '#e9ecef'}`
+                                                        }}
+                                                    >
+                                                        {eventData.event.type || 'N/A'}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Start Date & Time
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '10px 15px',
+                                                            backgroundColor: '#e8f5e8',
+                                                            borderLeft: '4px solid #28a745',
+                                                            borderRadius: '0 8px 8px 0',
+                                                            fontSize: '1rem',
+                                                            color: '#155724',
+                                                            fontWeight: '500'
+                                                        }}
+                                                    >
+                                                        <DateTimeFormatter date={eventData.event.startDate} time={eventData.event.startTime} />
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        End Date & Time
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '10px 15px',
+                                                            backgroundColor: '#fff3cd',
+                                                            borderLeft: '4px solid #ffc107',
+                                                            borderRadius: '0 8px 8px 0',
+                                                            fontSize: '1rem',
+                                                            color: '#856404',
+                                                            fontWeight: '500'
+                                                        }}
+                                                    >
+                                                        <DateTimeFormatter date={eventData.event.endDate} time={eventData.event.endTime} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Col>
+
+                                        <Col md={6}>
+                                            {/* Event Description & Categories Card */}
+                                            <div
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                                                    borderRadius: '15px',
+                                                    padding: '25px',
+                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
+                                                    height: '100%'
+                                                }}
+                                            >
+                                                <h6
+                                                    style={{
+                                                        color: '#4680ff',
+                                                        fontWeight: '600',
+                                                        marginBottom: '20px',
+                                                        fontSize: '1.1rem',
+                                                        borderBottom: '2px solid #e9ecef',
+                                                        paddingBottom: '10px'
+                                                    }}
+                                                >
+                                                    Categories & Description
+                                                </h6>
+
+                                                <div className="info-item">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '15px'
+                                                        }}
+                                                    >
+                                                        Categories
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '15px',
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '10px',
+                                                            border: '1px solid #e9ecef',
+                                                            minHeight: '80px'
+                                                        }}
+                                                    >
+                                                        {renderCategories()}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-4 mt-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '10px'
+                                                        }}
+                                                    >
+                                                        Event Description
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            padding: '15px',
+
+                                                            fontSize: '0.95rem',
+                                                            color: '#495057',
+                                                            lineHeight: '1.6',
+
+                                                            fontStyle: eventData.event.description ? 'normal' : 'italic'
+                                                        }}
+                                                    >
+                                                        {eventData.event.description || 'No description available'}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </Col>
                                     </Row>
                                 </div>
@@ -1029,10 +1252,7 @@ const ViewRegisterEventPage = () => {
                                                     padding: '20px'
                                                 }}
                                             >
-                                                <i
-                                                    className="fas fa-map-marker-alt text-primary mb-2"
-                                                    style={{ fontSize: '1.5rem' }}
-                                                ></i>
+                                                <i className="fas fa-map-marker-alt text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
                                                 <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
                                                     Location
                                                 </h6>
@@ -1089,17 +1309,11 @@ const ViewRegisterEventPage = () => {
                                                     padding: '20px'
                                                 }}
                                             >
-                                                <i
-                                                    className="fas fa-dollar-sign text-success mb-2"
-                                                    style={{ fontSize: '1.5rem' }}
-                                                ></i>
+                                                <i className="fas fa-dollar-sign text-success mb-2" style={{ fontSize: '1.5rem' }}></i>
                                                 <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
                                                     Price
                                                 </h6>
-                                                <p
-                                                    className="mb-0"
-                                                    style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}
-                                                >
+                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
                                                     {eventData.event?.price} {eventData.event?.currency}
                                                 </p>
                                             </div>
@@ -1119,17 +1333,23 @@ const ViewRegisterEventPage = () => {
                                                         location={eventData.event.location}
                                                     />
                                                 </div>
-                                                
+
                                                 {/* Coordinates Display */}
                                                 <div className="d-flex gap-3">
                                                     {eventData.event.latitude && (
-                                                        <div className="text-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}>
+                                                        <div
+                                                            className="text-center p-2"
+                                                            style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}
+                                                        >
                                                             <i className="fas fa-location-arrow text-primary"></i>
                                                             <span className="ms-2">Latitude: {eventData.event.latitude}</span>
                                                         </div>
                                                     )}
                                                     {eventData.event.longitude && (
-                                                        <div className="text-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}>
+                                                        <div
+                                                            className="text-center p-2"
+                                                            style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}
+                                                        >
                                                             <i className="fas fa-location-arrow text-primary"></i>
                                                             <span className="ms-2">Longitude: {eventData.event.longitude}</span>
                                                         </div>
@@ -1190,36 +1410,28 @@ const ViewRegisterEventPage = () => {
                             {/* Floor Plan Tab */}
                             {eventData?.event?.floorPlan && (
                                 <Tab.Pane eventKey="floorplan">
-                                    <div className="p-3">
-                                        {renderFloorPlan()}
-                                    </div>
+                                    <div className="p-3">{renderFloorPlan()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Gallery Tab */}
                             {eventData?.event?.galleries?.length > 0 && (
                                 <Tab.Pane eventKey="gallery">
-                                    <div className="p-3">
-                                        {renderGalleries()}
-                                    </div>
+                                    <div className="p-3">{renderGalleries()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Exhibitors Tab */}
                             {eventData?.event?.exhibitorsData?.exhibitors?.length > 0 && (
                                 <Tab.Pane eventKey="exhibitors">
-                                    <div className="p-3">
-                                        {renderExhibitors()}
-                                    </div>
+                                    <div className="p-3">{renderExhibitors()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Event Stamps Tab */}
                             {eventData?.event?.eventStamps && (
                                 <Tab.Pane eventKey="stamps">
-                                    <div className="p-3">
-                                        {renderEventStamps()}
-                                    </div>
+                                    <div className="p-3">{renderEventStamps()}</div>
                                 </Tab.Pane>
                             )}
                         </Tab.Content>
@@ -1250,9 +1462,14 @@ const ViewRegisterEventPage = () => {
                                     <p className="mb-2">
                                         <strong>Payment Status:</strong>
                                         <br />
-                                        <Badge 
-                                            bg={eventData.order?.status === 'Success' ? 'success' : 
-                                                eventData.order?.status === 'Withdraw' ? 'danger' : 'warning'}
+                                        <Badge
+                                            bg={
+                                                eventData.order?.status === 'Success'
+                                                    ? 'success'
+                                                    : eventData.order?.status === 'Withdraw'
+                                                    ? 'danger'
+                                                    : 'warning'
+                                            }
                                         >
                                             {eventData.order?.status || 'N/A'}
                                         </Badge>
@@ -1966,4 +2183,4 @@ const ViewRegisterEventPage = () => {
     );
 };
 
-export default ViewRegisterEventPage; 
+export default ViewRegisterEventPage;

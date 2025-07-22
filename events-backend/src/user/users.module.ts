@@ -5,6 +5,7 @@ import { UserService } from './users.service';
 import { UserController } from './users.controller';
 import { UserEntity } from './users.entity';
 import { JwtModule } from '@nestjs/jwt';
+import { ErrorHandlerService } from 'utils/services/error-handler.service';
 
 @Module({
     imports: [TypeOrmModule.forFeature([UserEntity]),
@@ -13,7 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
       signOptions: { }, // Set your token expiration
     }),
   ],
-    providers: [UserService],
+    providers: [UserService,ErrorHandlerService],
     controllers: [UserController],
     exports: [UserService],
 })

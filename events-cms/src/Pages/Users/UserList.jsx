@@ -7,17 +7,16 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector } from 'react-redux';
 import * as $ from 'jquery';
-import {  API_URL, DUMMY_PATH_USER } from '../../configs/env';
-import AddUserModal from './components/AddUserModal';
+import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
-import ViewUserModal from './components/ViewUserModal';
 import { useNavigate } from 'react-router-dom';
+import { USER_PATHS } from '../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser) {
+function atable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -70,7 +69,9 @@ function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleView
 
                     return `
                             <div class="d-inline-block align-middle">
-                                <img src="${row.profilePicture ? `${API_URL}/${row.profilePicture}` : imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                                <img src="${
+                                    row.profilePicture ? `${API_URL}/${row.profilePicture}` : imageUrl
+                                }" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
                                   <div class="d-inline-block">
                                     <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
                                     <p class="m-b-0">${row.email}</p>
@@ -79,7 +80,7 @@ function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleView
                         `;
                 }
             },
-    
+
             { data: 'mobile', title: 'Mobile' },
             { data: 'address', title: 'Address' },
             { data: 'city', title: 'City' },
@@ -128,15 +129,15 @@ function atable(data, handleAddUser, handleEditUser, handleDeleteUser,handleView
         ]
     });
 
-      // Restore the page
-      $(tableZero).DataTable().page(currentPage).draw(false);
+    // Restore the page
+    $(tableZero).DataTable().page(currentPage).draw(false);
 
     // Attach event listeners for actions
     $(document).on('click', '.btn-icon', function () {
         const userId = $(this).data('id');
         const userData = data.find((user) => user.id === userId);
         if (userData) {
-          handleViewUser(userData);
+            handleViewUser(userData);
         }
     });
 
@@ -158,6 +159,7 @@ const UserList = () => {
     const { fetchData, deleteUserData } = FetchUsers(); // Destructure fetchData from the custom hook
 
     const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
+
     const [showModal, setShowModal] = React.useState(false);
     const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
     const navigate = useNavigate();
@@ -174,16 +176,15 @@ const UserList = () => {
     };
 
     const handleViewUser = (userData) => {
-        navigate(`/users/view-user/${userData.id}`);
-      };
-    
+        navigate(`${USER_PATHS.VIEW_USER}/${userData.id}`);
+    };
 
     const handleAddUser = () => {
-        navigate(`/users/add-user`);
+        navigate(`${USER_PATHS.ADD_USER}`);
     };
 
     const handleEditUser = (userData) => {
-        navigate(`/users/edit-user/${userData.id}`);
+        navigate(`${USER_PATHS.EDIT_USER}/${userData.id}`);
     };
 
     const handleDeleteUser = (userId) => {
@@ -206,8 +207,8 @@ const UserList = () => {
     };
 
     useEffect(() => {
-        if (user.length) {
-            atable(user.data, handleAddUser, handleEditUser, handleDeleteUser,handleViewUser); // Pass handleAddUser to atable
+        if (user.data) {
+            atable(user.data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser); // Pass handleAddUser to atable
         }
     }, [user, handleAddUser]); // Add handleAddUser to dependencies
 
@@ -218,9 +219,7 @@ const UserList = () => {
 
     return (
         <>
-            <AddUserModal show={showModal} handleClose={handleCloseModal} editData={editData} />
-            <ViewUserModal show={showViewModal} handleClose={() => setShowViewModal(false)} userData={viewData} />
-   
+       
             <DeleteConfirmationModal
                 show={showConfirmModal}
                 onHide={() => setShowConfirmModal(false)}

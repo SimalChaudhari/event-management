@@ -61,10 +61,13 @@ const GoogleMap = ({ latitude, longitude, eventName, location }) => {
             });
 
             // Show info window by default
-            infoWindow.open(map, new window.google.maps.Marker({
-                position: { lat: parseFloat(latitude), lng: parseFloat(longitude) },
-                map: map
-            }));
+            infoWindow.open(
+                map,
+                new window.google.maps.Marker({
+                    position: { lat: parseFloat(latitude), lng: parseFloat(longitude) },
+                    map: map
+                })
+            );
         }
     }, [mapLoaded, latitude, longitude, eventName, location]);
 
@@ -168,12 +171,12 @@ const ViewEventPage = () => {
     };
 
     const renderCategories = () => {
-        if (!eventData?.categoriesData?.length) {
+        if (!eventData?.categories?.length) {
             return <p>No categories listed.</p>;
         }
         return (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {eventData.categoriesData.map((category, index) => (
+                {eventData?.categories?.map((category, index) => (
                     <Badge
                         key={category.id}
                         bg="success"
@@ -218,7 +221,7 @@ const ViewEventPage = () => {
                         Speakers
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {eventData.speakersData?.length || 0}
+                        {eventData.speakers?.length || 0}
                     </p>
                 </div>
             </Col>
@@ -298,7 +301,7 @@ const ViewEventPage = () => {
                             <div className="speaker-image" onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}>
                                 <img
                                     src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
-                                    alt={speaker.name}
+                                    alt="speaker"
                                 />
                             </div>
 
@@ -615,12 +618,7 @@ const ViewEventPage = () => {
                         }}
                     />
                 </div>
-                <Button
-                    variant="outline-primary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => window.open(floorPlanSrc, '_blank')}
-                >
+                <Button variant="outline-primary" size="sm" className="mt-3" onClick={() => window.open(floorPlanSrc, '_blank')}>
                     <i className="fas fa-external-link-alt me-2"></i>
                     Open in New Tab
                 </Button>
@@ -714,9 +712,7 @@ const ViewEventPage = () => {
                 {eventData.exhibitorsData.exhibitorDescription && (
                     <div className="mb-4">
                         <h6>Exhibitor Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
-                            {eventData.exhibitorsData.exhibitorDescription}
-                        </p>
+                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.exhibitorsData.exhibitorDescription}</p>
                         <hr />
                     </div>
                 )}
@@ -730,9 +726,7 @@ const ViewEventPage = () => {
                             </div>
 
                             <div className="exhibitor-info">
-                                {exhibitor.companyDescription && (
-                                    <p className="exhibitor-description">{exhibitor.companyDescription}</p>
-                                )}
+                                {exhibitor.companyDescription && <p className="exhibitor-description">{exhibitor.companyDescription}</p>}
 
                                 <div className="exhibitor-contact">
                                     {exhibitor.email && (
@@ -835,15 +829,6 @@ const ViewEventPage = () => {
             <div>
                 <h5>Event Stamps</h5>
                 <hr />
-                
-                {eventData.eventStamps.description && (
-                    <div className="mb-3">
-                        <h6>Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
-                            {eventData.eventStamps.description}
-                        </p>
-                    </div>
-                )}
 
                 {eventData.eventStamps.images?.length > 0 && (
                     <div>
@@ -903,6 +888,13 @@ const ViewEventPage = () => {
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {eventData.eventStamps.description && (
+                    <div className="mb-3 mt-3">
+                        <h6>Description</h6>
+                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.eventStamps.description}</p>
                     </div>
                 )}
             </div>
@@ -1006,7 +998,7 @@ const ViewEventPage = () => {
                                 location={eventData.location}
                             />
                         </div>
-                        
+
                         {/* Coordinates Display */}
                         <div className="d-flex gap-3">
                             {eventData.latitude && (
@@ -1129,51 +1121,234 @@ const ViewEventPage = () => {
                         <Tab.Content>
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <div className="p-3" style={{ padding: '10px' }}>
-                                    <h5>Event Information</h5>
-                                    <hr />
-                                    <Row>
+                                <div
+                                    className="p-4"
+                                    style={{ padding: '25px', background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}
+                                >
+                                    <Row className="g-4">
                                         <Col md={6}>
-                                            <p>
-                                                <strong>Event Name:</strong> {eventData.name}
-                                            </p>
-                                            <p>
-                                                <strong>Event Type:</strong> {eventData.type || 'N/A'}
-                                            </p>
-                                            <p>
-                                                <strong>Start Date:</strong>{' '}
-                                                <DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />
-                                            </p>
-                                            <p>
-                                                <strong>End Date:</strong>{' '}
-                                                <DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />
-                                            </p>
-                                        </Col>
-                                        <Col md={6}>
-                                            <p>
-                                                <strong>Categories:</strong>
-                                            </p>
-                                            {renderCategories()}
-                                            <p className="mt-3">
-                                                <strong>Description:</strong>
-                                            </p>
-                                            <p
+                                            {/* Event Basic Details Card */}
+                                            <div
                                                 style={{
-                                                    textAlign: 'justify',
-                                                    lineHeight: '1.5'
+                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                                                    borderRadius: '15px',
+                                                    padding: '25px',
+                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
+                                                    height: '100%'
                                                 }}
                                             >
-                                                {eventData.description}
-                                            </p>
+                                                <h6
+                                                    style={{
+                                                        color: '#4680ff',
+                                                        fontWeight: '600',
+                                                        marginBottom: '20px',
+                                                        fontSize: '1.1rem',
+                                                        borderBottom: '2px solid #e9ecef',
+                                                        paddingBottom: '10px'
+                                                    }}
+                                                >
+                                                    Basic Details
+                                                </h6>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Event Name
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '1.1rem',
+                                                            color: '#2c3e50',
+                                                            fontWeight: '600',
+                                                            lineHeight: '1.4'
+                                                        }}
+                                                    >
+                                                        {eventData.name}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Event Type
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            display: 'inline-block',
+                                                            padding: '6px 12px',
+                                                            backgroundColor: eventData.type ? '#e8f4fd' : '#f8f9fa',
+                                                            color: eventData.type ? '#0066cc' : '#6c757d',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: '500',
+                                                            border: `1px solid ${eventData.type ? '#b3d9ff' : '#e9ecef'}`
+                                                        }}
+                                                    >
+                                                        {eventData.type || 'N/A'}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        Start Date & Time
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '10px 15px',
+                                                            backgroundColor: '#e8f5e8',
+                                                            borderLeft: '4px solid #28a745',
+                                                            borderRadius: '0 8px 8px 0',
+                                                            fontSize: '1rem',
+                                                            color: '#155724',
+                                                            fontWeight: '500'
+                                                        }}
+                                                    >
+                                                        <DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        End Date & Time
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '10px 15px',
+                                                            backgroundColor: '#fff3cd',
+                                                            borderLeft: '4px solid #ffc107',
+                                                            borderRadius: '0 8px 8px 0',
+                                                            fontSize: '1rem',
+                                                            color: '#856404',
+                                                            fontWeight: '500'
+                                                        }}
+                                                    >
+                                                        <DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Col>
+
+                                        <Col md={6}>
+                                            {/* Event Description & Categories Card */}
+                                            <div
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                                                    borderRadius: '15px',
+                                                    padding: '25px',
+                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
+                                                    height: '100%'
+                                                }}
+                                            >
+                                                <h6
+                                                    style={{
+                                                        color: '#4680ff',
+                                                        fontWeight: '600',
+                                                        marginBottom: '20px',
+                                                        fontSize: '1.1rem',
+                                                        borderBottom: '2px solid #e9ecef',
+                                                        paddingBottom: '10px'
+                                                    }}
+                                                >
+                                                    Categories & Description
+                                                </h6>
+
+                                                <div className="info-item">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '15px'
+                                                        }}
+                                                    >
+                                                        Categories
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            padding: '15px',
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '10px',
+                                                            border: '1px solid #e9ecef',
+                                                            minHeight: '80px'
+                                                        }}
+                                                    >
+                                                        {renderCategories()}
+                                                    </div>
+                                                </div>
+
+                                                <div className="info-item mb-4 mt-3">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6c757d',
+                                                            fontWeight: '500',
+                                                            letterSpacing: '0.5px',
+                                                            marginBottom: '10px'
+                                                        }}
+                                                    >
+                                                        Event Description
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            backgroundColor: '#f8f9fa',
+                                                            padding: '15px',
+
+                                                            fontSize: '0.95rem',
+                                                            color: '#495057',
+                                                            lineHeight: '1.6',
+
+                                                            fontStyle: eventData.description ? 'normal' : 'italic'
+                                                        }}
+                                                    >
+                                                        {eventData.description || 'No description available'}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </Col>
                                     </Row>
                                 </div>
                             </Tab.Pane>
 
                             {/* Location & Pricing Tab */}
-                            <Tab.Pane eventKey="location">
-                                {renderLocationTab()}
-                            </Tab.Pane>
+                            <Tab.Pane eventKey="location">{renderLocationTab()}</Tab.Pane>
 
                             {/* Speakers Tab */}
                             <Tab.Pane eventKey="speakers">
@@ -1209,36 +1384,28 @@ const ViewEventPage = () => {
                             {/* Floor Plan Tab */}
                             {eventData?.floorPlan && (
                                 <Tab.Pane eventKey="floorplan">
-                                    <div className="p-3">
-                                        {renderFloorPlan()}
-                                    </div>
+                                    <div className="p-3">{renderFloorPlan()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Gallery Tab */}
                             {eventData?.galleries?.length > 0 && (
                                 <Tab.Pane eventKey="gallery">
-                                    <div className="p-3">
-                                        {renderGalleries()}
-                                    </div>
+                                    <div className="p-3">{renderGalleries()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Exhibitors Tab */}
                             {eventData?.exhibitorsData?.exhibitors?.length > 0 && (
                                 <Tab.Pane eventKey="exhibitors">
-                                    <div className="p-3">
-                                        {renderExhibitors()}
-                                    </div>
+                                    <div className="p-3">{renderExhibitors()}</div>
                                 </Tab.Pane>
                             )}
 
                             {/* Event Stamps Tab */}
                             {eventData?.eventStamps && (
                                 <Tab.Pane eventKey="stamps">
-                                    <div className="p-3">
-                                        {renderEventStamps()}
-                                    </div>
+                                    <div className="p-3">{renderEventStamps()}</div>
                                 </Tab.Pane>
                             )}
                         </Tab.Content>

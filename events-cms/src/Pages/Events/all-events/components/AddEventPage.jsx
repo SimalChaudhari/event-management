@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Badge, Container, Modal } from 'react-bootstrap';
 import Select from 'react-select';
 import { useDispatch } from 'react-redux';
-import { useParams, useHistory, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
-import { createEvent, editEvent, eventById, eventGetStamp, exhibitorGet, removeEventFloorPlan, removeEventStampImage } from '../../../../store/actions/eventActions';
+import { createEvent, editEvent, eventById, exhibitorGet, removeEventFloorPlan, removeEventStampImage } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
@@ -14,7 +14,8 @@ import SpeakerFormModal from '../components/SpeakerFormSidebar';
 import CategoryFormModal from '../components/CategoryFormModal';
 import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { createCategory } from '../../../../store/actions/categoryActions';
-import { removeEventImage, removeEventDocument, createEventStamp } from '../../../../store/actions/eventActions';
+import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
+import { EVENT_PATHS } from '../../../../utils/constants';
 
 function AddEventPage() {
     const dispatch = useDispatch();
@@ -56,14 +57,10 @@ function AddEventPage() {
 
     // Image and document management states
     const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
-    const [uploadProgress, setUploadProgress] = useState({});
+
     const [documentPreviewUrls, setDocumentPreviewUrls] = useState([]);
-    const [documentUploadProgress, setDocumentUploadProgress] = useState({});
-    const [removedImages, setRemovedImages] = useState([]);
-    const [removedDocuments, setRemovedDocuments] = useState([]);
 
     // Modal states
-    const [selectedSpeakers, setSelectedSpeakers] = useState([]);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const navigate = useNavigate();
@@ -256,8 +253,8 @@ function AddEventPage() {
                         setImagePreviewUrls(previewUrls);
                         setDocumentPreviewUrls(documentPreviewUrls);
                         setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
-                        setRemovedImages([]);
-                        setRemovedDocuments([]);
+                    
+                   
                         setFloorPlanPreview(floorPlanPreviewUrl);
                     }
                 } catch (error) {
@@ -341,54 +338,23 @@ function AddEventPage() {
             const newFiles = Array.from(files);
 
             if (name === 'images') {
-                const validFiles = newFiles.filter((file) => {
-                    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                    const isValidType = allowedImageTypes.includes(file.type);
-                    const isValidSize = file.size <= 50 * 1024 * 1024;
-
-                    if (!isValidType) {
-                        alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
-                    }
-                    if (!isValidSize) {
-                        alert(`${file.name} is too large. Maximum size is 50MB.`);
-                    }
-
-                    return isValidType && isValidSize;
-                });
-
-                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+                
+                const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
                     ...prev,
-                    images: [...prev.images, ...validFiles]
+                    images: [...prev.images, ...newFiles]
                 }));
 
                 setImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
             } else if (name === 'documents') {
-                const validFiles = newFiles.filter((file) => {
-                    const isValidType =
-                        file.type === 'application/pdf' ||
-                        file.type === 'application/msword' ||
-                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                        file.type === 'application/vnd.ms-excel' ||
-                        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                    const isValidSize = file.size <= 10 * 1024 * 1024;
+                
 
-                    if (!isValidType) {
-                        alert(`${file.name} is not a valid document file. Supported: PDF, DOC, DOCX, XLS, XLSX`);
-                    }
-                    if (!isValidSize) {
-                        alert(`${file.name} is too large. Maximum size is 10MB.`);
-                    }
-
-                    return isValidType && isValidSize;
-                });
-
-                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+                const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
                     ...prev,
-                    documents: [...prev.documents, ...validFiles]
+                    documents: [...prev.documents, ...newFiles]
                 }));
 
                 setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
@@ -409,27 +375,10 @@ function AddEventPage() {
     const handleDrop = (e) => {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
-
-        const validFiles = files.filter((file) => {
-            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            const isValidType = allowedImageTypes.includes(file.type);
-            const isValidSize = file.size <= 50 * 1024 * 1024;
-
-            if (!isValidType) {
-                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
-            }
-            if (!isValidSize) {
-                alert(`${file.name} is too large. Maximum size is 50MB.`);
-            }
-
-            return isValidType && isValidSize;
-        });
-
-        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
-
+        const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
         setFormData((prev) => ({
             ...prev,
-            images: [...prev.images, ...validFiles]
+            images: [...prev.images, ...files]
         }));
 
         setImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
@@ -443,30 +392,11 @@ function AddEventPage() {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
 
-        const validFiles = files.filter((file) => {
-            const isValidType =
-                file.type === 'application/pdf' ||
-                file.type === 'application/msword' ||
-                file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                file.type === 'application/vnd.ms-excel' ||
-                file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-            const isValidSize = file.size <= 10 * 1024 * 1024;
-
-            if (!isValidType) {
-                alert(`${file.name} is not a valid document file.`);
-            }
-            if (!isValidSize) {
-                alert(`${file.name} is too large. Maximum size is 10MB.`);
-            }
-
-            return isValidType && isValidSize;
-        });
-
-        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+        const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
 
         setFormData((prev) => ({
             ...prev,
-            documents: [...prev.documents, ...validFiles]
+            documents: [...prev.documents, ...files]
         }));
 
         setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
@@ -495,23 +425,11 @@ function AddEventPage() {
             longitude: '',
             floorPlan: null,
             exhibitorIds: [],
-            // Update event stamp fields
             eventStampDescription: '',
             eventStampImages: []
         });
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
-        setRemovedImages([]);
-        setRemovedDocuments([]);
-        setUploadProgress({});
-        setDocumentUploadProgress({});
-        // Remove old event stamp states
-        // setNewEventStamp({
-        //     description: '',
-        //     images: []
-        // });
-        // setEventStampImages([]);
-        // Add new event stamp state
         setEventStampImagePreviewUrls([]);
     };
 
@@ -555,10 +473,10 @@ function AddEventPage() {
     useEffect(() => {
         fetchSpeakers();
         fetchCategories();
-
         fetchExhibitors();
-        // fetchEventStamps(); // नया API call
-    }, []);
+
+    }, []
+);
 
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
@@ -776,7 +694,7 @@ function AddEventPage() {
             }
         };
 
-        const map = useMapEvents({
+         useMapEvents({
             click: async (event) => {
                 const { lat, lng } = event.latlng;
                 const address = await fetchAddressFromCoordinates(lat, lng);
@@ -805,19 +723,6 @@ function AddEventPage() {
     const handleFloorPlanChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            const isValidType = allowedImageTypes.includes(file.type);
-            const isValidSize = file.size <= 50 * 1024 * 1024;
-
-            if (!isValidType) {
-                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
-                return;
-            }
-            if (!isValidSize) {
-                alert(`${file.name} is too large. Maximum size is 50MB.`);
-                return;
-            }
-
             setFormData((prev) => ({
                 ...prev,
                 floorPlan: file
@@ -847,28 +752,6 @@ function AddEventPage() {
         }));
     };
 
-    // Event stamp handling
-    // Remove event stamp related functions
-    // const handleEventStampSelect = (selectedOptions) => {
-    //     const selectedIds = selectedOptions.map((option) => option.value);
-    //     setFormData((prev) => ({
-    //         ...prev,
-    //         eventStampIds: selectedIds
-    //     }));
-    // };
-
-    // const handleAddEventStamp = async () => {
-    //     // Remove this function
-    // };
-
-    // const handleRemoveEventStamp = (index) => {
-    //     // Remove this function
-    // };
-
-    // const fetchEventStamps = async () => {
-    //     // Remove this function
-    // };
-
     // Add new event stamp handling functions
     const handleEventStampDescriptionChange = (e) => {
         const { value } = e.target;
@@ -880,26 +763,12 @@ function AddEventPage() {
 
     const handleEventStampImagesChange = (e) => {
         const files = Array.from(e.target.files);
-        const validFiles = files.filter((file) => {
-            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            const isValidType = allowedImageTypes.includes(file.type);
-            const isValidSize = file.size <= 50 * 1024 * 1024;
-
-            if (!isValidType) {
-                alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
-            }
-            if (!isValidSize) {
-                alert(`${file.name} is too large. Maximum size is 50MB.`);
-            }
-
-            return isValidType && isValidSize;
-        });
-
-        const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+        
+        const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
 
         setFormData((prev) => ({
             ...prev,
-            eventStampImages: [...prev.eventStampImages, ...validFiles]
+            eventStampImages: [...prev.eventStampImages, ...files]
         }));
 
         setEventStampImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
@@ -923,7 +792,7 @@ function AddEventPage() {
                     setEventStampImagePreviewUrls(newPreviewUrls);
                 }
             } catch (error) {
-                console.error('Error removing image:', error);
+               // Error handling without console
             }
         } else {
             setFormData((prev) => ({
@@ -939,14 +808,15 @@ function AddEventPage() {
     const fetchExhibitors = async () => {
         try {
             const response = await dispatch(exhibitorGet());
-
             setExhibitorList(response.data);
         } catch (error) {
-            console.error('Error fetching exhibitors:', error);
+         // Error handling without console
         }
     };
 
-
+const handleNavigate = () => {
+    navigate(EVENT_PATHS.LIST_EVENTS);
+}
 
     return (
         <Container fluid>
@@ -956,7 +826,7 @@ function AddEventPage() {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Event' : 'Add Event'}</h4>
-                                <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
+                                <Button variant="secondary" onClick={handleNavigate}>
                                     <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>
@@ -2128,11 +1998,11 @@ function AddEventPage() {
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
+                                            <Button variant="danger" onClick={handleNavigate}>
                                                 Cancel
                                             </Button>
                                             <Button variant="primary" type="submit">
-                                                {id ? 'Update Event' : 'Create Event'}
+                                                {id ? 'Update' : 'Create'}
                                             </Button>
                                         </div>
                                     </div>

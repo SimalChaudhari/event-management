@@ -12,9 +12,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/register.css';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
-import AddRegisterEventModal from './modal/AddRegisterEventModal';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -360,11 +360,11 @@ const RegisteredEvents = () => {
 
     // Add handler for view button
     const handleView = (registration) => {
-        navigate(`/events/view-register-event/${registration.id}`);
+        navigate(EVENT_PATHS.VIEW_REGISTER_EVENT + '/' + registration.id);
     };
 
     const handleEdit = (registration) => {
-        navigate(`/events/edit-register-event/${registration.id}`);
+        navigate(EVENT_PATHS.EDIT_REGISTER_EVENT + '/' + registration.id);
     };
 
     // Handle delete button click
@@ -441,10 +441,7 @@ const RegisteredEvents = () => {
     return (
         <>
             <Row>
-                <RegisterEventModal show={showViewModal} onHide={() => setShowViewModal(false)} eventData={viewData} />
-
-                <AddRegisterEventModal show={showAddRegisterModal} onHide={() => setShowAddRegisterModal(false)} />
-
+              
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">
                         <Card.Body>

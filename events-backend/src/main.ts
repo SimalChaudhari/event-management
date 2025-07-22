@@ -3,11 +3,17 @@ import { AppModule } from './app.module';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from 'validation/validation.pipe';
+import { GlobalExceptionFilter } from 'utils/global-exception.filter';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   try {
    
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+       // Global exception filter
+       app.useGlobalFilters(new GlobalExceptionFilter());
+ 
 
     // app.useGlobalPipes(new ValidationPipe()); // Use custom pipe globally
 
@@ -29,6 +35,7 @@ async function bootstrap() {
     console.log(`Server is running on: http://localhost:${port}`); // Log the port
 
   } catch (error) {
+    Logger.error('Failed to start server:', error);
     process.exit(1); // Exit the process with failure
   }
 }

@@ -14,6 +14,7 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Speaker } from 'speaker/speaker.entity';
 import { Cart } from 'cart/cart.entity';
+import { ErrorHandlerService } from 'utils/services/error-handler.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { Cart } from 'cart/cart.entity';
   ],
 
   controllers: [GalleryController],
-  providers: [GalleryService, EventService],
+  providers: [GalleryService, EventService,ErrorHandlerService],
   exports: [GalleryService],
 })
 export class GalleryModule {}

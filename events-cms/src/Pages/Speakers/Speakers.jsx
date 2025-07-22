@@ -11,8 +11,6 @@ import { speakerList, deleteSpeaker } from '../../store/actions/speakerActions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
-import AddSpeakerModal from './components/AddSpeakerModal';
-import ViewSpeakerModal from './components/ViewSpeakerModal';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 
 // @ts-ignore
@@ -250,9 +248,7 @@ const Speakers = () => {
 
     return (
         <>
-            <AddSpeakerModal show={showModal} handleClose={handleCloseModal} editData={editData} />
-            <ViewSpeakerModal show={showViewModal} handleClose={() => setShowViewModal(false)} speakerData={viewData} />
-
+           
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <Row>
                 <Col sm={12} className="btn-page">

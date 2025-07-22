@@ -16,6 +16,7 @@ import {
   UploadedFiles,
   Request,
   BadRequestException,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -29,12 +30,16 @@ import { RolesGuard } from 'jwt/roles.guard';
 import { Roles } from 'jwt/roles.decorator';
 import * as fs from 'fs';
 import { UserRole } from 'user/users.entity';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { SuccessResponse } from '../utils/interfaces/error-response.interface';
+import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
 
 @Controller('api/events')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EventController {
-  constructor(private readonly eventService: EventService,
-
+  constructor(
+    private readonly eventService: EventService,
+    private readonly errorHandler: ErrorHandlerService,
   ) {}
 
   @Post('create')
@@ -82,6 +87,9 @@ export class EventController {
           cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
         }
       },
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
     }),
   )
   async createEvent(
@@ -92,6 +100,7 @@ export class EventController {
     
     },
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
       if (files.images && files.images.length > 0) {
@@ -119,83 +128,25 @@ export class EventController {
 
     const savedEvent = await this.eventService.createEvent(eventDto);
 
+    const successResponse: SuccessResponse = {
+      success: true,
+      message: 'Event created successfully',
+      data: savedEvent,
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    };
 
-      return response.status(201).json({
-        success: true,
-        message: 'Event created successfully',
-      });
-    } catch (error) {
-      console.log(error);
+    return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
       // Clean up uploaded files if error occurs
-      if (files.images && files.images.length > 0) {
-        files.images.forEach((file) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'images',
-            file.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
+      this.cleanupUploadedFiles(files);
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Event File Upload');
       }
-      if (files.documents && files.documents.length > 0) {
-        files.documents.forEach((file) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'documents',
-            file.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
-      }
-
-       // Clean up floor plan if error occurs
-       if (files.floorPlan && files.floorPlan.length > 0) {
-        files.floorPlan.forEach((file) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'floorPlan',
-            file.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
-      }
-
-         // Clean up event stamp images if error occurs
-         if (files.eventStampImages && files.eventStampImages.length > 0) {
-          files.eventStampImages.forEach((file) => {
-            const uploadedPath = path.join(
-              __dirname,
-              '..',
-              '..',
-              'uploads',
-              'eventStamps',
-              'images',
-              file.filename,
-            );
-            if (fs.existsSync(uploadedPath)) {
-              fs.unlinkSync(uploadedPath);
-            }
-          });
-        }
-
+      
+      this.errorHandler.logError(error, 'Event creation', req.user?.id);
       throw error;
     }
   }
@@ -215,15 +166,25 @@ export class EventController {
     @Request() req: any,
     @Res() response: Response,
   ) {
-    const userId = req.user?.id; // Get user ID from JWT token
-    const events = await this.eventService.getAllEvents(filters, userId);
-    return response.status(200).json({
-      success: true,
-      total: events.length,
+    try {
+      const userId = req.user?.id; // Get user ID from JWT token
+      const events = await this.eventService.getAllEvents(filters, userId);
       
-      message: 'Events retrieved successfully',
-      events: events,
-    });
+      const successResponse: any = {
+        success: true,
+        message: 'Events retrieved successfully',
+        events: events,
+        metadata: {
+          total: events.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Events retrieval', req.user?.id);
+      throw error;
+    }
   }
 
   @Get(':id')
@@ -232,13 +193,24 @@ export class EventController {
     @Request() req: any,
     @Res() response: Response
   ) {
-    const userId = req.user?.id; // Get user ID from JWT token
-    const event = await this.eventService.getEventById(id, userId);
-    return response.status(200).json({
-      success: true,
-      message: 'Event retrieved successfully',
-      data: event,
-    });
+    try {
+      const userId = req.user?.id; // Get user ID from JWT token
+      const event = await this.eventService.getEventById(id, userId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Event retrieved successfully',
+        data: event,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event retrieval by ID', req.user?.id);
+      throw error;
+    }
   }
 
   @Put('update/:id')
@@ -285,6 +257,9 @@ export class EventController {
         cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
       }
     },
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
   }),
 )
   async updateEvent(
@@ -297,84 +272,14 @@ export class EventController {
       eventStampImages?: Express.Multer.File[] // Add this
     },
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    // First get the event
-    const existingEvent = await this.eventService
-      .getEventEntityById(id)
-      .catch((err) => null);
-
-    // If event not found, delete the just-uploaded files
-    if (!existingEvent) {
-      if (files.images) {
-        files.images.forEach((img) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'images',
-            img.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
-      }
-      if (files.documents) {
-        files.documents.forEach((doc) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'documents',
-            doc.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
-      }
-        // Clean up floor plan if event not found
-        if (files.floorPlan) {
-          files.floorPlan.forEach((file) => {
-            const uploadedPath = path.join(
-              __dirname,
-              '..',
-              '..',
-              'uploads',
-              'event',
-              'floorPlan',
-              file.filename,
-            );
-            if (fs.existsSync(uploadedPath)) {
-              fs.unlinkSync(uploadedPath);
-            }
-          });
-        }
-      // Clean up event stamp images if event not found
-      if (files.eventStampImages) {
-        files.eventStampImages.forEach((file) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'eventStamps',
-            'images',
-            file.filename,
-          );
-          if (fs.existsSync(uploadedPath)) {
-            fs.unlinkSync(uploadedPath);
-          }
-        });
-      }
-      throw new NotFoundException('Event not found');
-    }
-
+    let existingEvent = null;
+    
     try {
+      // Get existing event first
+      existingEvent = await this.eventService.getEventEntityById(id);
+      
       // Handle images - combine existing and new images
       const allImages = [];
       
@@ -459,81 +364,49 @@ export class EventController {
 
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
 
-
-      return response.status(200).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: 'Event updated successfully',
         data: updatedEvent,
-      });
-    } catch (error) {
-      // Clean up uploaded files if error occurs
-      if (files.images) {
-        files.images.forEach((img) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'images',
-            img.filename,
-          );
-          if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-        });
-      }
-      if (files.documents) {
-        files.documents.forEach((doc) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'event',
-            'documents',
-            doc.filename,
-          );
-          if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-        });
-      }
-     // Clean up floor plan if error occurs
-     if (files.floorPlan) {
-      files.floorPlan.forEach((file) => {
-        const uploadedPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'uploads',
-          'event',
-          'floorPlan',
-          file.filename,
-        );
-        if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-      });
-    }
-    // Clean up event stamp images if error occurs
-    if (files.eventStampImages) {
-      files.eventStampImages.forEach((file) => {
-        const uploadedPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'uploads',
-          'eventStamps',
-          'images',
-          file.filename,
-        );
-        if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-      });
-    }
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
 
-    throw error;
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      // Clean up uploaded files if error occurs
+      this.cleanupUploadedFiles(files);
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Event File Upload');
+      }
+      
+      this.errorHandler.logError(error, 'Event update', req.user?.id);
+      throw error;
+    }
   }
-}
 
   @Delete('delete/:id')
   @Roles(UserRole.Admin)
-  async deleteEvent(@Param('id') id: string) {
-    return await this.eventService.deleteEvent(id);
+  async deleteEvent(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const result = await this.eventService.deleteEvent(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event deletion', req.user?.id);
+      throw error;
+    }
   }
 
   // Remove individual image
@@ -543,18 +416,14 @@ export class EventController {
     @Param('id') id: string,
     @Body() body: { imagePath: string },
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
       const event = await this.eventService.getEventEntityById(id);
-      if (!event) {
-        throw new NotFoundException('Event not found');
-      }
-
       const { imagePath } = body;
 
-      // Check if image exists in event
       if (!event.images || !event.images.includes(imagePath)) {
-        throw new NotFoundException('Image not found in this event');
+        throw new ResourceNotFoundException('Image', 'in this event');
       }
 
       // Remove image from filesystem
@@ -563,16 +432,21 @@ export class EventController {
         fs.unlinkSync(fullPath);
       }
 
-      // Remove image from database using new method
       const updatedImages = event.images.filter(img => img !== imagePath);
       await this.eventService.updateEventImages(id, updatedImages);
 
-      return response.status(200).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: 'Image removed successfully',
-        data: { images: updatedImages }
-      });
+        data: { images: updatedImages },
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
+      this.errorHandler.logError(error, 'Event image removal', req.user?.id);
       throw error;
     }
   }
@@ -584,18 +458,14 @@ export class EventController {
     @Param('id') id: string,
     @Body() body: { documentPath: string },
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
       const event = await this.eventService.getEventEntityById(id);
-      if (!event) {
-        throw new NotFoundException('Event not found');
-      }
-
       const { documentPath } = body;
 
-      // Check if document exists in event
       if (!event.documents || !event.documents.includes(documentPath)) {
-        throw new NotFoundException('Document not found in this event');
+        throw new ResourceNotFoundException('Document', 'in this event');
       }
 
       // Remove document from filesystem
@@ -604,16 +474,21 @@ export class EventController {
         fs.unlinkSync(fullPath);
       }
 
-      // Remove document from database using new method
       const updatedDocuments = event.documents.filter(doc => doc !== documentPath);
       await this.eventService.updateEventDocuments(id, updatedDocuments);
 
-      return response.status(200).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: 'Document removed successfully',
-        data: { documents: updatedDocuments }
-      });
+        data: { documents: updatedDocuments },
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
+      this.errorHandler.logError(error, 'Event document removal', req.user?.id);
       throw error;
     }
   }
@@ -625,36 +500,37 @@ export class EventController {
       @Param('id') id: string,
       @Body() body: { imagePath: string },
       @Res() response: Response,
+      @Request() req: any,
     ) {
       try {
         const event = await this.eventService.getEventEntityById(id);
-        if (!event) {
-          throw new NotFoundException('Event not found');
-        }
-  
         const { imagePath } = body;
-  
-        // Check if image exists in event
+
         if (!event.eventStampImages || !event.eventStampImages.includes(imagePath)) {
-          throw new NotFoundException('Event stamp image not found in this event');
+          throw new ResourceNotFoundException('Event stamp image', 'in this event');
         }
-  
+
         // Remove image from filesystem
         const fullPath = path.join(__dirname, '..', '..', imagePath);
         if (fs.existsSync(fullPath)) {
           fs.unlinkSync(fullPath);
         }
-  
-        // Remove image from database using new method
+
         const updatedEventStampImages = event.eventStampImages.filter(img => img !== imagePath);
         await this.eventService.updateEventStampImages(id, updatedEventStampImages);
-  
-        return response.status(200).json({
+
+        const successResponse: SuccessResponse = {
           success: true,
           message: 'Event stamp image removed successfully',
-          data: { eventStampImages: updatedEventStampImages }
-        });
+          data: { eventStampImages: updatedEventStampImages },
+          metadata: {
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        return response.status(HttpStatus.OK).json(successResponse);
       } catch (error) {
+        this.errorHandler.logError(error, 'Event stamp image removal', req.user?.id);
         throw error;
       }
     }
@@ -666,33 +542,72 @@ export class EventController {
     async removeEventFloorPlan(
       @Param('id') id: string,
       @Res() response: Response,
+      @Request() req: any,
     ) {
       try {
         const event = await this.eventService.getEventEntityById(id);
-        if (!event) {
-          throw new NotFoundException('Event not found');
-        }
-    
+
         if (!event.floorPlan) {
-          throw new NotFoundException('Floor plan not found in this event');
+          throw new ResourceNotFoundException('Floor plan', 'in this event');
         }
-    
+
         // Delete floor plan from filesystem
         const fullPath = path.join(__dirname, '..', '..', event.floorPlan);
         if (fs.existsSync(fullPath)) {
           fs.unlinkSync(fullPath);
         }
-    
-        // Remove floor plan from database (set to empty string)
+
         await this.eventService.updateEventFloorPlan(id, null);
-    
-        return response.status(200).json({
+
+        const successResponse: SuccessResponse = {
           success: true,
           message: 'Floor plan removed successfully',
-          data: { floorPlan: "" }
-        });
+          data: { floorPlan: "" },
+          metadata: {
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        return response.status(HttpStatus.OK).json(successResponse);
       } catch (error) {
+        this.errorHandler.logError(error, 'Event floor plan removal', req.user?.id);
         throw error;
       }
     }
+
+  // Helper method to clean up uploaded files
+  private cleanupUploadedFiles(files: any) {
+    if (files.images) {
+      files.images.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'images', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      });
+    }
+    if (files.documents) {
+      files.documents.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'documents', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      });
+    }
+    if (files.floorPlan) {
+      files.floorPlan.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'floorPlan', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      });
+    }
+    if (files.eventStampImages) {
+      files.eventStampImages.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'eventStamps', 'images', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      });
+    }
+  }
 }

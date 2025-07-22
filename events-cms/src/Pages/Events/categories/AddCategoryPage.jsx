@@ -3,25 +3,23 @@ import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createCategory, updateCategory, categoryById } from '../../../store/actions/categoryActions';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 const AddCategoryPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { id } = useParams(); // Edit mode के लिए
-    
+
     const [formData, setFormData] = useState({
         name: '',
         description: ''
     });
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
     // Load edit data if id exists
     useEffect(() => {
         if (id) {
             const loadCategoryData = async () => {
-                try {
                     const response = await dispatch(categoryById(id));
                     if (response?.data) {
                         const editData = response.data;
@@ -30,9 +28,6 @@ const AddCategoryPage = () => {
                             description: editData.description || ''
                         });
                     }
-                } catch (error) {
-                    console.error('Error loading category data:', error);
-                }
             };
             loadCategoryData();
         }
@@ -40,7 +35,7 @@ const AddCategoryPage = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             [name]: value
         }));
@@ -49,40 +44,33 @@ const AddCategoryPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
-        setSuccess('');
 
         try {
             if (id) {
                 const response = await dispatch(updateCategory(id, formData));
                 if (response) {
-                    setSuccess('Category updated successfully!');
-                    setTimeout(() => {
-                        navigate('/categories');
-                    }, 2000);
+                    navigate(EVENT_PATHS.CATEGORIES);
                 }
             } else {
                 const response = await dispatch(createCategory(formData));
                 if (response) {
-                    setSuccess('Category created successfully!');
                     setFormData({
                         name: '',
                         description: ''
                     });
-                    setTimeout(() => {
-                        navigate('/categories');
-                    }, 2000);
+
+                    navigate(EVENT_PATHS.CATEGORIES);
                 }
             }
         } catch (error) {
-            setError('An error occurred while saving category');
+            //error handling
         } finally {
             setLoading(false);
         }
     };
 
     const handleCancel = () => {
-        navigate('/categories');
+        navigate(EVENT_PATHS.CATEGORIES);
     };
 
     return (
@@ -93,25 +81,19 @@ const AddCategoryPage = () => {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Category' : 'Add Category'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={handleCancel}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
-                                    Back to Categories
+                                <Button variant="secondary" onClick={handleCancel}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                    Back
                                 </Button>
                             </div>
                         </div>
                         <div className="card-body">
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            {success && <Alert variant="success">{success}</Alert>}
-
                             <form onSubmit={handleSubmit}>
                                 <Row>
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="name">
-                                                Category Name *
+                                        <label className="floating-label" htmlFor="name">
+                                                Name <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -141,23 +123,22 @@ const AddCategoryPage = () => {
                                         </div>
                                     </Col>
                                 </Row>
-                                
+
                                 {/* Form Actions */}
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button 
-                                                variant="secondary" 
-                                                onClick={handleCancel}
-                                            >
+                                            <Button variant="danger" onClick={handleCancel}>
                                                 Cancel
                                             </Button>
-                                            <Button 
-                                                variant="primary" 
-                                                type="submit" 
-                                                disabled={loading || !formData.name.trim()}
-                                            >
-                                                {loading ? (id ? 'Updating...' : 'Creating...') : (id ? 'Update Category' : 'Create Category')}
+                                            <Button variant="primary" type="submit" disabled={loading || !formData.name.trim()}>
+                                                {loading
+                                                    ? id
+                                                        ? 'Updating...'
+                                                        : 'Creating...'
+                                                    : id
+                                                    ? 'Update'
+                                                    : 'Create'}
                                             </Button>
                                         </div>
                                     </div>
@@ -171,4 +152,4 @@ const AddCategoryPage = () => {
     );
 };
 
-export default AddCategoryPage; 
+export default AddCategoryPage;

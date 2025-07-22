@@ -11,7 +11,7 @@ import {
   Body,
   UseInterceptors,
   UploadedFile,
-  NotFoundException,
+  Request,
 } from '@nestjs/common';
 
 import { Response } from 'express';
@@ -25,48 +25,106 @@ import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import path from 'path';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 
 @Controller('api/users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly errorHandler: ErrorHandlerService,
+  ) {}
 
   @Get('')
   @Roles(UserRole.Admin)
-  async getAllUsers(@Res() response: Response) {
-    const users = await this.userService.getAll(UserRole.User);
-    return response.status(HttpStatus.OK).json({
-      message: 'User details retrieved successfully',
-      length: users.length,
-      data: users,
-    });
+  async getAllUsers(@Res() response: Response, @Request() req: any) {
+    try {
+      const users = await this.userService.getAll(UserRole.User);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User details retrieved successfully',
+        data: users,
+        metadata: {
+          total: users.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Users retrieval', req.user?.id);
+      throw error;
+    }
   }
 
   @Get('get/:id')
-  async getUserById(@Param('id') id: string, @Res() response: Response) {
-    const user = await this.userService.getById(id);
-    return response.status(HttpStatus.OK).json({
-      message: 'User details retrieved successfully',
-      data: user,
-    });
+  async getUserById(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const user = await this.userService.getById(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User details retrieved successfully',
+        data: user,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'User retrieval by ID', req.user?.id);
+      throw error;
+    }
   }
 
   @Delete('delete/:id')
-  async deleteUser(@Param('id') id: string, @Res() response: Response) {
-    const result = await this.userService.delete(id);
-    return response.status(HttpStatus.OK).json(result);
+  async deleteUser(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const result = await this.userService.delete(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'User deletion', req.user?.id);
+      throw error;
+    }
   }
 
   @Put('update/:id')
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images', // Directory to save the uploaded files
+        destination: './uploads/images',
         filename: (req, file, cb) => {
-          const uniqueSuffix = uuidv4() + path.extname(file.originalname); // Generate a unique filename
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
         },
       }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
     }),
   )
   async updateUser(
@@ -74,76 +132,53 @@ export class UserController {
     @Body() updateData: Partial<UserEntity>,
     @UploadedFile() file: Express.Multer.File,
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    const existingUser = await this.userService.getById(id).catch(() => null);
+    let existingUser = null;
+    
+    try {
+      // Get existing user first
+      existingUser = await this.userService.getById(id);
 
-    // ❌ If speaker not found, delete newly uploaded file
-    if (!existingUser) {
       if (file) {
-        const uploadedPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'uploads',
-          'images',
-          file.filename,
-        );
+        // Delete old file if it exists
+        if (existingUser.profilePicture) {
+          const oldPath = path.join(__dirname, '..', '..', existingUser.profilePicture);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+
+        updateData.profilePicture = `uploads/images/${file.filename}`;
+      }
+
+      const result = await this.userService.update(id, updateData);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User updated successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error:any) {
+      // If user not found or update failed, delete newly uploaded file
+      if (file) {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'images', file.filename);
         if (fs.existsSync(uploadedPath)) {
           fs.unlinkSync(uploadedPath);
         }
       }
-      throw new NotFoundException('User not found');
-    }
-    if (file) {
-      // Delete old file if it exists
-      if (existingUser.profilePicture) {
-        const oldPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          existingUser.profilePicture,
-        );
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'User Profile Picture Upload');
       }
-
-      updateData.profilePicture = `uploads/images/${file.filename}`;
-    }
-
-    try {
-      const result = await this.userService.update(id, updateData);
-
-      // ✅ Delete old image only after successful validation & update
-      if (file && existingUser.profilePicture) {
-        const oldPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          existingUser.profilePicture,
-        );
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'User updated successfully',
-        data: result,
-      });
-    } catch (error) {
-      // ❌ If any error occurs, delete the newly uploaded file
-      if (file) {
-        const uploadedPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'uploads',
-          'images',
-          file.filename,
-        );
-        if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
-      }
-      throw error; // Re-throw the error for global handler or client
+      
+      this.errorHandler.logError(error, 'User update', req.user?.id);
+      throw error;
     }
   }
 }

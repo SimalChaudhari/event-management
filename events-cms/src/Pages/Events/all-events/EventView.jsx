@@ -12,8 +12,6 @@ import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
-import AddEventModal from './components/AddEventModal';
-import ViewEventModal from './components/ViewEventModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 
@@ -260,6 +258,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
 const EventView = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
+    console.log(events);
     const [showModal, setShowModal] = React.useState(false);
 
     const [currentTable, setCurrentTable] = useState(null);
@@ -356,9 +355,7 @@ const EventView = () => {
 
     return (
         <>
-            <AddEventModal show={showModal} handleClose={handleCloseModal} editData={editData} />
-            <ViewEventModal show={showViewModal} handleClose={() => setShowViewModal(false)} eventData={viewData} />
-
+          
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <Row>
                 <Col sm={12} className="btn-page">

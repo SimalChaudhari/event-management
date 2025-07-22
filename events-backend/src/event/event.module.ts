@@ -14,6 +14,7 @@ import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
+import { ErrorHandlerService } from 'utils/services/error-handler.service';
 
 @Module({
     imports: [TypeOrmModule.forFeature([Event,
@@ -25,7 +26,7 @@ import { Exhibitor } from 'exhibitor/exhibitor.entity';
     OrderModule, // Import the OrderModule
   
   ],
-    providers: [EventService],
+    providers: [EventService,ErrorHandlerService],
     controllers: [EventController],
 })
 export class EventModule {}

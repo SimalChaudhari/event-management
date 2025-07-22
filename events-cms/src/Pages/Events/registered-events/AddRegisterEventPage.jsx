@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
+import { Button, Row, Col, Container } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createRegisterEvent, eventList, adminUpdateRegisterEvent, registerEventById } from '../../../store/actions/eventActions';
@@ -12,7 +12,6 @@ const AddRegisterEventPage = () => {
     const events = useSelector((state) => state.event?.event?.events || []);
     const users = useSelector((state) => state.user?.user?.data || []);
 
-
     const [formData, setFormData] = useState({
         userId: '',
         eventId: '',
@@ -21,10 +20,7 @@ const AddRegisterEventPage = () => {
         isCreatedByAdmin: true
     });
 
-    console.log(formData);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
     const [currentUser, setCurrentUser] = useState(null);
     const [currentEvent, setCurrentEvent] = useState(null);
 
@@ -43,12 +39,10 @@ const AddRegisterEventPage = () => {
                     if (response?.data) {
                         const editData = response.data;
 
-                        console.log(editData.user);
-                        
                         // Store current user and event data
                         setCurrentUser(editData.user);
                         setCurrentEvent(editData.event);
-                        
+
                         setFormData({
                             userId: editData.user?.id || '',
                             eventId: editData.event?.id || '',
@@ -58,8 +52,8 @@ const AddRegisterEventPage = () => {
                         });
                     }
                 } catch (error) {
-                    console.error('Error loading register event data:', error);
-                    setError('Error loading register event data');
+                    setLoading(false);
+                   
                 } finally {
                     setLoading(false);
                 }
@@ -79,8 +73,7 @@ const AddRegisterEventPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
-        setSuccess('');
+      
 
         try {
             let response;
@@ -99,9 +92,8 @@ const AddRegisterEventPage = () => {
                 // Create mode - create new register event
                 response = await dispatch(createRegisterEvent(formData));
             }
-            
+
             if (response) {
-                setSuccess(id ? 'Register Event updated successfully!' : 'Register Event created successfully!');
                 if (!id) {
                     setFormData({
                         userId: '',
@@ -111,12 +103,11 @@ const AddRegisterEventPage = () => {
                         isCreatedByAdmin: true
                     });
                 }
-                setTimeout(() => {
-                    navigate('/events/registered');
-                }, 2000);
-            } 
+
+                navigate('/events/registered');
+            }
         } catch (err) {
-            setError(id ? 'An error occurred while updating register event' : 'An error occurred while creating register event');
+            setLoading(false);
         } finally {
             setLoading(false);
         }
@@ -133,20 +124,15 @@ const AddRegisterEventPage = () => {
                     <div className="card">
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
-                                <h4 className="card-title">{id ? 'Edit Register Event' : 'Add Register Event'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={handleCancel}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
-                                    Back to Registered Events
+                                <h4 className="card-title">{id ? 'Edit Register' : 'Add Register'}</h4>
+                                <Button variant="secondary" onClick={handleCancel}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                    Back
                                 </Button>
                             </div>
                         </div>
                         <div className="card-body">
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            {success && <Alert variant="success">{success}</Alert>}
-
+                           
                             {loading && id ? (
                                 <div className="text-center">
                                     <div className="spinner-border" role="status">
@@ -205,7 +191,8 @@ const AddRegisterEventPage = () => {
                                                 </select>
                                                 {id && currentEvent && (
                                                     <small className="text-info">
-                                                        Current: {currentEvent.name} ({new Date(currentEvent.startDate).toLocaleDateString()})
+                                                        Current: {currentEvent.name} (
+                                                        {new Date(currentEvent.startDate).toLocaleDateString()})
                                                     </small>
                                                 )}
                                             </div>
@@ -216,11 +203,11 @@ const AddRegisterEventPage = () => {
                                                 <label className="floating-label" htmlFor="type">
                                                     Registration Type
                                                 </label>
-                                                <select 
-                                                    className="form-control" 
-                                                    name="type" 
-                                                    value={formData.type} 
-                                                    onChange={handleInputChange} 
+                                                <select
+                                                    className="form-control"
+                                                    name="type"
+                                                    value={formData.type}
+                                                    onChange={handleInputChange}
                                                     required
                                                 >
                                                     <option value="Attendee">Attendee</option>
@@ -245,23 +232,26 @@ const AddRegisterEventPage = () => {
                                             </div>
                                         </Col>
                                     </Row>
-                                    
+
                                     {/* Form Actions */}
                                     <div className="row mt-4">
                                         <div className="col-12">
                                             <div className="d-flex justify-content-between gap-2">
-                                                <Button 
-                                                    variant="secondary" 
-                                                    onClick={handleCancel}
-                                                >
+                                                <Button variant="danger" onClick={handleCancel}>
                                                     Cancel
                                                 </Button>
-                                                <Button 
-                                                    variant="primary" 
-                                                    type="submit" 
+                                                <Button
+                                                    variant="primary"
+                                                    type="submit"
                                                     disabled={loading || !formData.userId || !formData.eventId}
                                                 >
-                                                    {loading ? (id ? 'Updating...' : 'Creating...') : (id ? 'Update Register Event' : 'Create Register Event')}
+                                                    {loading
+                                                        ? id
+                                                            ? 'Updating...'
+                                                            : 'Creating...'
+                                                        : id
+                                                        ? 'Update'
+                                                        : 'Create'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -276,4 +266,4 @@ const AddRegisterEventPage = () => {
     );
 };
 
-export default AddRegisterEventPage; 
+export default AddRegisterEventPage;

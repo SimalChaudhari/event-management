@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Event } from 'event/event.entity';
+import { STATUS_OPTIONS } from './category.dto';
 
 @Entity('categories')
 export class Category {
@@ -18,6 +19,10 @@ export class Category {
 
   @Column({ type: 'text', nullable: true })
   description?: string;
+
+  @Column({ type: 'varchar', enum: STATUS_OPTIONS, default: 'active' })
+  status!: string;
+
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -11,8 +11,6 @@ import { SpeakerModule } from 'speaker/speaker.module';
 import { CartModule } from 'cart/cart.module';
 import { RegisterEventModule } from 'registerEvent/registerEvent.module';
 import { CountriesModule } from './countries/countries.module';
-import { join } from 'path';
-
 import { CacheModule } from '@nestjs/cache-manager';
 import { TokenBlacklistMiddleware } from 'middleware/tokenBlacklistMiddleware';
 import { WithdrawalModule } from 'withdrawal/withdrawal.module';
@@ -25,9 +23,13 @@ import { CategoryModule } from 'category/category.module';
 import { GalleryModule } from 'gallery/gallery.module';
 import { ExhibitorModule } from 'exhibitor/exhibitor.module';
 import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.module';
-
 import { SurveyModule } from 'survey/survey.module';
-console.log(join(__dirname, '..', 'uploads'))
+
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { GlobalExceptionFilter } from './utils/global-exception.filter';
+import { ValidationPipe } from './validation/validation.pipe';
+import { ErrorHandlerService } from './utils/services/error-handler.service';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // Load environment variables
@@ -59,7 +61,18 @@ console.log(join(__dirname, '..', 'uploads'))
     DashboardModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    ErrorHandlerService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    {
+      provide: APP_PIPE,
+      useClass: ValidationPipe,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -103,8 +103,12 @@ export const registerEventById = (id) => async (dispatch) => {
         const response = await axiosInstance.get(`/register-events/${id}`);
         return response.data;
     } catch (error) {
-        throw error;
+        // Handle errors appropriately
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
+    return false; // Return false for any errors or unsuccessful attempts
+
 };
 
 // All Filter Delete Events
@@ -112,11 +116,14 @@ export const registerEventById = (id) => async (dispatch) => {
 export const eventDelete = (id) => async (dispatch) => {
     try {
         await axiosInstance.delete(`/events/delete/${id}`);
+        toast.success('Event deleted successfully!');
         return true;
     } catch (error) {
-        console.error('Error deleting event:', error);
-        throw error;
+        // Handle errors appropriately
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
+    return false; // Return false for any errors or unsuccessful attempts
 };
 
 export const registrationDelete = (id) => async (dispatch) => {
@@ -124,10 +131,13 @@ export const registrationDelete = (id) => async (dispatch) => {
         await axiosInstance.delete(`/register-events/delete/${id}`);
         return true;
     } catch (error) {
-        console.error('Error deleting registration:', error);
-        throw error;
+        // Handle errors appropriately
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
+    return false; // Return false for any errors or unsuccessful attempts
 };
+
 
 export const createRegisterEvent = (data) => async (dispatch) => {
     try {
@@ -139,8 +149,10 @@ export const createRegisterEvent = (data) => async (dispatch) => {
         }
         return true;
     } catch (error) {
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
+    return false;
 };
 
 export const removeEventImage = (eventId, imagePath) => async (dispatch) => {
@@ -188,9 +200,10 @@ export const galleryList = () => async (dispatch) => {
         });
         return true;
     } catch (error) {
-        console.error('Error fetching gallery:', error);
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
+    return false;
 };
 
 export const exhibitorGet = () => async (dispatch) => {
@@ -198,8 +211,8 @@ export const exhibitorGet = () => async (dispatch) => {
         const response = await axiosInstance.get('/exhibitors');
         return response.data;
     } catch (error) {
-        console.error('Error fetching exhibitor:', error);
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
 };
 
@@ -208,7 +221,8 @@ export const createEventStamp = (data) => async (dispatch) => {
         const response = await axiosInstance.post('/events/event-stamps/create-or-update', data);
         return response.data;
     } catch (error) {
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
 };
 
@@ -217,8 +231,8 @@ export const eventGetStamp = () => async (dispatch) => {
         const response = await axiosInstance.get('/events/event-stamps');
         return response.data;
     } catch (error) {
-        console.error('Error fetching event stamp:', error);
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
 };
 
@@ -234,8 +248,8 @@ export const removeEventStampImage = (eventId, imagePath) => async (dispatch) =>
             return response.data.data.eventStampImages;
         }
     } catch (error) {
-        console.error('Error removing event stamp image:', error);
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
 };
 export const removeEventFloorPlan = (eventId) => async (dispatch) => {
@@ -243,8 +257,8 @@ export const removeEventFloorPlan = (eventId) => async (dispatch) => {
         const response = await axiosInstance.delete(`/events/floor-plan/${eventId}`);
         return response.data;
     } catch (error) {
-        console.error('Error removing event floor plan:', error);
-        throw error;
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
     }
 };
 
@@ -260,9 +274,9 @@ export const adminUpdateRegisterEvent = (id, data) => async (dispatch) => {
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
-        toast.error(errorMessage || 'Error updating registration');
-        throw error;
+        toast.error(errorMessage);
     }
+    return false;
 };
 
 export const adminDeleteRegisterEvent = (id) => async (dispatch) => {
@@ -275,8 +289,8 @@ export const adminDeleteRegisterEvent = (id) => async (dispatch) => {
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
-        toast.error(errorMessage || 'Error deleting registration');
-        throw error;
+        toast.error(errorMessage);
     }
+    return false;
 };
 

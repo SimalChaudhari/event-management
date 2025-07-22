@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { AUTH_PATHS } from './utils/constants';
 
 /**
  * @typedef {Object} RouteConfig
@@ -35,20 +36,20 @@ const maintenanceComponents = {
  */
 const authRoutes = [
   {
-    path: '/auth/signin',
+    path: AUTH_PATHS.SIGNIN,
     exact: true,
     name: 'Signin',
     component: authComponents.Signin
   },
 
   {
-    path: '/auth/reset-password',
+    path: AUTH_PATHS.RESET_PASSWORD,
     exact: true,
     name: 'Reset Password',
     component: authComponents.ResetPassword
   },
   {
-    path: '/auth/change-password',
+    path: AUTH_PATHS.CHANGE_PASSWORD,
     exact: true,
     name: 'Change Password',
     component: authComponents.ChangePassword

@@ -4,6 +4,7 @@ import { Button, Row, Col, Card, Container, Nav, Tab, Modal } from 'react-bootst
 import { useDispatch } from 'react-redux';
 import { speakerById } from '../../store/actions/speakerActions';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
+import { SPEAKER_PATHS } from '../../utils/constants';
 
 const ViewSpeakerPage = () => {
     const { id } = useParams();
@@ -78,10 +79,10 @@ const ViewSpeakerPage = () => {
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
                     <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View Speaker</h4>
-                        <Button variant="secondary" onClick={() => navigate('/speakers')}>
+                        <h4 className="card-title">View</h4>
+                        <Button variant="secondary" onClick={() => navigate(SPEAKER_PATHS.LIST_SPEAKERS)}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                            Back to Speakers
+                            Back
                         </Button>
                     </div>
                 </div>

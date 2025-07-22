@@ -12,9 +12,6 @@ import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import { useLocation } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
-
-import ViewEventModal from '../all-events/components/ViewEventModal';
-import AddEventModal from '../all-events/components/AddEventModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 
@@ -343,9 +340,7 @@ const UpcomingEvents = () => {
     
     return (
         <>
-            <AddEventModal show={showModal} handleClose={handleCloseModal} editData={editData} />
-            <ViewEventModal show={showViewModal} handleClose={() => setShowViewModal(false)} eventData={viewData} />
-
+        
             <DeleteConfirmationModal
                 show={showDeleteModal}
                 onHide={handleClose}

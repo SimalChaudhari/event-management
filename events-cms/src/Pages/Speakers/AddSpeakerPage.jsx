@@ -157,7 +157,7 @@ const AddSpeakerPage = () => {
                                     onClick={handleCancel}
                                 >
                                     <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
-                                    Back to Speakers
+                                    Back
                                 </Button>
                             </div>
                         </div>
@@ -325,7 +325,7 @@ const AddSpeakerPage = () => {
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
                                             <Button 
-                                                variant="secondary" 
+                                                variant="danger" 
                                                 onClick={handleCancel}
                                             >
                                                 Cancel
@@ -341,7 +341,7 @@ const AddSpeakerPage = () => {
                                                     !formData.position.trim()
                                                 }
                                             >
-                                                {loading ? (id ? 'Updating...' : 'Creating...') : id ? 'Update Speaker' : 'Create Speaker'}
+                                                {loading ? (id ? 'Updating...' : 'Creating...') : id ? 'Update' : 'Create'}
                                             </Button>
                                         </div>
                                     </div>

@@ -5,6 +5,7 @@ import { Category } from './category.entity';
 import { CategoryService } from './category.service';
 import { CategoryController } from './category.controller';
 import { JwtModule } from '@nestjs/jwt';
+import { ErrorHandlerService } from 'utils/services/error-handler.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { JwtModule } from '@nestjs/jwt';
       signOptions: {}, // Set your token expiration
     }),
   ],
-  providers: [CategoryService],
+  providers: [CategoryService, ErrorHandlerService],
   controllers: [CategoryController],
   exports: [CategoryService],
 })

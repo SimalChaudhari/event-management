@@ -11,8 +11,7 @@ import { categoryList, deleteCategory } from '../../../store/actions/categoryAct
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
-import AddCategoryModal from './components/AddCategoryModal';
-import ViewCategoryModal from './components/ViewCategoryModal';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -154,9 +153,7 @@ const Categories = () => {
     const dispatch = useDispatch();
     const categories = useSelector((state) => state.category?.categories);
     const [showModal, setShowModal] = React.useState(false);
-
     const [currentTable, setCurrentTable] = useState(null);
-    const location = useLocation();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -167,7 +164,7 @@ const Categories = () => {
     const navigate = useNavigate();
 
     const handleView = (data) => {
-        navigate(`/events/view-category/${data.id}`);
+        navigate(EVENT_PATHS.VIEW_CATEGORY + `/${data.id}`);
     };
 
     const destroyTable = () => {
@@ -197,11 +194,11 @@ const Categories = () => {
     }, [categories]);
 
     const handleAddCategory = () => {
-        navigate(`/events/add-category`);
+        navigate(EVENT_PATHS.ADD_CATEGORY);
     };
 
     const handleEdit = (data) => {
-        navigate(`/events/edit-category/${data.id}`);
+        navigate(EVENT_PATHS.EDIT_CATEGORY + `/${data.id}`);
     };
 
     const handleDelete = (categoryId) => {
@@ -239,9 +236,7 @@ const Categories = () => {
 
     return (
         <>
-            <AddCategoryModal show={showModal} handleClose={handleCloseModal} editData={editData} />
-            <ViewCategoryModal show={showViewModal} handleClose={() => setShowViewModal(false)} categoryData={viewData} />
-
+          
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <Row>
                 <Col sm={12} className="btn-page">

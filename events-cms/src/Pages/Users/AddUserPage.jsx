@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createUser, editUser, userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
+import { USER_PATHS } from '../../utils/constants';
 
 const AddUserPage = () => {
     const dispatch = useDispatch();
@@ -25,8 +26,6 @@ const AddUserPage = () => {
         profilePicture: null
     });
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
 
     // Load edit data if id exists
@@ -98,8 +97,7 @@ const AddUserPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
-        setSuccess('');
+       
 
         try {
             const formDataToSend = new FormData();
@@ -117,7 +115,6 @@ const AddUserPage = () => {
             }
 
             if (response) {
-                setSuccess(id ? 'User updated successfully!' : 'User created successfully!');
                 if (!id) {
                     setFormData({
                         firstName: '',
@@ -135,19 +132,20 @@ const AddUserPage = () => {
                     });
                     setImagePreview(null);
                 }
-                setTimeout(() => {
-                    navigate('/users');
-                }, 2000);
+               
+                    navigate(`${USER_PATHS.LIST_USERS}`);
+              
             }
         } catch (error) {
-            setError('An error occurred while saving user');
+            setLoading(false);
+
         } finally {
             setLoading(false);
         }
     };
 
     const handleCancel = () => {
-        navigate('/users');
+        navigate(`${USER_PATHS.LIST_USERS}`);
     };
 
     return (
@@ -163,20 +161,19 @@ const AddUserPage = () => {
                                     onClick={handleCancel}
                                 >
                                     <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
-                                    Back to Users
+                                    Back
                                 </Button>
                             </div>
                         </div>
                         <div className="card-body">
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            {success && <Alert variant="success">{success}</Alert>}
+                          
 
                             <form onSubmit={handleSubmit}>
                                 <Row>
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="firstName">
-                                                First Name *
+                                                First Name<span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -192,7 +189,7 @@ const AddUserPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="lastName">
-                                                Last Name *
+                                                Last Name<span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -208,7 +205,7 @@ const AddUserPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="email">
-                                                Email *
+                                                Email<span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="email"
@@ -225,7 +222,7 @@ const AddUserPage = () => {
                                         <Col sm={6}>
                                             <div className="form-group fill">
                                                 <label className="floating-label" htmlFor="password">
-                                                    Password *
+                                                    Password<span className="text-danger">*</span>
                                                 </label>
                                                 <input
                                                     type="password"
@@ -392,7 +389,7 @@ const AddUserPage = () => {
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
                                             <Button 
-                                                variant="secondary" 
+                                                variant="danger" 
                                                 onClick={handleCancel}
                                             >
                                                 Cancel

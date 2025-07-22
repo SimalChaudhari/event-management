@@ -9,6 +9,7 @@ import { Order } from 'order/order.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { UserEntity } from 'user/users.entity';
+import { ErrorHandlerService } from 'utils/services/error-handler.service';
 
 @Module({
     imports: [
@@ -18,7 +19,7 @@ import { UserEntity } from 'user/users.entity';
             signOptions: {},  // Set token expiration
         }),
     ],
-    providers: [RegisterEventService],
+    providers: [RegisterEventService,ErrorHandlerService],
     controllers: [RegisterEventController],
     exports: [RegisterEventService], // Export the service to be used in other modules
 })

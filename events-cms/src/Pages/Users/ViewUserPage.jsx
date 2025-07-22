@@ -72,7 +72,7 @@ const ViewUserPage = () => {
                         <h4 className="card-title">View User</h4>
                         <Button variant="secondary" onClick={() => navigate('/users')}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                            Back to Users
+                            Back
                         </Button>
                     </div>
                 </div>

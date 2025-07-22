@@ -12,6 +12,7 @@ export const categoryList = () => async (dispatch) => {
         });
         return true;
     } catch (error) {
+        console.log(error);
         const errorMessage = error?.response?.data?.message || 'Failed to fetch categories';
         toast.error(errorMessage);
     }
