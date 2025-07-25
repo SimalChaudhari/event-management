@@ -123,6 +123,19 @@ export class FavoriteEventService {
           ? await this.getEventAttendanceCount(favorite.eventId)
           : 0;
 
+          let formattedDocuments: { name: string; document: string }[] = [];
+          if (favorite.event.documents && favorite.event.documentNames) {
+            formattedDocuments = favorite.event.documents.map((doc, index) => ({
+              name: favorite.event.documentNames?.[index] || `Document ${index + 1}`,
+              document: doc
+            }));
+          } else if (favorite.event.documents) {
+            // Fallback if no names are provided
+            formattedDocuments = favorite.event.documents.map((doc, index) => ({
+              name: `Document ${index + 1}`,
+              document: doc
+            }));
+          }
         // Since these are favorite events, isFavorite will always be true
         const isFavorite = true;
 
@@ -139,7 +152,8 @@ export class FavoriteEventService {
           isRegistered = !!registration;
         }
 
-        const { eventSpeakers, category, ...eventData } = favorite.event;
+        const { eventSpeakers,  documents, 
+          documentNames, category, ...eventData } = favorite.event;
 
         // Extract categories
         const categories = category?.map((ec) => ec.category) || [];
@@ -150,6 +164,8 @@ export class FavoriteEventService {
           event: {
             ...eventData,
             color: getEventColor(favorite.event.type),
+            documents: formattedDocuments,
+
             speakers: eventSpeakers?.map((es) => es.speaker) || [],
             categories: categories,
             attendanceCount: attendanceCount,

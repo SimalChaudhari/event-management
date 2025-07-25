@@ -115,10 +115,25 @@ export class EventController {
         );
       }
 
+    
       if (files.documents && files.documents.length > 0) {
         eventDto.documents = files.documents.map(
           (doc) => `uploads/event/documents/${doc.filename}`,
         );
+        
+        // Handle document names - get from body or use original filenames
+        if (eventDto.documentNames) {
+          // If names are provided in body, use them
+          const names = Array.isArray(eventDto.documentNames) 
+            ? eventDto.documentNames 
+            : [eventDto.documentNames];
+          eventDto.documentNames = names;
+        } else {
+          // Use original filenames as fallback
+          eventDto.documentNames = files.documents.map(
+            (doc) => doc.originalname
+          );
+        }
       }
 
      // Handle floor plan
@@ -269,7 +284,7 @@ export class EventController {
       images?: Express.Multer.File[], 
       documents?: Express.Multer.File[], 
       floorPlan?: Express.Multer.File[],
-      eventStampImages?: Express.Multer.File[] // Add this
+      eventStampImages?: Express.Multer.File[]
     },
     @Res() response: Response,
     @Request() req: any,
@@ -306,6 +321,7 @@ export class EventController {
 
       // Handle documents - combine existing and new documents
       const allDocuments = [];
+      const allDocumentNames = [];
       
       // Add existing documents from originalDocuments field
       if (eventDto.originalDocuments) {
@@ -313,6 +329,14 @@ export class EventController {
           ? eventDto.originalDocuments 
           : [eventDto.originalDocuments];
         allDocuments.push(...originalDocuments);
+        
+        // Add existing document names
+        if (eventDto.originalDocumentNames) {
+          const originalDocumentNames = Array.isArray(eventDto.originalDocumentNames) 
+            ? eventDto.originalDocumentNames 
+            : [eventDto.originalDocumentNames];
+          allDocumentNames.push(...originalDocumentNames);
+        }
       }
       
       // Add new uploaded documents
@@ -321,11 +345,27 @@ export class EventController {
           (doc) => `uploads/event/documents/${doc.filename}`,
         );
         allDocuments.push(...newDocuments);
+        
+        // Handle document names for new uploads - get from body or use original filenames
+        if (eventDto.documentNames) {
+          // If names are provided in body for new uploads, use them
+          const newNames = Array.isArray(eventDto.documentNames) 
+            ? eventDto.documentNames 
+            : [eventDto.documentNames];
+          allDocumentNames.push(...newNames);
+        } else {
+          // Use original filenames as fallback for new uploads
+          const newDocumentNames = files.documents.map(
+            (doc) => doc.originalname
+          );
+          allDocumentNames.push(...newDocumentNames);
+        }
       }
       
-      // Set the combined documents
+      // Set the combined documents and document names
       if (allDocuments.length > 0) {
         eventDto.documents = allDocuments;
+        eventDto.documentNames = allDocumentNames;
       }
 
       // Handle floor plan - single image only
@@ -336,7 +376,6 @@ export class EventController {
         // Keep existing floor plan if no new one uploaded
         eventDto.floorPlan = eventDto.originalFloorPlan;
       }
-      // If neither new upload nor original, floorPlan will be null/undefined
 
       // Handle event stamp images - combine existing and new images
       const allEventStampImages = [];

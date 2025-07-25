@@ -355,12 +355,29 @@ export class EventService {
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
+
+          let formattedDocuments: { name: string; document: string }[] = [];
+          if (event.documents && event.documentNames) {
+            formattedDocuments = event.documents.map((doc, index) => ({
+              name: event.documentNames?.[index] || `Document ${index + 1}`,
+              document: doc
+            }));
+          } else if (event.documents) {
+            // Fallback if no names are provided
+            formattedDocuments = event.documents.map((doc, index) => ({
+              name: `Document ${index + 1}`,
+              document: doc
+            }));
+          }
+
           const {
             eventSpeakers,
             category,
             eventExhibitors,
             eventStampDescription,
             eventStampImages,
+            documents, // Remove original documents
+            documentNames, // Remove original documentNames
             ...eventData
           } = event;
 
@@ -399,6 +416,7 @@ export class EventService {
             color: getEventColor(event.type),
             speakersData: eventSpeakers.map((es) => es.speaker),
             categoriesData: category?.map((ec) => ec.category) || [],
+            documents: formattedDocuments,
             eventStamps: {
               description: event.eventStampDescription,
               images: event.eventStampImages,
@@ -486,23 +504,40 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
-         // Check if user has registered for this event
-    let isRegistered = false;
-    if (userId) {
-      const registration = await this.registerEventRepository.findOne({
-        where: { 
-          userId: userId, 
-          eventId: id,
-          isRegister: true // Only count active registrations
-        },
-      });
-      isRegistered = !!registration;
-    }
+      // Check if user has registered for this event
+      let isRegistered = false;
+      if (userId) {
+        const registration = await this.registerEventRepository.findOne({
+          where: { 
+            userId: userId, 
+            eventId: id,
+            isRegister: true // Only count active registrations
+          },
+        });
+        isRegistered = !!registration;
+      }
+
+      // Format documents with names
+      let formattedDocuments: { name: string; document: string }[] = [];
+      if (event.documents && event.documentNames) {
+        formattedDocuments = event.documents.map((doc, index) => ({
+          name: event.documentNames?.[index] || `Document ${index + 1}`,
+          document: doc
+        }));
+      } else if (event.documents) {
+        // Fallback if no names are provided
+        formattedDocuments = event.documents.map((doc, index) => ({
+          name: `Document ${index + 1}`,
+          document: doc
+        }));
+      }
 
       const {
         exhibitorDescription,
         eventStampDescription,
         eventStampImages,
+        documents, // Remove original documents
+        documentNames, // Remove original documentNames
         ...eventFiltered
       } = eventData;
 
@@ -511,6 +546,7 @@ export class EventService {
         color: getEventColor(event.type),
         speakers: eventSpeakers.map((es) => es.speaker),
         categories: category?.map((ec) => ec.category) || [],
+        documents: formattedDocuments, // New formatted documents
         eventStamps: {
           description: event.eventStampDescription,
           images: event.eventStampImages,

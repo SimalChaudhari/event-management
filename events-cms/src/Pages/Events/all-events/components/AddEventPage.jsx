@@ -4,7 +4,14 @@ import Select from 'react-select';
 import { useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
-import { createEvent, editEvent, eventById, exhibitorGet, removeEventFloorPlan, removeEventStampImage } from '../../../../store/actions/eventActions';
+import {
+    createEvent,
+    editEvent,
+    eventById,
+    exhibitorGet,
+    removeEventFloorPlan,
+    removeEventStampImage
+} from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
@@ -17,9 +24,90 @@ import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../../utils/constants';
 
+// DocumentNameInput component को main component के बाहर define करें
+const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
+    const [localError, setLocalError] = useState('');
+
+    // Validation function
+    const validateDocumentName = (name, allNames, currentIndex) => {
+        if (!name || name.trim() === '') {
+            return { isValid: true, error: '' };
+        }
+
+        if (name.trim().length < 2) {
+            return {
+                isValid: false,
+                error: 'Document name should be at least 2 characters'
+            };
+        }
+
+        const duplicateIndex = allNames.findIndex(
+            (docName, idx) => idx !== currentIndex && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
+        );
+
+        if (duplicateIndex !== -1) {
+            return {
+                isValid: false,
+                error: 'Document name already exists'
+            };
+        }
+
+        return { isValid: true, error: '' };
+    };
+
+    const handleNameChange = (e) => {
+        const newName = e.target.value;
+
+        // Update parent component
+        onNameChange(index, newName);
+
+        // Validate only if there's content
+        if (newName.trim()) {
+            // We'll handle validation in parent to avoid state issues
+            setLocalError('');
+        } else {
+            setLocalError('');
+        }
+    };
+
+    return (
+        <div style={{ width: '100%' }}>
+            <input
+                type="text"
+                value={documentName || ''}
+                onChange={handleNameChange}
+                placeholder="Enter document name (optional)"
+                style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    border: `1px solid ${localError ? '#dc3545' : '#ddd'}`,
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    marginBottom: localError ? '2px' : '4px',
+                    backgroundColor: localError ? '#fff5f5' : '#fff'
+                }}
+            />
+            {localError && (
+                <div
+                    style={{
+                        fontSize: '11px',
+                        color: '#dc3545',
+                        marginBottom: '4px',
+                        fontStyle: 'italic'
+                    }}
+                >
+                    {localError}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Main component
 function AddEventPage() {
     const dispatch = useDispatch();
-    const { id } = useParams(); // Edit mode 
+    const { id } = useParams(); // Edit mode
     const { fetchEvent } = FetchEventData();
     const [tempLatLng, setTempLatLng] = useState(null);
     const [display, setDisplay] = useState(null);
@@ -39,6 +127,7 @@ function AddEventPage() {
         country: '',
         images: [],
         documents: [],
+        documentNames: [], // Add this new field
         type: 'Physical',
         price: '',
         currency: '',
@@ -46,10 +135,8 @@ function AddEventPage() {
         categoryIds: [],
         latitude: '',
         longitude: '',
-        // new
         floorPlan: null,
         exhibitorIds: [],
-        // Remove eventStampIds and add new fields
         eventStampDescription: '',
         eventStampImages: []
     });
@@ -80,12 +167,15 @@ function AddEventPage() {
     });
 
     const [exhibitorList, setExhibitorList] = useState([]);
-  
+
     // Add new states for event stamp
     const [eventStampImagePreviewUrls, setEventStampImagePreviewUrls] = useState([]);
 
     // Add floor plan preview state
     const [floorPlanPreview, setFloorPlanPreview] = useState(null);
+
+    // Add new state for document names input
+    const [documentNames, setDocumentNames] = useState([]);
 
     // Fetch current location
     const getCurrentLocation = () => {
@@ -118,7 +208,7 @@ function AddEventPage() {
             const loadEventData = async () => {
                 try {
                     const response = await dispatch(eventById(id));
-             
+
                     if (response?.data) {
                         const editData = response.data;
 
@@ -138,13 +228,12 @@ function AddEventPage() {
                             categoryIds = editData.categoriesData.map((category) => category.id);
                         }
 
-                        
                         // Handle exhibitors
                         let exhibitorIds = [];
                         if (editData.exhibitors) {
-                            console.log(editData,"editData.exhibitors")
+                            console.log(editData, 'editData.exhibitors');
                             exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
-                        } 
+                        }
 
                         // Handle images
                         let imagesData = [];
@@ -167,24 +256,35 @@ function AddEventPage() {
                             }
                         }
 
-                        // Handle documents
+                        // Handle documents - updated to handle new structure
                         let documentsData = [];
+                        let documentNamesData = [];
                         let documentPreviewUrls = [];
+
                         if (editData.documents) {
-                            if (typeof editData.documents === 'string') {
-                                documentsData = [editData.documents];
-                                documentPreviewUrls = [`${API_URL}/${editData.documents.replace(/\\/g, '/')}`];
-                            } else if (Array.isArray(editData.documents)) {
-                                documentsData = editData.documents;
-                                documentPreviewUrls = editData.documents.map((doc) => {
-                                    if (typeof doc === 'string') {
+                            if (Array.isArray(editData.documents)) {
+                                // Check if documents are in new format with name and document properties
+                                if (editData.documents.length > 0 && editData.documents[0].hasOwnProperty('name')) {
+                                    // New format: array of objects with name and document
+                                    documentsData = editData.documents.map((doc) => doc.document);
+                                    documentNamesData = editData.documents.map((doc) => doc.name);
+                                    documentPreviewUrls = editData.documents.map((doc) => {
+                                        if (doc.document.startsWith('http')) {
+                                            return doc.document;
+                                        }
+                                        return `${API_URL}/${doc.document.replace(/\\/g, '/')}`;
+                                    });
+                                } else {
+                                    // Old format: array of document paths only
+                                    documentsData = editData.documents;
+                                    documentNamesData = editData.documents.map((doc, index) => `Document ${index + 1}`);
+                                    documentPreviewUrls = editData.documents.map((doc) => {
                                         if (doc.startsWith('http')) {
                                             return doc;
                                         }
                                         return `${API_URL}/${doc.replace(/\\/g, '/')}`;
-                                    }
-                                    return doc;
-                                });
+                                    });
+                                }
                             }
                         }
 
@@ -202,11 +302,11 @@ function AddEventPage() {
                         let eventStampDescription = '';
                         let eventStampImagesData = [];
                         let eventStampImagePreviewUrls = [];
-                        
+
                         if (editData.eventStamps) {
                             // Handle event stamp description
                             eventStampDescription = editData.eventStamps.description || '';
-                            
+
                             // Handle event stamp images
                             if (editData.eventStamps.images && Array.isArray(editData.eventStamps.images)) {
                                 eventStampImagesData = editData.eventStamps.images;
@@ -236,6 +336,7 @@ function AddEventPage() {
                             country: editData.country || '',
                             images: imagesData,
                             documents: documentsData,
+                            documentNames: documentNamesData,
                             type: editData.type || 'Physical',
                             price: editData.price || '',
                             currency: editData.currency || '',
@@ -247,14 +348,12 @@ function AddEventPage() {
                             eventStampImages: eventStampImagesData
                         };
 
-                    
-
                         setFormData(formDataToSet);
                         setImagePreviewUrls(previewUrls);
                         setDocumentPreviewUrls(documentPreviewUrls);
+                        setDocumentNames(documentNamesData);
                         setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
-                    
-                   
+
                         setFloorPlanPreview(floorPlanPreviewUrl);
                     }
                 } catch (error) {
@@ -296,9 +395,6 @@ function AddEventPage() {
         }
     };
 
-
-  
-
     // Document removal function
     const handleRemoveDocument = async (indexToRemove) => {
         const documentToRemove = formData.documents[indexToRemove];
@@ -316,6 +412,14 @@ function AddEventPage() {
                         doc.startsWith('http') ? doc : `${API_URL}/${doc.replace(/\\/g, '/')}`
                     );
                     setDocumentPreviewUrls(newPreviewUrls);
+
+                    // Remove corresponding document name
+                    const updatedNames = documentNames.filter((_, index) => index !== indexToRemove);
+                    setDocumentNames(updatedNames);
+                    setFormData((prev) => ({
+                        ...prev,
+                        documentNames: updatedNames
+                    }));
                 }
             } catch (error) {
                 console.error('Error removing document:', error);
@@ -327,6 +431,14 @@ function AddEventPage() {
             }));
 
             setDocumentPreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+
+            // Remove corresponding document name
+            const updatedNames = documentNames.filter((_, index) => index !== indexToRemove);
+            setDocumentNames(updatedNames);
+            setFormData((prev) => ({
+                ...prev,
+                documentNames: updatedNames
+            }));
         }
     };
 
@@ -338,7 +450,6 @@ function AddEventPage() {
             const newFiles = Array.from(files);
 
             if (name === 'images') {
-                
                 const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
@@ -348,8 +459,6 @@ function AddEventPage() {
 
                 setImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
             } else if (name === 'documents') {
-                
-
                 const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
@@ -358,6 +467,15 @@ function AddEventPage() {
                 }));
 
                 setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+
+                // Add default names for new documents
+                const newDocumentNames = newFiles.map((file) => file.name.replace(/\.[^/.]+$/, '')); // Remove extension
+                setDocumentNames((prev) => [...prev, ...newDocumentNames]);
+
+                setFormData((prev) => ({
+                    ...prev,
+                    documentNames: [...prev.documentNames, ...newDocumentNames]
+                }));
             }
         } else {
             setFormData((prev) => ({
@@ -392,14 +510,33 @@ function AddEventPage() {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
 
-        const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
+        // Only allow PDF files for documents
+        const validFiles = files.filter((file) => file.type === 'application/pdf');
 
-        setFormData((prev) => ({
-            ...prev,
-            documents: [...prev.documents, ...files]
-        }));
+        if (validFiles.length !== files.length) {
+            alert('केवल PDF files allowed हैं documents के लिए');
+        }
 
-        setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+        if (validFiles.length > 0) {
+            const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+            setFormData((prev) => ({
+                ...prev,
+                documents: [...prev.documents, ...validFiles]
+            }));
+
+            setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+
+            // नई files के लिए default names
+            const newDocumentNames = validFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+
+            setFormData((prev) => ({
+                ...prev,
+                documentNames: [...prev.documentNames, ...newDocumentNames]
+            }));
+
+            setDocumentNames((prev) => [...prev, ...newDocumentNames]);
+        }
     };
 
     // Reset form data
@@ -416,6 +553,7 @@ function AddEventPage() {
             country: '',
             images: [],
             documents: [],
+            documentNames: [], // Add this
             type: 'Physical',
             price: '',
             currency: '',
@@ -430,6 +568,7 @@ function AddEventPage() {
         });
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
+        setDocumentNames([]); // Add this
         setEventStampImagePreviewUrls([]);
     };
 
@@ -474,9 +613,7 @@ function AddEventPage() {
         fetchSpeakers();
         fetchCategories();
         fetchExhibitors();
-
-    }, []
-);
+    }, []);
 
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
@@ -498,6 +635,25 @@ function AddEventPage() {
     // Handle form submission - Updated to handle event stamps correctly
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate document names before submission
+        let hasValidationErrors = false;
+        const documentNameErrors = [];
+
+        formData.documentNames.forEach((name, index) => {
+            if (name && name.trim()) {
+                // Only validate if name is provided
+                const validation = validateDocumentName(name, formData.documentNames, index);
+                if (!validation.isValid) {
+                    hasValidationErrors = true;
+                    documentNameErrors.push(`Document ${index + 1}: ${validation.error}`);
+                }
+            }
+        });
+
+        // Clean up empty document names before sending
+        const cleanedDocumentNames = formData.documentNames.map((name) => (name && name.trim() ? name.trim() : ''));
+
         const formDataToSend = new FormData();
 
         const formattedStartTime = formatTime(formData.startTime);
@@ -505,6 +661,7 @@ function AddEventPage() {
 
         const dataToSend = {
             ...formData,
+            documentNames: cleanedDocumentNames, // Use cleaned names
             startTime: formattedStartTime,
             endTime: formattedEndTime
         };
@@ -555,6 +712,13 @@ function AddEventPage() {
                         }
                     });
                 }
+            } else if (key === 'documentNames') {
+                // Handle document names
+                if (dataToSend[key] && Array.isArray(dataToSend[key])) {
+                    dataToSend[key].forEach((name) => {
+                        formDataToSend.append('documentNames', name);
+                    });
+                }
             } else if (key !== 'speakersData' && dataToSend[key] !== null) {
                 formDataToSend.append(key, dataToSend[key]);
             }
@@ -574,6 +738,15 @@ function AddEventPage() {
                 formData.documents.forEach((document) => {
                     if (typeof document === 'string') {
                         formDataToSend.append('originalDocuments', document);
+                    }
+                });
+            }
+
+            // Handle existing document names for edit mode
+            if (formData.documentNames && formData.documentNames.length > 0) {
+                formData.documentNames.forEach((name) => {
+                    if (typeof name === 'string') {
+                        formDataToSend.append('originalDocumentNames', name);
                     }
                 });
             }
@@ -694,7 +867,7 @@ function AddEventPage() {
             }
         };
 
-         useMapEvents({
+        useMapEvents({
             click: async (event) => {
                 const { lat, lng } = event.latlng;
                 const address = await fetchAddressFromCoordinates(lat, lng);
@@ -731,7 +904,7 @@ function AddEventPage() {
         }
     };
 
-    const handleRemoveFloorPlan = async () =>    {
+    const handleRemoveFloorPlan = async () => {
         const response = await dispatch(removeEventFloorPlan(id));
         if (response.success) {
             setFormData((prev) => ({
@@ -739,9 +912,8 @@ function AddEventPage() {
                 floorPlan: null
             }));
             setFloorPlanPreview(null);
-        }   
-    }
-
+        }
+    };
 
     // Exhibitor handling
     const handleExhibitorSelect = (selectedOptions) => {
@@ -763,7 +935,7 @@ function AddEventPage() {
 
     const handleEventStampImagesChange = (e) => {
         const files = Array.from(e.target.files);
-        
+
         const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
 
         setFormData((prev) => ({
@@ -792,7 +964,7 @@ function AddEventPage() {
                     setEventStampImagePreviewUrls(newPreviewUrls);
                 }
             } catch (error) {
-               // Error handling without console
+                // Error handling without console
             }
         } else {
             setFormData((prev) => ({
@@ -802,7 +974,6 @@ function AddEventPage() {
 
             setImagePreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
         }
-    
     };
 
     const fetchExhibitors = async () => {
@@ -810,13 +981,137 @@ function AddEventPage() {
             const response = await dispatch(exhibitorGet());
             setExhibitorList(response.data);
         } catch (error) {
-         // Error handling without console
+            // Error handling without console
         }
     };
 
-const handleNavigate = () => {
-    navigate(EVENT_PATHS.LIST_EVENTS);
-}
+    const handleNavigate = () => {
+        navigate(EVENT_PATHS.LIST_EVENTS);
+    };
+
+    // Document name change handler - updated version
+    const handleDocumentNameChange = (index, newName) => {
+        // FormData में documentNames को update करें
+        setFormData((prev) => {
+            const updatedNames = [...prev.documentNames];
+            updatedNames[index] = newName;
+
+            return {
+                ...prev,
+                documentNames: updatedNames
+            };
+        });
+    };
+
+    // Document name validation function
+    const validateDocumentName = (name, index) => {
+        // If name is completely empty, no validation needed
+        if (!name || name.trim() === '') {
+            return { isValid: true, error: '' };
+        }
+
+        // If name has content, then validate
+        if (name.trim().length < 2) {
+            return {
+                isValid: false,
+                error: 'Document name should be at least 2 characters'
+            };
+        }
+
+        // Check for duplicate names
+        const duplicateIndex = formData.documentNames.findIndex(
+            (docName, idx) => idx !== index && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
+        );
+
+        if (duplicateIndex !== -1) {
+            return {
+                isValid: false,
+                error: 'Document name already exists'
+            };
+        }
+
+        return { isValid: true, error: '' };
+    };
+
+    // Document name input field with validation
+    const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
+        const [localError, setLocalError] = useState('');
+
+        // Validation function
+        const validateDocumentName = (name, allNames, currentIndex) => {
+            if (!name || name.trim() === '') {
+                return { isValid: true, error: '' };
+            }
+
+            if (name.trim().length < 2) {
+                return {
+                    isValid: false,
+                    error: 'Document name should be at least 2 characters'
+                };
+            }
+
+            const duplicateIndex = allNames.findIndex(
+                (docName, idx) => idx !== currentIndex && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
+            );
+
+            if (duplicateIndex !== -1) {
+                return {
+                    isValid: false,
+                    error: 'Document name already exists'
+                };
+            }
+
+            return { isValid: true, error: '' };
+        };
+
+        const handleNameChange = (e) => {
+            const newName = e.target.value;
+
+            // Update parent component
+            onNameChange(index, newName);
+
+            // Validate only if there's content
+            if (newName.trim()) {
+                // We'll handle validation in parent to avoid state issues
+                setLocalError('');
+            } else {
+                setLocalError('');
+            }
+        };
+
+        return (
+            <div style={{ width: '100%' }}>
+                <input
+                    type="text"
+                    value={documentName || ''}
+                    onChange={handleNameChange}
+                    placeholder="Enter document name (optional)"
+                    style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        border: `1px solid ${localError ? '#dc3545' : '#ddd'}`,
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        marginBottom: localError ? '2px' : '4px',
+                        backgroundColor: localError ? '#fff5f5' : '#fff'
+                    }}
+                />
+                {localError && (
+                    <div
+                        style={{
+                            fontSize: '11px',
+                            color: '#dc3545',
+                            marginBottom: '4px',
+                            fontStyle: 'italic'
+                        }}
+                    >
+                        {localError}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <Container fluid>
@@ -1239,7 +1534,9 @@ const handleNavigate = () => {
                                                         const isValidSize = file.size <= 50 * 1024 * 1024;
 
                                                         if (!isValidType) {
-                                                            alert(`${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`);
+                                                            alert(
+                                                                `${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`
+                                                            );
                                                         }
                                                         if (!isValidSize) {
                                                             alert(`${file.name} is too large. Maximum size is 50MB.`);
@@ -1462,8 +1759,6 @@ const handleNavigate = () => {
                                             )}
                                         </div>
                                     </Col>
-
-                             
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
@@ -1779,7 +2074,7 @@ const handleNavigate = () => {
                                                 </Button>
                                             </div>
 
-                                            {/* Document Preview List */}
+                                            {/* Document Preview List - Direct JSX instead of function */}
                                             {formData.documents && formData.documents.length > 0 && (
                                                 <div className="mt-3">
                                                     <h6
@@ -1820,44 +2115,43 @@ const handleNavigate = () => {
 
                                                             return (
                                                                 <div
-                                                                    key={index}
+                                                                    key={`doc-${index}-${fileName}`}
                                                                     style={{
                                                                         display: 'flex',
-                                                                        alignItems: 'center',
+                                                                        alignItems: 'flex-start',
                                                                         padding: '12px',
+                                                                        gap: '6px',
                                                                         border: '1px solid #e9ecef',
                                                                         borderRadius: '8px',
                                                                         backgroundColor: '#ffffff',
                                                                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                                                         transition: 'all 0.2s ease'
                                                                     }}
-                                                                    onMouseEnter={(e) => {
-                                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                                                                        e.currentTarget.style.transform = 'translateY(-1px)';
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                                                                        e.currentTarget.style.transform = 'translateY(0)';
-                                                                    }}
                                                                 >
-                                                                    <div style={{ marginRight: '12px', flexShrink: 0 }}>
+                                                                    <div style={{ marginRight: '12px', flexShrink: 0, marginTop: '8px' }}>
                                                                         <i className="fas fa-file-pdf fa-2x text-danger"></i>
                                                                     </div>
 
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div
+                                                                        {/* Simple input field for document name */}
+                                                                        <input
+                                                                            type="text"
+                                                                            value={formData.documentNames[index] || ''}
+                                                                            onChange={(e) =>
+                                                                                handleDocumentNameChange(index, e.target.value)
+                                                                            }
+                                                                            placeholder="Enter document name (optional)"
                                                                             style={{
-                                                                                fontWeight: '600',
+                                                                                width: '100%',
+                                                                                padding: '6px 8px',
+                                                                                border: '1px solid #ddd',
+                                                                                borderRadius: '4px',
                                                                                 fontSize: '14px',
-                                                                                color: '#333',
-                                                                                whiteSpace: 'nowrap',
-                                                                                overflow: 'hidden',
-                                                                                textOverflow: 'ellipsis',
-                                                                                marginBottom: '2px'
+                                                                                fontWeight: '600',
+                                                                                marginBottom: '4px'
                                                                             }}
-                                                                        >
-                                                                            {fileName}
-                                                                        </div>
+                                                                        />
+
                                                                         <div
                                                                             style={{
                                                                                 fontSize: '12px',
@@ -1867,6 +2161,7 @@ const handleNavigate = () => {
                                                                                 textOverflow: 'ellipsis'
                                                                             }}
                                                                         >
+                                                                            File: {fileName} |{' '}
                                                                             {isExistingDocument
                                                                                 ? 'Existing Document'
                                                                                 : `${(document.size / 1024 / 1024).toFixed(1)}MB`}
@@ -1877,7 +2172,8 @@ const handleNavigate = () => {
                                                                         style={{
                                                                             display: 'flex',
                                                                             gap: '6px',
-                                                                            flexShrink: 0
+                                                                            flexShrink: 0,
+                                                                            marginTop: '1px'
                                                                         }}
                                                                     >
                                                                         <Button
@@ -1906,6 +2202,19 @@ const handleNavigate = () => {
                                                                 </div>
                                                             );
                                                         })}
+                                                    </div>
+
+                                                    <div
+                                                        style={{
+                                                            marginTop: '10px',
+                                                            padding: '8px 12px',
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '4px',
+                                                            fontSize: '12px',
+                                                            color: '#6c757d'
+                                                        }}
+                                                    >
+                                                        💡 Document names are optional. Leave empty if not needed.
                                                     </div>
                                                 </div>
                                             )}

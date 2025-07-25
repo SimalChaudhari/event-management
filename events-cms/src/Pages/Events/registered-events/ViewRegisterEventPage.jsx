@@ -454,16 +454,9 @@ const ViewRegisterEventPage = () => {
                     marginTop: '15px'
                 }}
             >
-                {eventData.event.documents.map((document, index) => {
-                    let documentSrc = '';
-
-                    if (typeof document === 'string') {
-                        if (document.startsWith('http')) {
-                            documentSrc = document;
-                        } else {
-                            documentSrc = `${API_URL}/${document.replace(/\\/g, '/')}`;
-                        }
-                    }
+                {eventData.event.documents.map((doc, index) => {
+                    let documentSrc = `${API_URL}/${doc?.document?.replace(/\\/g, '/')}`;
+                
 
                     return (
                         <div
@@ -497,16 +490,9 @@ const ViewRegisterEventPage = () => {
                                         whiteSpace: 'nowrap'
                                     }}
                                 >
-                                    {typeof document === 'string' ? document.split('/').pop() : document.name}
+                                    {typeof doc === 'string' ? doc.split('/').pop() : doc.name}
                                 </div>
-                                <div
-                                    style={{
-                                        fontSize: '12px',
-                                        color: '#666'
-                                    }}
-                                >
-                                    Document {index + 1}
-                                </div>
+                            
                             </div>
 
                             <Button

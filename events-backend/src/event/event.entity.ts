@@ -69,8 +69,8 @@ export class Event {
   images?: string[];
 
   // Multiple PDF documents support
-  @Column('simple-array', { nullable: true })
-  documents?: string[];
+  // @Column('simple-array', { nullable: true })
+  // documents?: string[];
 
   @Column({ type: 'enum', enum: EventType, nullable: true })
   type?: EventType;
@@ -124,7 +124,12 @@ export class Event {
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.event)
   eventExhibitors!: EventExhibitor[];
 
+  @Column('simple-array', { nullable: true })
+  documents?: string[];
 
+  // Add this new field for document names
+  @Column('simple-array', { nullable: true })
+  documentNames?: string[];
 }
 
 @Entity('event_exhibitor')

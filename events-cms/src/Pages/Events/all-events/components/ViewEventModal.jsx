@@ -376,7 +376,7 @@ function ViewEventModal({ show, handleClose, eventData }) {
                                         color: '#666'
                                     }}
                                 >
-                                    Document {index + 1}
+                                    {eventData.documentNames}
                                 </div>
                             </div>
 

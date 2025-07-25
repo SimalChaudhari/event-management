@@ -160,6 +160,21 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
+
+            let formattedDocuments: { name: string; document: string }[] = [];
+            if (registerEvent?.event?.documents && registerEvent?.event?.documentNames) {
+              formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
+                name: registerEvent.event?.documentNames?.[index] || `Document ${index + 1}`,
+                document: doc
+              }));
+            } else if (registerEvent?.event?.documents) {
+              // Fallback if no names are provided
+              formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
+                name: `Document ${index + 1}`,
+                document: doc
+              }));
+            }
+            
           // Check if event is favorited by the user
           let isFavorite = false;
           if (registerEvent.userId) {
@@ -181,6 +196,8 @@ export class RegisterEventService {
             eventExhibitors,
             exhibitorDescription,
             eventStampDescription,
+            documents, // Remove original documents
+            documentNames, // Remove original documentNames
             eventStampImages,
             ...restEvent
           } = registerEvent.event || {};
@@ -190,10 +207,13 @@ export class RegisterEventService {
             color: getEventColor(registerEvent.event?.type),
             speakers,
             categories,
+            documents: formattedDocuments,
+
             eventStamps: {
               description: registerEvent.event?.eventStampDescription,
               images: registerEvent.event?.eventStampImages,
             },
+
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors:
@@ -293,6 +313,22 @@ export class RegisterEventService {
         isFavorite = !!favorite;
       }
 
+
+      // Format documents with names
+      let formattedDocuments: { name: string; document: string }[] = [];
+      if (registerEvent?.event?.documents && registerEvent?.event?.documentNames) {
+        formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
+          name: registerEvent?.event?.documentNames?.[index] || `Document ${index + 1}`,
+          document: doc
+        }));
+      } else if (registerEvent?.event?.documents) {
+        // Fallback if no names are provided
+        formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
+          name: `Document ${index + 1}`,
+          document: doc
+        }));
+      }
+
       // Extract only speakers
       const speakers = registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
       const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
@@ -314,6 +350,8 @@ export class RegisterEventService {
         exhibitorDescription,
         eventStampDescription,
         eventStampImages,
+        documents, // Remove original documents
+        documentNames, // Remove original documentNames
         ...restEvent
       } = registerEvent.event || {};
 
@@ -322,6 +360,7 @@ export class RegisterEventService {
         color: getEventColor(registerEvent.event?.type),
         speakers,
         categories,
+        documents: formattedDocuments,
         eventStamps: {
           description: registerEvent.event?.eventStampDescription,
           images: registerEvent.event?.eventStampImages,

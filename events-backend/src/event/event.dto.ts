@@ -9,6 +9,7 @@ import {
   Validate,
   IsUUID,
 } from 'class-validator';
+import { Column } from 'typeorm';
 
 // Custom validator for time format
 class IsTimeFormat {
@@ -77,8 +78,8 @@ export class EventDto {
   images?: string[];
 
   // Multiple PDF documents support
-  @IsOptional()
-  documents?: string[];
+  // @IsOptional()
+  // documents?: string[];
 
   @IsOptional()
   @IsEnum(EventType)
@@ -112,11 +113,21 @@ export class EventDto {
     @IsOptional()
     eventStampImages?: string[];
 
+    @IsOptional()
+    @Column('simple-array', { nullable: true })
+    documents?: string[];
+  
+    // Add this new field for document names
+    @IsOptional()
+    @Column('simple-array', { nullable: true })
+    documentNames?: string[];
+
   @IsOptional()
   speakerIds?: string;
   originalImages: any;
   originalDocuments: any;
   originalEventStampImages: any;
   originalFloorPlan: any;
+  originalDocumentNames: any; // Add this line
 }
 
