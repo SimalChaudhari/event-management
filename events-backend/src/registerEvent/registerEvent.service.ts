@@ -94,6 +94,7 @@ export class RegisterEventService {
         type: type,
         registerCode: registerCode,
         isCreatedByAdmin: isCreatedByAdmin || false,
+        isRegister: true,
         orderId: isCreatedByAdmin ? undefined : createRegisterEventDto.orderId,
       };
 

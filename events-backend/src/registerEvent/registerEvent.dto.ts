@@ -37,6 +37,10 @@ export class CreateRegisterEventDto {
   @IsBoolean()
   isCreatedByAdmin?: boolean = false;
 
+  @IsOptional()
+  @IsBoolean()
+  isRegister?: boolean = true;
+
 }
 // ... existing code ...
 
@@ -47,4 +51,5 @@ export class UpdateRegisterEventDto {
   registerCode?: string;
   isCreatedByAdmin?: boolean;
   orderId?: string;
+  isRegister?: boolean;
 }

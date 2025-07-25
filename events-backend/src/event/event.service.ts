@@ -20,11 +20,11 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
-import { 
-  ResourceNotFoundException, 
-  DuplicateResourceException, 
+import {
+  ResourceNotFoundException,
+  DuplicateResourceException,
   ValidationException,
-  ForeignKeyConstraintException 
+  ForeignKeyConstraintException,
 } from '../utils/exceptions/custom-exceptions';
 
 @Injectable()
@@ -72,7 +72,9 @@ export class EventService {
             where: { id: categoryId.trim() },
           });
           if (!categoryExists) {
-            validationErrors.push(`Category with ID "${categoryId}" does not exist`);
+            validationErrors.push(
+              `Category with ID "${categoryId}" does not exist`,
+            );
           }
         }
       }
@@ -85,7 +87,9 @@ export class EventService {
             where: { id: speakerId.trim() },
           });
           if (!speakerExists) {
-            validationErrors.push(`Speaker with ID "${speakerId}" does not exist`);
+            validationErrors.push(
+              `Speaker with ID "${speakerId}" does not exist`,
+            );
           }
         }
       }
@@ -98,14 +102,19 @@ export class EventService {
             where: { id: exhibitorId.trim() },
           });
           if (!exhibitorExists) {
-            validationErrors.push(`Exhibitor with ID "${exhibitorId}" does not exist`);
+            validationErrors.push(
+              `Exhibitor with ID "${exhibitorId}" does not exist`,
+            );
           }
         }
       }
 
       // If there are validation errors, throw them
       if (validationErrors.length > 0) {
-        throw new ValidationException('Invalid Category, Speaker, or Exhibitor references', validationErrors);
+        throw new ValidationException(
+          'Invalid Category, Speaker, or Exhibitor references',
+          validationErrors,
+        );
       }
 
       const today = new Date();
@@ -137,7 +146,9 @@ export class EventService {
           },
         });
         if (conflictingEvents.length > 0) {
-          throw new ValidationException('Another event is already scheduled at this location during these dates and times');
+          throw new ValidationException(
+            'Another event is already scheduled at this location during these dates and times',
+          );
         }
       }
 
@@ -277,7 +288,9 @@ export class EventService {
       if (filters.type) {
         const validTypes = Object.values(EventType);
         if (!validTypes.includes(filters.type)) {
-          throw new ValidationException(`Invalid event type. Valid types are: ${validTypes.join(', ')}`);
+          throw new ValidationException(
+            `Invalid event type. Valid types are: ${validTypes.join(', ')}`,
+          );
         }
       }
 
@@ -360,6 +373,19 @@ export class EventService {
             isFavorite = !!favorite;
           }
 
+          // Check if user has registered for this event
+          let isRegistered = false;
+          if (userId) {
+            const registration = await this.registerEventRepository.findOne({
+              where: {
+                userId: userId,
+                eventId: event.id,
+                isRegister: true, // Only count active registrations
+              },
+            });
+            isRegistered = !!registration;
+          }
+
           // Find which fields matched the keyword search
           let matchedFields: string[] = [];
           if (filters.keyword) {
@@ -368,14 +394,14 @@ export class EventService {
 
           const { exhibitorDescription, ...eventFiltered } = eventData;
           // Convert eventStamps array to single object
-           return {
+          return {
             ...eventFiltered,
             color: getEventColor(event.type),
             speakersData: eventSpeakers.map((es) => es.speaker),
             categoriesData: category?.map((ec) => ec.category) || [],
-            eventStamps:{
-              description:event.eventStampDescription,
-              images:event.eventStampImages
+            eventStamps: {
+              description: event.eventStampDescription,
+              images: event.eventStampImages,
             },
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
@@ -386,6 +412,7 @@ export class EventService {
             },
             attendanceCount: attendanceCount,
             isFavorite: isFavorite,
+            isRegistered: isRegistered,
             searchFields: matchedFields, // Add matched fields to response
           };
         }),
@@ -459,17 +486,34 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
-      const { exhibitorDescription,eventStampDescription,eventStampImages, ...eventFiltered } = eventData;
+         // Check if user has registered for this event
+    let isRegistered = false;
+    if (userId) {
+      const registration = await this.registerEventRepository.findOne({
+        where: { 
+          userId: userId, 
+          eventId: id,
+          isRegister: true // Only count active registrations
+        },
+      });
+      isRegistered = !!registration;
+    }
 
+      const {
+        exhibitorDescription,
+        eventStampDescription,
+        eventStampImages,
+        ...eventFiltered
+      } = eventData;
 
       return {
         ...eventFiltered,
         color: getEventColor(event.type),
         speakers: eventSpeakers.map((es) => es.speaker),
         categories: category?.map((ec) => ec.category) || [],
-        eventStamps:{
-          description:event.eventStampDescription,
-          images:event.eventStampImages
+        eventStamps: {
+          description: event.eventStampDescription,
+          images: event.eventStampImages,
         },
         exhibitors: {
           exhibitorDescription: exhibitorDescription || '',
@@ -480,6 +524,7 @@ export class EventService {
         },
         attendanceCount: attendanceCount,
         isFavorite: isFavorite,
+        isRegistered: isRegistered,
       };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -555,7 +600,7 @@ export class EventService {
       const registrationCount = await this.errorHandler.getRelatedDataCount(
         this.registerEventRepository,
         { eventId: id },
-        'Event Registrations'
+        'Event Registrations',
       );
 
       if (registrationCount > 0) {
@@ -563,7 +608,7 @@ export class EventService {
           'Event',
           'Registration',
           registrationCount,
-          'delete'
+          'delete',
         );
       }
 
@@ -652,7 +697,7 @@ export class EventService {
       if (!event) {
         throw new ResourceNotFoundException('Event', id);
       }
-  
+
       // Delete existing floor plan from filesystem if it exists
       if (event.floorPlan) {
         const existingFloorPlanPath = path.resolve(event.floorPlan);
@@ -660,9 +705,9 @@ export class EventService {
           fs.unlinkSync(existingFloorPlanPath);
         }
       }
-  
+
       // Update floor plan in database - set to empty string instead of null
-      event.floorPlan = floorPlan === null ? "" : floorPlan;
+      event.floorPlan = floorPlan === null ? '' : floorPlan;
       return await this.eventRepository.save(event);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -678,12 +723,23 @@ export class EventService {
     const keywordLower = keyword.toLowerCase();
 
     const fieldsToCheck = [
-      'name', 'description', 'venue', 'location', 'country', 
-      'type', 'price', 'currency', 'latitude', 'longitude'
+      'name',
+      'description',
+      'venue',
+      'location',
+      'country',
+      'type',
+      'price',
+      'currency',
+      'latitude',
+      'longitude',
     ];
 
-    fieldsToCheck.forEach(field => {
-      if (event[field] && event[field].toString().toLowerCase().includes(keywordLower)) {
+    fieldsToCheck.forEach((field) => {
+      if (
+        event[field] &&
+        event[field].toString().toLowerCase().includes(keywordLower)
+      ) {
         matchedFields.push(field);
       }
     });
@@ -732,7 +788,10 @@ export class EventService {
     }
   }
 
-  private async updateEventAssociations(eventId: string, eventDto: Partial<EventDto>) {
+  private async updateEventAssociations(
+    eventId: string,
+    eventDto: Partial<EventDto>,
+  ) {
     // Update category associations if provided
     if (eventDto.categoryIds !== undefined) {
       await this.eventCategoryRepository.delete({ eventId });
@@ -793,7 +852,9 @@ export class EventService {
           where: { id: categoryId.trim() },
         });
         if (!categoryExists) {
-          validationErrors.push(`Category with ID "${categoryId}" does not exist`);
+          validationErrors.push(
+            `Category with ID "${categoryId}" does not exist`,
+          );
         }
       }
     }
@@ -804,10 +865,21 @@ export class EventService {
     }
   }
 
-  private validateEventDates(eventDto: Partial<EventDto>, existingEvent?: Event) {
+  private validateEventDates(
+    eventDto: Partial<EventDto>,
+    existingEvent?: Event,
+  ) {
     const today = new Date();
-    const startDate = eventDto.startDate ? new Date(eventDto.startDate) : (existingEvent ? new Date(existingEvent.startDate) : null);
-    const endDate = eventDto.endDate ? new Date(eventDto.endDate) : (existingEvent ? new Date(existingEvent.endDate) : null);
+    const startDate = eventDto.startDate
+      ? new Date(eventDto.startDate)
+      : existingEvent
+        ? new Date(existingEvent.startDate)
+        : null;
+    const endDate = eventDto.endDate
+      ? new Date(eventDto.endDate)
+      : existingEvent
+        ? new Date(existingEvent.endDate)
+        : null;
 
     if (startDate && startDate < today) {
       throw new ValidationException('Start date cannot be in the past');
@@ -817,32 +889,51 @@ export class EventService {
     }
   }
 
-  private async checkLocationConflict(eventDto: Partial<EventDto>, excludeId?: string) {
+  private async checkLocationConflict(
+    eventDto: Partial<EventDto>,
+    excludeId?: string,
+  ) {
     if (!eventDto.startDate || !eventDto.endDate) {
       throw new ValidationException('Start date and end date must be provided');
     }
 
     const whereClause: any = {
       location: eventDto.location,
-      startDate: Between(new Date(eventDto.startDate), new Date(eventDto.endDate)),
-      endDate: Between(new Date(eventDto.startDate), new Date(eventDto.endDate)),
+      startDate: Between(
+        new Date(eventDto.startDate),
+        new Date(eventDto.endDate),
+      ),
+      endDate: Between(
+        new Date(eventDto.startDate),
+        new Date(eventDto.endDate),
+      ),
     };
 
     if (excludeId) {
       whereClause.id = Not(excludeId);
     }
 
-    const conflictingEvents = await this.eventRepository.find({ where: whereClause });
+    const conflictingEvents = await this.eventRepository.find({
+      where: whereClause,
+    });
     if (conflictingEvents.length > 0) {
-      throw new ValidationException('Another event is already scheduled at this location during these dates and times');
+      throw new ValidationException(
+        'Another event is already scheduled at this location during these dates and times',
+      );
     }
   }
 
   private validateCoordinates(eventDto: Partial<EventDto>) {
-    if (eventDto.latitude && (eventDto.latitude < -90 || eventDto.latitude > 90)) {
+    if (
+      eventDto.latitude &&
+      (eventDto.latitude < -90 || eventDto.latitude > 90)
+    ) {
       throw new ValidationException('Invalid latitude value');
     }
-    if (eventDto.longitude && (eventDto.longitude < -180 || eventDto.longitude > 180)) {
+    if (
+      eventDto.longitude &&
+      (eventDto.longitude < -180 || eventDto.longitude > 180)
+    ) {
       throw new ValidationException('Invalid longitude value');
     }
   }

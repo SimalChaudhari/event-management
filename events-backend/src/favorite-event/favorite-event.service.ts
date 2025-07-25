@@ -119,16 +119,31 @@ export class FavoriteEventService {
     // Add attendance count and favorite status to each favorite event
     const favoritesWithAttendance = await Promise.all(
       favorites.map(async (favorite) => {
-        const attendanceCount = favorite.eventId ? await this.getEventAttendanceCount(favorite.eventId) : 0;
-        
+        const attendanceCount = favorite.eventId
+          ? await this.getEventAttendanceCount(favorite.eventId)
+          : 0;
+
         // Since these are favorite events, isFavorite will always be true
         const isFavorite = true;
-        
+
+        // Check if user has registered for this event भी add करें
+        let isRegistered = false;
+        if (favorite.eventId) {
+          const registration = await this.registerEventRepository.findOne({
+            where: {
+              userId: userId,
+              eventId: favorite.eventId,
+              isRegister: true, // Only count active registrations
+            },
+          });
+          isRegistered = !!registration;
+        }
+
         const { eventSpeakers, category, ...eventData } = favorite.event;
-        
+
         // Extract categories
         const categories = category?.map((ec) => ec.category) || [];
-        
+
         return {
           id: favorite.id,
           createdAt: favorite.createdAt,
@@ -139,9 +154,10 @@ export class FavoriteEventService {
             categories: categories,
             attendanceCount: attendanceCount,
             isFavorite: isFavorite, // Always true for favorite events
+            isRegistered: isRegistered,
           },
         };
-      })
+      }),
     );
 
     return favoritesWithAttendance;
@@ -150,7 +166,7 @@ export class FavoriteEventService {
   // Add this method to get event attendance count
   async getEventAttendanceCount(eventId: string): Promise<number> {
     const count = await this.registerEventRepository.count({
-      where: { eventId: eventId }
+      where: { eventId: eventId },
     });
     return count;
   }

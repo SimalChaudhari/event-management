@@ -64,14 +64,14 @@ import { ErrorHandlerService } from './utils/services/error-handler.service';
   providers: [
     AppService,
     ErrorHandlerService,
-    {
-      provide: APP_FILTER,
-      useClass: GlobalExceptionFilter,
-    },
-    {
-      provide: APP_PIPE,
-      useClass: ValidationPipe,
-    },
+    // {
+    //   provide: APP_FILTER,
+    //   useClass: GlobalExceptionFilter,
+    // },
+    // {
+    //   provide: APP_PIPE,
+    //   useClass: ValidationPipe,
+    // },
   ],
 })
 export class AppModule implements NestModule {
