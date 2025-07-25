@@ -35,3 +35,7 @@ export const CLEAR_ALL_BANNERS = 'CLEAR_ALL_BANNERS';
 export const CLEAR_ALL_BANNER_EVENTS = 'CLEAR_ALL_BANNER_EVENTS';
 export const SET_BANNER_LOADING = 'SET_BANNER_LOADING';
 export const SET_BANNER_ERROR = 'SET_BANNER_ERROR';
+
+// Gallery Action Types
+export const GALLERY_BY_ID = 'GALLERY_BY_ID';
+export const ALL_GALLERIES = 'ALL_GALLERIES';

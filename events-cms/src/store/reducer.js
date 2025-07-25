@@ -10,6 +10,7 @@ import speakerReducer from './reducer/speakerReducer';
 import settingsReducer from './reducer/settingsReducer';
 import bannerReducer from './reducer/bannerReducer';
 import categoryReducer from './reducer/categoryReducer';
+import galleryReducer from './reducer/galleryReducer';
 
 const reducer = combineReducers({
     able: ableReducer,
@@ -22,7 +23,8 @@ const reducer = combineReducers({
     speaker: speakerReducer,
     settings: settingsReducer,
     banner: bannerReducer,
-    category: categoryReducer
+    category: categoryReducer,
+    gallery: galleryReducer
 });
 
 export default reducer;

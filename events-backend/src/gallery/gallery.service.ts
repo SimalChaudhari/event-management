@@ -7,11 +7,15 @@ import {
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Event } from 'event/event.entity';
-import { Like } from 'typeorm';
 import { Gallery } from './gallery.entity';
-import { GalleryDto, UpdateGalleryDto } from './gallery.dto';
+import { GalleryDto } from './gallery.dto';
 import * as fs from 'fs';
 import path from 'path';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { 
+  ResourceNotFoundException, 
+  ValidationException 
+} from '../utils/exceptions/custom-exceptions';
 
 export interface GalleryItem {
   type: 'image' | 'document';
@@ -34,7 +38,7 @@ export class GalleryService {
     @InjectRepository(Gallery)
     private galleryRepository: Repository<Gallery>,
 
-
+    private errorHandler: ErrorHandlerService,
   ) {}
 
   async getAllGalleryItems(filters: {
@@ -42,34 +46,95 @@ export class GalleryService {
     type?: 'images' | 'documents' | 'all';
     eventId?: string;
   }): Promise<EventGallery[]> {
-    const queryBuilder = this.eventRepository
-      .createQueryBuilder('event')
-      .select([
-        'event.id',
-        'event.name',
-        'event.images',
-        'event.documents',
-        'event.createdAt',
-        'event.updatedAt',
-      ]);
+    try {
+      const queryBuilder = this.eventRepository
+        .createQueryBuilder('event')
+        .select([
+          'event.id',
+          'event.name',
+          'event.images',
+          'event.documents',
+          'event.createdAt',
+          'event.updatedAt',
+        ]);
 
-    // Filter by event ID if provided
-    if (filters.eventId) {
-      queryBuilder.where('event.id = :eventId', { eventId: filters.eventId });
+      // Filter by event ID if provided
+      if (filters.eventId) {
+        queryBuilder.where('event.id = :eventId', { eventId: filters.eventId });
+      }
+
+      // Filter by keyword if provided
+      if (filters.keyword) {
+        queryBuilder.andWhere(
+          'LOWER(event.name) LIKE :keyword',
+          { keyword: `%${filters.keyword.toLowerCase()}%` }
+        );
+      }
+
+      const events = await queryBuilder.getMany();
+      const eventGalleries: EventGallery[] = [];
+
+      events.forEach((event) => {
+        const images: GalleryItem[] = [];
+        const documents: GalleryItem[] = [];
+
+        // Add images
+        if (event.images && event.images.length > 0) {
+          if (!filters.type || filters.type === 'images' || filters.type === 'all') {
+            event.images.forEach((imagePath) => {
+              images.push({
+                type: 'image',
+                path: imagePath,
+              });
+            });
+          }
+        }
+
+        // Add documents
+        if (event.documents && event.documents.length > 0) {
+          if (!filters.type || filters.type === 'documents' || filters.type === 'all') {
+            event.documents.forEach((documentPath) => {
+              documents.push({
+                type: 'document',
+                path: documentPath,
+              });
+            });
+          }
+        }
+
+        // Only add events that have images or documents
+        if (images.length > 0 || documents.length > 0) {
+          eventGalleries.push({
+            eventId: event.id,
+            eventName: event.name,
+            images: images,
+            documents: documents
+          });
+        }
+      });
+
+      return eventGalleries;
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Gallery items retrieval');
     }
+  }
 
-    // Filter by keyword if provided
-    if (filters.keyword) {
-      queryBuilder.andWhere(
-        'LOWER(event.name) LIKE :keyword',
-        { keyword: `%${filters.keyword.toLowerCase()}%` }
-      );
-    }
+  async getGalleryByEvent(
+    eventId: string,
+    filters: {
+      type?: 'images' | 'documents' | 'all';
+    },
+  ): Promise<EventGallery> {
+    try {
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name', 'images', 'documents', 'createdAt', 'updatedAt'],
+      });
 
-    const events = await queryBuilder.getMany();
-    const eventGalleries: EventGallery[] = [];
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
 
-    events.forEach((event) => {
       const images: GalleryItem[] = [];
       const documents: GalleryItem[] = [];
 
@@ -97,77 +162,33 @@ export class GalleryService {
         }
       }
 
-      // Only add events that have images or documents
-      if (images.length > 0 || documents.length > 0) {
-        eventGalleries.push({
-          eventId: event.id,
-          eventName: event.name,
-          images: images,
-          documents: documents
-        });
+      return {
+        eventId: event.id,
+        eventName: event.name,
+        images: images,
+        documents: documents
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
       }
-    });
-
-    return eventGalleries;
+      this.errorHandler.handleDatabaseError(error, 'Gallery retrieval by event');
+    }
   }
 
-  async getGalleryByEvent(
-    eventId: string,
-    filters: {
-      type?: 'images' | 'documents' | 'all';
-    },
-  ): Promise<EventGallery> {
-    const event = await this.eventRepository.findOne({
-      where: { id: eventId },
-      select: ['id', 'name', 'images', 'documents', 'createdAt', 'updatedAt'],
-    });
-
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
-
-    const images: GalleryItem[] = [];
-    const documents: GalleryItem[] = [];
-
-    // Add images
-    if (event.images && event.images.length > 0) {
-      if (!filters.type || filters.type === 'images' || filters.type === 'all') {
-        event.images.forEach((imagePath) => {
-          images.push({
-            type: 'image',
-            path: imagePath,
-          });
-        });
-      }
-    }
-
-    // Add documents
-    if (event.documents && event.documents.length > 0) {
-      if (!filters.type || filters.type === 'documents' || filters.type === 'all') {
-        event.documents.forEach((documentPath) => {
-          documents.push({
-            type: 'document',
-            path: documentPath,
-          });
-        });
-      }
-    }
-
-    return {
-      eventId: event.id,
-      eventName: event.name,
-      images: images,
-      documents: documents
-    };
-  }
-
-  // Events Gallery
-
-  async createOrUpdateGallery(galleryDto: GalleryDto) {
+  async createOrUpdateGallery(eventId: string, galleryDto: GalleryDto) {
     try {
+      // Check if event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
       // Check if gallery already exists for this event
       const existingGallery = await this.galleryRepository.findOne({
-        where: { eventId: galleryDto.eventId },
+        where: { eventId: eventId },
       });
       
       if (existingGallery) {
@@ -185,33 +206,49 @@ export class GalleryService {
       }
 
       // Create new gallery if none exists
-      const gallery = this.galleryRepository.create(galleryDto);
+      const gallery = this.galleryRepository.create({
+        ...galleryDto,
+        eventId: eventId
+      });
       const result = await this.galleryRepository.save(gallery);
       return { message: 'Gallery created successfully', data: result };
-    } catch (error: any) {
-      throw new InternalServerErrorException('Error creating or updating gallery', error.message);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Gallery creation/update');
     }
   }
 
   async getAllGalleries() {
-    return await this.galleryRepository.find({
-      relations: ['event'],
-      order: { createdAt: 'DESC' },
-    });
+    try {
+      return await this.galleryRepository.find({
+        relations: ['event'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Galleries retrieval');
+    }
   }
 
   async getGalleryById(id: string) {
-    const gallery = await this.galleryRepository.findOne({
-      where: { id },
-      relations: ['event'],
-    });
-    if (!gallery) {
-      throw new NotFoundException('Gallery not found');
+    try {
+      const gallery = await this.galleryRepository.findOne({
+        where: { id },
+        relations: ['event'],
+      });
+      if (!gallery) {
+        throw new ResourceNotFoundException('Gallery', id);
+      }
+      return gallery;
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Gallery retrieval by ID');
     }
-    return gallery;
   }
 
-  // DELETE GALLERY COMPLETELY
   async deleteGallery(id: string) {
     try {
       const gallery = await this.galleryRepository.findOne({ 
@@ -219,7 +256,7 @@ export class GalleryService {
         relations: ['event']
       });
       if (!gallery) {
-        throw new NotFoundException('Gallery not found');
+        throw new ResourceNotFoundException('Gallery', id);
       }
 
       // Delete all images from filesystem
@@ -230,24 +267,23 @@ export class GalleryService {
       // Delete gallery from database
       await this.galleryRepository.remove(gallery);
       return { message: 'Gallery deleted successfully' };
-    } catch (error: any) {
-      if (error instanceof NotFoundException) {
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException('Error deleting gallery', error.message);
+      this.errorHandler.handleDatabaseError(error, 'Gallery deletion');
     }
   }
 
-  // DELETE SPECIFIC IMAGE FROM GALLERY
   async deleteSpecificGalleryImage(galleryId: string, imagePath: string): Promise<{ message: string; data: Gallery }> {
     try {
       const gallery = await this.galleryRepository.findOne({ where: { id: galleryId } });
       if (!gallery) {
-        throw new NotFoundException('Gallery not found');
+        throw new ResourceNotFoundException('Gallery', galleryId);
       }
 
       if (!gallery.galleryImages || !gallery.galleryImages.includes(imagePath)) {
-        throw new NotFoundException('Image not found in this gallery');
+        throw new ResourceNotFoundException('Image', 'in this gallery');
       }
 
       // Delete file from filesystem
@@ -259,22 +295,19 @@ export class GalleryService {
       const result = await this.galleryRepository.save(gallery);
 
       return { message: 'Gallery image deleted successfully', data: result };
-    } catch (error: any) {
-      if (error instanceof NotFoundException) {
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException('Error deleting gallery image', error.message);
+      this.errorHandler.handleDatabaseError(error, 'Gallery image deletion');
     }
   }
 
-
-
-  // CLEAR ALL IMAGES FROM GALLERY
   async clearAllGalleryImages(galleryId: string): Promise<{ message: string; data: Gallery }> {
     try {
       const gallery = await this.galleryRepository.findOne({ where: { id: galleryId } });
       if (!gallery) {
-        throw new NotFoundException('Gallery not found');
+        throw new ResourceNotFoundException('Gallery', galleryId);
       }
 
       // Delete all files from filesystem
@@ -287,29 +320,24 @@ export class GalleryService {
       const result = await this.galleryRepository.save(gallery);
 
       return { message: 'All gallery images cleared successfully', data: result };
-    } catch (error: any) {
-      if (error instanceof NotFoundException) {
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException('Error clearing gallery images', error.message);
+      this.errorHandler.handleDatabaseError(error, 'Gallery images clearing');
     }
   }
-
 
   // HELPER METHODS FOR FILE DELETION
   private async deleteFileFromFolder(imagePath: string): Promise<void> {
     try {
       if (!imagePath) return;
       const filePath = path.join(process.cwd(), imagePath);
-      console.log('Deleting file:', filePath);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
-        console.log(`File deleted: ${filePath}`);
-      } else {
-        console.log(`File not found: ${filePath}`);
       }
     } catch (error) {
-      console.error(`Error deleting file ${imagePath}:`, error);
+      this.errorHandler.logError(error, 'File deletion', imagePath);
     }
   }
 
@@ -319,8 +347,7 @@ export class GalleryService {
         await this.deleteFileFromFolder(imagePath);
       }
     } catch (error) {
-      console.error('Error deleting files:', error);
+      this.errorHandler.logError(error, 'Files deletion');
     }
   }
-
 }

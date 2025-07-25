@@ -6,14 +6,13 @@ import {
   Query,
   Res,
   UseGuards,
-  NotFoundException,
   Post,
   UseInterceptors,
   Body,
   UploadedFiles,
-  Put,
   Delete,
-  BadRequestException,
+  Request,
+  HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,17 +22,24 @@ import { Roles } from 'jwt/roles.decorator';
 import { UserRole } from 'user/users.entity';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { GalleryDto, UpdateGalleryDto } from './gallery.dto';
+import { GalleryDto } from './gallery.dto';
 import path from 'path';
 import * as fs from 'fs';
 import { EventService } from 'event/event.service';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { SuccessResponse } from '../utils/interfaces/error-response.interface';
+import { ResourceNotFoundException, ValidationException } from '../utils/exceptions/custom-exceptions';
 
 @Controller('api/gallery')
 @UseGuards(JwtAuthGuard)
 export class GalleryController {
-  constructor(private readonly galleryService: GalleryService, private readonly eventService: EventService) {}
+  constructor(
+    private readonly galleryService: GalleryService, 
+    private readonly eventService: EventService,
+    private readonly errorHandler: ErrorHandlerService,
+  ) {}
 
-
+  // Fot Events
   @Get()
   async getAllGalleryItems(
     @Query()
@@ -43,17 +49,24 @@ export class GalleryController {
       eventId?: string;
     },
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
       const galleryItems = await this.galleryService.getAllGalleryItems(filters);
       
-      return response.status(200).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: 'Gallery items retrieved successfully',
-        total: galleryItems.length,
         data: galleryItems,
-      });
+        metadata: {
+          total: galleryItems.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
+      this.errorHandler.logError(error, 'Gallery items retrieval', req.user?.id);
       throw error;
     }
   }
@@ -66,32 +79,39 @@ export class GalleryController {
       type?: 'images' | 'documents' | 'all';
     },
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
       const galleryItems = await this.galleryService.getGalleryByEvent(eventId, filters);
       
-      if (!galleryItems) {
-        throw new NotFoundException('Event not found or no gallery items available');
-      }
-
-      return response.status(200).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: 'Event gallery retrieved successfully',
-        eventId: eventId,
-        total: galleryItems.images.length + galleryItems.documents.length,
-        data: galleryItems,
-      });
+        data: {
+          // eventId: eventId,
+          ...galleryItems,
+        },
+        metadata: {
+          total: galleryItems.images.length + galleryItems.documents.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
+      this.errorHandler.logError(error, 'Gallery retrieval by event', req.user?.id);
       throw error;
     }
   }
 
 
-  @Post('create-or-update')
+  // For Event Gallery
+  
+  @Post('create-or-update/:eventId')
   @Roles(UserRole.Admin)
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'galleryImages', maxCount: 500 }, // Up to 500 images
+      { name: 'galleryImages', maxCount: 500 },
     ], {
       storage: diskStorage({
         destination: './uploads/gallery/images',
@@ -108,14 +128,19 @@ export class GalleryController {
           cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF.`), false);
         }
       },
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
     }),
   )
   async createOrUpdateGallery(
+    @Param('eventId') eventId: string,
     @Body() galleryDto: GalleryDto,
     @UploadedFiles() files: { galleryImages?: Express.Multer.File[] },
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    try { 
+    try {
       if (files.galleryImages && files.galleryImages.length > 0) {
         galleryDto.galleryImages = files.galleryImages.map(
           (img) => `uploads/gallery/images/${img.filename}`,
@@ -123,124 +148,172 @@ export class GalleryController {
       }
       
       // Check if event exists
-      const event = await this.eventService.getEventEntityById(galleryDto.eventId);
+      const event = await this.eventService.getEventEntityById(eventId);
       if (!event) {
-        throw new NotFoundException('Event not found');
+        throw new ResourceNotFoundException('Event', eventId);
       }
 
-      const gallery = await this.galleryService.createOrUpdateGallery(galleryDto);
+      const gallery = await this.galleryService.createOrUpdateGallery(eventId, galleryDto);
 
       // Check if gallery was created or updated
       const isNewGallery = !gallery.data.id || gallery.data.createdAt === gallery.data.updatedAt;
 
-      return response.status(201).json({
+      const successResponse: SuccessResponse = {
         success: true,
         message: isNewGallery ? 'Gallery created successfully' : 'Gallery updated successfully',
-        data: gallery,
-        action: isNewGallery ? 'created' : 'updated'
-      });
-    } catch (error) {
+        data: {
+          ...gallery,
+          action: isNewGallery ? 'created' : 'updated',
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
       // Clean up uploaded files if error occurs
       if (files.galleryImages && files.galleryImages.length > 0) {
         files.galleryImages.forEach((file) => {
-          const uploadedPath = path.join(
-            __dirname,
-            '..',
-            '..',
-            'uploads',
-            'gallery',
-            'images',
-            file.filename,
-          );
+          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'gallery', 'images', file.filename);
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
           }
         });
       }
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Gallery Images Upload');
+      }
+      
+      this.errorHandler.logError(error, 'Gallery creation/update', req.user?.id);
       throw error;
     }
   }
 
   @Get('get-all')
-  async getAllGalleries(@Res() response: Response) {
-    const galleries = await this.galleryService.getAllGalleries();
-    return response.status(200).json({
-      success: true,
-      message: 'Galleries retrieved successfully',
-      data: galleries,
-    });
+  async getAllGalleries(@Res() response: Response, @Request() req: any) {
+    try {
+      const galleries = await this.galleryService.getAllGalleries();
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Galleries retrieved successfully',
+        data: galleries,
+        metadata: {
+          total: galleries.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Galleries retrieval', req.user?.id);
+      throw error;
+    }
   }
 
   @Get(':id')
   async getGalleryById(
     @Param('id') id: string,
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    const gallery = await this.galleryService.getGalleryById(id);
-    return response.status(200).json({
-      success: true,
-      message: 'Gallery retrieved successfully',
-      data: gallery,
-    });
+    try {
+      const gallery = await this.galleryService.getGalleryById(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Gallery retrieved successfully',
+        data: gallery,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery retrieval by ID', req.user?.id);
+      throw error;
+    }
   }
 
- // DELETE COMPLETE GALLERY
- @Delete('delete/:id')
- @Roles(UserRole.Admin)
- async deleteGallery(@Param('id') id: string, @Res() response: Response) {
-   try {
-     const result = await this.galleryService.deleteGallery(id);
-     return response.status(200).json({
-       success: true,
-       message: result.message,
-     });
-   } catch (error) {
-     throw error;
-   }
- }
+  @Delete('delete/:id')
+  @Roles(UserRole.Admin)
+  async deleteGallery(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const result = await this.galleryService.deleteGallery(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery deletion', req.user?.id);
+      throw error;
+    }
+  }
 
- // DELETE SPECIFIC IMAGE BY PATH
- @Delete('delete-image/:galleryId')
- @Roles(UserRole.Admin)
- async deleteSpecificGalleryImage(
-   @Param('galleryId') galleryId: string,
-   @Body() body: { imagePath: string },
-   @Res() response: Response,
- ) {
-   try {
-     if (!body.imagePath) {
-       throw new BadRequestException('Image path is required');
-     }
+  @Delete('delete-image/:galleryId')
+  @Roles(UserRole.Admin)
+  async deleteSpecificGalleryImage(
+    @Param('galleryId') galleryId: string,
+    @Body() body: { imagePath: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      if (!body.imagePath) {
+        throw new ValidationException('Image path is required');
+      }
 
-     const result = await this.galleryService.deleteSpecificGalleryImage(galleryId, body.imagePath);
-     return response.status(200).json({
-       success: true,
-       message: result.message,
-       data: result.data,
-     });
-   } catch (error) {
-     throw error;
-   }
- }
+      const result = await this.galleryService.deleteSpecificGalleryImage(galleryId, body.imagePath);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery image deletion', req.user?.id);
+      throw error;
+    }
+  }
 
-
- // CLEAR ALL IMAGES FROM GALLERY
- @Delete('clear/:galleryId')
- @Roles(UserRole.Admin)
- async clearAllGalleryImages(
-   @Param('galleryId') galleryId: string,
-   @Res() response: Response,
- ) {
-   try {
-     const result = await this.galleryService.clearAllGalleryImages(galleryId);
-     return response.status(200).json({
-       success: true,
-       message: result.message,
-       data: result.data,
-     });
-   } catch (error) {
-     throw error;
-   }
- }
-
+  @Delete('clear/:galleryId')
+  @Roles(UserRole.Admin)
+  async clearAllGalleryImages(
+    @Param('galleryId') galleryId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.galleryService.clearAllGalleryImages(galleryId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery images clearing', req.user?.id);
+      throw error;
+    }
+  }
 }

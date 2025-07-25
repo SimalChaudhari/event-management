@@ -101,6 +101,13 @@ const chartData = {
             icon: 'icon-ui',
             children: [
                 {
+                    id: 'event-resources',
+                    title: 'Event Resources',
+                    type: 'item',
+                    icon: 'feather icon-image',
+                    url: '/media-manager/event-resources'
+                },
+                {
                     id: 'gallery',
                     title: 'Gallery',
                     type: 'item',

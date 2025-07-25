@@ -14,6 +14,8 @@ import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
+import { EVENT_PATHS } from '../../../utils/constants';
+import { getAllGalleries } from '../../../store/actions/galleryActions';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -27,7 +29,7 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
+function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -159,7 +161,6 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                     return formatDateTimeForTable(row.startDate, row.startTime);
                 }
             },
-
             {
                 data: null,
                 title: 'Actions',
@@ -170,6 +171,10 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
                             <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
+                            </button>
+                            <button type="button" class="btn btn-info btn-circle btn-sm gallery-btn" data-id="${row.id}" title="Gallery" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-image"></i>
                             </button>
                             <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
@@ -241,6 +246,14 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
         }
     });
 
+    $(document).on('click', '.gallery-btn', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((event) => event.id === eventId);
+        if (dataEvent) {
+            handleGallery(dataEvent);
+        }
+    });
+
     $(document).on('click', '.edit-btn', function () {
         const eventId = $(this).data('id');
         const dataEvent = data.find((user) => user.id === eventId);
@@ -286,10 +299,29 @@ const EventView = () => {
         }
     };
 
+// ... existing code ...
+
+const handleGallery = async (data) => {
+    try {
+        const response = await dispatch(getAllGalleries());
+        const allGalleries = response?.data || [];
+        const existingGallery = allGalleries.find(gallery => gallery.eventId === data.id);
+        console.log({existingGallery});
+        if (existingGallery) {
+            navigate(`${EVENT_PATHS.VIEW_GALLERY}/${existingGallery.id}`);
+        } else {
+            navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
+        }
+    } catch (error) {
+        console.error('Error checking gallery:', error);
+        navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
+    }
+};
+
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
-            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView);
+            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery);
             setCurrentTable(table);
         }
     };

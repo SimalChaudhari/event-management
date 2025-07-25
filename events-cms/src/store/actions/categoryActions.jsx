@@ -74,6 +74,6 @@ export const deleteCategory = (id) => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete category';
         toast.error(errorMessage);
-        throw error;
     }
+    return false;
 }; 

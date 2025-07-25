@@ -12,9 +12,9 @@ import {
     @IsString()
     title!: string;
   
-    @IsNotEmpty()
-    @IsUUID()
-    eventId!: string;
+    // @IsNotEmpty()
+    // @IsUUID()
+    // eventId!: string;
   
     @IsOptional()
     @IsArray()

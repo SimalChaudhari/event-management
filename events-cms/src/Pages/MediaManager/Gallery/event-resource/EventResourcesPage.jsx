@@ -3,13 +3,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Card, Row, Col, Button, Spinner, Form, InputGroup, Nav } from 'react-bootstrap';
 import { FaImages, FaFileAlt, FaSearch, FaEye, FaFilePdf, FaTrash } from 'react-icons/fa';
 import { useSearchParams } from 'react-router-dom';
-import { galleryList, removeEventImage, removeEventDocument } from '../../../store/actions/eventActions';
-import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
-import '../../../assets/css/gallery.css';
-import ImageModal from '../../../components/gallery/modal/ImageModal';
-import PaginationsComponent from '../../../components/gallery/pagination/Pagination';
+import { galleryList, removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
+import DeleteConfirmationModal from '../../../../components/modal/DeleteConfirmationModal';
+import '../../../../assets/css/gallery.css';
+import ImageModal from '../../../../components/gallery/modal/ImageModal';
+import PaginationsComponent from '../../../../components/gallery/pagination/Pagination';
 
-const GalleryPage = () => {
+const EventResourcesPage = () => {
     const dispatch = useDispatch();
     const { galleryList: galleryData } = useSelector((state) => state.event);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -803,4 +803,4 @@ const GalleryPage = () => {
     );
 };
 
-export default GalleryPage;
+export default EventResourcesPage;

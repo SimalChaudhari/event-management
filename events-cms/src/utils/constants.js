@@ -46,11 +46,19 @@ export const EVENT_PATHS = {
     CATEGORIES: '/categories',
     ADD_CATEGORY: '/events/add-category',
     EDIT_CATEGORY: '/events/edit-category',
-    VIEW_CATEGORY: '/events/view-category'
+    VIEW_CATEGORY: '/events/view-category',
+
+    //gallery
+
+    GALLERY: '/events/gallery',
+    ADD_GALLERY: '/events/gallery/add',
+    EDIT_GALLERY: '/events/gallery/edit',
+    VIEW_GALLERY: '/events/gallery/view',
 };
 
 export const MEDIA_MANAGER_PATHS = {
-    GALLERY: '/media-manager/gallery',
+  
+    EVENT_RESOURCES: '/media-manager/event-resources',
     BANNER_MANAGEMENT: '/media-manager/banner-management'
 };
 

@@ -42,11 +42,17 @@ const eventComponents = {
     ViewEvent: React.lazy(() => import('./Pages/Events/all-events/components/ViewEventPage.jsx')),
     AddRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
     EditRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
-    ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx'))
+    ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx')),
+
+    Gallery: React.lazy(() => import('./Pages/Events/gallery/GalleryPage.jsx')),
+    AddGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
+    EditGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
+    ViewGallery: React.lazy(() => import('./Pages/Events/gallery/ViewGalleryPage.jsx')),
 };
 
 const MediaManagerComponents = {
-    Gallery: React.lazy(() => import('./Pages/MediaManager/Gallery/GalleryPage.jsx')),
+    EventResources: React.lazy(() => import('./Pages/MediaManager/Gallery/event-resource/EventResourcesPage.jsx')),
+   
     BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx'))
 };
 
@@ -238,6 +244,32 @@ const eventRoutes = [
         component: eventComponents.ViewRegisterEvent
     },
 
+    // Gallery
+
+    {
+        path: EVENT_PATHS.GALLERY,
+        exact: true,
+        name: 'Gallery',
+        component: eventComponents.Gallery
+    },
+    {
+        path: EVENT_PATHS.ADD_GALLERY,
+        exact: true,
+        name: 'Add Gallery',
+        component: eventComponents.AddGallery
+    },
+    {
+        path: EVENT_PATHS.EDIT_GALLERY + '/:id',
+        exact: true,
+        name: 'Edit Gallery',
+        component: eventComponents.EditGallery
+    },
+    {
+        path: EVENT_PATHS.VIEW_GALLERY + '/:id',
+        exact: true,
+        name: 'View Gallery',
+        component: eventComponents.ViewGallery
+    },
     // Categories
     {
         path: EVENT_PATHS.CATEGORIES,
@@ -267,11 +299,12 @@ const eventRoutes = [
 
 const MediaManagerRoutes = [
     {
-        path: MEDIA_MANAGER_PATHS.GALLERY,
+        path: MEDIA_MANAGER_PATHS.EVENT_RESOURCES,
         exact: true,
-        name: 'Gallery',
-        component: MediaManagerComponents.Gallery
+        name: 'Event Resources',
+        component: MediaManagerComponents.EventResources
     },
+   
     {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,
         exact: true,

@@ -73,6 +73,6 @@ export const deleteSpeaker = (id) => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete speaker';
         toast.error(errorMessage);
-        throw error;
     }
+    return false;
 };
