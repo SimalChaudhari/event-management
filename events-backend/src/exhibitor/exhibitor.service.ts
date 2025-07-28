@@ -5,93 +5,193 @@ import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorDto } from './exhibitor.dto';
 import path from 'path';
 import * as fs from 'fs';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import {
+  ResourceNotFoundException,
+  DuplicateResourceException,
+  ValidationException,
+  ForeignKeyConstraintException,
+} from '../utils/exceptions/custom-exceptions';
 
 @Injectable()
 export class ExhibitorService {
   constructor(
     @InjectRepository(Exhibitor)
     private exhibitorRepository: Repository<Exhibitor>,
+    private readonly errorHandler: ErrorHandlerService, // Add this
   ) {}
 
   async createExhibitor(exhibitorDto: ExhibitorDto): Promise<Exhibitor> {
-    // Check if email already exists
-    const existingExhibitor = await this.exhibitorRepository.findOne({
-      where: { email: exhibitorDto.email },
-    });
-    if (existingExhibitor) {
-      throw new ConflictException('Email already exists');
-    }
-
-    const exhibitor = this.exhibitorRepository.create(exhibitorDto);
-    return await this.exhibitorRepository.save(exhibitor);
-  }
-
-  async getAllExhibitors(): Promise<Exhibitor[]> {
-    return await this.exhibitorRepository.find({
-      relations: ['promotionalOffers'],
-    });
-  }
-
-  async getExhibitorById(id: string): Promise<Exhibitor> {
-    const exhibitor = await this.exhibitorRepository.findOne({ 
-      where: { id },
-      relations: ['promotionalOffers'],
-    });
-    if (!exhibitor) {
-      throw new NotFoundException('Exhibitor not found');
-    }
-    return exhibitor;
-  }
-
-  async updateExhibitor(id: string, exhibitorDto: Partial<ExhibitorDto>): Promise<Exhibitor> {
-    const exhibitor = await this.getExhibitorById(id);
-    
-    // Check if email is being changed and if it already exists
-    if (exhibitorDto.email && exhibitorDto.email !== exhibitor.email) {
+    try {
+      // Check if email already exists
       const existingExhibitor = await this.exhibitorRepository.findOne({
         where: { email: exhibitorDto.email },
       });
       if (existingExhibitor) {
-        throw new ConflictException('Email already exists');
+        throw new DuplicateResourceException('Exhibitor', 'email', exhibitorDto.email);
       }
-    }
 
-    Object.assign(exhibitor, exhibitorDto);
-    return await this.exhibitorRepository.save(exhibitor);
+      const exhibitor = this.exhibitorRepository.create(exhibitorDto);
+      const savedExhibitor = await this.exhibitorRepository.save(exhibitor);
+      
+      // Return exhibitor with relations
+      return await this.exhibitorRepository.findOne({
+        where: { id: savedExhibitor.id },
+        relations: ['promotionalOffers']
+      }) || savedExhibitor;
+    } catch (error) {
+      if (error instanceof DuplicateResourceException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor creation');
+    }
   }
 
-  async deleteExhibitor(id: string): Promise<void> {
-    const exhibitor = await this.getExhibitorById(id);
-    
-    // Delete all associated files
-    if (exhibitor.flyers && exhibitor.flyers.length > 0) {
-      exhibitor.flyers.forEach((flyer) => {
-        const filePath = path.join(__dirname, '..', '..', flyer);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+  async getAllExhibitors(): Promise<any[]> {
+    try {
+      const exhibitors = await this.exhibitorRepository.find({
+        relations: ['promotionalOffers'],
       });
-    }
-
-    if (exhibitor.documents && exhibitor.documents.length > 0) {
-      exhibitor.documents.forEach((doc) => {
-        const filePath = path.join(__dirname, '..', '..', doc);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+      
+      // Format response with documents like events
+      return exhibitors.map(exhibitor => {
+        // Format documents with names
+        let formattedDocuments: { name: string; document: string }[] = [];
+        if (exhibitor.documents && exhibitor.documentNames) {
+          formattedDocuments = exhibitor.documents.map((doc, index) => ({
+            name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
+            document: doc
+          }));
+        } else if (exhibitor.documents) {
+          // Fallback if no names are provided
+          formattedDocuments = exhibitor.documents.map((doc, index) => ({
+            name: `Document ${index + 1}`,
+            document: doc
+          }));
         }
-      });
-    }
 
-    if (exhibitor.eventImages && exhibitor.eventImages.length > 0) {
-      exhibitor.eventImages.forEach((image) => {
-        const filePath = path.join(__dirname, '..', '..', image);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        const { 
+          documents, // Remove original documents
+          documentNames, // Remove original documentNames
+          ...exhibitorData 
+        } = exhibitor;
+
+        return {
+          ...exhibitorData,
+          documents: formattedDocuments // Add formatted documents
+        };
+      });
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Exhibitors retrieval');
+    }
+  }
+
+  async getExhibitorById(id: string): Promise<any> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({ 
+        where: { id },
+        relations: ['promotionalOffers'],
+      });
+      
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
+
+      // Format documents with names
+      let formattedDocuments: { name: string; document: string }[] = [];
+      if (exhibitor.documents && exhibitor.documentNames) {
+        formattedDocuments = exhibitor.documents.map((doc, index) => ({
+          name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
+          document: doc
+        }));
+      } else if (exhibitor.documents) {
+        formattedDocuments = exhibitor.documents.map((doc, index) => ({
+          name: `Document ${index + 1}`,
+          document: doc
+        }));
+      }
+
+      const { 
+        documents, 
+        documentNames, 
+        ...exhibitorData 
+      } = exhibitor;
+
+      return {
+        ...exhibitorData,
+        documents: formattedDocuments
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor retrieval by ID');
+    }
+  }
+
+  async getExhibitorEntityById(id: string): Promise<Exhibitor> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
+      return exhibitor;
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor entity retrieval by ID');
+    }
+  }
+
+  async updateExhibitor(id: string, exhibitorDto: Partial<ExhibitorDto>): Promise<Exhibitor> {
+    try {
+      const exhibitor = await this.getExhibitorEntityById(id);
+      
+      // Check if email is being changed and if it already exists
+      if (exhibitorDto.email && exhibitorDto.email !== exhibitor.email) {
+        const existingExhibitor = await this.exhibitorRepository.findOne({
+          where: { email: exhibitorDto.email },
+        });
+        if (existingExhibitor) {
+          throw new DuplicateResourceException('Exhibitor', 'email', exhibitorDto.email);
         }
-      });
-    }
+      }
 
-    await this.exhibitorRepository.remove(exhibitor);
+      Object.assign(exhibitor, exhibitorDto);
+      const savedExhibitor = await this.exhibitorRepository.save(exhibitor);
+      
+      // Return exhibitor with relations
+      return await this.exhibitorRepository.findOne({
+        where: { id: savedExhibitor.id },
+        relations: ['promotionalOffers']
+      }) || savedExhibitor;
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof DuplicateResourceException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor update');
+    }
+  }
+
+  async deleteExhibitor(id: string): Promise<{ message: string }> {
+    try {
+      const exhibitor = await this.getExhibitorEntityById(id);
+      
+      // Delete associated files
+      this.deleteExhibitorFiles(exhibitor);
+
+      await this.exhibitorRepository.remove(exhibitor);
+      return { message: 'Exhibitor deleted successfully' };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor deletion');
+    }
   }
 
   async updateExhibitorFiles(
@@ -99,10 +199,79 @@ export class ExhibitorService {
     fileType: 'flyers' | 'documents' | 'eventImages',
     files: string[],
   ): Promise<Partial<Exhibitor>> {
-    const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
-    if (!exhibitor) throw new NotFoundException('Exhibitor not found!');
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
 
-    exhibitor[fileType] = files;
-    return await this.exhibitorRepository.save(exhibitor);
+      exhibitor[fileType] = files;
+      return await this.exhibitorRepository.save(exhibitor);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, `Exhibitor ${fileType} update`);
+    }
+  }
+
+  async updateExhibitorDocuments(
+    id: string,
+    documents: string[],
+    documentNames: string[],
+  ): Promise<Partial<Exhibitor>> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
+
+      exhibitor.documents = documents;
+      exhibitor.documentNames = documentNames;
+      return await this.exhibitorRepository.save(exhibitor);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor documents update');
+    }
+  }
+
+  // Helper method to delete exhibitor files
+  private deleteExhibitorFiles(exhibitor: Exhibitor) {
+    try {
+      // Delete flyers if they exist
+      if (exhibitor.flyers && exhibitor.flyers.length > 0) {
+        exhibitor.flyers.forEach((flyerPath) => {
+          const filePath = path.resolve(flyerPath);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+      }
+
+      // Delete documents if they exist
+      if (exhibitor.documents && exhibitor.documents.length > 0) {
+        exhibitor.documents.forEach((docPath) => {
+          const filePath = path.resolve(docPath);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+      }
+
+      // Delete event images if they exist
+      if (exhibitor.eventImages && exhibitor.eventImages.length > 0) {
+        exhibitor.eventImages.forEach((imagePath) => {
+          const filePath = path.resolve(imagePath);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+      }
+    } catch (fileError) {
+      this.errorHandler.logError(fileError, 'Exhibitor file deletion', exhibitor.id);
+      // Continue with exhibitor deletion even if file deletion fails
+    }
   }
 }

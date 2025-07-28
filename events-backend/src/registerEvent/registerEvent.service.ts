@@ -219,10 +219,14 @@ export class RegisterEventService {
               exhibitors:
                 registerEvent.event?.eventExhibitors
                   ?.filter((ee) => ee.exhibitor.isActive)
-                  ?.map((ee) => ({
-                    ...ee.exhibitor,
-                    promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                  })) || [],
+                  ?.map((ee) => {
+                    // Format exhibitor documents
+                    const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+                    return {
+                      ...formattedExhibitor,
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
             },
             attendanceCount: attendanceCount,
             isFavorite: isFavorite,
@@ -337,10 +341,14 @@ export class RegisterEventService {
       const exhibitors =
         registerEvent.event?.eventExhibitors
           ?.filter((ee) => ee.exhibitor.isActive)
-          ?.map((ee) => ({
-            ...ee.exhibitor,
-            promotionalOffers: ee.exhibitor.promotionalOffers || [],
-          })) || [];
+          ?.map((ee) => {
+            // Format exhibitor documents
+            const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+            return {
+              ...formattedExhibitor,
+              promotionalOffers: ee.exhibitor.promotionalOffers || [],
+            };
+          }) || [];
 
       // Clean up event object
       const {
@@ -489,5 +497,34 @@ export class RegisterEventService {
       }
       this.errorHandler.handleDatabaseError(error, 'Register Event deletion');
     }
+  }
+
+  private formatExhibitorDocuments(exhibitor: any) {
+    // Format documents with names
+    let formattedDocuments: { name: string; document: string }[] = [];
+    if (exhibitor.documents && exhibitor.documentNames) {
+      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
+        name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
+        document: doc
+      }));
+    } else if (exhibitor.documents) {
+      // Fallback if no names are provided
+      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
+        name: `Document ${index + 1}`,
+        document: doc
+      }));
+    }
+
+    // Remove raw documents and documentNames from response
+    const { 
+      documents, 
+      documentNames, 
+      ...exhibitorData 
+    } = exhibitor;
+
+    return {
+      ...exhibitorData,
+      documents: formattedDocuments
+    };
   }
 }

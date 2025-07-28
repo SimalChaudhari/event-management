@@ -68,6 +68,11 @@ export class ExhibitorDto {
   @IsArray()
   documents?: string[];
 
+  // Add document names field (Event जैसा ही)
+  @IsOptional()
+  @IsArray()
+  documentNames?: string[];
+
   @IsOptional()
   @IsArray()
   eventImages?: string[];
@@ -80,6 +85,11 @@ export class ExhibitorDto {
   @IsOptional()
   @IsArray()
   originalDocuments?: string[];
+
+  // Add this for handling existing document names (Event जैसा ही)
+  @IsOptional()
+  @IsArray()
+  originalDocumentNames?: string[];
 
   @IsOptional()
   @IsArray()

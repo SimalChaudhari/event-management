@@ -48,6 +48,11 @@ import { EventExhibitor } from 'event/event.entity';
     // Multiple documents support
     @Column('simple-array', { nullable: true })
     documents?: string[];
+
+    // Add this new field for document names (Event जैसा ही)
+    @Column('simple-array', { nullable: true })
+    documentNames?: string[];
+    
   
     // Multiple event images support
     @Column('simple-array', { nullable: true })
