@@ -22,6 +22,23 @@ export class FavoriteEventService {
     private registerEventRepository: Repository<RegisterEvent>,
   ) {}
 
+  // Private helper method for formatting documents
+  private formatDocuments(documents?: string[], documentNames?: string[]): { name: string; document: string }[] {
+    let formattedDocuments: { name: string; document: string }[] = [];
+    if (documents && documentNames) {
+      formattedDocuments = documents.map((doc, index) => ({
+        name: documentNames[index] || `Document ${index + 1}`,
+        document: doc
+      }));
+    } else if (documents) {
+      formattedDocuments = documents.map((doc, index) => ({
+        name: `Document ${index + 1}`,
+        document: doc
+      }));
+    }
+    return formattedDocuments;
+  }
+
   async toggleFavorite(
     userId: string,
     eventId: string,
@@ -59,6 +76,57 @@ export class FavoriteEventService {
     }
   }
 
+  private formatExhibitorDocuments(exhibitor: any) {
+    // Use the same formatting helper method for exhibitor documents
+    const formattedDocuments = this.formatDocuments(exhibitor.documents, exhibitor.documentNames);
+
+    // Format images with names
+    let formattedImages: { name: string; image: string }[] = [];
+    if (exhibitor.eventImages && exhibitor.eventImageNames) {
+      formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
+        name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
+        image: img
+      }));
+    } else if (exhibitor.eventImages) {
+      formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
+        name: `Image ${index + 1}`,
+        image: img
+      }));
+    }
+
+    // Format flyers with names
+    let formattedFlyers: { name: string; flyer: string }[] = [];
+    if (exhibitor.flyers && exhibitor.flyerNames) {
+      formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
+        name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+        flyer: flyer
+      }));
+    } else if (exhibitor.flyers) {
+      formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
+        name: `Flyer ${index + 1}`,
+        flyer: flyer
+      }));
+    }
+
+    // Remove raw documents and documentNames from response
+    const { 
+      documents, 
+      documentNames, 
+      eventImages,
+      eventImageNames,
+      flyers,
+      flyerNames,
+      ...exhibitorData 
+    } = exhibitor;
+
+    return {
+      ...exhibitorData,
+      documents: formattedDocuments, // Use formatted documents
+      flyers: formattedFlyers,
+      eventImages: formattedImages,
+    };
+  }
+
   async getUserFavorites(
     userId: string,
     filter: FavoriteFilterType = FavoriteFilterType.ALL,
@@ -71,8 +139,10 @@ export class FavoriteEventService {
       .leftJoinAndSelect('favorite.event', 'event')
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
       .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
-      .leftJoinAndSelect('event.category', 'eventCategory') // Add this
-      .leftJoinAndSelect('eventCategory.category', 'category') // Add this
+      .leftJoinAndSelect('event.category', 'eventCategory')
+      .leftJoinAndSelect('eventCategory.category', 'category')
+      .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
+      .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
       .where('favorite.userId = :userId', { userId });
 
     // Apply filters based on filter type
@@ -123,23 +193,16 @@ export class FavoriteEventService {
           ? await this.getEventAttendanceCount(favorite.eventId)
           : 0;
 
-          let formattedDocuments: { name: string; document: string }[] = [];
-          if (favorite.event.documents && favorite.event.documentNames) {
-            formattedDocuments = favorite.event.documents.map((doc, index) => ({
-              name: favorite.event.documentNames?.[index] || `Document ${index + 1}`,
-              document: doc
-            }));
-          } else if (favorite.event.documents) {
-            // Fallback if no names are provided
-            formattedDocuments = favorite.event.documents.map((doc, index) => ({
-              name: `Document ${index + 1}`,
-              document: doc
-            }));
-          }
+        // Format event documents using helper method
+        const formattedDocuments = this.formatDocuments(
+          favorite.event.documents, 
+          favorite.event.documentNames
+        );
+
         // Since these are favorite events, isFavorite will always be true
         const isFavorite = true;
 
-        // Check if user has registered for this event भी add करें
+        // Check if user has registered for this event
         let isRegistered = false;
         if (favorite.eventId) {
           const registration = await this.registerEventRepository.findOne({
@@ -152,8 +215,15 @@ export class FavoriteEventService {
           isRegistered = !!registration;
         }
 
-        const { eventSpeakers,  documents, 
-          documentNames, category, ...eventData } = favorite.event;
+        const { 
+          eventSpeakers, 
+          documents, 
+          exhibitorDescription,
+          documentNames, 
+          category,
+          eventExhibitors,
+          ...eventData 
+        } = favorite.event;
 
         // Extract categories
         const categories = category?.map((ec) => ec.category) || [];
@@ -164,10 +234,22 @@ export class FavoriteEventService {
           event: {
             ...eventData,
             color: getEventColor(favorite.event.type),
-            documents: formattedDocuments,
-
+            documents: formattedDocuments, // Use formatted documents
             speakers: eventSpeakers?.map((es) => es.speaker) || [],
             categories: categories,
+
+            exhibitors: {
+              exhibitorDescription: exhibitorDescription || '',
+              exhibitors: eventExhibitors.map((ee) => {
+                // Format exhibitor documents
+                const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+                return {
+                  ...formattedExhibitor,
+                  promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                };
+              }) || [],
+            },
+
             attendanceCount: attendanceCount,
             isFavorite: isFavorite, // Always true for favorite events
             isRegistered: isRegistered,
@@ -187,3 +269,5 @@ export class FavoriteEventService {
     return count;
   }
 }
+
+
