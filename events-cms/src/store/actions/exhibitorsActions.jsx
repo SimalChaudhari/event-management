@@ -5,7 +5,8 @@ import {
     EXHIBITOR_BY_ID, 
     CREATE_EXHIBITOR, 
     UPDATE_EXHIBITOR, 
-    DELETE_EXHIBITOR 
+    DELETE_EXHIBITOR, 
+    FETCH_PROMOTIONAL_OFFERS
 } from '../constants/actionTypes';
 
 // Get all exhibitors
@@ -99,3 +100,19 @@ export const deleteExhibitor = (id) => async (dispatch) => {
         return false;
     }
 };
+
+
+export const fetchPromotional = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/promotional-offers');
+        dispatch({
+            type: FETCH_PROMOTIONAL_OFFERS,
+            payload: response.data
+        });
+        return response.data;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch promotional offers';
+        toast.error(errorMessage);
+        return false;
+    }
+}

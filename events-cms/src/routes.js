@@ -88,7 +88,12 @@ const speakerComponents = {
 const exhibitorComponents = {
     List: React.lazy(() => import('./Pages/Exhibitors/Exhibitors.jsx')),
     AddExhibitor: React.lazy(() => import('./Pages/Exhibitors/AddExhibitorPage.jsx')),
-    ViewExhibitor: React.lazy(() => import('./Pages/Exhibitors/ViewExhibitorPage.jsx'))
+    ViewExhibitor: React.lazy(() => import('./Pages/Exhibitors/ViewExhibitorPage.jsx')),
+    
+    // Promotional Offers components
+    PromotionalOffers: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/PromotionalOffersPage.jsx')),
+    AddPromotionalOffer: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/AddPromotionalOfferPage.jsx')),
+    ViewPromotionalOffer: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/ViewPromotionalOfferPage.jsx'))
 };
 
 /**
@@ -209,6 +214,32 @@ const exhibitorRoutes = [
         exact: true,
         name: 'View Exhibitor',
         component: exhibitorComponents.ViewExhibitor
+    },
+    
+    // Promotional Offers routes
+    {
+        path: EXHIBITOR_PATHS.PROMOTIONAL_OFFERS,
+        exact: true,
+        name: 'Promotional Offers',
+        component: exhibitorComponents.PromotionalOffers
+    },
+    {
+        path: EXHIBITOR_PATHS.ADD_PROMOTIONAL_OFFER,
+        exact: true,
+        name: 'Add Promotional Offer',
+        component: exhibitorComponents.AddPromotionalOffer
+    },
+    {
+        path: EXHIBITOR_PATHS.EDIT_PROMOTIONAL_OFFER + '/:id',
+        exact: true,
+        name: 'Edit Promotional Offer',
+        component: exhibitorComponents.AddPromotionalOffer
+    },
+    {
+        path: EXHIBITOR_PATHS.VIEW_PROMOTIONAL_OFFER + '/:id',
+        exact: true,
+        name: 'View Promotional Offer',
+        component: exhibitorComponents.ViewPromotionalOffer
     }
 ];
 

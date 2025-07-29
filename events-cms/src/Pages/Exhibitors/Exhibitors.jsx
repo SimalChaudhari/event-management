@@ -10,14 +10,15 @@ import * as $ from 'jquery';
 import { exhibitorList, deleteExhibitor } from '../../store/actions/exhibitorsActions';
 import { useNavigate } from 'react-router-dom';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
-import { API_URL } from '../../configs/env';
+import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
+import { getAllPromotionalOffers } from '../../store/actions/promotionalOfferActions';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, handleView) {
+function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, handleView, handleOffers) {
     let tableZero = '#exhibitor-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -33,46 +34,68 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
         order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
-        pageLength: 10,
+        pageLength: 5, // Events जैसा ही
         lengthMenu: [
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
         ],
+        pagingType: 'full_numbers', // Events जैसा ही
+        dom:
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-exhibitor-button ml-2'>>>" +
+            "<'row'<'col-sm-12'tr>>" +
+            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>", // Events जैसा ही
         columns: [
             {
                 data: 'name',
                 title: 'Exhibitor Details',
                 render: function (data, type, row) {
+                    // Events pattern के अनुसार image handling
                     const imageUrl = row.eventImages && row.eventImages.length > 0 
-                        ? `${API_URL}/${row.eventImages[0]}` 
-                        : '/assets/images/user/avatar-1.jpg';
+                        ? (row.eventImages[0].eventImage 
+                            ? `${API_URL}/${row.eventImages[0].eventImage}` 
+                            : `${API_URL}/${row.eventImages[0]}`)
+                        : DUMMY_PATH;
                     
-                    const statusBadge = row.isActive 
-                        ? '<span class="badge badge-success">Active</span>'
-                        : '<span class="badge badge-danger">Inactive</span>';
+                    // Events pattern के अनुसार status badge
+                    let badgeClass = 'badge-light-success';
+                    let statusText = 'Active';
+                    
+                    if (!row.isActive) {
+                        badgeClass = 'badge-light-danger';
+                        statusText = 'Inactive';
+                    }
 
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${imageUrl}" alt="exhibitor image" class="img-radius wid-40 align-top m-r-15" 
-                                 onerror="this.src='/assets/images/user/avatar-1.jpg';">
+                            <img src="${imageUrl}" alt="exhibitor" class="img-radius align-top m-r-15" 
+                                 style="width:50px; height:50px; object-fit:cover;" 
+                                 onerror="this.src='${DUMMY_PATH}';">
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.name || 'N/A'}</h6>
-                                <p class="m-b-0 text-muted">${row.companyName || 'N/A'}</p>
-                                ${statusBadge}
+                                <p class="m-b-5 text-muted">${row.companyName || 'N/A'}</p>
+                                <span class="badge ${badgeClass}">
+                                    ${statusText}
+                                </span>
                             </div>
-                        </div>
+                        </div>   
                     `;
                 }
             },
             {
                 data: 'email',
-                title: 'Contact Information',
+                title: 'Contact & Company',
                 render: function (data, type, row) {
+                    // Events pattern के अनुसार styling
                     return `
-                        <div class="contact-info">
-                            <div><strong>Email:</strong> ${row.email || 'N/A'}</div>
-                            <div><strong>Mobile:</strong> ${row.mobile || 'N/A'}</div>
-                            <div><strong>Username:</strong> ${row.userName || 'N/A'}</div>
+                        <div class="d-inline-block align-middle">
+                            <h6 class="m-b-5">${row.email || 'N/A'}</h6>
+                            <p class="m-b-0">
+                                <span class="badge badge-success">
+                                    <i class="feather icon-phone mr-1"></i>
+                                    ${row.mobile || 'N/A'}
+                                </span>
+                            </p>
+                            <p class="m-b-0 text-muted small">@${row.userName || 'N/A'}</p>
                         </div>
                     `;
                 }
@@ -81,39 +104,20 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
                 data: 'address',
                 title: 'Location',
                 render: function (data, type, row) {
+                    // Events pattern के अनुसार location styling
                     return `
-                        <div class="text-wrap" style="max-width: 200px;">
-                            <span class="badge badge-light-primary">
-                                <i class="feather icon-map-pin mr-1"></i>
-                                ${row.address || 'N/A'}
-                            </span>
+                        <div class="d-inline-block align-middle">
+                            <p class="m-b-0">
+                                <span class="badge badge-light-primary">
+                                    <i class="feather icon-map-pin mr-1"></i>
+                                    ${row.address || 'Not specified'}
+                                </span>
+                            </p>
                         </div>
                     `;
                 }
             },
-            {
-                data: 'promotionalOffers',
-                title: 'Offers & Documents',
-                render: function (data, type, row) {
-                    const offersCount = row.promotionalOffers?.length || 0;
-                    const documentsCount = row.documents?.length || 0;
-                    const flyersCount = row.flyers?.length || 0;
-                    
-                    return `
-                        <div class="offers-info">
-                            <div class="mb-1">
-                                <span class="badge badge-info">Offers: ${offersCount}</span>
-                            </div>
-                            <div class="mb-1">
-                                <span class="badge badge-warning">Documents: ${documentsCount}</span>
-                            </div>
-                            <div>
-                                <span class="badge badge-secondary">Flyers: ${flyersCount}</span>
-                            </div>
-                        </div>
-                    `;
-                }
-            },
+        
             {
                 data: null,
                 title: 'Created Date',
@@ -126,11 +130,16 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
                 title: 'Actions',
                 orderable: false,
                 render: function (data, type, row) {
+                    // Events pattern के अनुसार action buttons
                     return `
                         <div class="btn-group" role="group" aria-label="Actions">
                             <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
+                            </button>
+                            <button type="button" class="btn btn-info btn-circle btn-sm offers-btn" data-id="${row.id}" title="Promotional Offers" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-gift"></i>
                             </button>
                             <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
@@ -146,10 +155,27 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
             }
         ],
         initComplete: function (settings, json) {
+            // Events pattern के अनुसार Add button initialization
+            if (!$('#addExhibitorBtn').length) {
+                $('.add-exhibitor-button').html(`
+                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addExhibitorBtn">
+                        <i class="feather icon-plus mr-1"></i>
+                        Add
+                    </button>
+                `);
+
+                $('#addExhibitorBtn').on('click', handleAddExhibitor);
+            }
+
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const id = $(this).data('id');
                 handleView(id);
+            });
+
+            $(tableZero + ' tbody').off('click', '.offers-btn').on('click', '.offers-btn', function () {
+                const id = $(this).data('id');
+                handleOffers(id);
             });
 
             $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
@@ -182,35 +208,56 @@ const Exhibitors = () => {
     const navigate = useNavigate();
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExhibitorId, setSelectedExhibitorId] = useState(null);
+    const [currentTable, setCurrentTable] = useState(null); // Events pattern के अनुसार
 
     const { exhibitors, loading } = useSelector((state) => state.exhibitor);
 
     useEffect(() => {
         dispatch(exhibitorList());
+        return () => destroyTable(); // Events pattern के अनुसार cleanup
     }, [dispatch]);
 
     useEffect(() => {
-        if (exhibitors && exhibitors.length >= 0) {
-            exhibitorTable(
+        initializeTable();
+        return () => destroyTable(); // Events pattern के अनुसार cleanup
+    }, [exhibitors]);
+
+    // Events pattern के अनुसार table management
+    const destroyTable = () => {
+        if (currentTable) {
+            $('#exhibitor-data-table').off('click', '.delete-btn');
+            currentTable.destroy();
+            setCurrentTable(null);
+        }
+    };
+
+    const initializeTable = () => {
+        destroyTable();
+        if (Array.isArray(exhibitors) && exhibitors.length >= 0) {
+            const table = exhibitorTable(
                 exhibitors,
                 handleAddExhibitor,
                 handleEdit,
                 handleDelete,
-                handleView
+                handleView,
+                handleOffers
             );
+            setCurrentTable(table);
         }
-    }, [exhibitors]);
+    };
 
     const handleAddExhibitor = () => {
         navigate(EXHIBITOR_PATHS.ADD_EXHIBITOR);
     };
 
     const handleEdit = (id) => {
-        navigate(`${EXHIBITOR_PATHS.EDIT_EXHIBITOR}?id=${id}`);
+        // Events pattern के अनुसार navigation
+        navigate(`${EXHIBITOR_PATHS.EDIT_EXHIBITOR}/${id}`);
     };
 
     const handleView = (id) => {
-        navigate(`${EXHIBITOR_PATHS.VIEW_EXHIBITOR}?id=${id}`);
+        // Events pattern के अनुसार navigation
+        navigate(`${EXHIBITOR_PATHS.VIEW_EXHIBITOR}/${id}`);
     };
 
     const handleDelete = (id) => {
@@ -218,73 +265,80 @@ const Exhibitors = () => {
         setIsDeleteModalOpen(true);
     };
 
-    const confirmDelete = async () => {
-        if (selectedExhibitorId) {
+    // Events pattern के अनुसार delete handling
+    const handleConfirmDelete = async () => {
+        if (!selectedExhibitorId) return;
+
+        try {
             const success = await dispatch(deleteExhibitor(selectedExhibitorId));
             if (success) {
-                dispatch(exhibitorList()); // Refresh the list
+                setIsDeleteModalOpen(false);
+                setSelectedExhibitorId(null);
+                destroyTable();
+                await dispatch(exhibitorList());
             }
+        } catch (error) {
+            console.error('Delete failed:', error);
         }
+    };
+
+    const handleClose = () => {
         setIsDeleteModalOpen(false);
         setSelectedExhibitorId(null);
     };
 
-    const cancelDelete = () => {
-        setIsDeleteModalOpen(false);
-        setSelectedExhibitorId(null);
+    // Event Gallery के handleGallery जैसा pattern
+    const handleOffers = async (exhibitorId) => {
+        try {
+            const response = await dispatch(getAllPromotionalOffers());
+            const allOffers = response?.data || [];
+            const existingOffers = allOffers.filter(offer => offer.exhibitorId === exhibitorId);
+            
+            // अगर offers exist करते हैं तो list page पर भेज दो, नहीं तो add page पर
+            if (existingOffers && existingOffers.length > 0) {
+                navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${exhibitorId}`);
+            } else {
+                navigate(`${EXHIBITOR_PATHS.ADD_PROMOTIONAL_OFFER}?exhibitorId=${exhibitorId}`);
+            }
+        } catch (error) {
+            console.error('Error checking promotional offers:', error);
+            navigate(`${EXHIBITOR_PATHS.ADD_PROMOTIONAL_OFFER}?exhibitorId=${exhibitorId}`);
+        }
     };
 
     return (
         <>
+            {/* Events pattern के अनुसार Delete Modal */}
+            <DeleteConfirmationModal 
+                show={isDeleteModalOpen} 
+                onHide={handleClose} 
+                onConfirm={handleConfirmDelete} 
+                isLoading={false}
+                title="Delete Exhibitor"
+                message="Are you sure you want to delete this exhibitor? This action cannot be undone."
+            />
+            
             <Row>
-                <Col sm={12}>
-                    <Card>
-                        <Card.Header>
-                            <div className="d-flex justify-content-between align-items-center">
-                                <Card.Title as="h5">Exhibitors Management</Card.Title>
-                                <button 
-                                    className="btn btn-primary"
-                                    onClick={handleAddExhibitor}
-                                >
-                                    <i className="feather icon-plus mr-2"></i>
-                                    Add New Exhibitor
-                                </button>
-                            </div>
-                        </Card.Header>
+                <Col sm={12} className="btn-page">
+                    <Card className="exhibitor-list"> {/* Events pattern के अनुसार class */}
                         <Card.Body>
-                            {loading ? (
-                                <div className="text-center">
-                                    <div className="spinner-border" role="status">
-                                        <span className="sr-only">Loading...</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <Table id="exhibitor-data-table" className="table table-striped table-bordered nowrap">
-                                    <thead>
-                                        <tr>
-                                            <th>Exhibitor Details</th>
-                                            <th>Contact Information</th>
-                                            <th>Location</th>
-                                            <th>Offers & Documents</th>
-                                            <th>Created Date</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </Table>
-                            )}
+                            <Table striped hover responsive id="exhibitor-data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Exhibitor Details</th>
+                                        <th>Contact & Company</th>
+                                        <th>Location</th>
+                                       
+                                        <th>Created Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </Table>
                         </Card.Body>
                     </Card>
                 </Col>
             </Row>
-
-            <DeleteConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onConfirm={confirmDelete}
-                onCancel={cancelDelete}
-                title="Delete Exhibitor"
-                message="Are you sure you want to delete this exhibitor? This action cannot be undone."
-            />
         </>
     );
 };

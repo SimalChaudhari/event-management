@@ -1043,16 +1043,51 @@ export class EventService {
       }));
     }
 
+     // Format images with names
+     let formattedImages: { name: string; image: string }[] = [];
+     if (exhibitor.eventImages && exhibitor.eventImageNames) {
+       formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
+         name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
+         image: img
+       }));
+     } else if (exhibitor.eventImages) {
+       formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
+         name: `Image ${index + 1}`,
+         image: img
+       }));
+     }
+
+     // Format flyers with names
+     let formattedFlyers: { name: string; flyer: string }[] = [];
+     if (exhibitor.flyers && exhibitor.flyerNames) {
+       formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
+         name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+         flyer: flyer
+       }));
+     } else if (exhibitor.flyers) {
+       formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
+         name: `Flyer ${index + 1}`,
+         flyer: flyer
+       }));
+     }
+
     // Remove raw documents and documentNames from response
     const { 
       documents, 
       documentNames, 
+      eventImages,
+      eventImageNames,
+      flyers,
+      flyerNames,
+    
       ...exhibitorData 
     } = exhibitor;
 
     return {
       ...exhibitorData,
-      documents: formattedDocuments
+      documents: formattedDocuments,
+      flyers: formattedFlyers,
+      eventImages: formattedImages,
     };
   }
 }

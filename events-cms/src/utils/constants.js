@@ -30,7 +30,13 @@ export const EXHIBITOR_PATHS = {
     LIST_EXHIBITORS: '/exhibitors',
     ADD_EXHIBITOR: '/exhibitors/add-exhibitor',
     EDIT_EXHIBITOR: '/exhibitors/edit-exhibitor',
-    VIEW_EXHIBITOR: '/exhibitors/view-exhibitor'
+    VIEW_EXHIBITOR: '/exhibitors/view-exhibitor',
+    
+    // Promotional Offers paths (Event Gallery जैसा pattern)
+    PROMOTIONAL_OFFERS: '/exhibitors/promotional-offers',
+    ADD_PROMOTIONAL_OFFER: '/exhibitors/promotional-offers/add',
+    EDIT_PROMOTIONAL_OFFER: '/exhibitors/promotional-offers/edit',
+    VIEW_PROMOTIONAL_OFFER: '/exhibitors/promotional-offers/view',
 };
 
 export const EVENT_PATHS = {

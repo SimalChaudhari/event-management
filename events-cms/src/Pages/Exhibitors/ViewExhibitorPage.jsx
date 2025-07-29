@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Row, Col, Card, Badge, Button, Tab, Nav, Alert } from 'react-bootstrap';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Row, Col, Card, Badge, Button, Tab, Nav, Alert, Container, Modal } from 'react-bootstrap';
 import { exhibitorById } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
@@ -10,26 +10,31 @@ import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils'
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const exhibitorId = searchParams.get('id');
+    const { id } = useParams();
 
     const [exhibitor, setExhibitor] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // Zoomable functionality states - Events pattern के अनुसार exact same
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [currentImageType, setCurrentImageType] = useState('');
+    const [currentImages, setCurrentImages] = useState([]);
+
     useEffect(() => {
-        if (exhibitorId) {
+        if (id) {
             loadExhibitorData();
         } else {
             setError('Exhibitor ID not found');
             setLoading(false);
         }
-    }, [exhibitorId]);
+    }, [id]);
 
     const loadExhibitorData = async () => {
         try {
             setLoading(true);
-            const response = await dispatch(exhibitorById(exhibitorId));
+            const response = await dispatch(exhibitorById(id));
             if (response && response.data) {
                 setExhibitor(response.data);
             } else {
@@ -43,11 +48,65 @@ const ViewExhibitorPage = () => {
     };
 
     const handleEdit = () => {
-        navigate(`${EXHIBITOR_PATHS.EDIT_EXHIBITOR}?id=${exhibitorId}`);
+        navigate(`${EXHIBITOR_PATHS.ADD_EXHIBITOR}/${id}`);
     };
 
     const handleBack = () => {
         navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
+    };
+
+    // Image Modal Functions - Events pattern के अनुसार exact same
+    const getImageSrc = (image) => {
+        if (typeof image === 'string') {
+            if (image.startsWith('http')) {
+                return image;
+            }
+            return `${API_URL}/${image.replace(/\\/g, '/')}`;
+        }
+        if (image && image.flyer) {
+            return `${API_URL}/${image.flyer.replace(/\\/g, '/')}`;
+        }
+        if (image && image.eventImage) {
+            return `${API_URL}/${image.eventImage.replace(/\\/g, '/')}`;
+        }
+        if (image && image.image) {
+            return `${API_URL}/${image.image.replace(/\\/g, '/')}`;
+        }
+        return image;
+    };
+
+    const goToPreviousImage = () => {
+        setCurrentImageIndex((prevIndex) => 
+            prevIndex === 0 ? currentImages.length - 1 : prevIndex - 1
+        );
+    };
+
+    const goToNextImage = () => {
+        setCurrentImageIndex((prevIndex) => 
+            prevIndex === currentImages.length - 1 ? 0 : prevIndex + 1
+        );
+    };
+
+    const handleFlyerImageClick = (index) => {
+        setCurrentImages(exhibitor.flyers || []);
+        setCurrentImageIndex(index);
+        setCurrentImageType('flyers');
+        setShowImageModal(true);
+    };
+
+    const handleEventImageClick = (index) => {
+        setCurrentImages(exhibitor.eventImages || []);
+        setCurrentImageIndex(index);
+        setCurrentImageType('eventImages');
+        setShowImageModal(true);
+    };
+
+    const handleOfferImageClick = (offerIndex) => {
+        const offersWithImages = exhibitor.promotionalOffers.filter(offer => offer.image);
+        setCurrentImages(offersWithImages);
+        setCurrentImageIndex(offerIndex);
+        setCurrentImageType('offers');
+        setShowImageModal(true);
     };
 
     if (loading) {
@@ -62,27 +121,33 @@ const ViewExhibitorPage = () => {
 
     if (error) {
         return (
-            <Row>
-                <Col sm={12}>
-                    <Alert variant="danger">{error}</Alert>
-                    <Button variant="secondary" onClick={handleBack}>
-                        Back to Exhibitors
-                    </Button>
-                </Col>
-            </Row>
+            <Container fluid>
+                <Row>
+                    <Col sm={12}>
+                        <Alert variant="danger">{error}</Alert>
+                        <Button variant="secondary" onClick={handleBack}>
+                            <i className="fas fa-arrow-left me-2"></i>
+                            Back to Exhibitors
+                        </Button>
+                    </Col>
+                </Row>
+            </Container>
         );
     }
 
     if (!exhibitor) {
         return (
-            <Row>
-                <Col sm={12}>
-                    <Alert variant="warning">Exhibitor not found</Alert>
-                    <Button variant="secondary" onClick={handleBack}>
-                        Back to Exhibitors
-                    </Button>
-                </Col>
-            </Row>
+            <Container fluid>
+                <Row>
+                    <Col sm={12}>
+                        <Alert variant="warning">Exhibitor not found</Alert>
+                        <Button variant="secondary" onClick={handleBack}>
+                            <i className="fas fa-arrow-left me-2"></i>
+                            Back to Exhibitors
+                        </Button>
+                    </Col>
+                </Row>
+            </Container>
         );
     }
 
@@ -93,14 +158,15 @@ const ViewExhibitorPage = () => {
 
         return (
             <Row>
-                {exhibitor.promotionalOffers.map((offer) => (
+                {exhibitor.promotionalOffers.map((offer, index) => (
                     <Col md={6} lg={4} key={offer.id} className="mb-3">
                         <Card className="h-100">
                             {offer.image && (
                                 <Card.Img 
                                     variant="top" 
                                     src={`${API_URL}/${offer.image}`}
-                                    style={{ height: '200px', objectFit: 'cover' }}
+                                    style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                                    onClick={() => handleOfferImageClick(index)}
                                     onError={(e) => {
                                         e.target.src = '/assets/images/placeholder.jpg';
                                     }}
@@ -108,17 +174,67 @@ const ViewExhibitorPage = () => {
                             )}
                             <Card.Body>
                                 <Card.Title className="h6">{offer.title}</Card.Title>
-                                <Card.Text className="small text-muted">
-                                    {offer.description}
-                                </Card.Text>
+                                <Card.Text className="small text-muted">{offer.description}</Card.Text>
                                 <div className="d-flex justify-content-between align-items-center">
-                                    <small className="text-muted">
-                                        Valid until: {new Date(offer.validDate).toLocaleDateString()}
-                                    </small>
-                                    <Badge variant={offer.isActive ? 'success' : 'danger'}>
-                                        {offer.isActive ? 'Active' : 'Inactive'}
-                                    </Badge>
+                                    <small className="text-muted">Valid until: {new Date(offer.validDate).toLocaleDateString()}</small>
+                                    <Badge variant={offer.isActive ? 'success' : 'danger'}>{offer.isActive ? 'Active' : 'Inactive'}</Badge>
                                 </div>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                ))}
+            </Row>
+        );
+    };
+
+    const renderFlyers = () => {
+        if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
+            return <p className="text-muted">No flyers available.</p>;
+        }
+
+        return (
+            <Row>
+                {exhibitor.flyers.map((flyer, index) => (
+                    <Col md={4} lg={3} key={index} className="mb-3">
+                        <Card style={{ cursor: 'pointer' }} onClick={() => handleFlyerImageClick(index)}>
+                            <Card.Img 
+                                variant="top" 
+                                src={`${API_URL}/${flyer.flyer || flyer}`}
+                                style={{ height: '200px', objectFit: 'cover' }}
+                                onError={(e) => {
+                                    e.target.src = '/assets/images/placeholder.jpg';
+                                }}
+                            />
+                            <Card.Body className="p-2">
+                                <small className="text-muted">{flyer.name || `Flyer ${index + 1}`}</small>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                ))}
+            </Row>
+        );
+    };
+
+    const renderEventImages = () => {
+        if (!exhibitor.eventImages || exhibitor.eventImages.length === 0) {
+            return <p className="text-muted">No event images available.</p>;
+        }
+
+        return (
+            <Row>
+                {exhibitor.eventImages.map((eventImage, index) => (
+                    <Col md={4} lg={3} key={index} className="mb-3">
+                        <Card style={{ cursor: 'pointer' }} onClick={() => handleEventImageClick(index)}>
+                            <Card.Img 
+                                variant="top" 
+                                src={`${API_URL}/${eventImage.eventImage || eventImage}`}
+                                style={{ height: '200px', objectFit: 'cover' }}
+                                onError={(e) => {
+                                    e.target.src = '/assets/images/placeholder.jpg';
+                                }}
+                            />
+                            <Card.Body className="p-2">
+                                <small className="text-muted">{eventImage.name || `Event Image ${index + 1}`}</small>
                             </Card.Body>
                         </Card>
                     </Col>
@@ -139,18 +255,18 @@ const ViewExhibitorPage = () => {
                         <Card.Body className="py-2">
                             <div className="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 className="mb-0">{doc.name}</h6>
+                                    <h6 className="mb-0">{doc.name || `Document ${index + 1}`}</h6>
                                     <small className="text-muted">Document {index + 1}</small>
                                 </div>
                                 <div>
                                     <Button 
                                         variant="outline-primary" 
                                         size="sm"
-                                        href={`${API_URL}/${doc.document}`}
+                                        href={`${API_URL}/${doc.document || doc}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
-                                        <i className="feather icon-download me-1"></i>
+                                        <i style={{ marginRight: '10px' }} className="feather icon-download me-1"></i>
                                         Download
                                     </Button>
                                 </div>
@@ -162,181 +278,329 @@ const ViewExhibitorPage = () => {
         );
     };
 
-    const renderImages = (images, title) => {
-        if (!images || images.length === 0) {
-            return <p className="text-muted">No {title.toLowerCase()} available.</p>;
+    const renderExhibitorStats = () => (
+        <div className="exhibitor-stats">
+            <div className="text-center p-3 bg-light rounded">
+                <div className="row text-center">
+                    <div className="col-3">
+                        <h6 className="mb-0">{exhibitor.promotionalOffers?.length || 0}</h6>
+                        <small className="text-muted">Offers</small>
+                    </div>
+                    <div className="col-3">
+                        <h6 className="mb-0">{exhibitor.documents?.length || 0}</h6>
+                        <small className="text-muted">Documents</small>
+                    </div>
+                    <div className="col-3">
+                        <h6 className="mb-0">{exhibitor.flyers?.length || 0}</h6>
+                        <small className="text-muted">Flyers</small>
+                    </div>
+                    <div className="col-3">
+                        <h6 className="mb-0">{exhibitor.eventImages?.length || 0}</h6>
+                        <small className="text-muted">Images</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Events pattern के अनुसार exact same modal
+    const renderImageModal = () => {
+        if (!currentImages || currentImages.length === 0) return null;
+
+        const currentImage = currentImages[currentImageIndex];
+        let imageSrc = '';
+        let imageTitle = '';
+
+        if (currentImageType === 'flyers') {
+            imageSrc = getImageSrc(currentImage);
+            imageTitle = currentImage.name || `Flyer ${currentImageIndex + 1}`;
+        } else if (currentImageType === 'eventImages') {
+            imageSrc = getImageSrc(currentImage);
+            imageTitle = currentImage.name || `Event Image ${currentImageIndex + 1}`;
+        } else if (currentImageType === 'offers') {
+            imageSrc = getImageSrc(currentImage);
+            imageTitle = currentImage.title || `Promotional Offer ${currentImageIndex + 1}`;
         }
 
         return (
-            <Row>
-                {images.map((image, index) => (
-                    <Col md={4} lg={3} key={index} className="mb-3">
-                        <Card>
-                            <Card.Img 
-                                variant="top" 
-                                src={`${API_URL}/${image}`}
-                                style={{ height: '200px', objectFit: 'cover' }}
-                                onError={(e) => {
-                                    e.target.src = '/assets/images/placeholder.jpg';
+            <Modal
+                show={showImageModal}
+                onHide={() => setShowImageModal(false)}
+                size="xl"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            >
+                <Modal.Body>
+                    {/* Close Button - Events pattern के अनुसार exact same */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Download Button - Events pattern के अनुसार exact same */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = imageSrc;
+                            link.download = `${currentImageType}-${currentImageIndex + 1}.jpg`;
+                            link.click();
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            left: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-download"></i>
+                    </Button>
+
+                    {/* Navigation Arrows - Events pattern के अनुसार exact same */}
+                    {currentImages.length > 1 && (
+                        <>
+                            <Button
+                                variant="light"
+                                size="lg"
+                                onClick={goToPreviousImage}
+                                style={{
+                                    position: 'fixed',
+                                    left: '20px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    borderRadius: '50%',
+                                    width: '50px',
+                                    height: '50px',
+                                    zIndex: 1000,
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    border: 'none',
+                                    color: 'white'
                                 }}
-                            />
-                            <Card.Body className="p-2">
-                                <small className="text-muted">{title} {index + 1}</small>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
+                            >
+                                <i className="fas fa-chevron-left"></i>
+                            </Button>
+
+                            <Button
+                                variant="light"
+                                size="lg"
+                                onClick={goToNextImage}
+                                style={{
+                                    position: 'fixed',
+                                    right: '20px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    borderRadius: '50%',
+                                    width: '50px',
+                                    height: '50px',
+                                    zIndex: 1000,
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    border: 'none',
+                                    color: 'white'
+                                }}
+                            >
+                                <i className="fas fa-chevron-right"></i>
+                            </Button>
+                        </>
+                    )}
+
+                    {/* Image Counter - Events pattern के अनुसार exact same */}
+                    <div
+                        style={{
+                            position: 'fixed',
+                            bottom: '20px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '8px 16px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            zIndex: 1000
+                        }}
+                    >
+                        {currentImageIndex + 1} / {currentImages.length}
+                    </div>
+
+                    {/* Image Container - Events pattern के अनुसार exact same */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
+                        <img
+                            src={imageSrc}
+                            alt={imageTitle}
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Modal image failed to load:', imageSrc);
+                                e.target.style.display = 'none';
+                            }}
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
         );
     };
 
     return (
-        <Row>
-            <Col sm={12}>
-                <Card>
-                    <Card.Header>
-                        <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <Card.Title as="h5">Exhibitor Details</Card.Title>
-                                <p className="text-muted mb-0">View exhibitor information and related data</p>
-                            </div>
-                            <div>
-                                <Button variant="outline-secondary" onClick={handleBack} className="me-2">
-                                    <i className="feather icon-arrow-left me-1"></i>
-                                    Back
-                                </Button>
-                                <Button variant="primary" onClick={handleEdit}>
-                                    <i className="feather icon-edit me-1"></i>
-                                    Edit
-                                </Button>
+        <Container fluid>
+            <div className="row">
+                <div className="col-12">
+                    <div className="card">
+                        <div className="card-header">
+                            <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4 className="card-title">Exhibitor Details</h4>
+                                    <p className="text-muted mb-0">View exhibitor information and related data</p>
+                                </div>
+                                <div>
+                                    <Button variant="secondary" onClick={handleBack} className="me-2">
+                                        <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                        Back
+                                    </Button>
+                                    <Button variant="primary" onClick={handleEdit}>
+                                        <i className="feather icon-edit me-1"></i>
+                                        Edit
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </Card.Header>
-                    <Card.Body>
-                        {/* Basic Information */}
-                        <Row className="mb-4">
-                            <Col md={8}>
-                                <div className="exhibitor-basic-info">
-                                    <div className="d-flex align-items-center mb-3">
-                                        {exhibitor.eventImages && exhibitor.eventImages.length > 0 && (
-                                            <img 
-                                                src={`${API_URL}/${exhibitor.eventImages[0]}`}
-                                                alt="Exhibitor"
-                                                className="img-thumbnail me-3"
-                                                style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                                                onError={(e) => {
-                                                    e.target.src = '/assets/images/user/avatar-1.jpg';
-                                                }}
-                                            />
-                                        )}
-                                        <div>
-                                            <h4 className="mb-1">{exhibitor.name}</h4>
-                                            <p className="text-muted mb-1">{exhibitor.companyName}</p>
-                                            <Badge variant={exhibitor.isActive ? 'success' : 'danger'}>
-                                                {exhibitor.isActive ? 'Active' : 'Inactive'}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Col>
-                            <Col md={4}>
-                                <div className="exhibitor-stats">
-                                    <div className="text-center p-3 bg-light rounded">
-                                        <div className="row text-center">
-                                            <div className="col-4">
-                                                <h6 className="mb-0">{exhibitor.promotionalOffers?.length || 0}</h6>
-                                                <small className="text-muted">Offers</small>
-                                            </div>
-                                            <div className="col-4">
-                                                <h6 className="mb-0">{exhibitor.documents?.length || 0}</h6>
-                                                <small className="text-muted">Documents</small>
-                                            </div>
-                                            <div className="col-4">
-                                                <h6 className="mb-0">{exhibitor.flyers?.length || 0}</h6>
-                                                <small className="text-muted">Flyers</small>
+                        <div className="card-body">
+                            {/* Basic Information */}
+                            <Row className="mb-4">
+                                <Col md={8}>
+                                    <div className="exhibitor-basic-info">
+                                        <div className="d-flex align-items-center mb-3">
+                                            {exhibitor.eventImages && exhibitor.eventImages.length > 0 && (
+                                                <img 
+                                                    src={`${API_URL}/${exhibitor.eventImages[0].eventImage || exhibitor.eventImages[0]}`}
+                                                    alt="Exhibitor"
+                                                    className="img-thumbnail me-3"
+                                                    style={{ 
+                                                        width: '80px', 
+                                                        height: '80px', 
+                                                        objectFit: 'cover',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => handleEventImageClick(0)}
+                                                    onError={(e) => {
+                                                        e.target.src = '/assets/images/user/avatar-1.jpg';
+                                                    }}
+                                                />
+                                            )}
+                                            <div className='m-1'>
+                                                <h4 className="mb-1">{exhibitor.name}</h4>
+                                                <p className="text-muted mb-1">{exhibitor.companyName}</p>
+                                                <Badge variant={exhibitor.isActive ? 'success' : 'danger'}>
+                                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                                </Badge>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </Col>
-                        </Row>
+                                </Col>
+                                <Col md={4}>{renderExhibitorStats()}</Col>
+                            </Row>
 
-                        {/* Contact Information */}
-                        <Row className="mb-4">
-                            <Col md={6}>
-                                <Card className="bg-light">
-                                    <Card.Body>
-                                        <h6 className="card-title">Contact Information</h6>
-                                        <div className="contact-details">
-                                            <p><strong>Email:</strong> {exhibitor.email}</p>
-                                            <p><strong>Mobile:</strong> {exhibitor.mobile}</p>
-                                            <p><strong>Username:</strong> {exhibitor.userName}</p>
-                                            <p><strong>Address:</strong> {exhibitor.address || 'Not provided'}</p>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                            <Col md={6}>
-                                <Card className="bg-light">
-                                    <Card.Body>
-                                        <h6 className="card-title">Additional Information</h6>
-                                        <div className="additional-details">
-                                            <p><strong>Created:</strong> {formatDateTimeForTable(exhibitor.createdAt)}</p>
-                                            <p><strong>Last Updated:</strong> {formatDateTimeForTable(exhibitor.updatedAt)}</p>
-                                            <p><strong>Company Description:</strong></p>
-                                            <p className="text-muted small">
-                                                {exhibitor.companyDescription || 'No description provided'}
-                                            </p>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        </Row>
+                            {/* Contact Information */}
+                            <Row className="mb-4">
+                                <Col md={6}>
+                                    <Card className="bg-light">
+                                        <Card.Body>
+                                            <h6 className="card-title">Contact Information</h6>
+                                            <hr />
+                                            <div className="contact-details">
+                                                <p><strong>Email:</strong> {exhibitor.email}</p>
+                                                <p><strong>Mobile:</strong> {exhibitor.mobile}</p>
+                                                <p><strong>Username:</strong> {exhibitor.userName}</p>
+                                                <p><strong>Address:</strong> {exhibitor.address || 'Not provided'}</p>
+                                            </div>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                                <Col md={6}>
+                                    <Card className="bg-light">
+                                        <Card.Body>
+                                            <h6 className="card-title">Additional Information</h6>
+                                            <hr />
+                                            <div className="additional-details">
+                                                <p><strong>Company Description:</strong></p>
+                                                <p className="text-muted small">
+                                                    {exhibitor.companyDescription || 'No description provided'}
+                                                </p>
+                                                <p><strong>Created:</strong> {exhibitor.createdAt ? exhibitor.createdAt : 'N/A'}</p>
+                                                <p><strong>Last Updated:</strong> {exhibitor.updatedAt ? exhibitor.updatedAt : 'N/A'}</p>
+                                            </div>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            </Row>
 
-                        {/* Tabs for additional content */}
-                        <Tab.Container defaultActiveKey="offers">
-                            <Nav variant="tabs" className="mb-3">
-                                <Nav.Item>
-                                    <Nav.Link eventKey="offers">
-                                        Promotional Offers ({exhibitor.promotionalOffers?.length || 0})
-                                    </Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="flyers">
-                                        Flyers ({exhibitor.flyers?.length || 0})
-                                    </Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="images">
-                                        Event Images ({exhibitor.eventImages?.length || 0})
-                                    </Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="documents">
-                                        Documents ({exhibitor.documents?.length || 0})
-                                    </Nav.Link>
-                                </Nav.Item>
-                            </Nav>
+                            {/* Tabs for additional content */}
+                            <Tab.Container defaultActiveKey="offers">
+                                <Nav variant="tabs" className="mb-3">
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="offers">
+                                            Promotional Offers ({exhibitor.promotionalOffers?.length || 0})
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="flyers">Flyers ({exhibitor.flyers?.length || 0})</Nav.Link>
+                                    </Nav.Item>
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="images">Event Images ({exhibitor.eventImages?.length || 0})</Nav.Link>
+                                    </Nav.Item>
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="documents">Documents ({exhibitor.documents?.length || 0})</Nav.Link>
+                                    </Nav.Item>
+                                </Nav>
 
-                            <Tab.Content>
-                                <Tab.Pane eventKey="offers">
-                                    {renderPromotionalOffers()}
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="flyers">
-                                    {renderImages(exhibitor.flyers, 'Flyer')}
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="images">
-                                    {renderImages(exhibitor.eventImages, 'Event Image')}
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="documents">
-                                    {renderDocuments()}
-                                </Tab.Pane>
-                            </Tab.Content>
-                        </Tab.Container>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+                                <Tab.Content>
+                                    <Tab.Pane eventKey="offers">{renderPromotionalOffers()}</Tab.Pane>
+                                    <Tab.Pane eventKey="flyers">{renderFlyers()}</Tab.Pane>
+                                    <Tab.Pane eventKey="images">{renderEventImages()}</Tab.Pane>
+                                    <Tab.Pane eventKey="documents">{renderDocuments()}</Tab.Pane>
+                                </Tab.Content>
+                            </Tab.Container>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Image Zoom Modal - Events pattern के अनुसार exact same */}
+            {renderImageModal()}
+        </Container>
     );
 };
 

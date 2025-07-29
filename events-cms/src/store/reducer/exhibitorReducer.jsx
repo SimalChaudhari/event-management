@@ -1,8 +1,9 @@
-import { CREATE_EXHIBITOR, DELETE_EXHIBITOR, EXHIBITOR_BY_ID, EXHIBITOR_LIST, UPDATE_EXHIBITOR } from "../constants/actionTypes";
+import { ALL_PROMOTIONAL_OFFERS, CREATE_EXHIBITOR, CREATE_PROMOTIONAL_OFFER, DELETE_EXHIBITOR, DELETE_PROMOTIONAL_OFFER, EXHIBITOR_BY_ID, EXHIBITOR_LIST, FETCH_PROMOTIONAL_OFFERS, GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR, PROMOTIONAL_OFFER_BY_ID, UPDATE_EXHIBITOR, UPDATE_PROMOTIONAL_OFFER } from "../constants/actionTypes";
 
 const initialState = {
     exhibitors: [],
     exhibitorById: null,
+    promotionalOffers: [],
     loading: false,
     error: null,
     total: 0
@@ -46,6 +47,57 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 exhibitors: state.exhibitors.filter(exhibitor => exhibitor.id !== payload),
+                loading: false,
+                error: null
+            };
+        case FETCH_PROMOTIONAL_OFFERS:
+            return {
+                ...state,
+                promotionalOffers: payload,
+                loading: false,
+                error: null
+            };
+        case CREATE_PROMOTIONAL_OFFER:
+            return {
+                ...state,
+                promotionalOffers: [payload, ...state.promotionalOffers],
+                loading: false,
+                error: null
+            };
+        case UPDATE_PROMOTIONAL_OFFER:
+            return {
+                ...state,
+                promotionalOffers: state.promotionalOffers.map(offer => 
+                    offer.id === payload.id ? payload : offer
+                ),
+                loading: false,
+                error: null
+            };
+        case DELETE_PROMOTIONAL_OFFER:
+            return {
+                ...state,
+                promotionalOffers: state.promotionalOffers.filter(offer => offer.id !== payload),
+                loading: false,
+                error: null
+            };
+        case GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR:
+            return {
+                ...state,
+                promotionalOffers: payload.data?.data || [],
+                loading: false,
+                error: null
+            };
+        case ALL_PROMOTIONAL_OFFERS:
+            return {
+                ...state,
+                allPromotionalOffers: payload,
+                loading: false,
+                error: null
+            };
+        case PROMOTIONAL_OFFER_BY_ID:
+            return {
+                ...state,
+                promotionalOfferById: payload,
                 loading: false,
                 error: null
             };
