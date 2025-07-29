@@ -26,6 +26,13 @@ export const SPEAKER_PATHS = {
     VIEW_SPEAKER: '/speakers/view-speaker'
 };
 
+export const EXHIBITOR_PATHS = {
+    LIST_EXHIBITORS: '/exhibitors',
+    ADD_EXHIBITOR: '/exhibitors/add-exhibitor',
+    EDIT_EXHIBITOR: '/exhibitors/edit-exhibitor',
+    VIEW_EXHIBITOR: '/exhibitors/view-exhibitor'
+};
+
 export const EVENT_PATHS = {
     // Events
     LIST_EVENTS: '/events/event-list',

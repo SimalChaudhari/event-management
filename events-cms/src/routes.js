@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
     DASHBOARD_PATHS,
     EVENT_PATHS,
+    EXHIBITOR_PATHS,
     MEDIA_MANAGER_PATHS,
     SETTINGS_PATHS,
     SPEAKER_PATHS,
@@ -82,6 +83,12 @@ const speakerComponents = {
     List: React.lazy(() => import('./Pages/Speakers/Speakers.jsx')),
     AddSpeaker: React.lazy(() => import('./Pages/Speakers/AddSpeakerPage.jsx')),
     ViewSpeaker: React.lazy(() => import('./Pages/Speakers/ViewSpeakerPage.jsx'))
+};
+
+const exhibitorComponents = {
+    List: React.lazy(() => import('./Pages/Exhibitors/Exhibitors.jsx')),
+    AddExhibitor: React.lazy(() => import('./Pages/Exhibitors/AddExhibitorPage.jsx')),
+    ViewExhibitor: React.lazy(() => import('./Pages/Exhibitors/ViewExhibitorPage.jsx'))
 };
 
 /**
@@ -175,6 +182,33 @@ const speakerRoutes = [
         exact: true,
         name: 'View Speaker',
         component: speakerComponents.ViewSpeaker
+    }
+];
+
+const exhibitorRoutes = [
+    {
+        path: EXHIBITOR_PATHS.LIST_EXHIBITORS,
+        exact: true,
+        name: 'Exhibitors List',
+        component: exhibitorComponents.List
+    },
+    {
+        path: EXHIBITOR_PATHS.ADD_EXHIBITOR,
+        exact: true,
+        name: 'Add Exhibitor',
+        component: exhibitorComponents.AddExhibitor
+    },
+    {
+        path: EXHIBITOR_PATHS.EDIT_EXHIBITOR + '/:id',
+        exact: true,
+        name: 'Edit Exhibitor',
+        component: exhibitorComponents.AddExhibitor
+    },
+    {
+        path: EXHIBITOR_PATHS.VIEW_EXHIBITOR + '/:id',
+        exact: true,
+        name: 'View Exhibitor',
+        component: exhibitorComponents.ViewExhibitor
     }
 ];
 
@@ -375,6 +409,7 @@ const routes = [
     ...userRoutes,
     ...eventRoutes,
     ...MediaManagerRoutes,
+    ...exhibitorRoutes,
     ...speakerRoutes,
     ...settingsRoutes,
     ...transactionRoutes,

@@ -91,6 +91,19 @@ export class ExhibitorController {
         exhibitorDto.flyers = files.flyers.map(
           (file) => `uploads/exhibitor/flyers/${file.filename}`,
         );
+
+        // Handle flyer names
+        if (exhibitorDto.flyerNames) {
+          const names = Array.isArray(exhibitorDto.flyerNames) 
+            ? exhibitorDto.flyerNames 
+            : [exhibitorDto.flyerNames];
+          exhibitorDto.flyerNames = names;
+        } else {
+          // Use original filenames as fallback
+          exhibitorDto.flyerNames = files.flyers.map(
+            (file) => file.originalname
+          );
+        }
       }
 
       // Handle documents
@@ -119,6 +132,19 @@ export class ExhibitorController {
         exhibitorDto.eventImages = files.eventImages.map(
           (file) => `uploads/exhibitor/eventImages/${file.filename}`,
         );
+
+        // Handle event image names
+        if (exhibitorDto.eventImageNames) {
+          const names = Array.isArray(exhibitorDto.eventImageNames) 
+            ? exhibitorDto.eventImageNames 
+            : [exhibitorDto.eventImageNames];
+          exhibitorDto.eventImageNames = names;
+        } else {
+          // Use original filenames as fallback
+          exhibitorDto.eventImageNames = files.eventImages.map(
+            (file) => file.originalname
+          );
+        }
       }
 
       const exhibitor = await this.exhibitorService.createExhibitor(exhibitorDto);
@@ -137,10 +163,42 @@ export class ExhibitorController {
         }));
       }
 
-      // Remove raw documents and documentNames from response
+      // Format flyers for response
+      let formattedFlyers: { name: string; flyer: string }[] = [];
+      if (exhibitor.flyers && exhibitor.flyerNames) {
+        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+          name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      } else if (exhibitor.flyers) {
+        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+          name: `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      }
+
+      // Format event images for response
+      let formattedEventImages: { name: string; eventImage: string }[] = [];
+      if (exhibitor.eventImages && exhibitor.eventImageNames) {
+        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+          name: exhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      } else if (exhibitor.eventImages) {
+        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+          name: `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      }
+
+      // Remove raw fields from response
       const { 
         documents, 
-        documentNames, 
+        documentNames,
+        flyers,
+        flyerNames,
+        eventImages,
+        eventImageNames,
         ...exhibitorData 
       } = exhibitor;
 
@@ -149,7 +207,9 @@ export class ExhibitorController {
         message: 'Exhibitor created successfully',
         data: {
           ...exhibitorData,
-          documents: formattedDocuments
+          documents: formattedDocuments,
+          flyers: formattedFlyers,
+          eventImages: formattedEventImages
         },
         metadata: {
           timestamp: new Date().toISOString(),
@@ -281,20 +341,47 @@ export class ExhibitorController {
       
       // Handle flyers - combine existing and new
       const allFlyers = [];
+      const allFlyerNames = [];
+      
       if (exhibitorDto.originalFlyers) {
         const originalFlyers = Array.isArray(exhibitorDto.originalFlyers) 
           ? exhibitorDto.originalFlyers 
           : [exhibitorDto.originalFlyers];
         allFlyers.push(...originalFlyers);
+        
+        // Add existing flyer names
+        if (exhibitorDto.originalFlyerNames) {
+          const originalFlyerNames = Array.isArray(exhibitorDto.originalFlyerNames) 
+            ? exhibitorDto.originalFlyerNames 
+            : [exhibitorDto.originalFlyerNames];
+          allFlyerNames.push(...originalFlyerNames);
+        }
       }
+      
       if (files.flyers && files.flyers.length > 0) {
         const newFlyers = files.flyers.map(
           (file) => `uploads/exhibitor/flyers/${file.filename}`,
         );
         allFlyers.push(...newFlyers);
+        
+        // Handle flyer names for new uploads
+        if (exhibitorDto.flyerNames) {
+          const newNames = Array.isArray(exhibitorDto.flyerNames) 
+            ? exhibitorDto.flyerNames 
+            : [exhibitorDto.flyerNames];
+          allFlyerNames.push(...newNames);
+        } else {
+          // Use original filenames as fallback for new uploads
+          const newFlyerNames = files.flyers.map(
+            (file) => file.originalname
+          );
+          allFlyerNames.push(...newFlyerNames);
+        }
       }
+      
       if (allFlyers.length > 0) {
         exhibitorDto.flyers = allFlyers;
+        exhibitorDto.flyerNames = allFlyerNames;
       }
 
       // Handle documents - combine existing and new
@@ -349,20 +436,47 @@ export class ExhibitorController {
 
       // Handle event images - combine existing and new
       const allEventImages = [];
+      const allEventImageNames = [];
+      
       if (exhibitorDto.originalEventImages) {
         const originalEventImages = Array.isArray(exhibitorDto.originalEventImages) 
           ? exhibitorDto.originalEventImages 
           : [exhibitorDto.originalEventImages];
         allEventImages.push(...originalEventImages);
+        
+        // Add existing event image names
+        if (exhibitorDto.originalEventImageNames) {
+          const originalEventImageNames = Array.isArray(exhibitorDto.originalEventImageNames) 
+            ? exhibitorDto.originalEventImageNames 
+            : [exhibitorDto.originalEventImageNames];
+          allEventImageNames.push(...originalEventImageNames);
+        }
       }
+      
       if (files.eventImages && files.eventImages.length > 0) {
         const newEventImages = files.eventImages.map(
           (file) => `uploads/exhibitor/eventImages/${file.filename}`,
         );
         allEventImages.push(...newEventImages);
+        
+        // Handle event image names for new uploads
+        if (exhibitorDto.eventImageNames) {
+          const newNames = Array.isArray(exhibitorDto.eventImageNames) 
+            ? exhibitorDto.eventImageNames 
+            : [exhibitorDto.eventImageNames];
+          allEventImageNames.push(...newNames);
+        } else {
+          // Use original filenames as fallback for new uploads
+          const newEventImageNames = files.eventImages.map(
+            (file) => file.originalname
+          );
+          allEventImageNames.push(...newEventImageNames);
+        }
       }
+      
       if (allEventImages.length > 0) {
         exhibitorDto.eventImages = allEventImages;
+        exhibitorDto.eventImageNames = allEventImageNames;
       }
 
       const updatedExhibitor = await this.exhibitorService.updateExhibitor(id, exhibitorDto);
@@ -381,10 +495,42 @@ export class ExhibitorController {
         }));
       }
 
-      // Remove raw documents and documentNames from response
+      // Format flyers for response
+      let formattedFlyers: { name: string; flyer: string }[] = [];
+      if (updatedExhibitor.flyers && updatedExhibitor.flyerNames) {
+        formattedFlyers = updatedExhibitor.flyers.map((flyer, index) => ({
+          name: updatedExhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      } else if (updatedExhibitor.flyers) {
+        formattedFlyers = updatedExhibitor.flyers.map((flyer, index) => ({
+          name: `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      }
+
+      // Format event images for response
+      let formattedEventImages: { name: string; eventImage: string }[] = [];
+      if (updatedExhibitor.eventImages && updatedExhibitor.eventImageNames) {
+        formattedEventImages = updatedExhibitor.eventImages.map((eventImage, index) => ({
+          name: updatedExhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      } else if (updatedExhibitor.eventImages) {
+        formattedEventImages = updatedExhibitor.eventImages.map((eventImage, index) => ({
+          name: `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      }
+
+      // Remove raw fields from response
       const { 
         documents, 
-        documentNames, 
+        documentNames,
+        flyers,
+        flyerNames,
+        eventImages,
+        eventImageNames,
         ...exhibitorData 
       } = updatedExhibitor;
 
@@ -393,7 +539,9 @@ export class ExhibitorController {
         message: 'Exhibitor updated successfully',
         data: {
           ...exhibitorData,
-          documents: formattedDocuments
+          documents: formattedDocuments,
+          flyers: formattedFlyers,
+          eventImages: formattedEventImages
         },
         metadata: {
           timestamp: new Date().toISOString(),

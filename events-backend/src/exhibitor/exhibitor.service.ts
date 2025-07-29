@@ -70,15 +70,49 @@ export class ExhibitorService {
           }));
         }
 
+        // Format flyers with names
+        let formattedFlyers: { name: string; flyer: string }[] = [];
+        if (exhibitor.flyers && exhibitor.flyerNames) {
+          formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+            name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+            flyer: flyer
+          }));
+        } else if (exhibitor.flyers) {
+          formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+            name: `Flyer ${index + 1}`,
+            flyer: flyer
+          }));
+        }
+
+        // Format event images with names
+        let formattedEventImages: { name: string; eventImage: string }[] = [];
+        if (exhibitor.eventImages && exhibitor.eventImageNames) {
+          formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+            name: exhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
+            eventImage: eventImage
+          }));
+        } else if (exhibitor.eventImages) {
+          formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+            name: `Event Image ${index + 1}`,
+            eventImage: eventImage
+          }));
+        }
+
         const { 
-          documents, // Remove original documents
-          documentNames, // Remove original documentNames
+          documents,
+          documentNames,
+          flyers,
+          flyerNames,
+          eventImages,
+          eventImageNames,
           ...exhibitorData 
         } = exhibitor;
 
         return {
           ...exhibitorData,
-          documents: formattedDocuments // Add formatted documents
+          documents: formattedDocuments,
+          flyers: formattedFlyers,
+          eventImages: formattedEventImages
         };
       });
     } catch (error) {
@@ -111,15 +145,49 @@ export class ExhibitorService {
         }));
       }
 
+      // Format flyers with names
+      let formattedFlyers: { name: string; flyer: string }[] = [];
+      if (exhibitor.flyers && exhibitor.flyerNames) {
+        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+          name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      } else if (exhibitor.flyers) {
+        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
+          name: `Flyer ${index + 1}`,
+          flyer: flyer
+        }));
+      }
+
+      // Format event images with names
+      let formattedEventImages: { name: string; eventImage: string }[] = [];
+      if (exhibitor.eventImages && exhibitor.eventImageNames) {
+        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+          name: exhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      } else if (exhibitor.eventImages) {
+        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
+          name: `Event Image ${index + 1}`,
+          eventImage: eventImage
+        }));
+      }
+
       const { 
         documents, 
         documentNames, 
+        flyers,
+        flyerNames,
+        eventImages,
+        eventImageNames,
         ...exhibitorData 
       } = exhibitor;
 
       return {
         ...exhibitorData,
-        documents: formattedDocuments
+        documents: formattedDocuments,
+        flyers: formattedFlyers,
+        eventImages: formattedEventImages
       };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {

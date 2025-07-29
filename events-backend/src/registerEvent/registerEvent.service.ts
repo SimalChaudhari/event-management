@@ -16,10 +16,10 @@ import { getEventColor } from 'utils/event-color.util';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { UserEntity } from 'user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
-import { 
-  ResourceNotFoundException, 
-  DuplicateResourceException, 
-  ValidationException 
+import {
+  ResourceNotFoundException,
+  DuplicateResourceException,
+  ValidationException,
 } from '../utils/exceptions/custom-exceptions';
 
 @Injectable()
@@ -48,7 +48,8 @@ export class RegisterEventService {
     createRegisterEventDto: CreateRegisterEventDto,
   ): Promise<RegisterEvent> {
     try {
-      const { eventId, type, registerCode, isCreatedByAdmin } = createRegisterEventDto;
+      const { eventId, type, registerCode, isCreatedByAdmin } =
+        createRegisterEventDto;
 
       // Check if event exists
       const event = await this.eventRepository.findOne({
@@ -78,13 +79,15 @@ export class RegisterEventService {
         throw new DuplicateResourceException(
           'Registration',
           'user-event combination',
-          `${userId}-${eventId}`
+          `${userId}-${eventId}`,
         );
       }
 
       // Validate registerCode for Exhibitor type (only if not created by admin)
       if (type === 'Exhibitor' && !registerCode && !isCreatedByAdmin) {
-        throw new ValidationException('Register code is required for Exhibitor');
+        throw new ValidationException(
+          'Register code is required for Exhibitor',
+        );
       }
 
       // Create new registration
@@ -98,7 +101,8 @@ export class RegisterEventService {
         orderId: isCreatedByAdmin ? undefined : createRegisterEventDto.orderId,
       };
 
-      const registerEvent = this.registerEventRepository.create(registerEventData);
+      const registerEvent =
+        this.registerEventRepository.create(registerEventData);
       return await this.registerEventRepository.save(registerEvent);
     } catch (error) {
       if (
@@ -160,21 +164,29 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
-
-            let formattedDocuments: { name: string; document: string }[] = [];
-            if (registerEvent?.event?.documents && registerEvent?.event?.documentNames) {
-              formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
-                name: registerEvent.event?.documentNames?.[index] || `Document ${index + 1}`,
-                document: doc
-              }));
-            } else if (registerEvent?.event?.documents) {
-              // Fallback if no names are provided
-              formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
+          let formattedDocuments: { name: string; document: string }[] = [];
+          if (
+            registerEvent?.event?.documents &&
+            registerEvent?.event?.documentNames
+          ) {
+            formattedDocuments = registerEvent.event.documents.map(
+              (doc, index) => ({
+                name:
+                  registerEvent.event?.documentNames?.[index] ||
+                  `Document ${index + 1}`,
+                document: doc,
+              }),
+            );
+          } else if (registerEvent?.event?.documents) {
+            // Fallback if no names are provided
+            formattedDocuments = registerEvent.event.documents.map(
+              (doc, index) => ({
                 name: `Document ${index + 1}`,
-                document: doc
-              }));
-            }
-            
+                document: doc,
+              }),
+            );
+          }
+
           // Check if event is favorited by the user
           let isFavorite = false;
           if (registerEvent.userId) {
@@ -187,8 +199,10 @@ export class RegisterEventService {
             isFavorite = !!favorite;
           }
 
-          const speakers = registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
-          const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+          const speakers =
+            registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
+          const categories =
+            registerEvent.event?.category?.map((ec) => ec.category) || [];
 
           const {
             eventSpeakers,
@@ -221,7 +235,9 @@ export class RegisterEventService {
                   ?.filter((ee) => ee.exhibitor.isActive)
                   ?.map((ee) => {
                     // Format exhibitor documents
-                    const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+                    const formattedExhibitor = this.formatExhibitorDocuments(
+                      ee.exhibitor,
+                    );
                     return {
                       ...formattedExhibitor,
                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
@@ -230,14 +246,17 @@ export class RegisterEventService {
             },
             attendanceCount: attendanceCount,
             isFavorite: isFavorite,
+            isRegister: registerEvent.isRegister,
           };
 
-          const { firstName, lastName, email, mobile, id } = registerEvent.user || {};
+          const { firstName, lastName, email, mobile, id } =
+            registerEvent.user || {};
           const cleanedUser = { firstName, lastName, email, mobile, id };
 
           const {
             orderId: _,
             eventId: __,
+            isRegister: ___,
             ...cleanRegisterEvent
           } = registerEvent;
 
@@ -312,30 +331,43 @@ export class RegisterEventService {
       let isFavorite = false;
       if (registerEvent.userId) {
         const favorite = await this.favoriteEventRepository.findOne({
-          where: { userId: registerEvent.userId, eventId: registerEvent.eventId },
+          where: {
+            userId: registerEvent.userId,
+            eventId: registerEvent.eventId,
+          },
         });
         isFavorite = !!favorite;
       }
 
-
       // Format documents with names
       let formattedDocuments: { name: string; document: string }[] = [];
-      if (registerEvent?.event?.documents && registerEvent?.event?.documentNames) {
-        formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
-          name: registerEvent?.event?.documentNames?.[index] || `Document ${index + 1}`,
-          document: doc
-        }));
+      if (
+        registerEvent?.event?.documents &&
+        registerEvent?.event?.documentNames
+      ) {
+        formattedDocuments = registerEvent.event.documents.map(
+          (doc, index) => ({
+            name:
+              registerEvent?.event?.documentNames?.[index] ||
+              `Document ${index + 1}`,
+            document: doc,
+          }),
+        );
       } else if (registerEvent?.event?.documents) {
         // Fallback if no names are provided
-        formattedDocuments = registerEvent.event.documents.map((doc, index) => ({
-          name: `Document ${index + 1}`,
-          document: doc
-        }));
+        formattedDocuments = registerEvent.event.documents.map(
+          (doc, index) => ({
+            name: `Document ${index + 1}`,
+            document: doc,
+          }),
+        );
       }
 
       // Extract only speakers
-      const speakers = registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
-      const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+      const speakers =
+        registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
+      const categories =
+        registerEvent.event?.category?.map((ec) => ec.category) || [];
 
       // Extract exhibitors (only active ones)
       const exhibitors =
@@ -343,7 +375,9 @@ export class RegisterEventService {
           ?.filter((ee) => ee.exhibitor.isActive)
           ?.map((ee) => {
             // Format exhibitor documents
-            const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+            const formattedExhibitor = this.formatExhibitorDocuments(
+              ee.exhibitor,
+            );
             return {
               ...formattedExhibitor,
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
@@ -379,14 +413,21 @@ export class RegisterEventService {
         },
         attendanceCount: attendanceCount,
         isFavorite: isFavorite,
+        isRegister: registerEvent.isRegister,
       };
 
       // Clean up user object
-      const { firstName, lastName, email, mobile, id } = registerEvent.user || {};
+      const { firstName, lastName, email, mobile, id } =
+        registerEvent.user || {};
       const cleanedUser = { firstName, lastName, email, mobile, id };
 
       // Exclude unnecessary fields
-      const { orderId: _, eventId: __, ...cleanRegisterEvent } = registerEvent;
+      const {
+        orderId: _,
+        eventId: __,
+        isRegister: ___,
+        ...cleanRegisterEvent
+      } = registerEvent;
 
       return {
         success: true,
@@ -402,7 +443,10 @@ export class RegisterEventService {
       if (error instanceof ResourceNotFoundException) {
         throw error;
       }
-      this.errorHandler.handleDatabaseError(error, 'Register Event retrieval by ID');
+      this.errorHandler.handleDatabaseError(
+        error,
+        'Register Event retrieval by ID',
+      );
     }
   }
 
@@ -426,7 +470,10 @@ export class RegisterEventService {
           where: { id: updateRegisterEventDto.userId },
         });
         if (!newUser) {
-          throw new ResourceNotFoundException('User', updateRegisterEventDto.userId);
+          throw new ResourceNotFoundException(
+            'User',
+            updateRegisterEventDto.userId,
+          );
         }
         registration.userId = updateRegisterEventDto.userId;
         registration.user = newUser;
@@ -438,7 +485,10 @@ export class RegisterEventService {
           where: { id: updateRegisterEventDto.eventId },
         });
         if (!newEvent) {
-          throw new ResourceNotFoundException('Event', updateRegisterEventDto.eventId);
+          throw new ResourceNotFoundException(
+            'Event',
+            updateRegisterEventDto.eventId,
+          );
         }
         registration.eventId = updateRegisterEventDto.eventId;
         registration.event = newEvent;
@@ -459,7 +509,8 @@ export class RegisterEventService {
       }
 
       // Save the updated registration
-      const updatedRegistration = await this.registerEventRepository.save(registration);
+      const updatedRegistration =
+        await this.registerEventRepository.save(registration);
 
       // Fetch the updated registration with fresh relations
       const freshRegistration = await this.registerEventRepository.findOne({
@@ -503,28 +554,28 @@ export class RegisterEventService {
     // Format documents with names
     let formattedDocuments: { name: string; document: string }[] = [];
     if (exhibitor.documents && exhibitor.documentNames) {
-      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
-        name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
-        document: doc
-      }));
+      formattedDocuments = exhibitor.documents.map(
+        (doc: string, index: number) => ({
+          name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
+          document: doc,
+        }),
+      );
     } else if (exhibitor.documents) {
       // Fallback if no names are provided
-      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
-        name: `Document ${index + 1}`,
-        document: doc
-      }));
+      formattedDocuments = exhibitor.documents.map(
+        (doc: string, index: number) => ({
+          name: `Document ${index + 1}`,
+          document: doc,
+        }),
+      );
     }
 
     // Remove raw documents and documentNames from response
-    const { 
-      documents, 
-      documentNames, 
-      ...exhibitorData 
-    } = exhibitor;
+    const { documents, documentNames, ...exhibitorData } = exhibitor;
 
     return {
       ...exhibitorData,
-      documents: formattedDocuments
+      documents: formattedDocuments,
     };
   }
 }

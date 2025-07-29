@@ -15,9 +15,11 @@ const chartData = {
                 },
             ]
         },
+
+        //Members
         {
-            id: 'management',
-            title: 'Management',
+            id: 'members',
+            title: 'Members',
             type: 'group',
             icon: 'icon-monitor',
             children: [
@@ -25,9 +27,34 @@ const chartData = {
                     id: 'users',
                     title: 'Users',
                     type: 'item',
-                    icon: 'feather icon-users',
+                    icon: 'feather icon-user',          // Single person icon
                     url: '/users'
                 },
+                {
+                    id: 'exhibitors',
+                    title: 'Exhibitors',
+                    type: 'item',
+                    icon: 'feather icon-users',         // Group of people icon
+                    url: '/exhibitors'
+                },
+                {
+                    id: 'speakers',
+                    title: 'Speakers',
+                    type: 'item',
+                    icon: 'feather icon-mic',           // Microphone icon for speakers
+                    url: '/speakers'
+                }
+            ]
+            
+        },
+
+        {
+            id: 'management',
+            title: 'Management',
+            type: 'group',
+            icon: 'icon-monitor',
+            children: [
+              
                 {
                     id: 'events',
                     title: 'Events',
@@ -66,13 +93,7 @@ const chartData = {
                     icon: 'feather icon-tag',
                     url: '/categories'
                 },
-                {
-                    id: 'speakers',
-                    title: 'Speakers',
-                    type: 'item',
-                    icon: 'feather icon-users',
-                    url: '/speakers'
-                },
+               
                 {
                     id: 'order ',
                     title: 'Orders ',

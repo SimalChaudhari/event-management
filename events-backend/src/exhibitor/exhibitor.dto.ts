@@ -61,6 +61,11 @@ export class ExhibitorDto {
   @IsArray()
   flyers?: string[];
 
+  // Add flyer names field
+  @IsOptional()
+  @IsArray()
+  flyerNames?: string[];
+
   @IsOptional()
   promotionalOffers?: PromotionalOfferDto[];
 
@@ -77,10 +82,20 @@ export class ExhibitorDto {
   @IsArray()
   eventImages?: string[];
 
+  // Add event image names field
+  @IsOptional()
+  @IsArray()
+  eventImageNames?: string[];
+
   // For handling existing files during update
   @IsOptional()
   @IsArray()
   originalFlyers?: string[];
+
+  // Add original flyer names field
+  @IsOptional()
+  @IsArray()
+  originalFlyerNames?: string[];
 
   @IsOptional()
   @IsArray()
@@ -94,4 +109,9 @@ export class ExhibitorDto {
   @IsOptional()
   @IsArray()
   originalEventImages?: string[];
+
+  // Add original event image names field
+  @IsOptional()
+  @IsArray()
+  originalEventImageNames?: string[];
 }

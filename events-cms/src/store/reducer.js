@@ -11,6 +11,7 @@ import settingsReducer from './reducer/settingsReducer';
 import bannerReducer from './reducer/bannerReducer';
 import categoryReducer from './reducer/categoryReducer';
 import galleryReducer from './reducer/galleryReducer';
+import exhibitorReducer from './reducer/exhibitorReducer';
 
 const reducer = combineReducers({
     able: ableReducer,
@@ -24,7 +25,8 @@ const reducer = combineReducers({
     settings: settingsReducer,
     banner: bannerReducer,
     category: categoryReducer,
-    gallery: galleryReducer
+    gallery: galleryReducer,
+    exhibitor: exhibitorReducer
 });
 
 export default reducer;
