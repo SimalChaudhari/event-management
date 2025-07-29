@@ -143,6 +143,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
+      .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
       .where('favorite.userId = :userId', { userId });
 
     // Apply filters based on filter type
@@ -238,9 +239,10 @@ export class FavoriteEventService {
             speakers: eventSpeakers?.map((es) => es.speaker) || [],
             categories: categories,
 
-            exhibitors: {
+            exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
+                console.log(ee.exhibitor,"%%%%%%%%%%");
                 // Format exhibitor documents
                 const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
                 return {
