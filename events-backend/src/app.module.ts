@@ -29,6 +29,7 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { GlobalExceptionFilter } from './utils/global-exception.filter';
 import { ValidationPipe } from './validation/validation.pipe';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
+import { PollingModule } from 'polling/polling.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { ErrorHandlerService } from './utils/services/error-handler.service';
     GalleryModule,
     PromotionalOfferModule,
     SurveyModule,
+    PollingModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     CacheModule.register({
       isGlobal: true,
