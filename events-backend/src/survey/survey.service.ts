@@ -14,13 +14,14 @@ import {
   CreateSessionDto,
 } from './survey.dto';
 import { Event } from 'event/event.entity';
-import { 
-  ValidationException, 
-  ResourceNotFoundException, 
+import {
+  ValidationException,
+  ResourceNotFoundException,
   DuplicateResourceException,
-  BusinessLogicException 
+  BusinessLogicException,
 } from '../utils/exceptions/custom-exceptions';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { UserEntity } from 'user/users.entity';
 
 @Injectable()
 export class SurveyService {
@@ -33,6 +34,8 @@ export class SurveyService {
     private surveySessionRepository: Repository<SurveySession>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
   ) {}
 
@@ -117,7 +120,9 @@ export class SurveyService {
       return suggestions;
     } catch (error: any) {
       this.errorHandler.logError(error, 'Generate session suggestions');
-      throw new BusinessLogicException('Failed to generate session suggestions');
+      throw new BusinessLogicException(
+        'Failed to generate session suggestions',
+      );
     }
   }
 
@@ -161,7 +166,11 @@ export class SurveyService {
           { name: 'Morning', startTime: '09:00:00', endTime: '10:30:00' },
           { name: 'Mid Morning', startTime: '10:30:00', endTime: '12:00:00' },
           { name: 'Afternoon', startTime: '13:00:00', endTime: '15:00:00' },
-          { name: 'Late Afternoon', startTime: '15:00:00', endTime: '17:00:00' },
+          {
+            name: 'Late Afternoon',
+            startTime: '15:00:00',
+            endTime: '17:00:00',
+          },
           { name: 'Evening', startTime: '17:00:00', endTime: '18:00:00' },
         ],
       };
@@ -202,42 +211,46 @@ export class SurveyService {
       if (surveyStartDate < eventStartDate) {
         throw new ValidationException(
           `Survey start date (${surveyStartDateStr}) cannot be before event start date. ` +
-          `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-          `Suggested: Use startDate: "${eventStartDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
-          [{
-            field: 'startDate',
-            providedValue: surveyStartDateStr,
-            suggestedValue: eventStartDateStr,
-            validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
-            eventInfo: {
-              name: event.name,
-              startDate: eventStartDateStr,
-              endDate: eventEndDateStr,
-              startTime: event.startTime,
-              endTime: event.endTime
-            }
-          }]
+            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
+            `Suggested: Use startDate: "${eventStartDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+          [
+            {
+              field: 'startDate',
+              providedValue: surveyStartDateStr,
+              suggestedValue: eventStartDateStr,
+              validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+              eventInfo: {
+                name: event.name,
+                startDate: eventStartDateStr,
+                endDate: eventEndDateStr,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
         );
       }
 
       if (surveyEndDate > eventEndDate) {
         throw new ValidationException(
           `Survey end date (${surveyEndDateStr}) cannot be after event end date. ` +
-          `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-          `Suggested: Use endDate: "${eventEndDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
-          [{
-            field: 'endDate',
-            providedValue: surveyEndDateStr,
-            suggestedValue: eventEndDateStr,
-            validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
-            eventInfo: {
-              name: event.name,
-              startDate: eventStartDateStr,
-              endDate: eventEndDateStr,
-              startTime: event.startTime,
-              endTime: event.endTime
-            }
-          }]
+            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
+            `Suggested: Use endDate: "${eventEndDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+          [
+            {
+              field: 'endDate',
+              providedValue: surveyEndDateStr,
+              suggestedValue: eventEndDateStr,
+              validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+              eventInfo: {
+                name: event.name,
+                startDate: eventStartDateStr,
+                endDate: eventEndDateStr,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
         );
       }
 
@@ -245,38 +258,42 @@ export class SurveyService {
       if (!this.validateTimeFormat(surveyData.startTime)) {
         throw new ValidationException(
           `Invalid start time format "${surveyData.startTime}". Use HH:MM:SS format. ` +
-          `Event "${event.name}" starts at ${event.startTime}. ` +
-          `Suggested: Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
-          [{
-            field: 'startTime',
-            providedValue: surveyData.startTime,
-            suggestedValue: event.startTime,
-            validFormat: 'HH:MM:SS',
-            eventInfo: {
-              name: event.name,
-              startTime: event.startTime,
-              endTime: event.endTime
-            }
-          }]
+            `Event "${event.name}" starts at ${event.startTime}. ` +
+            `Suggested: Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
+          [
+            {
+              field: 'startTime',
+              providedValue: surveyData.startTime,
+              suggestedValue: event.startTime,
+              validFormat: 'HH:MM:SS',
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
         );
       }
 
       if (!this.validateTimeFormat(surveyData.endTime)) {
         throw new ValidationException(
           `Invalid end time format "${surveyData.endTime}". Use HH:MM:SS format. ` +
-          `Event "${event.name}" ends at ${event.endTime}. ` +
-          `Suggested: Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
-          [{
-            field: 'endTime',
-            providedValue: surveyData.endTime,
-            suggestedValue: event.endTime,
-            validFormat: 'HH:MM:SS',
-            eventInfo: {
-              name: event.name,
-              startTime: event.startTime,
-              endTime: event.endTime
-            }
-          }]
+            `Event "${event.name}" ends at ${event.endTime}. ` +
+            `Suggested: Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
+          [
+            {
+              field: 'endTime',
+              providedValue: surveyData.endTime,
+              suggestedValue: event.endTime,
+              validFormat: 'HH:MM:SS',
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
         );
       }
 
@@ -289,20 +306,22 @@ export class SurveyService {
       if (surveyEndTimeMinutes <= surveyStartTimeMinutes) {
         throw new ValidationException(
           `Survey end time (${surveyData.endTime}) must be after start time (${surveyData.startTime}). ` +
-          `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-          `Suggested: Use startTime: "${event.startTime}" and endTime: "${event.endTime}".`,
-          [{
-            field: 'timeRange',
-            providedStartTime: surveyData.startTime,
-            providedEndTime: surveyData.endTime,
-            suggestedStartTime: event.startTime,
-            suggestedEndTime: event.endTime,
-            eventInfo: {
-              name: event.name,
-              startTime: event.startTime,
-              endTime: event.endTime
-            }
-          }]
+            `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
+            `Suggested: Use startTime: "${event.startTime}" and endTime: "${event.endTime}".`,
+          [
+            {
+              field: 'timeRange',
+              providedStartTime: surveyData.startTime,
+              providedEndTime: surveyData.endTime,
+              suggestedStartTime: event.startTime,
+              suggestedEndTime: event.endTime,
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
         );
       }
 
@@ -314,40 +333,44 @@ export class SurveyService {
         if (surveyStartTimeMinutes < eventStartTimeMinutes) {
           throw new ValidationException(
             `Survey start time (${surveyData.startTime}) cannot be before event start time (${event.startTime}) on ${eventStartDateStr}. ` +
-            `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
-            `Suggested: Use startTime: "${event.startTime}" or any time between ${event.startTime} and ${event.endTime}.`,
-            [{
-              field: 'startTime',
-              providedValue: surveyData.startTime,
-              suggestedValue: event.startTime,
-              validTimeRange: `${event.startTime} to ${event.endTime}`,
-              eventInfo: {
-                name: event.name,
-                date: eventStartDateStr,
-                startTime: event.startTime,
-                endTime: event.endTime
-              }
-            }]
+              `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
+              `Suggested: Use startTime: "${event.startTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            [
+              {
+                field: 'startTime',
+                providedValue: surveyData.startTime,
+                suggestedValue: event.startTime,
+                validTimeRange: `${event.startTime} to ${event.endTime}`,
+                eventInfo: {
+                  name: event.name,
+                  date: eventStartDateStr,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
           );
         }
 
         if (surveyEndTimeMinutes > eventEndTimeMinutes) {
           throw new ValidationException(
             `Survey end time (${surveyData.endTime}) cannot be after event end time (${event.endTime}) on ${eventEndDateStr}. ` +
-            `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
-            `Suggested: Use endTime: "${event.endTime}" or any time between ${event.startTime} and ${event.endTime}.`,
-            [{
-              field: 'endTime',
-              providedValue: surveyData.endTime,
-              suggestedValue: event.endTime,
-              validTimeRange: `${event.startTime} to ${event.endTime}`,
-              eventInfo: {
-                name: event.name,
-                date: eventEndDateStr,
-                startTime: event.startTime,
-                endTime: event.endTime
-              }
-            }]
+              `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
+              `Suggested: Use endTime: "${event.endTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            [
+              {
+                field: 'endTime',
+                providedValue: surveyData.endTime,
+                suggestedValue: event.endTime,
+                validTimeRange: `${event.startTime} to ${event.endTime}`,
+                eventInfo: {
+                  name: event.name,
+                  date: eventEndDateStr,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
           );
         }
       }
@@ -402,41 +425,45 @@ export class SurveyService {
         if (sessionDate < surveyStartDate || sessionDate > surveyEndDate) {
           throw new ValidationException(
             `Session ${i + 1} "${session.name}" date (${sessionDateStr}) is outside survey date range (${surveyStartDateStr} to ${surveyEndDateStr}). ` +
-            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-            `Suggested: Use any date between ${surveyStartDateStr} and ${surveyEndDateStr}.`,
-            [{
-              field: `sessions[${i}].date`,
-              sessionName: session.name,
-              providedValue: sessionDateStr,
-              validRange: `${surveyStartDateStr} to ${surveyEndDateStr}`,
-              eventDateRange: `${eventStartDateStr} to ${eventEndDateStr}`,
-              suggestedValue: surveyStartDateStr,
-              eventInfo: {
-                name: event.name,
-                startDate: eventStartDateStr,
-                endDate: eventEndDateStr
-              }
-            }]
+              `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
+              `Suggested: Use any date between ${surveyStartDateStr} and ${surveyEndDateStr}.`,
+            [
+              {
+                field: `sessions[${i}].date`,
+                sessionName: session.name,
+                providedValue: sessionDateStr,
+                validRange: `${surveyStartDateStr} to ${surveyEndDateStr}`,
+                eventDateRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+                suggestedValue: surveyStartDateStr,
+                eventInfo: {
+                  name: event.name,
+                  startDate: eventStartDateStr,
+                  endDate: eventEndDateStr,
+                },
+              },
+            ],
           );
         }
 
         if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
           throw new ValidationException(
             `Session ${i + 1} "${session.name}" date (${sessionDateStr}) is outside event date range. ` +
-            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-            `Suggested: Use any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
-            [{
-              field: `sessions[${i}].date`,
-              sessionName: session.name,
-              providedValue: sessionDateStr,
-              validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
-              suggestedValue: eventStartDateStr,
-              eventInfo: {
-                name: event.name,
-                startDate: eventStartDateStr,
-                endDate: eventEndDateStr
-              }
-            }]
+              `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
+              `Suggested: Use any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+            [
+              {
+                field: `sessions[${i}].date`,
+                sessionName: session.name,
+                providedValue: sessionDateStr,
+                validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+                suggestedValue: eventStartDateStr,
+                eventInfo: {
+                  name: event.name,
+                  startDate: eventStartDateStr,
+                  endDate: eventEndDateStr,
+                },
+              },
+            ],
           );
         }
 
@@ -444,40 +471,44 @@ export class SurveyService {
         if (!this.validateTimeFormat(session.startTime)) {
           throw new ValidationException(
             `Session ${i + 1} "${session.name}" start time format is invalid. Use HH:MM:SS format. ` +
-            `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-            `Suggested: Use time in HH:MM:SS format, e.g., "${event.startTime}".`,
-            [{
-              field: `sessions[${i}].startTime`,
-              sessionName: session.name,
-              providedValue: session.startTime,
-              validFormat: 'HH:MM:SS',
-              suggestedValue: event.startTime,
-              eventInfo: {
-                name: event.name,
-                startTime: event.startTime,
-                endTime: event.endTime
-              }
-            }]
+              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
+              `Suggested: Use time in HH:MM:SS format, e.g., "${event.startTime}".`,
+            [
+              {
+                field: `sessions[${i}].startTime`,
+                sessionName: session.name,
+                providedValue: session.startTime,
+                validFormat: 'HH:MM:SS',
+                suggestedValue: event.startTime,
+                eventInfo: {
+                  name: event.name,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
           );
         }
 
         if (!this.validateTimeFormat(session.endTime)) {
           throw new ValidationException(
             `Session ${i + 1} "${session.name}" end time format is invalid. Use HH:MM:SS format. ` +
-            `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-            `Suggested: Use time in HH:MM:SS format, e.g., "${event.endTime}".`,
-            [{
-              field: `sessions[${i}].endTime`,
-              sessionName: session.name,
-              providedValue: session.endTime,
-              validFormat: 'HH:MM:SS',
-              suggestedValue: event.endTime,
-              eventInfo: {
-                name: event.name,
-                startTime: event.startTime,
-                endTime: event.endTime
-              }
-            }]
+              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
+              `Suggested: Use time in HH:MM:SS format, e.g., "${event.endTime}".`,
+            [
+              {
+                field: `sessions[${i}].endTime`,
+                sessionName: session.name,
+                providedValue: session.endTime,
+                validFormat: 'HH:MM:SS',
+                suggestedValue: event.endTime,
+                eventInfo: {
+                  name: event.name,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
           );
         }
 
@@ -489,20 +520,22 @@ export class SurveyService {
           const suggestedEndTime = this.addMinutesToTime(session.startTime, 90); // Add 1.5 hours
           throw new ValidationException(
             `Session ${i + 1} "${session.name}" end time (${session.endTime}) must be after start time (${session.startTime}). ` +
-            `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-            `Suggested: Use endTime: "${suggestedEndTime}" or any time after ${session.startTime}.`,
-            [{
-              field: `sessions[${i}].timeRange`,
-              sessionName: session.name,
-              providedStartTime: session.startTime,
-              providedEndTime: session.endTime,
-              suggestedEndTime: suggestedEndTime,
-              eventInfo: {
-                name: event.name,
-                startTime: event.startTime,
-                endTime: event.endTime
-              }
-            }]
+              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
+              `Suggested: Use endTime: "${suggestedEndTime}" or any time after ${session.startTime}.`,
+            [
+              {
+                field: `sessions[${i}].timeRange`,
+                sessionName: session.name,
+                providedStartTime: session.startTime,
+                providedEndTime: session.endTime,
+                suggestedEndTime: suggestedEndTime,
+                eventInfo: {
+                  name: event.name,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
           );
         }
 
@@ -511,22 +544,24 @@ export class SurveyService {
           if (sessionStartMinutes < eventStartTimeMinutes) {
             throw new ValidationException(
               `Session ${i + 1} "${session.name}" start time (${session.startTime}) cannot be before event start time (${event.startTime}) on ${eventStartDateStr}. ` +
-              `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
-              `Suggested: Use startTime: "${event.startTime}" or later.`,
-              [{
-                field: `sessions[${i}].startTime`,
-                sessionName: session.name,
-                providedValue: session.startTime,
-                suggestedValue: event.startTime,
-                eventDate: eventStartDateStr,
-                validTimeRange: `${event.startTime} to ${event.endTime}`,
-                eventInfo: {
-                  name: event.name,
-                  date: eventStartDateStr,
-                  startTime: event.startTime,
-                  endTime: event.endTime
-                }
-              }]
+                `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
+                `Suggested: Use startTime: "${event.startTime}" or later.`,
+              [
+                {
+                  field: `sessions[${i}].startTime`,
+                  sessionName: session.name,
+                  providedValue: session.startTime,
+                  suggestedValue: event.startTime,
+                  eventDate: eventStartDateStr,
+                  validTimeRange: `${event.startTime} to ${event.endTime}`,
+                  eventInfo: {
+                    name: event.name,
+                    date: eventStartDateStr,
+                    startTime: event.startTime,
+                    endTime: event.endTime,
+                  },
+                },
+              ],
             );
           }
         }
@@ -535,22 +570,24 @@ export class SurveyService {
           if (sessionEndMinutes > eventEndTimeMinutes) {
             throw new ValidationException(
               `Session ${i + 1} "${session.name}" end time (${session.endTime}) cannot be after event end time (${event.endTime}) on ${eventEndDateStr}. ` +
-              `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
-              `Suggested: Use endTime: "${event.endTime}" or earlier.`,
-              [{
-                field: `sessions[${i}].endTime`,
-                sessionName: session.name,
-                providedValue: session.endTime,
-                suggestedValue: event.endTime,
-                eventDate: eventEndDateStr,
-                validTimeRange: `${event.startTime} to ${event.endTime}`,
-                eventInfo: {
-                  name: event.name,
-                  date: eventEndDateStr,
-                  startTime: event.startTime,
-                  endTime: event.endTime
-                }
-              }]
+                `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
+                `Suggested: Use endTime: "${event.endTime}" or earlier.`,
+              [
+                {
+                  field: `sessions[${i}].endTime`,
+                  sessionName: session.name,
+                  providedValue: session.endTime,
+                  suggestedValue: event.endTime,
+                  eventDate: eventEndDateStr,
+                  validTimeRange: `${event.startTime} to ${event.endTime}`,
+                  eventInfo: {
+                    name: event.name,
+                    date: eventEndDateStr,
+                    startTime: event.startTime,
+                    endTime: event.endTime,
+                  },
+                },
+              ],
             );
           }
         }
@@ -561,7 +598,9 @@ export class SurveyService {
           const otherSessionDate = new Date(otherSession.date);
 
           if (sessionDate.getTime() === otherSessionDate.getTime()) {
-            const otherStartMinutes = this.timeToMinutes(otherSession.startTime);
+            const otherStartMinutes = this.timeToMinutes(
+              otherSession.startTime,
+            );
             const otherEndMinutes = this.timeToMinutes(otherSession.endTime);
 
             if (
@@ -571,16 +610,18 @@ export class SurveyService {
               const suggestedTime = this.addMinutesToTime(session.endTime, 15); // 15 min gap
               throw new ValidationException(
                 `Session ${i + 1} "${session.name}" (${session.startTime}-${session.endTime}) overlaps with Session ${j + 1} "${otherSession.name}" (${otherSession.startTime}-${otherSession.endTime}) on ${sessionDateStr}. ` +
-                `Suggested: Adjust Session ${j + 1} to start at "${suggestedTime}" or later to avoid overlap.`,
-                [{
-                  field: `sessions[${i}].overlap`,
-                  sessionName: session.name,
-                  conflictingSession: otherSession.name,
-                  session1Time: `${session.startTime}-${session.endTime}`,
-                  session2Time: `${otherSession.startTime}-${otherSession.endTime}`,
-                  suggestedStartTime: suggestedTime,
-                  date: sessionDateStr
-                }]
+                  `Suggested: Adjust Session ${j + 1} to start at "${suggestedTime}" or later to avoid overlap.`,
+                [
+                  {
+                    field: `sessions[${i}].overlap`,
+                    sessionName: session.name,
+                    conflictingSession: otherSession.name,
+                    session1Time: `${session.startTime}-${session.endTime}`,
+                    session2Time: `${otherSession.startTime}-${otherSession.endTime}`,
+                    suggestedStartTime: suggestedTime,
+                    date: sessionDateStr,
+                  },
+                ],
               );
             }
           }
@@ -605,16 +646,19 @@ export class SurveyService {
   }
 
   // Get user feedback history for sessions
-  private async getUserFeedbackHistory(userId: string, surveyId: string): Promise<{[sessionId: string]: SurveyResponse}> {
+  private async getUserFeedbackHistory(
+    userId: string,
+    surveyId: string,
+  ): Promise<{ [sessionId: string]: SurveyResponse }> {
     try {
       if (!userId) return {};
-      
+
       const feedbacks = await this.surveyResponseRepository.find({
-        where: { userId, surveyId }
+        where: { userId, surveyId },
       });
 
-      const feedbackMap: {[sessionId: string]: SurveyResponse} = {};
-      feedbacks.forEach(feedback => {
+      const feedbackMap: { [sessionId: string]: SurveyResponse } = {};
+      feedbacks.forEach((feedback) => {
         feedbackMap[feedback.sessionId] = feedback;
       });
 
@@ -626,7 +670,11 @@ export class SurveyService {
   }
 
   // Enhanced method with clear event status logic
-  private getSessionsForUserWithHistory(sessions: SurveySession[], survey: Survey, userId?: string): {
+  private getSessionsForUserWithHistory(
+    sessions: SurveySession[],
+    survey: Survey,
+    userId?: string,
+  ): {
     sessionsToShow: SurveySession[];
     pastSessions: SurveySession[];
     upcomingSessions: SurveySession[];
@@ -637,15 +685,15 @@ export class SurveyService {
       const now = new Date();
       const currentDate = now.toISOString().split('T')[0];
       const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-      
+
       const surveyStartDate = new Date(survey.startDate);
       const surveyEndDate = new Date(survey.endDate);
       const surveyStartDateStr = surveyStartDate.toISOString().split('T')[0];
       const surveyEndDateStr = surveyEndDate.toISOString().split('T')[0];
-      
+
       const eventStartTimeMinutes = this.timeToMinutes(survey.startTime);
       const eventEndTimeMinutes = this.timeToMinutes(survey.endTime);
-      
+
       // Sort sessions by date and time
       const sortedSessions = sessions.sort((a, b) => {
         const dateA = new Date(a.date).getTime();
@@ -653,24 +701,32 @@ export class SurveyService {
         if (dateA !== dateB) {
           return dateA - dateB;
         }
-        return this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime);
+        return (
+          this.timeToMinutes(a.startTime) - this.timeToMinutes(b.startTime)
+        );
       });
 
       // Determine event status first
       let eventStatus: 'PAST_EVENT' | 'TODAY_EVENT' | 'UPCOMING_EVENT';
-      
+
       if (surveyEndDateStr < currentDate) {
         // Event completely ended (past date)
         eventStatus = 'PAST_EVENT';
       } else if (surveyStartDateStr > currentDate) {
         // Event in future (upcoming)
         eventStatus = 'UPCOMING_EVENT';
-      } else if (surveyStartDateStr <= currentDate && surveyEndDateStr >= currentDate) {
+      } else if (
+        surveyStartDateStr <= currentDate &&
+        surveyEndDateStr >= currentDate
+      ) {
         // Event is today or spanning multiple days including today
         eventStatus = 'TODAY_EVENT';
-        
+
         // Check if event ended today
-        if (surveyEndDateStr === currentDate && currentTimeMinutes > eventEndTimeMinutes) {
+        if (
+          surveyEndDateStr === currentDate &&
+          currentTimeMinutes > eventEndTimeMinutes
+        ) {
           eventStatus = 'PAST_EVENT';
         }
       } else {
@@ -682,7 +738,7 @@ export class SurveyService {
       const currentSessions: SurveySession[] = [];
       const upcomingSessions: SurveySession[] = [];
 
-      sortedSessions.forEach(session => {
+      sortedSessions.forEach((session) => {
         const sessionDate = new Date(session.date).toISOString().split('T')[0];
         const sessionStartMinutes = this.timeToMinutes(session.startTime);
         const sessionEndMinutes = this.timeToMinutes(session.endTime);
@@ -690,8 +746,10 @@ export class SurveyService {
         if (sessionDate < currentDate) {
           pastSessions.push(session);
         } else if (sessionDate === currentDate) {
-          if (currentTimeMinutes >= sessionStartMinutes - 5 && 
-              currentTimeMinutes <= sessionEndMinutes + 5) {
+          if (
+            currentTimeMinutes >= sessionStartMinutes - 5 &&
+            currentTimeMinutes <= sessionEndMinutes + 5
+          ) {
             currentSessions.push(session);
           } else if (currentTimeMinutes > sessionEndMinutes + 5) {
             pastSessions.push(session);
@@ -714,19 +772,26 @@ export class SurveyService {
         sessionsToShow = sortedSessions.length > 0 ? [sortedSessions[0]] : [];
       } else if (eventStatus === 'TODAY_EVENT') {
         // Event is today - time-based logic
-        
+
         // Check if event hasn't started yet today
-        if (surveyStartDateStr === currentDate && currentTimeMinutes < eventStartTimeMinutes) {
+        if (
+          surveyStartDateStr === currentDate &&
+          currentTimeMinutes < eventStartTimeMinutes
+        ) {
           // Event is today but hasn't started - show first session only
           sessionsToShow = sortedSessions.length > 0 ? [sortedSessions[0]] : [];
         } else {
           // Event has started today - show based on current time
-          
+
           if (currentSessions.length > 0) {
             // Current session active - show first session + current sessions
             const firstSession = sortedSessions[0];
-            const sessionsSet = new Set([firstSession, ...currentSessions].map(s => s.id));
-            sessionsToShow = sortedSessions.filter(s => sessionsSet.has(s.id));
+            const sessionsSet = new Set(
+              [firstSession, ...currentSessions].map((s) => s.id),
+            );
+            sessionsToShow = sortedSessions.filter((s) =>
+              sessionsSet.has(s.id),
+            );
           } else if (pastSessions.length > 0) {
             // Some sessions completed - show next upcoming session
             const nextSession = upcomingSessions[0];
@@ -738,7 +803,8 @@ export class SurveyService {
             }
           } else {
             // First session hasn't started yet
-            sessionsToShow = sortedSessions.length > 0 ? [sortedSessions[0]] : [];
+            sessionsToShow =
+              sortedSessions.length > 0 ? [sortedSessions[0]] : [];
           }
         }
       }
@@ -748,9 +814,8 @@ export class SurveyService {
         pastSessions,
         upcomingSessions,
         currentSessions,
-        eventStatus
+        eventStatus,
       };
-
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get sessions for user with history');
       return {
@@ -758,15 +823,26 @@ export class SurveyService {
         pastSessions: [],
         upcomingSessions: [],
         currentSessions: [],
-        eventStatus: 'TODAY_EVENT'
+        eventStatus: 'TODAY_EVENT',
       };
     }
   }
 
   // Helper method to determine session type
-  private determineSessionType(session: SurveySession, sessionInfo: any): string {
-    if (sessionInfo.pastSessions.some((s: SurveySession) => s.id === session.id)) return 'PAST';
-    if (sessionInfo.currentSessions.some((s: SurveySession) => s.id === session.id)) return 'CURRENT';
+  private determineSessionType(
+    session: SurveySession,
+    sessionInfo: any,
+  ): string {
+    if (
+      sessionInfo.pastSessions.some((s: SurveySession) => s.id === session.id)
+    )
+      return 'PAST';
+    if (
+      sessionInfo.currentSessions.some(
+        (s: SurveySession) => s.id === session.id,
+      )
+    )
+      return 'CURRENT';
     return 'UPCOMING';
   }
 
@@ -785,9 +861,11 @@ export class SurveyService {
       // 2. Auto-fill survey date/time from event if not provided
       const surveyData = {
         ...createSurveyDto,
-        startDate: createSurveyDto.startDate || event.startDate.toString().split('T')[0],
+        startDate:
+          createSurveyDto.startDate || event.startDate.toString().split('T')[0],
         startTime: createSurveyDto.startTime || event.startTime,
-        endDate: createSurveyDto.endDate || event.endDate.toString().split('T')[0],
+        endDate:
+          createSurveyDto.endDate || event.endDate.toString().split('T')[0],
         endTime: createSurveyDto.endTime || event.endTime,
       };
 
@@ -803,7 +881,7 @@ export class SurveyService {
         throw new DuplicateResourceException(
           'Survey',
           'eventId',
-          createSurveyDto.eventId
+          createSurveyDto.eventId,
         );
       }
 
@@ -823,7 +901,7 @@ export class SurveyService {
       // 6. Create sessions if provided
       const sessionsToCreate = createSurveyDto.sessions || [];
       const createdSessions = [];
-      
+
       for (const sessionDto of sessionsToCreate) {
         try {
           const session = new SurveySession();
@@ -834,19 +912,24 @@ export class SurveyService {
           session.endTime = sessionDto.endTime;
           session.description = sessionDto.description;
           session.isActive = sessionDto.isActive ?? true;
-          
+
           const savedSession = await this.surveySessionRepository.save(session);
           createdSessions.push(savedSession);
         } catch (sessionError: any) {
           // If session creation fails, delete the survey and sessions
           await this.surveyRepository.delete(savedSurvey.id);
           await Promise.all(
-            createdSessions.map(session => 
-              this.surveySessionRepository.delete(session.id)
-            )
+            createdSessions.map((session) =>
+              this.surveySessionRepository.delete(session.id),
+            ),
           );
-          this.errorHandler.logError(sessionError, 'Session creation in survey');
-          throw new ValidationException(`Failed to create session: ${sessionError.message}`);
+          this.errorHandler.logError(
+            sessionError,
+            'Session creation in survey',
+          );
+          throw new ValidationException(
+            `Failed to create session: ${sessionError.message}`,
+          );
         }
       }
 
@@ -865,10 +948,9 @@ export class SurveyService {
             startTime: !createSurveyDto.startTime,
             endDate: !createSurveyDto.endDate,
             endTime: !createSurveyDto.endTime,
-          }
-        }
+          },
+        },
       };
-
     } catch (error: any) {
       if (
         error instanceof ValidationException ||
@@ -877,7 +959,7 @@ export class SurveyService {
       ) {
         throw error;
       }
-      
+
       this.errorHandler.logError(error, 'Survey creation');
       this.errorHandler.handleDatabaseError(error, 'Survey creation');
     }
@@ -929,31 +1011,42 @@ export class SurveyService {
 
         if (allSessions.length === 0) continue;
 
-        const sessionInfo = this.getSessionsForUserWithHistory(allSessions, survey, userId);
-        
+        const sessionInfo = this.getSessionsForUserWithHistory(
+          allSessions,
+          survey,
+          userId,
+        );
+
         // Show all surveys (past, today, upcoming) but with different session visibility
         if (sessionInfo.sessionsToShow.length > 0) {
-          
           // Get user feedback history if userId provided
-          const feedbackHistory = userId ? 
-            await this.getUserFeedbackHistory(userId, survey.id) : {};
+          const feedbackHistory = userId
+            ? await this.getUserFeedbackHistory(userId, survey.id)
+            : {};
 
           // Add feedback status to sessions
-          const sessionsWithFeedback = sessionInfo.sessionsToShow.map(session => ({
-            ...session,
-            userFeedback: feedbackHistory[session.id] || null,
-            hasFeedback: !!feedbackHistory[session.id],
-            canSubmitFeedback: sessionInfo.eventStatus === 'PAST_EVENT' || 
-                             (sessionInfo.eventStatus === 'TODAY_EVENT' && 
-                              (sessionInfo.currentSessions.some(s => s.id === session.id) || 
-                               sessionInfo.pastSessions.some(s => s.id === session.id))),
-            sessionType: this.determineSessionType(session, sessionInfo)
-          }));
+          const sessionsWithFeedback = sessionInfo.sessionsToShow.map(
+            (session) => ({
+              ...session,
+              userFeedback: feedbackHistory[session.id] || null,
+              hasFeedback: !!feedbackHistory[session.id],
+              canSubmitFeedback:
+                sessionInfo.eventStatus === 'PAST_EVENT' ||
+                (sessionInfo.eventStatus === 'TODAY_EVENT' &&
+                  (sessionInfo.currentSessions.some(
+                    (s) => s.id === session.id,
+                  ) ||
+                    sessionInfo.pastSessions.some((s) => s.id === session.id))),
+              sessionType: this.determineSessionType(session, sessionInfo),
+            }),
+          );
 
           // For users: Single session → object, Multiple sessions → array
           // For admin: Always array (they see all sessions)
-          const sessionsFormat = sessionsWithFeedback.length === 1 ? 
-            sessionsWithFeedback[0] : sessionsWithFeedback;
+          const sessionsFormat =
+            sessionsWithFeedback.length === 1
+              ? sessionsWithFeedback[0]
+              : sessionsWithFeedback;
 
           currentTimeSurveys.push({
             ...survey,
@@ -964,7 +1057,10 @@ export class SurveyService {
 
       return currentTimeSurveys;
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get current time surveys with sessions');
+      this.errorHandler.logError(
+        error,
+        'Get current time surveys with sessions',
+      );
       this.errorHandler.handleDatabaseError(error, 'Current surveys retrieval');
     }
   }
@@ -1030,27 +1126,37 @@ export class SurveyService {
         order: { date: 'ASC', startTime: 'ASC' },
       });
 
-      const sessionInfo = this.getSessionsForUserWithHistory(allSessions, survey, userId);
-      
+      const sessionInfo = this.getSessionsForUserWithHistory(
+        allSessions,
+        survey,
+        userId,
+      );
+
       // Get user feedback history
-      const feedbackHistory = userId ? 
-        await this.getUserFeedbackHistory(userId, surveyId) : {};
+      const feedbackHistory = userId
+        ? await this.getUserFeedbackHistory(userId, surveyId)
+        : {};
 
       // Add feedback status to sessions
-      const sessionsWithFeedback = sessionInfo.sessionsToShow.map(session => ({
-        ...session,
-        userFeedback: feedbackHistory[session.id] || null,
-        hasFeedback: !!feedbackHistory[session.id],
-        canSubmitFeedback: sessionInfo.eventStatus === 'PAST_EVENT' || 
-                         (sessionInfo.eventStatus === 'TODAY_EVENT' && 
-                          (sessionInfo.currentSessions.some(s => s.id === session.id) || 
-                           sessionInfo.pastSessions.some(s => s.id === session.id))),
-        sessionType: this.determineSessionType(session, sessionInfo)
-      }));
+      const sessionsWithFeedback = sessionInfo.sessionsToShow.map(
+        (session) => ({
+          ...session,
+          userFeedback: feedbackHistory[session.id] || null,
+          hasFeedback: !!feedbackHistory[session.id],
+          canSubmitFeedback:
+            sessionInfo.eventStatus === 'PAST_EVENT' ||
+            (sessionInfo.eventStatus === 'TODAY_EVENT' &&
+              (sessionInfo.currentSessions.some((s) => s.id === session.id) ||
+                sessionInfo.pastSessions.some((s) => s.id === session.id))),
+          sessionType: this.determineSessionType(session, sessionInfo),
+        }),
+      );
 
       // For users: Single session → object, Multiple sessions → array
-      const sessionsFormat = sessionsWithFeedback.length === 1 ? 
-        sessionsWithFeedback[0] : sessionsWithFeedback;
+      const sessionsFormat =
+        sessionsWithFeedback.length === 1
+          ? sessionsWithFeedback[0]
+          : sessionsWithFeedback;
 
       return {
         ...survey,
@@ -1061,7 +1167,10 @@ export class SurveyService {
         throw error;
       }
       this.errorHandler.logError(error, 'Get survey with current sessions');
-      this.errorHandler.handleDatabaseError(error, 'Survey with current sessions');
+      this.errorHandler.handleDatabaseError(
+        error,
+        'Survey with current sessions',
+      );
     }
   }
 
@@ -1074,17 +1183,17 @@ export class SurveyService {
     try {
       // Calculate total days
       const totalDays = this.calculateEventDays(startDate, endDate);
-      
+
       // Convert time strings to minutes
       const startTimeMinutes = this.timeToMinutes(startTime);
       const endTimeMinutes = this.timeToMinutes(endTime);
-      
+
       // Calculate hours per day
       const hoursPerDay = (endTimeMinutes - startTimeMinutes) / 60;
-      
+
       // Calculate total hours for the entire event period
       const totalHours = totalDays * hoursPerDay;
-      
+
       return totalHours;
     } catch (error: any) {
       this.errorHandler.logError(error, 'Calculate total event time');
@@ -1092,7 +1201,7 @@ export class SurveyService {
     }
   }
 
-  async getSurveyById(surveyId: string) {
+  async getFeedbackSurveyById(surveyId: string) {
     try {
       return await this.surveyRepository.findOne({
         where: { id: surveyId },
@@ -1116,7 +1225,7 @@ export class SurveyService {
     }
   }
 
-  // Enhanced submit feedback method
+  // Simplified submit feedback method
   async submitFeedback(
     surveyId: string,
     eventId: string,
@@ -1124,6 +1233,7 @@ export class SurveyService {
     feedbackDto: SurveyResponseDto,
   ) {
     try {
+      // 1. Validate survey
       const survey = await this.surveyRepository.findOne({
         where: { id: surveyId, eventId, isActive: true },
       });
@@ -1132,7 +1242,7 @@ export class SurveyService {
         throw new ResourceNotFoundException('Survey not found or inactive');
       }
 
-      // Check if session exists
+      // 2. Validate session
       const session = await this.surveySessionRepository.findOne({
         where: { id: feedbackDto.sessionId, surveyId, isActive: true },
       });
@@ -1141,41 +1251,62 @@ export class SurveyService {
         throw new ResourceNotFoundException('Session not found or inactive');
       }
 
-      // Get session info to check if feedback is allowed
+      // 3. Get all sessions and categorize them
       const allSessions = await this.surveySessionRepository.find({
         where: { surveyId, isActive: true },
+        order: { date: 'ASC', startTime: 'ASC' },
       });
 
-      const sessionInfo = this.getSessionsForUserWithHistory(allSessions, survey, userId);
-      
-      // Allow feedback for:
-      // 1. Past events (all sessions)
-      // 2. Today's events (current and past sessions only)
-      // 3. NOT for upcoming events
-      let canSubmitFeedback = false;
-      let feedbackMessage = '';
+      const sessionInfo = this.getSessionsForUserWithHistory(
+        allSessions,
+        survey,
+        userId,
+      );
 
-      if (sessionInfo.eventStatus === 'PAST_EVENT') {
-        canSubmitFeedback = true;
-        feedbackMessage = 'Feedback allowed for completed event';
-      } else if (sessionInfo.eventStatus === 'TODAY_EVENT') {
-        const isCurrentOrPastSession = sessionInfo.currentSessions.some(s => s.id === feedbackDto.sessionId) ||
-                                     sessionInfo.pastSessions.some(s => s.id === feedbackDto.sessionId);
-        if (isCurrentOrPastSession) {
-          canSubmitFeedback = true;
-          feedbackMessage = 'Feedback allowed for current/completed session';
-        } else {
-          feedbackMessage = 'Feedback not allowed for future sessions';
-        }
+      // 4. Enhanced feedback eligibility logic
+      let canSubmitFeedback = false;
+      let feedbackReason = '';
+      let sessionStatus = '';
+
+      // Determine session status
+      if (
+        sessionInfo.pastSessions.some((s) => s.id === feedbackDto.sessionId)
+      ) {
+        sessionStatus = 'COMPLETED';
+      } else if (
+        sessionInfo.currentSessions.some((s) => s.id === feedbackDto.sessionId)
+      ) {
+        sessionStatus = 'ONGOING';
       } else {
-        feedbackMessage = 'Feedback not allowed before event starts';
+        sessionStatus = 'UPCOMING';
+      }
+
+      // Enhanced feedback rules
+      switch (sessionInfo.eventStatus) {
+        case 'PAST_EVENT':
+          canSubmitFeedback = true;
+          feedbackReason = `Feedback allowed for completed event. Session: ${session.name} (${sessionStatus})`;
+          break;
+
+        case 'TODAY_EVENT':
+          if (sessionStatus === 'COMPLETED' || sessionStatus === 'ONGOING') {
+            canSubmitFeedback = true;
+            feedbackReason = `Feedback allowed for ${sessionStatus.toLowerCase()} session: ${session.name}`;
+          } else {
+            feedbackReason = `Feedback not allowed for upcoming session: ${session.name}. Please wait until session starts.`;
+          }
+          break;
+
+        case 'UPCOMING_EVENT':
+          feedbackReason = `Feedback not allowed for future event. Session: ${session.name} is scheduled for future.`;
+          break;
       }
 
       if (!canSubmitFeedback) {
-        throw new BusinessLogicException(feedbackMessage);
+        throw new BusinessLogicException(feedbackReason);
       }
 
-      // Check if user already submitted for this session
+      // 5. Check for duplicate feedback
       const existingResponse = await this.surveyResponseRepository.findOne({
         where: { surveyId, sessionId: feedbackDto.sessionId, userId },
       });
@@ -1184,10 +1315,11 @@ export class SurveyService {
         throw new DuplicateResourceException(
           'Feedback',
           'session',
-          'You have already submitted feedback for this session'
+          `You have already submitted feedback for session: ${session.name}`,
         );
       }
 
+      // 6. Create feedback response
       const response = new SurveyResponse();
       response.surveyId = surveyId;
       response.sessionId = feedbackDto.sessionId;
@@ -1199,12 +1331,10 @@ export class SurveyService {
 
       const savedResponse = await this.surveyResponseRepository.save(response);
 
+      // 7. Simple response - केवल ID return करें
       return {
-        ...savedResponse,
-        sessionInfo: session,
-        submissionAllowed: canSubmitFeedback,
-        eventStatus: sessionInfo.eventStatus,
-        feedbackMessage
+        feedbackId: savedResponse.id,
+        message: 'Feedback created successfully',
       };
     } catch (error: any) {
       if (
@@ -1216,6 +1346,93 @@ export class SurveyService {
       }
       this.errorHandler.logError(error, 'Submit feedback');
       this.errorHandler.handleDatabaseError(error, 'Feedback submission');
+    }
+  }
+
+  //  method - Feedback details
+  async getFeedbackById(feedbackId: string) {
+    try {
+      // 1. Get feedback response
+      const feedback = await this.surveyResponseRepository.findOne({
+        where: { id: feedbackId },
+      });
+
+      if (!feedback) {
+        throw new ResourceNotFoundException('Feedback not found');
+      }
+
+      // 2. Get user information
+      const user = await this.userRepository.findOne({
+        where: { id: feedback.userId },
+        select: ['id', 'firstName', 'lastName', 'email', 'mobile', 'role'],
+      });
+
+      // 3. Get session information
+      const session = await this.surveySessionRepository.findOne({
+        where: { id: feedback.sessionId },
+      });
+
+      // 4. Get event information
+      const event = await this.eventRepository.findOne({
+        where: { id: feedback.eventId },
+        select: [
+          'id',
+          'name',
+          'description',
+          'startDate',
+          'endDate',
+          'location',
+          'venue',
+        ],
+      });
+
+      // 5. Get survey information
+      const survey = await this.surveyRepository.findOne({
+        where: { id: feedback.surveyId },
+      });
+
+      // 6. Return detailed information
+      return {
+        feedbackId: feedback.id,
+        feedbackData: {
+          name: feedback.name,
+          title: feedback.title,
+          comment: feedback.comment,
+          submittedAt: feedback.createdAt,
+        },
+        user: {
+          id: user?.id,
+          name: `${user?.firstName} ${user?.lastName}`,
+          email: user?.email,
+          mobile: user?.mobile,
+          role: user?.role,
+        },
+        session: {
+          id: session?.id,
+          name: session?.name,
+          description: session?.description,
+          date: session?.date,
+          time: `${session?.startTime} - ${session?.endTime}`,
+        },
+        event: {
+          id: event?.id,
+          name: event?.name,
+          description: event?.description,
+          location: event?.location,
+          venue: event?.venue,
+        },
+        survey: {
+          id: survey?.id,
+          title: survey?.title,
+          description: survey?.description,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Get feedback by ID');
+      this.errorHandler.handleDatabaseError(error, 'Feedback retrieval');
     }
   }
 
@@ -1274,11 +1491,16 @@ export class SurveyService {
       }
 
       // For User: Show sessions based on current time and event status
-      const sessionInfo = this.getSessionsForUserWithHistory(allSessions, survey);
+      const sessionInfo = this.getSessionsForUserWithHistory(
+        allSessions,
+        survey,
+      );
 
       // For users: Single session → object, Multiple sessions → array
-      const sessionsFormat = sessionInfo.sessionsToShow.length === 1 ? 
-        sessionInfo.sessionsToShow[0] : sessionInfo.sessionsToShow;
+      const sessionsFormat =
+        sessionInfo.sessionsToShow.length === 1
+          ? sessionInfo.sessionsToShow[0]
+          : sessionInfo.sessionsToShow;
 
       return {
         ...survey,
@@ -1294,15 +1516,22 @@ export class SurveyService {
   }
 
   // Get survey detail by event ID and user role
-  async getSurveyDetailByEventId(eventId: string, userRole: string, userId?: string) {
+  async getSurveyDetailByEventId(
+    eventId: string,
+    userRole: string,
+    userId?: string,
+  ) {
     try {
       // First find the survey for this event
       const survey = await this.surveyRepository.findOne({
         where: { eventId, isActive: true },
       });
- 
+
       if (!survey) {
-        throw new ResourceNotFoundException('Survey not found for this event', eventId);
+        throw new ResourceNotFoundException(
+          'Survey not found for this event',
+          eventId,
+        );
       }
 
       const allSessions = await this.surveySessionRepository.find({
@@ -1319,39 +1548,216 @@ export class SurveyService {
       }
 
       // For User: Show sessions based on current time and event status
-      const sessionInfo = this.getSessionsForUserWithHistory(allSessions, survey, userId);
-      
+      const sessionInfo = this.getSessionsForUserWithHistory(
+        allSessions,
+        survey,
+        userId,
+      );
+
       // Get user feedback history if userId provided
-      const feedbackHistory = userId ? 
-        await this.getUserFeedbackHistory(userId, survey.id) : {};
+      const feedbackHistory = userId
+        ? await this.getUserFeedbackHistory(userId, survey.id)
+        : {};
 
       // Add feedback status to sessions for users
-      const sessionsWithFeedback = sessionInfo.sessionsToShow.map(session => ({
-        ...session,
-        userFeedback: feedbackHistory[session.id] || null,
-        hasFeedback: !!feedbackHistory[session.id],
-        canSubmitFeedback: sessionInfo.eventStatus === 'PAST_EVENT' || 
-                         (sessionInfo.eventStatus === 'TODAY_EVENT' && 
-                          (sessionInfo.currentSessions.some(s => s.id === session.id) || 
-                           sessionInfo.pastSessions.some(s => s.id === session.id))),
-        sessionType: this.determineSessionType(session, sessionInfo)
-      }));
+      const sessionsWithFeedback = sessionInfo.sessionsToShow.map(
+        (session) => ({
+          ...session,
+          userFeedback: feedbackHistory[session.id] || null,
+          hasFeedback: !!feedbackHistory[session.id],
+          canSubmitFeedback:
+            sessionInfo.eventStatus === 'PAST_EVENT' ||
+            (sessionInfo.eventStatus === 'TODAY_EVENT' &&
+              (sessionInfo.currentSessions.some((s) => s.id === session.id) ||
+                sessionInfo.pastSessions.some((s) => s.id === session.id))),
+          sessionType: this.determineSessionType(session, sessionInfo),
+        }),
+      );
 
       // For users: Single session → object, Multiple sessions → array
-      const sessionsFormat = sessionsWithFeedback.length === 1 ? 
-        sessionsWithFeedback[0] : sessionsWithFeedback;
+      const sessionsFormat =
+        sessionsWithFeedback.length === 1
+          ? sessionsWithFeedback[0]
+          : sessionsWithFeedback;
 
       return {
         ...survey,
         sessions: sessionsFormat,
       };
     } catch (error: any) {
-      console.log(error,"$$$$$$");
+      console.log(error, '$$$$$$');
       if (error instanceof ResourceNotFoundException) {
         throw error;
       }
       this.errorHandler.logError(error, 'Get survey detail by event ID');
       this.errorHandler.handleDatabaseError(error, 'Survey detail by event ID');
+    }
+  }
+
+  // Get all feedbacks - Admin detailed information
+  async getAllFeedbacks() {
+    try {
+      const feedbacks = await this.surveyResponseRepository.find({
+        order: { createdAt: 'DESC' },
+      });
+
+      // Get detailed information for each feedback
+      const detailedFeedbacks = await Promise.all(
+        feedbacks.map(async (feedback) => {
+          // Get user information
+          const user = await this.userRepository.findOne({
+            where: { id: feedback.userId },
+            select: ['id', 'firstName', 'lastName', 'email', 'mobile', 'role'],
+          });
+
+          // Get session information
+          const session = await this.surveySessionRepository.findOne({
+            where: { id: feedback.sessionId },
+          });
+
+          // Get event information
+          const event = await this.eventRepository.findOne({
+            where: { id: feedback.eventId },
+            select: [
+              'id',
+              'name',
+              'description',
+              'startDate',
+              'endDate',
+              'location',
+              'venue',
+            ],
+          });
+
+          // Get survey information
+          const survey = await this.surveyRepository.findOne({
+            where: { id: feedback.surveyId },
+            select: ['id', 'title', 'description'],
+          });
+
+          return {
+            feedbackId: feedback.id,
+            feedbackData: {
+              name: feedback.name,
+              title: feedback.title,
+              comment: feedback.comment,
+              submittedAt: feedback.createdAt,
+            },
+            user: {
+              id: user?.id,
+              name: `${user?.firstName} ${user?.lastName}`,
+              email: user?.email,
+              mobile: user?.mobile,
+              role: user?.role,
+            },
+            session: {
+              id: session?.id,
+              name: session?.name,
+              description: session?.description,
+              date: session?.date,
+              time: `${session?.startTime} - ${session?.endTime}`,
+            },
+            event: {
+              id: event?.id,
+              name: event?.name,
+              description: event?.description,
+              location: event?.location,
+              venue: event?.venue,
+            },
+            survey: {
+              id: survey?.id,
+              title: survey?.title,
+              description: survey?.description,
+            },
+          };
+        }),
+      );
+
+      return {
+        totalFeedbacks: feedbacks.length,
+        feedbacks: detailedFeedbacks,
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get all feedbacks');
+      this.errorHandler.handleDatabaseError(error, 'Feedbacks retrieval');
+    }
+  }
+
+  // Get feedbacks by user ID - Simple
+  async getFeedbacksByUserId(userId: string) {
+    try {
+      // Get all feedbacks for user
+      const feedbacks = await this.surveyResponseRepository.find({
+        where: { userId },
+        order: { createdAt: 'DESC' },
+      });
+
+      // Get detailed information for each feedback
+      const detailedFeedbacks = await Promise.all(
+        feedbacks.map(async (feedback) => {
+          // Get session information
+          const session = await this.surveySessionRepository.findOne({
+            where: { id: feedback.sessionId },
+          });
+
+          // Get event information
+          const event = await this.eventRepository.findOne({
+            where: { id: feedback.eventId },
+            select: [
+              'id',
+              'name',
+              'description',
+              'startDate',
+              'endDate',
+              'location',
+              'venue',
+            ],
+          });
+
+          // Get survey information
+          const survey = await this.surveyRepository.findOne({
+            where: { id: feedback.surveyId },
+            select: ['id', 'title', 'description'],
+          });
+
+          return {
+            feedbackId: feedback.id,
+            feedbackData: {
+              name: feedback.name,
+              title: feedback.title,
+              comment: feedback.comment,
+              submittedAt: feedback.createdAt,
+            },
+            session: {
+              id: session?.id,
+              name: session?.name,
+              description: session?.description,
+              date: session?.date,
+              time: `${session?.startTime} - ${session?.endTime}`,
+            },
+            event: {
+              id: event?.id,
+              name: event?.name,
+              description: event?.description,
+              location: event?.location,
+              venue: event?.venue,
+            },
+            survey: {
+              id: survey?.id,
+              title: survey?.title,
+              description: survey?.description,
+            },
+          };
+        }),
+      );
+
+      return {
+        totalFeedbacks: feedbacks.length,
+        feedbacks: detailedFeedbacks,
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get feedbacks by user ID');
+      this.errorHandler.handleDatabaseError(error, 'User feedbacks retrieval');
     }
   }
 }

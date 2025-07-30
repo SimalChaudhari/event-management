@@ -18,11 +18,13 @@ import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { Survey, SurveyResponse, SurveySession } from 'survey/survey.entity';
 import { SurveyService } from 'survey/survey.service';
 import { UtilsModule } from 'utils/utils.module';
+import { UserEntity } from 'user/users.entity';
 
 
 @Module({
     imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,
       Survey,
+      UserEntity,
       SurveySession,    // Add this
       SurveyResponse,    // Add this
       EventCategory,Category,Speaker,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey]),

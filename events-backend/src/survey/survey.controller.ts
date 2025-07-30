@@ -15,7 +15,12 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { SurveyService } from './survey.service';
-import { CreateSurveyDto, UpdateSurveyDto, SurveyResponseDto, CreateSessionDto } from './survey.dto';
+import {
+  CreateSurveyDto,
+  UpdateSurveyDto,
+  SurveyResponseDto,
+  CreateSessionDto,
+} from './survey.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
 import { Roles } from 'jwt/roles.decorator';
@@ -49,8 +54,9 @@ export class SurveyController {
     @Request() req: any,
   ) {
     try {
-      const suggestions = await this.surveyService.getEventSuggestionsByEventId(eventId);
-      
+      const suggestions =
+        await this.surveyService.getEventSuggestionsByEventId(eventId);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event suggestions generated successfully',
@@ -78,7 +84,7 @@ export class SurveyController {
   ) {
     try {
       const survey = await this.surveyService.createSurvey(createSurveyDto);
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Survey created successfully',
@@ -106,7 +112,7 @@ export class SurveyController {
   ) {
     try {
       const surveys = await this.surveyService.getAllSurveysWithSessions();
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Surveys with sessions retrieved successfully',
@@ -119,7 +125,11 @@ export class SurveyController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get all surveys with sessions', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get all surveys with sessions',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -131,8 +141,9 @@ export class SurveyController {
     @Request() req: any,
   ) {
     try {
-      const surveys = await this.surveyService.getCurrentTimeSurveysWithSessions();
-      
+      const surveys =
+        await this.surveyService.getCurrentTimeSurveysWithSessions();
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Current time surveys with sessions retrieved successfully',
@@ -144,7 +155,11 @@ export class SurveyController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get current time surveys', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get current time surveys',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -157,8 +172,9 @@ export class SurveyController {
     @Request() req: any,
   ) {
     try {
-      const survey = await this.surveyService.getSurveyWithCurrentSessions(surveyId);
-      
+      const survey =
+        await this.surveyService.getSurveyWithCurrentSessions(surveyId);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Survey with current sessions retrieved successfully',
@@ -171,54 +187,51 @@ export class SurveyController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get survey with current sessions', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get survey with current sessions',
+        req.user?.id,
+      );
       throw error;
     }
   }
 
-  // User submits feedback - ENHANCED
-  @Post('feedback/:surveyId')
-  async submitFeedback(
-    @Param('surveyId') surveyId: string,
-    @Body() feedbackDto: SurveyResponseDto,
+  // Get survey detail by event ID and user role
+  @Get('event/:eventId')
+  async getSurveyDetailByEventId(
+    @Param('eventId') eventId: string,
     @Request() req: any,
     @Res() response: Response,
   ) {
     try {
+      const userRole = req.user?.role;
       const userId = req.user?.id;
 
-      const survey = await this.surveyService.getSurveyById(surveyId);
-      
-      if (!survey) {
-        const successResponse: SuccessResponse = {
-          success: false,
-          message: 'Survey not found',
-        };
-        return response.status(HttpStatus.NOT_FOUND).json(successResponse);
-      }
-
-      const feedback = await this.surveyService.submitFeedback(
-        surveyId,
-        survey.eventId,
+      const survey = await this.surveyService.getSurveyDetailByEventId(
+        eventId,
+        userRole,
         userId,
-        feedbackDto,
       );
 
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'Feedback submitted successfully',
-        data: feedback,
+        message: 'Survey detail retrieved successfully by event ID',
+        data: survey,
         metadata: {
           timestamp: new Date().toISOString(),
-          userId,
-          surveyId,
-          sessionId: feedbackDto.sessionId,
+          userRole,
+          eventId,
+          userId: userId || null,
         },
       };
 
-      return response.status(HttpStatus.CREATED).json(successResponse);
+      return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Submit feedback', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get survey detail by event ID',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -232,9 +245,12 @@ export class SurveyController {
   ) {
     try {
       const userRole = req.user?.role || 'user';
-      
-      const survey = await this.surveyService.getSurveyDetailByRole(surveyId, userRole);
-      
+
+      const survey = await this.surveyService.getSurveyDetailByRole(
+        surveyId,
+        userRole,
+      );
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Survey detail retrieved successfully',
@@ -245,10 +261,14 @@ export class SurveyController {
           surveyId,
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get survey detail by role', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get survey detail by role',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -264,7 +284,7 @@ export class SurveyController {
   ) {
     try {
       const session = await this.surveyService.addSession(surveyId, sessionDto);
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Session added successfully',
@@ -292,8 +312,9 @@ export class SurveyController {
     @Request() req: any,
   ) {
     try {
-      const survey = await this.surveyService.getSurveyWithAllSessions(surveyId);
-      
+      const survey =
+        await this.surveyService.getSurveyWithAllSessions(surveyId);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Survey with all sessions retrieved successfully',
@@ -307,39 +328,137 @@ export class SurveyController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get survey with all sessions', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Get survey with all sessions',
+        req.user?.id,
+      );
       throw error;
     }
   }
 
-  // Get survey detail by event ID and user role
-  @Get('event/:eventId')
-  async getSurveyDetailByEventId(
-    @Param('eventId') eventId: string,
+  // FEED BACK ENDPOINTS
+
+  // User submits feedback - SIMPLIFIED
+  @Post('feedback/:surveyId')
+  async submitFeedback(
+    @Param('surveyId') surveyId: string,
+    @Body() feedbackDto: SurveyResponseDto,
     @Request() req: any,
     @Res() response: Response,
   ) {
     try {
-      const userRole = req.user?.role;
       const userId = req.user?.id;
-      
-      const survey = await this.surveyService.getSurveyDetailByEventId(eventId, userRole, userId);
-      
+
+      const survey = await this.surveyService.getFeedbackSurveyById(surveyId);
+
+      if (!survey) {
+        const successResponse: SuccessResponse = {
+          success: false,
+          message: 'Survey not found',
+        };
+        return response.status(HttpStatus.NOT_FOUND).json(successResponse);
+      }
+
+      const feedback = await this.surveyService.submitFeedback(
+        surveyId,
+        survey.eventId,
+        userId,
+        feedbackDto,
+      );
+
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'Survey detail retrieved successfully by event ID',
-        data: survey,
+        message: 'Feedback created successfully',
+        data: {
+          feedbackId: feedback.feedbackId,
+        },
         metadata: {
           timestamp: new Date().toISOString(),
-          userRole,
-          eventId,
-          userId: userId || null,
+          userId,
+          surveyId,
+          sessionId: feedbackDto.sessionId,
         },
       };
-      
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Submit feedback', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get all feedbacks - Admin only
+  @Get('feedback/get-all')
+  @Roles(UserRole.Admin)
+  async getAllFeedbacks(@Res() response: Response, @Request() req: any) {
+    try {
+      const feedbacks = await this.surveyService.getAllFeedbacks();
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'All feedbacks retrieved successfully',
+        data: feedbacks,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          requestedBy: req.user?.id,
+        },
+      };
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get survey detail by event ID', req.user?.id);
+      this.errorHandler.logError(error, 'Get all feedbacks', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get user's own feedbacks
+  @Get('feedback/my-feedbacks')
+  async getMyFeedbacks(@Res() response: Response, @Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      const feedbacks = await this.surveyService.getFeedbacksByUserId(userId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User feedbacks retrieved successfully',
+        data: feedbacks,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          userId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get user feedbacks', req.user?.id);
+      throw error;
+    }
+  }
+
+  //  endpoint - Get feedback details by ID
+  @Get('feedback/:feedbackId')
+  async getFeedbackDetails(
+    @Param('feedbackId') feedbackId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const feedbackDetails =
+        await this.surveyService.getFeedbackById(feedbackId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Feedback details retrieved successfully',
+        data: feedbackDetails,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get feedback details', req.user?.id);
       throw error;
     }
   }
