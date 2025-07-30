@@ -21,6 +21,7 @@ import {
   DuplicateResourceException,
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
+import { SurveyUtilityService } from 'utils/services/survey-utility.service';
 
 @Injectable()
 export class RegisterEventService {
@@ -39,7 +40,7 @@ export class RegisterEventService {
 
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
-
+    private readonly surveyUtility: SurveyUtilityService,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -164,6 +165,12 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
+            const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
+              registerEvent.eventId || '',
+              role,
+              registerEvent.userId,
+            );
+
           let formattedDocuments: { name: string; document: string }[] = [];
           if (
             registerEvent?.event?.documents &&
@@ -245,6 +252,8 @@ export class RegisterEventService {
                   }) || [],
             },
             attendanceCount: attendanceCount,
+            surveyDetails: surveyDetails,
+            hasSurvey: !!surveyDetails,
             isFavorite: isFavorite,
             isRegister: registerEvent.isRegister,
           };
@@ -363,6 +372,12 @@ export class RegisterEventService {
         );
       }
 
+      const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
+        registerEvent.eventId || '',
+        role,
+        registerEvent.userId,
+      );
+
       // Extract only speakers
       const speakers =
         registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
@@ -412,6 +427,8 @@ export class RegisterEventService {
           exhibitors: exhibitors,
         },
         attendanceCount: attendanceCount,
+        surveyDetails: surveyDetails,
+        hasSurvey: !!surveyDetails,
         isFavorite: isFavorite,
         isRegister: registerEvent.isRegister,
       };

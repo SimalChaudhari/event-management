@@ -26,6 +26,7 @@ import {
   ValidationException,
   ForeignKeyConstraintException,
 } from '../utils/exceptions/custom-exceptions';
+import { SurveyUtilityService } from 'utils/services/survey-utility.service';
 
 @Injectable()
 export class EventService {
@@ -49,6 +50,8 @@ export class EventService {
     @InjectRepository(FavoriteEvent)
     private favoriteEventRepository: Repository<FavoriteEvent>,
     private readonly errorHandler: ErrorHandlerService,
+
+    private readonly surveyUtility: SurveyUtilityService,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -282,6 +285,7 @@ export class EventService {
       category?: string;
     },
     userId?: string,
+    userRole?: string,
   ) {
     try {
       // Validate EventType enum if provided
@@ -351,22 +355,32 @@ export class EventService {
 
       const events = await queryBuilder.getMany();
 
+      // Get survey details for all events efficiently using utility
+      const eventIds = events.map((event) => event.id);
+      const surveyMap = await this.surveyUtility.getBulkEventSurveyDetails(
+        eventIds,
+        userRole || 'user',
+        userId,
+      );
+
       // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
 
+          const surveyDetails = surveyMap.get(event.id);
+
           let formattedDocuments: { name: string; document: string }[] = [];
           if (event.documents && event.documentNames) {
             formattedDocuments = event.documents.map((doc, index) => ({
               name: event.documentNames?.[index] || `Document ${index + 1}`,
-              document: doc
+              document: doc,
             }));
           } else if (event.documents) {
             // Fallback if no names are provided
             formattedDocuments = event.documents.map((doc, index) => ({
               name: `Document ${index + 1}`,
-              document: doc
+              document: doc,
             }));
           }
 
@@ -425,7 +439,9 @@ export class EventService {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
                 // Format exhibitor documents
-                const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+                const formattedExhibitor = this.formatExhibitorDocuments(
+                  ee.exhibitor,
+                );
                 return {
                   ...formattedExhibitor,
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
@@ -433,6 +449,9 @@ export class EventService {
               }),
             },
             attendanceCount: attendanceCount,
+            surveyDetails: surveyDetails,
+            hasSurvey: !!surveyDetails,
+
             isFavorite: isFavorite,
             isRegistered: isRegistered,
             searchFields: matchedFields, // Add matched fields to response
@@ -477,7 +496,7 @@ export class EventService {
     }
   }
 
-  async getEventById(id: string, userId?: string) {
+  async getEventById(id: string, userId?: string, userRole?: string) {
     try {
       const event = await this.eventRepository
         .createQueryBuilder('event')
@@ -508,14 +527,19 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
+      const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
+        id,
+        userRole || 'user',
+        userId,
+      );
       // Check if user has registered for this event
       let isRegistered = false;
       if (userId) {
         const registration = await this.registerEventRepository.findOne({
-          where: { 
-            userId: userId, 
+          where: {
+            userId: userId,
             eventId: id,
-            isRegister: true // Only count active registrations
+            isRegister: true, // Only count active registrations
           },
         });
         isRegistered = !!registration;
@@ -526,13 +550,13 @@ export class EventService {
       if (event.documents && event.documentNames) {
         formattedDocuments = event.documents.map((doc, index) => ({
           name: event.documentNames?.[index] || `Document ${index + 1}`,
-          document: doc
+          document: doc,
         }));
       } else if (event.documents) {
         // Fallback if no names are provided
         formattedDocuments = event.documents.map((doc, index) => ({
           name: `Document ${index + 1}`,
-          document: doc
+          document: doc,
         }));
       }
 
@@ -559,7 +583,9 @@ export class EventService {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: eventExhibitors.map((ee) => {
             // Format exhibitor documents
-            const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+            const formattedExhibitor = this.formatExhibitorDocuments(
+              ee.exhibitor,
+            );
             return {
               ...formattedExhibitor,
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
@@ -567,6 +593,8 @@ export class EventService {
           }),
         },
         attendanceCount: attendanceCount,
+        surveyDetails: surveyDetails,
+        hasSurvey: !!surveyDetails,
         isFavorite: isFavorite,
         isRegistered: isRegistered,
       };
@@ -1031,56 +1059,68 @@ export class EventService {
     // Format documents with names
     let formattedDocuments: { name: string; document: string }[] = [];
     if (exhibitor.documents && exhibitor.documentNames) {
-      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
-        name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
-        document: doc
-      }));
+      formattedDocuments = exhibitor.documents.map(
+        (doc: string, index: number) => ({
+          name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
+          document: doc,
+        }),
+      );
     } else if (exhibitor.documents) {
       // Fallback if no names are provided
-      formattedDocuments = exhibitor.documents.map((doc: string, index: number) => ({
-        name: `Document ${index + 1}`,
-        document: doc
-      }));
+      formattedDocuments = exhibitor.documents.map(
+        (doc: string, index: number) => ({
+          name: `Document ${index + 1}`,
+          document: doc,
+        }),
+      );
     }
 
-     // Format images with names
-     let formattedImages: { name: string; image: string }[] = [];
-     if (exhibitor.eventImages && exhibitor.eventImageNames) {
-       formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
-         name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
-         image: img
-       }));
-     } else if (exhibitor.eventImages) {
-       formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
-         name: `Image ${index + 1}`,
-         image: img
-       }));
-     }
+    // Format images with names
+    let formattedImages: { name: string; image: string }[] = [];
+    if (exhibitor.eventImages && exhibitor.eventImageNames) {
+      formattedImages = exhibitor.eventImages.map(
+        (img: string, index: number) => ({
+          name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
+          image: img,
+        }),
+      );
+    } else if (exhibitor.eventImages) {
+      formattedImages = exhibitor.eventImages.map(
+        (img: string, index: number) => ({
+          name: `Image ${index + 1}`,
+          image: img,
+        }),
+      );
+    }
 
-     // Format flyers with names
-     let formattedFlyers: { name: string; flyer: string }[] = [];
-     if (exhibitor.flyers && exhibitor.flyerNames) {
-       formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
-         name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
-         flyer: flyer
-       }));
-     } else if (exhibitor.flyers) {
-       formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
-         name: `Flyer ${index + 1}`,
-         flyer: flyer
-       }));
-     }
+    // Format flyers with names
+    let formattedFlyers: { name: string; flyer: string }[] = [];
+    if (exhibitor.flyers && exhibitor.flyerNames) {
+      formattedFlyers = exhibitor.flyers.map(
+        (flyer: string, index: number) => ({
+          name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
+          flyer: flyer,
+        }),
+      );
+    } else if (exhibitor.flyers) {
+      formattedFlyers = exhibitor.flyers.map(
+        (flyer: string, index: number) => ({
+          name: `Flyer ${index + 1}`,
+          flyer: flyer,
+        }),
+      );
+    }
 
     // Remove raw documents and documentNames from response
-    const { 
-      documents, 
-      documentNames, 
+    const {
+      documents,
+      documentNames,
       eventImages,
       eventImageNames,
       flyers,
       flyerNames,
-    
-      ...exhibitorData 
+
+      ...exhibitorData
     } = exhibitor;
 
     return {

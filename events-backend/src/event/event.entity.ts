@@ -16,6 +16,7 @@ import { Feedback } from 'feedback/feedback.entity';
 import { Category } from 'category/category.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Gallery } from 'gallery/gallery.entity';
+import { Survey } from '../survey/survey.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -113,6 +114,12 @@ export class Event {
 
   @OneToMany(() => Gallery, (gallery) => gallery.event)
   galleries?: Gallery[];
+
+  @OneToMany(() => Survey, (survey) => survey.event, {
+    cascade: true,
+    eager: false,
+  })
+  surveys!: Survey[];
 
   // Event Stamp relationship
   @Column({ type: 'text', nullable: true })

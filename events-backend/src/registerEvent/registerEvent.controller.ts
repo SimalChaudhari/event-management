@@ -13,6 +13,7 @@ import {
   DuplicateResourceException,
   ValidationException
 } from '../utils/exceptions/custom-exceptions';
+import { SurveyUtilityService } from 'utils/services/survey-utility.service';
 
 @Controller('api/register-events')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +21,7 @@ export class RegisterEventController {
   constructor(
     private readonly registerEventService: RegisterEventService,
     private readonly errorHandler: ErrorHandlerService,
+    private readonly surveyUtility: SurveyUtilityService,
   ) {}
 
   @Post('create')

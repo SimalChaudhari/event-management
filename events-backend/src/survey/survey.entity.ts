@@ -1,10 +1,12 @@
  // src/entities/survey.entity.ts
+import { Event } from 'event/event.entity';
 import {
     Entity,
     Column,
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    ManyToOne,
   } from 'typeorm';
 
   @Entity('surveys')
@@ -35,6 +37,9 @@ import {
   
     @Column({ type: 'boolean', default: true })
     isActive!: boolean;
+
+    @ManyToOne(() => Event, (event) => event.surveys)
+    event?: Event;
   
     @CreateDateColumn()
     createdAt!: Date;

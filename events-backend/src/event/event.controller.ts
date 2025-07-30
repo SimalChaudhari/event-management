@@ -183,7 +183,9 @@ export class EventController {
   ) {
     try {
       const userId = req.user?.id; // Get user ID from JWT token
-      const events = await this.eventService.getAllEvents(filters, userId);
+      const userRole = req?.user?.role; // Get actual role from JWT
+
+      const events = await this.eventService.getAllEvents(filters, userId, userRole);
       
       const successResponse: any = {
         success: true,
@@ -210,7 +212,8 @@ export class EventController {
   ) {
     try {
       const userId = req.user?.id; // Get user ID from JWT token
-      const event = await this.eventService.getEventById(id, userId);
+      const userRole = req?.user?.role; // Get actual role from JWT
+      const event = await this.eventService.getEventById(id, userId, userRole);
       
       const successResponse: SuccessResponse = {
         success: true,

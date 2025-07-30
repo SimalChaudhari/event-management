@@ -15,18 +15,36 @@ import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Speaker } from 'speaker/speaker.entity';
 import { Cart } from 'cart/cart.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
+import { Survey, SurveySession, SurveyResponse } from 'survey/survey.entity'; // Add all survey entities
+import { SurveyService } from 'survey/survey.service';
+import { UtilsModule } from 'utils/utils.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Event, Gallery, EventSpeaker, EventCategory, EventExhibitor, Exhibitor, Category, RegisterEvent, FavoriteEvent, Speaker, Cart]),
+    TypeOrmModule.forFeature([
+      Event, 
+      Gallery, 
+      EventSpeaker, 
+      EventCategory, 
+      EventExhibitor, 
+      Exhibitor, 
+      Category, 
+      RegisterEvent, 
+      FavoriteEvent, 
+      Speaker, 
+      Cart,
+      Survey,
+      SurveySession,   // Add this
+      SurveyResponse   // Add this - यह missing था!
+    ]),
+    UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
-      secret: process.env.JWT_SECRET, // Use JWT secret from .env file
-      signOptions: {}, // Set token expiration
+      secret: process.env.JWT_SECRET,
+      signOptions: {},
     }),
   ],
-
   controllers: [GalleryController],
-  providers: [GalleryService, EventService,ErrorHandlerService],
+  providers: [GalleryService, EventService, SurveyService, ErrorHandlerService],
   exports: [GalleryService],
 })
 export class GalleryModule {}

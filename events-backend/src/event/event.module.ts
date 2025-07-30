@@ -15,18 +15,30 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
+import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Event,
-      EventSpeaker,EventCategory,Speaker,Cart,Category,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
-      signOptions: { }, // Set your token expiration
-    }),
-    OrderModule, // Import the OrderModule
-  
-  ],
-    providers: [EventService,ErrorHandlerService],
+    imports: [
+      TypeOrmModule.forFeature([
+        Event,
+        EventSpeaker,
+        EventCategory,
+        Speaker,
+        Cart,
+        Category,
+        RegisterEvent,
+        FavoriteEvent,
+        EventExhibitor,
+        Exhibitor,
+      ]),
+      UtilsModule, // Import Utils Module instead of individual services
+      JwtModule.register({
+        secret: process.env.JWT_SECRET,
+        signOptions: { },
+      }),
+      OrderModule,
+    ],
+    providers: [EventService, ErrorHandlerService],
     controllers: [EventController],
 })
 export class EventModule {}

@@ -15,21 +15,22 @@ export class CreateSurveyDto {
   @IsNotEmpty()
   description!: string;
 
+  // Make date and time fields optional - will be auto-filled from event
   @IsDateString()
-  @IsNotEmpty()
-  startDate!: string;
+  @IsOptional()
+  startDate?: string;
 
   @IsString()
-  @IsNotEmpty()
-  startTime!: string;
+  @IsOptional()
+  startTime?: string;
 
   @IsDateString()
-  @IsNotEmpty()
-  endDate!: string;
+  @IsOptional()
+  endDate?: string;
 
   @IsString()
-  @IsNotEmpty()
-  endTime!: string;
+  @IsOptional()
+  endTime?: string;
 
   @IsBoolean()
   @IsOptional()
