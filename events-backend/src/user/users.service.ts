@@ -137,7 +137,7 @@ async update(
         where: { email: updateData.email, id: Not(id) },
       });
       if (existingUser) {
-        throw new DuplicateResourceException('User', 'email', updateData.email);
+        throw new DuplicateResourceException(`User ${updateData.email}`);
       }
     }
 

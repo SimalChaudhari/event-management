@@ -11,6 +11,19 @@ import {
 } from 'typeorm';
 import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
+import { Speaker } from 'speaker/speaker.entity';
+
+export enum PollType {
+  INTERNAL = 'internal',
+  EXTERNAL = 'external'
+}
+
+export enum ExternalPlatform {
+  KAHOOT = 'kahoot',
+  SLIDO = 'slido',
+  MENTIMETER = 'mentimeter',
+  OTHER = 'other'
+}
 
 @Entity('quiz_questions')
 export class QuizQuestion {
@@ -26,9 +39,18 @@ export class QuizQuestion {
   @Column()
   eventId!: string;
 
+
+  @Column({ nullable: true })
+  speakerId?: string;
+
   @ManyToOne(() => Event, { eager: false })
   @JoinColumn({ name: 'eventId' })
   event?: Event;
+
+
+  @ManyToOne(() => Speaker, { eager: false })
+  @JoinColumn({ name: 'speakerId' })
+  speaker?: Speaker;
 
   @Column()
   createdById!: string;
@@ -48,6 +70,27 @@ export class QuizQuestion {
 
   @Column({ type: 'boolean', default: true })
   showCorrectAnswer!: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: PollType,
+    default: PollType.INTERNAL
+  })
+  pollType!: PollType;
+
+  // For external polls only
+  @Column({ type: 'varchar', nullable: true })
+  externalUrl?: string;
+
+  @Column({
+    type: 'enum',
+    enum: ExternalPlatform,
+    nullable: true
+  })
+  platform?: ExternalPlatform;
+
+  @Column({ type: 'boolean', default: false })
+  isLive!: boolean; // Currently showing to users
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -87,7 +130,7 @@ export class QuizOption {
   createdAt!: Date;
 }
 
-@Entity('user_quiz_attempts')
+@Entity('quiz_user_attempts')
 export class UserQuizAttempt {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -98,6 +141,13 @@ export class UserQuizAttempt {
   @ManyToOne(() => Event, { eager: false })
   @JoinColumn({ name: 'eventId' })
   event?: Event;
+
+  @Column({ nullable: true })
+  speakerId?: string;
+
+  @ManyToOne(() => Speaker, { eager: false })
+  @JoinColumn({ name: 'speakerId' })
+  speaker?: Speaker;
 
   @Column()
   userId!: string;
@@ -138,7 +188,7 @@ export class UserQuizAttempt {
   answers!: UserQuizAnswer[];
 }
 
-@Entity('user_quiz_answers')
+@Entity('quiz_user_answers')
 export class UserQuizAnswer {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

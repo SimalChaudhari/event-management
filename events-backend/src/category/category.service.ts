@@ -30,9 +30,7 @@ export class CategoryService {
 
       if (existingCategory) {
         throw new DuplicateResourceException(
-          'Category',
-          'name',
-          categoryDto.name,
+          `Category ${categoryDto.name}`
         );
       }
       const category = await this.categoryRepository.create(categoryDto);
@@ -87,9 +85,7 @@ export class CategoryService {
 
         if (existingCategory) {
           throw new DuplicateResourceException(
-            'Category',
-            'name',
-            categoryDto.name,
+            `Category ${categoryDto.name}`
           );
         }
       }

@@ -8,6 +8,7 @@ import { Event } from '../event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
+import { Speaker } from 'speaker/speaker.entity';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ErrorHandlerService } from 'utils/services/error-handler.service';
       UserQuizAttempt, 
       UserQuizAnswer, 
       Event, 
+      Speaker,
       UserEntity
     ]),
     JwtModule.register({

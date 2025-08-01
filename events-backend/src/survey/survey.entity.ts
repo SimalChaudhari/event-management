@@ -20,9 +20,6 @@ import {
     @Column({ type: 'varchar' })
     title!: string;
   
-    @Column({ type: 'text' })
-    description!: string;
-  
     @Column({ type: 'date' })
     startDate!: Date;
   

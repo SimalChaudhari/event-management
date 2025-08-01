@@ -20,6 +20,7 @@ import {
   UpdateSurveyDto,
   SurveyResponseDto,
   CreateSessionDto,
+  UpdateSessionDto,
 } from './survey.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -459,6 +460,165 @@ export class SurveyController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get feedback details', req.user?.id);
+      throw error;
+    }
+  }
+
+  // DELETE ENDPOINTS
+
+  // Delete single survey
+  @Delete(':surveyId')
+  @Roles(UserRole.Admin)
+  async deleteSurvey(
+    @Param('surveyId') surveyId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.surveyService.deleteSurvey(surveyId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deletedBy: req.user?.id,
+          surveyId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Delete survey', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Delete all surveys (Admin only)
+  @Delete()
+  @Roles(UserRole.Admin)
+  async deleteAllSurveys(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.surveyService.deleteAllSurveys();
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deletedBy: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Delete all surveys', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Delete single session
+  @Delete(':surveyId/sessions/:sessionId')
+  @Roles(UserRole.Admin)
+  async deleteSession(
+    @Param('surveyId') surveyId: string,
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.surveyService.deleteSession(surveyId, sessionId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deletedBy: req.user?.id,
+          surveyId,
+          sessionId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Delete session', req.user?.id);
+      throw error;
+    }
+  }
+
+  // UPDATE ENDPOINTS
+
+  // Update survey
+  @Put(':surveyId')
+  @Roles(UserRole.Admin)
+  async updateSurvey(
+    @Param('surveyId') surveyId: string,
+    @Body() updateSurveyDto: UpdateSurveyDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.surveyService.updateSurvey(surveyId, updateSurveyDto);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          updatedBy: req.user?.id,
+          surveyId,
+          updatedFields: result.updatedFields,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Update survey', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Update session
+  @Put(':surveyId/sessions/:sessionId')
+  @Roles(UserRole.Admin)
+  async updateSession(
+    @Param('surveyId') surveyId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() updateSessionDto: UpdateSessionDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.surveyService.updateSession(
+        surveyId,
+        sessionId,
+        updateSessionDto,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          updatedBy: req.user?.id,
+          surveyId,
+          sessionId,
+          updatedFields: result.updatedFields,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Update session', req.user?.id);
       throw error;
     }
   }

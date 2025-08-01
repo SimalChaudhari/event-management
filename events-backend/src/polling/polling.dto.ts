@@ -1,6 +1,7 @@
 // src/polling/polling.dto.ts
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested, ArrayMinSize, IsEnum, IsUrl } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { PollType, ExternalPlatform } from './polling.entity';
 
 export class QuizOptionDto {
   @IsNotEmpty()
@@ -25,9 +26,23 @@ export class CreateQuizQuestionDto {
   @IsUUID()
   eventId!: string;
 
+  // नया field add करें speaker के लिए
+  @IsOptional()
+  @IsUUID()
+  speakerId?: string;
+
   @IsOptional()
   @IsBoolean()
   allowMultipleSelection?: boolean;
+
+  @IsOptional()
+  pollType?: PollType;
+
+  @IsOptional()
+  externalUrl?: string;
+
+  @IsOptional()
+  platform?: ExternalPlatform;
 
   @IsNotEmpty()
   @IsArray()
@@ -53,6 +68,11 @@ export class UpdateQuizQuestionDto {
   @IsBoolean()
   allowMultipleSelection?: boolean;
 
+  // नया field add करें speaker update के लिए
+  @IsOptional()
+  @IsUUID()
+  speakerId?: string;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -60,10 +80,16 @@ export class UpdateQuizQuestionDto {
   options?: QuizOptionDto[];
 }
 
+// StartQuizDto में भी speakerId add करें
 export class StartQuizDto {
   @IsNotEmpty()
   @IsUUID()
   eventId!: string;
+
+  // Remove @IsOptional - speakerId is now required
+  @IsNotEmpty()
+  @IsUUID()
+  speakerId!: string;
 }
 
 export class QuizAnswerDto {
@@ -86,4 +112,66 @@ export class SubmitQuizDto {
   @ValidateNested({ each: true })
   @Type(() => QuizAnswerDto)
   answers!: QuizAnswerDto[];
+}
+
+export class SubmitAnswerDto {
+  @IsNotEmpty()
+  @IsUUID()
+  attemptId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  questionId!: string;
+
+  @IsNotEmpty()
+  @IsArray()
+  @ArrayMinSize(1, { message: 'At least one option must be selected' })
+  @Transform(({ value }) => {
+    // Ensure it's always an array
+    if (typeof value === 'string') {
+      return [value];
+    }
+    return Array.isArray(value) ? value : [];
+  })
+  selectedOptions!: string[];
+}
+
+// Add these new DTOs for result queries
+
+export class GetUserQuizResultDto {
+  @IsNotEmpty()
+  @IsUUID()
+  userId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  speakerId?: string;
+}
+
+// New DTO for external polls
+export class CreateExternalPollDto {
+  @IsNotEmpty()
+  question!: string;
+
+  @IsOptional()
+  description?: string;
+
+  @IsNotEmpty()
+  @IsUrl()
+  externalUrl!: string;
+
+  @IsEnum(ExternalPlatform)
+  platform!: ExternalPlatform;
+
+  @IsNotEmpty()
+  @IsUUID()
+  eventId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  speakerId?: string;
 } 

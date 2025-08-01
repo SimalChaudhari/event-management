@@ -8,6 +8,7 @@ import { UserEntity } from 'user/users.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteFilterType } from './favorite-event.dto';
+import { SurveyUtilityService } from 'utils/services/survey-utility.service';
 
 @Injectable()
 export class FavoriteEventService {
@@ -20,6 +21,8 @@ export class FavoriteEventService {
     private userRepository: Repository<UserEntity>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+
+    private readonly surveyUtility: SurveyUtilityService,
   ) {}
 
   // Private helper method for formatting documents
@@ -130,6 +133,7 @@ export class FavoriteEventService {
   async getUserFavorites(
     userId: string,
     filter: FavoriteFilterType = FavoriteFilterType.ALL,
+    userRole?: string,
   ) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -187,12 +191,21 @@ export class FavoriteEventService {
 
     const favorites = await query.getMany();
 
+    const eventIds = favorites.map((event) => event.eventId);
+    const surveyMap = await this.surveyUtility.getBulkEventSurveyDetails(
+      eventIds,
+      userRole || 'user',
+      userId,
+    );
+
     // Add attendance count and favorite status to each favorite event
     const favoritesWithAttendance = await Promise.all(
       favorites.map(async (favorite) => {
         const attendanceCount = favorite.eventId
           ? await this.getEventAttendanceCount(favorite.eventId)
           : 0;
+
+        const surveyDetails = surveyMap.get(favorite.eventId); 
 
         // Format event documents using helper method
         const formattedDocuments = this.formatDocuments(
@@ -221,6 +234,8 @@ export class FavoriteEventService {
           documents, 
           exhibitorDescription,
           documentNames, 
+          eventStampDescription,
+          eventStampImages,
           category,
           eventExhibitors,
           ...eventData 
@@ -238,11 +253,15 @@ export class FavoriteEventService {
             documents: formattedDocuments, // Use formatted documents
             speakers: eventSpeakers?.map((es) => es.speaker) || [],
             categories: categories,
+            eventStamps: {
+              description: favorite.event.eventStampDescription,
+              images: favorite.event.eventStampImages,
+            },
 
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
-                console.log(ee.exhibitor,"%%%%%%%%%%");
+               
                 // Format exhibitor documents
                 const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
                 return {
@@ -253,6 +272,8 @@ export class FavoriteEventService {
             },
 
             attendanceCount: attendanceCount,
+            surveyDetails: surveyDetails,
+            hasSurvey: !!surveyDetails,
             isFavorite: isFavorite, // Always true for favorite events
             isRegistered: isRegistered,
           },

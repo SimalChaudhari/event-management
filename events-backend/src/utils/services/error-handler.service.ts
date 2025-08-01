@@ -17,7 +17,7 @@ export class ErrorHandlerService {
       if (match) {
         const value = match[1];
         const field = match[2].split('.')[1] || 'unknown';
-        throw new DuplicateResourceException(context, field, value);
+        throw new DuplicateResourceException(context);
       }
     }
 
@@ -110,7 +110,7 @@ export class ErrorHandlerService {
       const match = error.message.match(/duplicate key value violates unique constraint "(.+)"/);
       if (match) {
         const constraintName = match[1];
-        throw new DuplicateResourceException('Resource', 'field', 'value');
+        throw new DuplicateResourceException('Resource');
       }
     }
 

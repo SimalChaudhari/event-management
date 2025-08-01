@@ -5,13 +5,15 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Survey, SurveyResponse, SurveySession } from './survey.entity';
 import {
   CreateSurveyDto,
   SurveyResponseDto,
   CreateSessionDto,
+  UpdateSurveyDto,
+  UpdateSessionDto,
 } from './survey.dto';
 import { Event } from 'event/event.entity';
 import {
@@ -154,9 +156,9 @@ export class SurveyService {
           id: event.id,
           name: event.name,
           description: event.description,
-          startDate: event.startDate,
+          startDate: new Date(event.startDate).toISOString().split('T')[0],
           startTime: event.startTime,
-          endDate: event.endDate,
+          endDate: new Date(event.endDate).toISOString().split('T')[0],
           endTime: event.endTime,
           location: event.location,
           venue: event.venue,
@@ -210,9 +212,7 @@ export class SurveyService {
       // 3. Enhanced validation with detailed suggestions
       if (surveyStartDate < eventStartDate) {
         throw new ValidationException(
-          `Survey start date (${surveyStartDateStr}) cannot be before event start date. ` +
-            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-            `Suggested: Use startDate: "${eventStartDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+          `Use startDate: "${eventStartDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
           [
             {
               field: 'startDate',
@@ -233,9 +233,7 @@ export class SurveyService {
 
       if (surveyEndDate > eventEndDate) {
         throw new ValidationException(
-          `Survey end date (${surveyEndDateStr}) cannot be after event end date. ` +
-            `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-            `Suggested: Use endDate: "${eventEndDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+          `Use endDate: "${eventEndDateStr}" or any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
           [
             {
               field: 'endDate',
@@ -257,9 +255,7 @@ export class SurveyService {
       // 4. Validate time formats with suggestions
       if (!this.validateTimeFormat(surveyData.startTime)) {
         throw new ValidationException(
-          `Invalid start time format "${surveyData.startTime}". Use HH:MM:SS format. ` +
-            `Event "${event.name}" starts at ${event.startTime}. ` +
-            `Suggested: Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
+          `Invalid start time format.Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
           [
             {
               field: 'startTime',
@@ -278,9 +274,7 @@ export class SurveyService {
 
       if (!this.validateTimeFormat(surveyData.endTime)) {
         throw new ValidationException(
-          `Invalid end time format "${surveyData.endTime}". Use HH:MM:SS format. ` +
-            `Event "${event.name}" ends at ${event.endTime}. ` +
-            `Suggested: Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
+          `Invalid end time format.Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
           [
             {
               field: 'endTime',
@@ -305,9 +299,7 @@ export class SurveyService {
 
       if (surveyEndTimeMinutes <= surveyStartTimeMinutes) {
         throw new ValidationException(
-          `Survey end time (${surveyData.endTime}) must be after start time (${surveyData.startTime}). ` +
-            `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-            `Suggested: Use startTime: "${event.startTime}" and endTime: "${event.endTime}".`,
+          `Use startTime: "${event.startTime}" and endTime: "${event.endTime}".`,
           [
             {
               field: 'timeRange',
@@ -332,9 +324,7 @@ export class SurveyService {
       ) {
         if (surveyStartTimeMinutes < eventStartTimeMinutes) {
           throw new ValidationException(
-            `Survey start time (${surveyData.startTime}) cannot be before event start time (${event.startTime}) on ${eventStartDateStr}. ` +
-              `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
-              `Suggested: Use startTime: "${event.startTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            `Use startTime: "${event.startTime}" or any time between ${event.startTime} and ${event.endTime}.`,
             [
               {
                 field: 'startTime',
@@ -354,9 +344,7 @@ export class SurveyService {
 
         if (surveyEndTimeMinutes > eventEndTimeMinutes) {
           throw new ValidationException(
-            `Survey end time (${surveyData.endTime}) cannot be after event end time (${event.endTime}) on ${eventEndDateStr}. ` +
-              `Event "${event.name}" starts at ${event.startTime} and ends at ${event.endTime}. ` +
-              `Suggested: Use endTime: "${event.endTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            `Use endTime: "${event.endTime}" or any time between ${event.startTime} and ${event.endTime}.`,
             [
               {
                 field: 'endTime',
@@ -424,9 +412,8 @@ export class SurveyService {
         // 1. Session date validation with suggestions
         if (sessionDate < surveyStartDate || sessionDate > surveyEndDate) {
           throw new ValidationException(
-            `Session ${i + 1} "${session.name}" date (${sessionDateStr}) is outside survey date range (${surveyStartDateStr} to ${surveyEndDateStr}). ` +
-              `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-              `Suggested: Use any date between ${surveyStartDateStr} and ${surveyEndDateStr}.`,
+            `Outside the event date range.Use date between ${surveyStartDateStr} and ${surveyEndDateStr}.`,
+
             [
               {
                 field: `sessions[${i}].date`,
@@ -447,9 +434,7 @@ export class SurveyService {
 
         if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
           throw new ValidationException(
-            `Session ${i + 1} "${session.name}" date (${sessionDateStr}) is outside event date range. ` +
-              `Event "${event.name}" runs from ${eventStartDateStr} to ${eventEndDateStr}. ` +
-              `Suggested: Use any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+            `Outside the event date range.Use date between ${eventStartDateStr} and ${eventEndDateStr}.`,
             [
               {
                 field: `sessions[${i}].date`,
@@ -470,9 +455,7 @@ export class SurveyService {
         // 2. Session time format validation with suggestions
         if (!this.validateTimeFormat(session.startTime)) {
           throw new ValidationException(
-            `Session ${i + 1} "${session.name}" start time format is invalid. Use HH:MM:SS format. ` +
-              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-              `Suggested: Use time in HH:MM:SS format, e.g., "${event.startTime}".`,
+            `start time format is invalid. Use time in HH:MM:SS format, e.g., "${event.startTime}".`,
             [
               {
                 field: `sessions[${i}].startTime`,
@@ -492,9 +475,7 @@ export class SurveyService {
 
         if (!this.validateTimeFormat(session.endTime)) {
           throw new ValidationException(
-            `Session ${i + 1} "${session.name}" end time format is invalid. Use HH:MM:SS format. ` +
-              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-              `Suggested: Use time in HH:MM:SS format, e.g., "${event.endTime}".`,
+            `End time format is invalid. Use time in HH:MM:SS format, e.g., "${event.endTime}".`,
             [
               {
                 field: `sessions[${i}].endTime`,
@@ -519,9 +500,7 @@ export class SurveyService {
         if (sessionEndMinutes <= sessionStartMinutes) {
           const suggestedEndTime = this.addMinutesToTime(session.startTime, 90); // Add 1.5 hours
           throw new ValidationException(
-            `Session ${i + 1} "${session.name}" end time (${session.endTime}) must be after start time (${session.startTime}). ` +
-              `Event "${event.name}" timing: ${event.startTime} to ${event.endTime}. ` +
-              `Suggested: Use endTime: "${suggestedEndTime}" or any time after ${session.startTime}.`,
+            `End time  must be after start time.Use endTime: "${suggestedEndTime}" or any time after ${session.startTime}.`,
             [
               {
                 field: `sessions[${i}].timeRange`,
@@ -543,9 +522,7 @@ export class SurveyService {
         if (sessionDate.getTime() === eventStartDate.getTime()) {
           if (sessionStartMinutes < eventStartTimeMinutes) {
             throw new ValidationException(
-              `Session ${i + 1} "${session.name}" start time (${session.startTime}) cannot be before event start time (${event.startTime}) on ${eventStartDateStr}. ` +
-                `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
-                `Suggested: Use startTime: "${event.startTime}" or later.`,
+              `start time cannot be before event start time Use startTime: "${event.startTime}" or later.`,
               [
                 {
                   field: `sessions[${i}].startTime`,
@@ -569,9 +546,7 @@ export class SurveyService {
         if (sessionDate.getTime() === eventEndDate.getTime()) {
           if (sessionEndMinutes > eventEndTimeMinutes) {
             throw new ValidationException(
-              `Session ${i + 1} "${session.name}" end time (${session.endTime}) cannot be after event end time (${event.endTime}) on ${eventEndDateStr}. ` +
-                `Event "${event.name}" runs from ${event.startTime} to ${event.endTime}. ` +
-                `Suggested: Use endTime: "${event.endTime}" or earlier.`,
+              `Use endTime: "${event.endTime}" or earlier.`,
               [
                 {
                   field: `sessions[${i}].endTime`,
@@ -609,8 +584,7 @@ export class SurveyService {
             ) {
               const suggestedTime = this.addMinutesToTime(session.endTime, 15); // 15 min gap
               throw new ValidationException(
-                `Session ${i + 1} "${session.name}" (${session.startTime}-${session.endTime}) overlaps with Session ${j + 1} "${otherSession.name}" (${otherSession.startTime}-${otherSession.endTime}) on ${sessionDateStr}. ` +
-                  `Suggested: Adjust Session ${j + 1} to start at "${suggestedTime}" or later to avoid overlap.`,
+                `Adjust Session ${j + 1} to start at "${suggestedTime}" or later to avoid overlap.`,
                 [
                   {
                     field: `sessions[${i}].overlap`,
@@ -855,17 +829,19 @@ export class SurveyService {
       });
 
       if (!event) {
-        throw new ResourceNotFoundException('Event', createSurveyDto.eventId);
+        throw new ResourceNotFoundException('Event');
       }
 
       // 2. Auto-fill survey date/time from event if not provided
       const surveyData = {
         ...createSurveyDto,
         startDate:
-          createSurveyDto.startDate || event.startDate.toString().split('T')[0],
+          createSurveyDto.startDate ||
+          new Date(event.startDate).toISOString().split('T')[0],
         startTime: createSurveyDto.startTime || event.startTime,
         endDate:
-          createSurveyDto.endDate || event.endDate.toString().split('T')[0],
+          createSurveyDto.endDate ||
+          new Date(event.endDate).toISOString().split('T')[0],
         endTime: createSurveyDto.endTime || event.endTime,
       };
 
@@ -878,18 +854,13 @@ export class SurveyService {
       });
 
       if (existingSurvey) {
-        throw new DuplicateResourceException(
-          'Survey',
-          'eventId',
-          createSurveyDto.eventId,
-        );
+        throw new DuplicateResourceException('Survey event');
       }
 
       // 5. Create survey with auto-filled data
       const survey = new Survey();
       survey.eventId = surveyData.eventId;
       survey.title = surveyData.title;
-      survey.description = surveyData.description;
       survey.startDate = new Date(surveyData.startDate);
       survey.startTime = surveyData.startTime;
       survey.endDate = new Date(surveyData.endDate);
@@ -1313,8 +1284,6 @@ export class SurveyService {
 
       if (existingResponse) {
         throw new DuplicateResourceException(
-          'Feedback',
-          'session',
           `You have already submitted feedback for session: ${session.name}`,
         );
       }
@@ -1424,7 +1393,6 @@ export class SurveyService {
         survey: {
           id: survey?.id,
           title: survey?.title,
-          description: survey?.description,
         },
       };
     } catch (error: any) {
@@ -1632,7 +1600,7 @@ export class SurveyService {
           // Get survey information
           const survey = await this.surveyRepository.findOne({
             where: { id: feedback.surveyId },
-            select: ['id', 'title', 'description'],
+            select: ['id', 'title'],
           });
 
           return {
@@ -1667,7 +1635,6 @@ export class SurveyService {
             survey: {
               id: survey?.id,
               title: survey?.title,
-              description: survey?.description,
             },
           };
         }),
@@ -1717,7 +1684,7 @@ export class SurveyService {
           // Get survey information
           const survey = await this.surveyRepository.findOne({
             where: { id: feedback.surveyId },
-            select: ['id', 'title', 'description'],
+            select: ['id', 'title'],
           });
 
           return {
@@ -1745,7 +1712,6 @@ export class SurveyService {
             survey: {
               id: survey?.id,
               title: survey?.title,
-              description: survey?.description,
             },
           };
         }),
@@ -1758,6 +1724,784 @@ export class SurveyService {
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get feedbacks by user ID');
       this.errorHandler.handleDatabaseError(error, 'User feedbacks retrieval');
+    }
+  }
+
+  // DELETE METHODS
+
+  // Delete single survey with all its sessions and responses
+  async deleteSurvey(surveyId: string) {
+    try {
+      const survey = await this.surveyRepository.findOne({
+        where: { id: surveyId },
+      });
+
+      if (!survey) {
+        throw new ResourceNotFoundException('Survey', surveyId);
+      }
+
+      // First delete all survey responses
+      await this.surveyResponseRepository.delete({ surveyId });
+
+      // Then delete all sessions
+      await this.surveySessionRepository.delete({ surveyId });
+
+      // Finally delete the survey
+      await this.surveyRepository.delete(surveyId);
+
+      return {
+        message: 'Survey elated data successfully deleted',
+        deletedSurveyId: surveyId,
+        deletedData: {
+          survey: survey.title,
+          eventId: survey.eventId,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Delete survey');
+      this.errorHandler.handleDatabaseError(error, 'Survey deletion');
+    }
+  }
+
+  // Delete all surveys (Admin only)
+  async deleteAllSurveys() {
+    try {
+      // Get count before deletion for response
+      const totalSurveys = await this.surveyRepository.count();
+      const totalSessions = await this.surveySessionRepository.count();
+      const totalResponses = await this.surveyResponseRepository.count();
+
+      // Delete in correct order (foreign key constraints)
+      await this.surveyResponseRepository.delete({});
+      await this.surveySessionRepository.delete({});
+      await this.surveyRepository.delete({});
+
+      return {
+        message: 'survey related data successfully deleted',
+        deletedCounts: {
+          surveys: totalSurveys,
+          sessions: totalSessions,
+          responses: totalResponses,
+        },
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Delete all surveys');
+      this.errorHandler.handleDatabaseError(error, 'All surveys deletion');
+    }
+  }
+
+  // Delete single session
+  async deleteSession(surveyId: string, sessionId: string) {
+    try {
+      const session = await this.surveySessionRepository.findOne({
+        where: { id: sessionId, surveyId },
+      });
+
+      if (!session) {
+        throw new ResourceNotFoundException('Session', sessionId);
+      }
+
+      // Delete all responses for this session first
+      await this.surveyResponseRepository.delete({ sessionId });
+
+      // Delete the session
+      await this.surveySessionRepository.delete(sessionId);
+
+      return {
+        message: 'Session responses successfully deleted',
+        deletedSession: {
+          id: sessionId,
+          name: session.name,
+          date: session.date,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Delete session');
+      this.errorHandler.handleDatabaseError(error, 'Session deletion');
+    }
+  }
+
+  // UPDATE METHODS
+
+  // Update survey (Enhanced like createSurvey with auto-fill and comprehensive validation)
+  async updateSurvey(surveyId: string, updateSurveyDto: UpdateSurveyDto) {
+    try {
+      // 1. Check if survey exists
+      const survey = await this.surveyRepository.findOne({
+        where: { id: surveyId },
+      });
+
+      if (!survey) {
+        throw new ResourceNotFoundException('Survey', surveyId);
+      }
+
+      // 2. Get event details for auto-fill and validation
+      const event = await this.eventRepository.findOne({
+        where: { id: survey.eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', survey.eventId);
+      }
+
+      // 3. Auto-fill missing fields from event (just like createSurvey)
+      const updatedSurveyData = {
+        eventId: survey.eventId,
+        title:
+          updateSurveyDto.title !== undefined
+            ? updateSurveyDto.title
+            : survey.title,
+        startDate:
+          updateSurveyDto.startDate ||
+          survey.startDate.toISOString().split('T')[0],
+        endDate:
+          updateSurveyDto.endDate || survey.endDate.toISOString().split('T')[0],
+        startTime: updateSurveyDto.startTime || survey.startTime,
+        endTime: updateSurveyDto.endTime || survey.endTime,
+        isActive:
+          updateSurveyDto.isActive !== undefined
+            ? updateSurveyDto.isActive
+            : survey.isActive,
+      };
+
+      // 4. Comprehensive validation with event (same as createSurvey)
+      await this.validateSurveyWithEvent(updatedSurveyData);
+
+      // 5. Get existing sessions for overlap validation
+      const existingSessions = await this.surveySessionRepository.find({
+        where: { surveyId, isActive: true },
+        order: { date: 'ASC', startTime: 'ASC' },
+      });
+
+      // 6. Validate existing sessions with new survey timing
+      if (existingSessions.length > 0) {
+        await this.validateExistingSessionsAfterSurveyUpdate(
+          existingSessions,
+          event,
+          new Date(updatedSurveyData.startDate),
+          new Date(updatedSurveyData.endDate),
+        );
+      }
+
+      // 7. Update survey fields
+      if (updateSurveyDto.title !== undefined) {
+        survey.title = updateSurveyDto.title;
+      }
+      if (updateSurveyDto.startDate !== undefined) {
+        survey.startDate = new Date(updateSurveyDto.startDate);
+      }
+      if (updateSurveyDto.endDate !== undefined) {
+        survey.endDate = new Date(updateSurveyDto.endDate);
+      }
+      if (updateSurveyDto.startTime !== undefined) {
+        survey.startTime = updateSurveyDto.startTime;
+      }
+      if (updateSurveyDto.endTime !== undefined) {
+        survey.endTime = updateSurveyDto.endTime;
+      }
+      if (updateSurveyDto.isActive !== undefined) {
+        survey.isActive = updateSurveyDto.isActive;
+      }
+
+      const updatedSurvey = await this.surveyRepository.save(survey);
+
+      // 8. Return response with auto-filled information (like createSurvey)
+      return {
+        message: 'Survey successfully updated',
+        survey: updatedSurvey,
+        updatedFields: Object.keys(updateSurveyDto),
+        autoFilledFromEvent: {
+          eventName: event.name,
+          eventLocation: event.location,
+          autoFilledFields: {
+            startDate: !updateSurveyDto.startDate && !survey.startDate,
+            startTime: !updateSurveyDto.startTime && !survey.startTime,
+            endDate: !updateSurveyDto.endDate && !survey.endDate,
+            endTime: !updateSurveyDto.endTime && !survey.endTime,
+          },
+        },
+        existingSessionsValidated: existingSessions.length,
+      };
+    } catch (error: any) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ValidationException ||
+        error instanceof BusinessLogicException
+      ) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Update survey');
+      this.errorHandler.handleDatabaseError(error, 'Survey update');
+    }
+  }
+
+  // Helper method to validate existing sessions after survey update
+  private async validateExistingSessionsAfterSurveyUpdate(
+    existingSessions: SurveySession[],
+    event: Event,
+    newSurveyStartDate: Date,
+    newSurveyEndDate: Date,
+  ): Promise<void> {
+    try {
+      const eventStartDate = new Date(event.startDate);
+      const eventEndDate = new Date(event.endDate);
+      const eventStartTimeMinutes = this.timeToMinutes(event.startTime);
+      const eventEndTimeMinutes = this.timeToMinutes(event.endTime);
+
+      const eventStartDateStr = eventStartDate.toISOString().split('T')[0];
+      const eventEndDateStr = eventEndDate.toISOString().split('T')[0];
+      const newSurveyStartDateStr = newSurveyStartDate
+        .toISOString()
+        .split('T')[0];
+      const newSurveyEndDateStr = newSurveyEndDate.toISOString().split('T')[0];
+
+      // Check each existing session against new survey timing
+      for (let i = 0; i < existingSessions.length; i++) {
+        const session = existingSessions[i];
+        const sessionDate = new Date(session.date);
+        const sessionDateStr = sessionDate.toISOString().split('T')[0];
+        const sessionStartMinutes = this.timeToMinutes(session.startTime);
+        const sessionEndMinutes = this.timeToMinutes(session.endTime);
+
+        // 1. Session date validation with new survey range
+        if (
+          sessionDate < newSurveyStartDate ||
+          sessionDate > newSurveyEndDate
+        ) {
+          throw new ValidationException(
+            `Session "${session.name}" (${sessionDateStr}) is outside the survey date range
+               (${newSurveyStartDateStr}–${newSurveyEndDateStr}). Update survey dates or modify the session.`,
+
+            [
+              {
+                field: 'existingSession.date',
+                sessionName: session.name,
+                sessionDate: sessionDateStr,
+                newSurveyRange: `${newSurveyStartDateStr} to ${newSurveyEndDateStr}`,
+                suggestion: `Update survey dates to include ${sessionDateStr} or delete/update session "${session.name}"`,
+                eventInfo: {
+                  name: event.name,
+                  startDate: eventStartDateStr,
+                  endDate: eventEndDateStr,
+                },
+              },
+            ],
+          );
+        }
+
+        // 2. Session within event date range
+        if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
+          throw new ValidationException(
+            `Session "${session.name}" (${sessionDateStr}) is outside event date range 
+              (${eventStartDateStr}–${eventEndDateStr}). Update or remove it before changing the survey.`,
+
+            [
+              {
+                field: 'existingSession.eventDate',
+                sessionName: session.name,
+                sessionDate: sessionDateStr,
+                eventDateRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+                suggestion: `Delete session "${session.name}" or move to valid date between ${eventStartDateStr} and ${eventEndDateStr}`,
+                eventInfo: {
+                  name: event.name,
+                  startDate: eventStartDateStr,
+                  endDate: eventEndDateStr,
+                },
+              },
+            ],
+          );
+        }
+
+        // 3. Session time within event time on same day
+        if (sessionDate.getTime() === eventStartDate.getTime()) {
+          if (sessionStartMinutes < eventStartTimeMinutes) {
+            throw new ValidationException(
+              `Update session start time to ${event.startTime} or later, or delete the session.`,
+              [
+                {
+                  field: 'existingSession.startTime',
+                  sessionName: session.name,
+                  sessionStartTime: session.startTime,
+                  eventStartTime: event.startTime,
+                  suggestion: `Update session "${session.name}" start time to ${event.startTime} or delete the session`,
+                  eventInfo: {
+                    name: event.name,
+                    date: eventStartDateStr,
+                    startTime: event.startTime,
+                    endTime: event.endTime,
+                  },
+                },
+              ],
+            );
+          }
+        }
+
+        if (sessionDate.getTime() === eventEndDate.getTime()) {
+          if (sessionEndMinutes > eventEndTimeMinutes) {
+            throw new ValidationException(
+              `Update session end time to ${event.endTime} or earlier, or delete the session.`,
+              [
+                {
+                  field: 'existingSession.endTime',
+                  sessionName: session.name,
+                  sessionEndTime: session.endTime,
+                  eventEndTime: event.endTime,
+                  suggestion: `Update session "${session.name}" end time to ${event.endTime} or delete the session`,
+                  eventInfo: {
+                    name: event.name,
+                    date: eventEndDateStr,
+                    startTime: event.startTime,
+                    endTime: event.endTime,
+                  },
+                },
+              ],
+            );
+          }
+        }
+
+        // 4. Check session overlaps with other existing sessions
+        for (let j = i + 1; j < existingSessions.length; j++) {
+          const otherSession = existingSessions[j];
+          const otherSessionDate = new Date(otherSession.date);
+
+          if (sessionDate.getTime() === otherSessionDate.getTime()) {
+            const otherStartMinutes = this.timeToMinutes(
+              otherSession.startTime,
+            );
+            const otherEndMinutes = this.timeToMinutes(otherSession.endTime);
+
+            if (
+              sessionStartMinutes < otherEndMinutes &&
+              sessionEndMinutes > otherStartMinutes
+            ) {
+              const suggestedTime = this.addMinutesToTime(session.endTime, 15);
+              throw new ValidationException(
+                `Update one of the session timings to avoid overlap. Suggested: Move "${otherSession.name}" to start at "${suggestedTime}" or later.`,
+                [
+                  {
+                    field: 'existingSession.overlap',
+                    session1Name: session.name,
+                    session2Name: otherSession.name,
+                    session1Time: `${session.startTime}-${session.endTime}`,
+                    session2Time: `${otherSession.startTime}-${otherSession.endTime}`,
+                    suggestedTime: suggestedTime,
+                    date: sessionDateStr,
+                    suggestion: `Update "${otherSession.name}" start time to ${suggestedTime} or adjust "${session.name}" timing`,
+                  },
+                ],
+              );
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error instanceof ValidationException) {
+        throw error;
+      }
+      this.errorHandler.logError(
+        error,
+        'Validate existing sessions after survey update',
+      );
+      throw new ValidationException('Existing sessions validation failed');
+    }
+  }
+
+  // Update session (Enhanced with comprehensive validation and overlap detection)
+  async updateSession(
+    surveyId: string,
+    sessionId: string,
+    updateSessionDto: UpdateSessionDto,
+  ) {
+    try {
+      // 1. Validate session exists
+      const session = await this.surveySessionRepository.findOne({
+        where: { id: sessionId, surveyId },
+      });
+
+      if (!session) {
+        throw new ResourceNotFoundException('Session', sessionId);
+      }
+
+      // 2. Validate survey exists
+      const survey = await this.surveyRepository.findOne({
+        where: { id: surveyId },
+      });
+
+      if (!survey) {
+        throw new ResourceNotFoundException('Survey', surveyId);
+      }
+
+      // 3. Get event details for validation
+      const event = await this.eventRepository.findOne({
+        where: { id: survey.eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', survey.eventId);
+      }
+
+      // 4. Prepare updated session data
+      const newDate =
+        updateSessionDto.date ||
+        new Date(session.date).toISOString().split('T')[0];
+      const newStartTime = updateSessionDto.startTime || session.startTime;
+      const newEndTime = updateSessionDto.endTime || session.endTime;
+      const newName = updateSessionDto.name || session.name;
+      const newDescription =
+        updateSessionDto.description || session.description;
+      const newIsActive =
+        updateSessionDto.isActive !== undefined
+          ? updateSessionDto.isActive
+          : session.isActive;
+
+      // 5. Get other sessions for overlap validation (exclude current session)
+      const otherSessions = await this.surveySessionRepository.find({
+        where: {
+          surveyId,
+          isActive: true,
+          id: Not(sessionId), // Exclude current session
+        },
+        order: { date: 'ASC', startTime: 'ASC' },
+      });
+
+      // 6. Comprehensive validation if date/time is being updated
+      if (
+        updateSessionDto.date ||
+        updateSessionDto.startTime ||
+        updateSessionDto.endTime
+      ) {
+        // Create a temporary session object for validation
+        const sessionForValidation = {
+          name: newName,
+          date: newDate,
+          startTime: newStartTime,
+          endTime: newEndTime,
+          description: newDescription,
+          isActive: newIsActive,
+        };
+
+        // Validate single session with event and survey
+        await this.validateSingleSessionWithSurveyAndEvent(
+          sessionForValidation,
+          survey,
+          event,
+        );
+
+        // Check overlap with other sessions
+        if (otherSessions.length > 0) {
+          await this.validateSessionOverlapWithOthers(
+            sessionForValidation,
+            otherSessions,
+            event,
+          );
+        }
+      }
+
+      // 7. Update session fields
+      if (updateSessionDto.name !== undefined) {
+        session.name = updateSessionDto.name;
+      }
+      if (updateSessionDto.date !== undefined) {
+        session.date = new Date(updateSessionDto.date);
+      }
+      if (updateSessionDto.startTime !== undefined) {
+        session.startTime = updateSessionDto.startTime;
+      }
+      if (updateSessionDto.endTime !== undefined) {
+        session.endTime = updateSessionDto.endTime;
+      }
+      if (updateSessionDto.description !== undefined) {
+        session.description = updateSessionDto.description;
+      }
+      if (updateSessionDto.isActive !== undefined) {
+        session.isActive = updateSessionDto.isActive;
+      }
+
+      const updatedSession = await this.surveySessionRepository.save(session);
+
+      return {
+        message: 'Session successfully updated',
+        session: updatedSession,
+        updatedFields: Object.keys(updateSessionDto),
+        validatedAgainstSessions: otherSessions?.length || 0,
+        eventInfo: {
+          name: event.name,
+          dateRange: `${new Date(event.startDate).toISOString().split('T')[0]} to ${new Date(event.endDate).toISOString().split('T')[0]}`,
+          timeRange: `${event.startTime} to ${event.endTime}`,
+        },
+      };
+    } catch (error: any) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ValidationException
+      ) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Update session');
+      this.errorHandler.handleDatabaseError(error, 'Session update');
+    }
+  }
+
+  // Helper method to validate single session with survey and event
+  private async validateSingleSessionWithSurveyAndEvent(
+    sessionData: any,
+    survey: Survey,
+    event: Event,
+  ): Promise<void> {
+    try {
+      const sessionDate = new Date(sessionData.date);
+      const sessionDateStr = sessionDate.toISOString().split('T')[0];
+      const surveyStartDate = new Date(survey.startDate);
+      const surveyEndDate = new Date(survey.endDate);
+      const eventStartDate = new Date(event.startDate);
+      const eventEndDate = new Date(event.endDate);
+
+      const surveyStartDateStr = surveyStartDate.toISOString().split('T')[0];
+      const surveyEndDateStr = surveyEndDate.toISOString().split('T')[0];
+      const eventStartDateStr = eventStartDate.toISOString().split('T')[0];
+      const eventEndDateStr = eventEndDate.toISOString().split('T')[0];
+
+      // 1. Session date within survey range
+      if (sessionDate < surveyStartDate || sessionDate > surveyEndDate) {
+        throw new ValidationException(
+          `Use any date between ${surveyStartDateStr} and ${surveyEndDateStr}.`,
+          [
+            {
+              field: 'date',
+              sessionName: sessionData.name,
+              providedValue: sessionDateStr,
+              validRange: `${surveyStartDateStr} to ${surveyEndDateStr}`,
+              suggestedValue: surveyStartDateStr,
+              surveyInfo: {
+                title: survey.title,
+                startDate: surveyStartDateStr,
+                endDate: surveyEndDateStr,
+              },
+            },
+          ],
+        );
+      }
+
+      // 2. Session date within event range
+      if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
+        throw new ValidationException(
+          `Use any date between ${eventStartDateStr} and ${eventEndDateStr}.`,
+          [
+            {
+              field: 'date',
+              sessionName: sessionData.name,
+              providedValue: sessionDateStr,
+              validRange: `${eventStartDateStr} to ${eventEndDateStr}`,
+              suggestedValue: eventStartDateStr,
+              eventInfo: {
+                name: event.name,
+                startDate: eventStartDateStr,
+                endDate: eventEndDateStr,
+              },
+            },
+          ],
+        );
+      }
+
+      // 3. Time format validation
+      if (!this.validateTimeFormat(sessionData.startTime)) {
+        throw new ValidationException(
+          `start time format is invalid.
+           Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
+          [
+            {
+              field: 'startTime',
+              sessionName: sessionData.name,
+              providedValue: sessionData.startTime,
+              validFormat: 'HH:MM:SS',
+              suggestedValue: event.startTime,
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
+        );
+      }
+
+      if (!this.validateTimeFormat(sessionData.endTime)) {
+        throw new ValidationException(
+          `End time format is invalid. Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
+          [
+            {
+              field: 'endTime',
+              sessionName: sessionData.name,
+              providedValue: sessionData.endTime,
+              validFormat: 'HH:MM:SS',
+              suggestedValue: event.endTime,
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
+        );
+      }
+
+      // 4. Session time logic validation
+      const sessionStartMinutes = this.timeToMinutes(sessionData.startTime);
+      const sessionEndMinutes = this.timeToMinutes(sessionData.endTime);
+
+      if (sessionEndMinutes <= sessionStartMinutes) {
+        const suggestedEndTime = this.addMinutesToTime(
+          sessionData.startTime,
+          90,
+        );
+        throw new ValidationException(
+          `Use endTime: "${suggestedEndTime}" or any time after ${sessionData.startTime}.`,
+          [
+            {
+              field: 'timeRange',
+              sessionName: sessionData.name,
+              providedStartTime: sessionData.startTime,
+              providedEndTime: sessionData.endTime,
+              suggestedEndTime: suggestedEndTime,
+              eventInfo: {
+                name: event.name,
+                startTime: event.startTime,
+                endTime: event.endTime,
+              },
+            },
+          ],
+        );
+      }
+
+      // 5. Session within event time range on same day
+      const eventStartTimeMinutes = this.timeToMinutes(event.startTime);
+      const eventEndTimeMinutes = this.timeToMinutes(event.endTime);
+
+      if (sessionDate.getTime() === eventStartDate.getTime()) {
+        if (sessionStartMinutes < eventStartTimeMinutes) {
+          throw new ValidationException(
+            `Use startTime: "${event.startTime}" or later.`,
+            [
+              {
+                field: 'startTime',
+                sessionName: sessionData.name,
+                providedValue: sessionData.startTime,
+                suggestedValue: event.startTime,
+                eventDate: eventStartDateStr,
+                validTimeRange: `${event.startTime} to ${event.endTime}`,
+                eventInfo: {
+                  name: event.name,
+                  date: eventStartDateStr,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
+          );
+        }
+      }
+
+      if (sessionDate.getTime() === eventEndDate.getTime()) {
+        if (sessionEndMinutes > eventEndTimeMinutes) {
+          throw new ValidationException(
+            `Use endTime: "${event.endTime}" or earlier.`,
+            [
+              {
+                field: 'endTime',
+                sessionName: sessionData.name,
+                providedValue: sessionData.endTime,
+                suggestedValue: event.endTime,
+                eventDate: eventEndDateStr,
+                validTimeRange: `${event.startTime} to ${event.endTime}`,
+                eventInfo: {
+                  name: event.name,
+                  date: eventEndDateStr,
+                  startTime: event.startTime,
+                  endTime: event.endTime,
+                },
+              },
+            ],
+          );
+        }
+      }
+    } catch (error: any) {
+      if (error instanceof ValidationException) {
+        throw error;
+      }
+      this.errorHandler.logError(
+        error,
+        'Validate single session with survey and event',
+      );
+      throw new ValidationException('Session validation failed');
+    }
+  }
+
+  // Helper method to validate session overlap with other sessions
+  private async validateSessionOverlapWithOthers(
+    sessionData: any,
+    otherSessions: SurveySession[],
+    event: Event,
+  ): Promise<void> {
+    try {
+      const sessionDate = new Date(sessionData.date);
+      const sessionDateStr = sessionDate.toISOString().split('T')[0];
+      const sessionStartMinutes = this.timeToMinutes(sessionData.startTime);
+      const sessionEndMinutes = this.timeToMinutes(sessionData.endTime);
+
+      for (const otherSession of otherSessions) {
+        const otherSessionDate = new Date(otherSession.date);
+        const otherSessionDateStr = otherSessionDate
+          .toISOString()
+          .split('T')[0];
+
+        // Only check overlap for sessions on the same date
+        if (sessionDate.getTime() === otherSessionDate.getTime()) {
+          const otherStartMinutes = this.timeToMinutes(otherSession.startTime);
+          const otherEndMinutes = this.timeToMinutes(otherSession.endTime);
+
+          // Check for time overlap
+          if (
+            sessionStartMinutes < otherEndMinutes &&
+            sessionEndMinutes > otherStartMinutes
+          ) {
+            const suggestedTime = this.addMinutesToTime(
+              otherSession.endTime,
+              15,
+            );
+            throw new ValidationException(
+              `Change session start time to "${suggestedTime}" or later to avoid overlap.`,
+              [
+                {
+                  field: 'overlap',
+                  sessionName: sessionData.name,
+                  conflictingSession: otherSession.name,
+                  sessionTime: `${sessionData.startTime}-${sessionData.endTime}`,
+                  conflictingSessionTime: `${otherSession.startTime}-${otherSession.endTime}`,
+                  suggestedStartTime: suggestedTime,
+                  date: sessionDateStr,
+                  suggestion: `Change "${sessionData.name}" start time to ${suggestedTime} or adjust "${otherSession.name}" timing`,
+                  eventInfo: {
+                    name: event.name,
+                    timeRange: `${event.startTime} to ${event.endTime}`,
+                  },
+                },
+              ],
+            );
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error instanceof ValidationException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Validate session overlap with others');
+      throw new ValidationException('Session overlap validation failed');
     }
   }
 }

@@ -36,9 +36,10 @@ export class FavoriteEventController {
     @Query() query: GetFavoritesDto
   ) {
     const userId = req.user.id;
+    const userRole = req.user.role;
     const filter = query.filter || FavoriteFilterType.ALL;
     
-    const favorites = await this.favoriteEventService.getUserFavorites(userId, filter);
+    const favorites = await this.favoriteEventService.getUserFavorites(userId, filter, userRole);
     
     return response.status(200).json({
       success: true,

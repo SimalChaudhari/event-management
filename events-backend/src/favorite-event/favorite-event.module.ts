@@ -8,9 +8,12 @@ import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { UtilsModule } from 'utils/utils.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([FavoriteEvent, Event, UserEntity, RegisterEvent]),
+  imports: [TypeOrmModule.forFeature([FavoriteEvent, Event, UserEntity,
+     RegisterEvent]),
+     UtilsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration

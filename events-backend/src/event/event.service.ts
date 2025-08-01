@@ -61,7 +61,7 @@ export class EventService {
         where: { name: eventDto.name },
       });
       if (existingEvent) {
-        throw new DuplicateResourceException('Event', 'name', eventDto.name);
+        throw new DuplicateResourceException(`Event ${eventDto.name}`);
       }
 
       // Validate all IDs before creating the event
@@ -622,7 +622,7 @@ export class EventService {
           where: { name: eventDto.name, id: Not(id) },
         });
         if (existingEvent) {
-          throw new DuplicateResourceException('Event', 'name', eventDto.name);
+          throw new DuplicateResourceException(`Event ${eventDto.name}`);
         }
       }
 

@@ -30,6 +30,7 @@ import { GlobalExceptionFilter } from './utils/global-exception.filter';
 import { ValidationPipe } from './validation/validation.pipe';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { PollingModule } from 'polling/polling.module';
+import { ChatModule } from 'chat/chat.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { PollingModule } from 'polling/polling.module';
     ExhibitorModule,
     GalleryModule,
     PromotionalOfferModule,
+    ChatModule,
     SurveyModule,
     PollingModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,

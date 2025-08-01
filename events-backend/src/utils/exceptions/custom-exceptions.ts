@@ -32,14 +32,12 @@ export class ResourceNotFoundException extends HttpException {
 }
 
 export class DuplicateResourceException extends HttpException {
-  constructor(resource: string, field: string, value: string) {
+  constructor(resource: string) {
     super(
       {
-        message: `${resource} with ${field} '${value}' already exists`,
+        message: `${resource} already exists`,
         error: 'Conflict',
-        resource,
-        field,
-        value,
+        resource
       },
       HttpStatus.CONFLICT,
     );

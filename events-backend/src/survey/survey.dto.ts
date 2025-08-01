@@ -11,10 +11,6 @@ export class CreateSurveyDto {
   @IsNotEmpty()
   title!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  description!: string;
-
   // Make date and time fields optional - will be auto-filled from event
   @IsDateString()
   @IsOptional()
@@ -90,10 +86,6 @@ export class UpdateSurveyDto {
   @IsOptional()
   title?: string;
 
-  @IsString()
-  @IsOptional()
-  description?: string;
-
   @IsDateString()
   @IsOptional()
   startDate?: string;
@@ -109,6 +101,33 @@ export class UpdateSurveyDto {
   @IsString()
   @IsOptional()
   endTime?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
+
+export class UpdateSessionDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+
+  @IsString()
+  @IsOptional()
+  startTime?: string;
+
+  @IsString()
+  @IsOptional()
+  endTime?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @IsBoolean()
   @IsOptional()

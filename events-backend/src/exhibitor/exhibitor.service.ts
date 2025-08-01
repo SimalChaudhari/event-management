@@ -28,7 +28,7 @@ export class ExhibitorService {
         where: { email: exhibitorDto.email },
       });
       if (existingExhibitor) {
-        throw new DuplicateResourceException('Exhibitor', 'email', exhibitorDto.email);
+        throw new DuplicateResourceException(`Exhibitor ${exhibitorDto.email}`);
       }
 
       const exhibitor = this.exhibitorRepository.create(exhibitorDto);
@@ -222,7 +222,7 @@ export class ExhibitorService {
           where: { email: exhibitorDto.email },
         });
         if (existingExhibitor) {
-          throw new DuplicateResourceException('Exhibitor', 'email', exhibitorDto.email);
+          throw new DuplicateResourceException(`Exhibitor ${exhibitorDto.email}`);
         }
       }
 

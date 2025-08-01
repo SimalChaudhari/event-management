@@ -28,9 +28,7 @@ export class SpeakerService {
 
         if (existingSpeaker) {
           throw new DuplicateResourceException(
-            'Speaker',
-            'email',
-            speakerDto.email,
+            `Speaker ${speakerDto.email}`
           );
         }
       }
@@ -87,9 +85,7 @@ export class SpeakerService {
 
         if (existingSpeaker) {
           throw new DuplicateResourceException(
-            'Speaker',
-            'email',
-            speakerDto.email,
+            `Speaker ${speakerDto.email}`
           );
         }
       }
