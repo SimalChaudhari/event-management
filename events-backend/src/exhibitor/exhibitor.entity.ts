@@ -41,6 +41,14 @@ export class Exhibitor {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  // Add new profile field
+  @Column({ type: 'varchar', nullable: true })
+  profile?: string;
+
+  // Add new bothNumber field
+  @Column({ type: 'varchar', nullable: true })
+  bothNumber?: string;
+
   // Multiple flyer images support
   @Column('simple-array', { nullable: true })
   flyers?: string[];

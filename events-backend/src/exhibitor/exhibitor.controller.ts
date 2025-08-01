@@ -39,6 +39,7 @@ export class ExhibitorController {
       { name: 'flyers', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'eventImages', maxCount: 10 },
+      { name: 'profile', maxCount: 1 }, // Add profile image upload
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -48,6 +49,8 @@ export class ExhibitorController {
             cb(null, './uploads/exhibitor/documents');
           } else if (file.fieldname === 'eventImages') {
             cb(null, './uploads/exhibitor/eventImages');
+          } else if (file.fieldname === 'profile') {
+            cb(null, './uploads/exhibitor/profile'); // Add profile directory
           } else {
             cb(null, './uploads/exhibitor/flyers'); // Default
           }
@@ -63,6 +66,8 @@ export class ExhibitorController {
         if (file.fieldname === 'flyers' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'eventImages' && allowedImageTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else if (file.fieldname === 'profile' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
@@ -80,12 +85,18 @@ export class ExhibitorController {
     @UploadedFiles() files: { 
       flyers?: Express.Multer.File[], 
       documents?: Express.Multer.File[], 
-      eventImages?: Express.Multer.File[]
+      eventImages?: Express.Multer.File[],
+      profile?: Express.Multer.File[] // Add profile field
     },
     @Res() response: Response,
     @Request() req: any, // Add this for user tracking
   ) {
     try {
+      // Handle profile image
+      if (files.profile && files.profile.length > 0) {
+        exhibitorDto.profile = `uploads/exhibitor/profile/${files.profile[0].filename}`;
+      }
+
       // Handle flyers
       if (files.flyers && files.flyers.length > 0) {
         exhibitorDto.flyers = files.flyers.map(
@@ -286,6 +297,7 @@ export class ExhibitorController {
       { name: 'flyers', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'eventImages', maxCount: 10 },
+      { name: 'profile', maxCount: 1 }, // Add profile image upload
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -295,6 +307,8 @@ export class ExhibitorController {
             cb(null, './uploads/exhibitor/documents');
           } else if (file.fieldname === 'eventImages') {
             cb(null, './uploads/exhibitor/eventImages');
+          } else if (file.fieldname === 'profile') {
+            cb(null, './uploads/exhibitor/profile'); // Add profile directory
           } else {
             cb(null, './uploads/exhibitor/flyers'); // Default
           }
@@ -310,6 +324,8 @@ export class ExhibitorController {
         if (file.fieldname === 'flyers' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'eventImages' && allowedImageTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else if (file.fieldname === 'profile' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
@@ -328,7 +344,8 @@ export class ExhibitorController {
     @UploadedFiles() files: { 
       flyers?: Express.Multer.File[], 
       documents?: Express.Multer.File[], 
-      eventImages?: Express.Multer.File[]
+      eventImages?: Express.Multer.File[],
+      profile?: Express.Multer.File[] // Add profile field
     },
     @Res() response: Response,
     @Request() req: any,
@@ -339,6 +356,11 @@ export class ExhibitorController {
       // Get existing exhibitor first
       existingExhibitor = await this.exhibitorService.getExhibitorEntityById(id);
       
+      // Handle profile image
+      if (files.profile && files.profile.length > 0) {
+        exhibitorDto.profile = `uploads/exhibitor/profile/${files.profile[0].filename}`;
+      }
+
       // Handle flyers - combine existing and new
       const allFlyers = [];
       const allFlyerNames = [];
@@ -749,6 +771,14 @@ export class ExhibitorController {
     if (files.eventImages) {
       files.eventImages.forEach((file: any) => {
         const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'eventImages', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      });
+    }
+    if (files.profile) {
+      files.profile.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'profile', file.filename);
         if (fs.existsSync(uploadedPath)) {
           fs.unlinkSync(uploadedPath);
         }

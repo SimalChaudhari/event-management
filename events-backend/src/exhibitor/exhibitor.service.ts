@@ -308,6 +308,14 @@ export class ExhibitorService {
   // Helper method to delete exhibitor files
   private deleteExhibitorFiles(exhibitor: Exhibitor) {
     try {
+      // Delete profile image if it exists
+      if (exhibitor.profile) {
+        const profilePath = path.resolve(exhibitor.profile);
+        if (fs.existsSync(profilePath)) {
+          fs.unlinkSync(profilePath);
+        }
+      }
+
       // Delete flyers if they exist
       if (exhibitor.flyers && exhibitor.flyers.length > 0) {
         exhibitor.flyers.forEach((flyerPath) => {

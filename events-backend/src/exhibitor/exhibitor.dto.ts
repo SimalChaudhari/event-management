@@ -57,6 +57,16 @@ export class ExhibitorDto {
   @IsBoolean()
   isActive?: boolean;
 
+  // Add new profile field
+  @IsOptional()
+  @IsString()
+  profile?: string;
+
+  // Add new bothNumber field
+  @IsOptional()
+  @IsString()
+  bothNumber?: string;
+
   @IsOptional()
   @IsArray()
   flyers?: string[];

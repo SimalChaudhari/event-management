@@ -1277,16 +1277,16 @@ export class SurveyService {
         throw new BusinessLogicException(feedbackReason);
       }
 
-      // 5. Check for duplicate feedback
-      const existingResponse = await this.surveyResponseRepository.findOne({
-        where: { surveyId, sessionId: feedbackDto.sessionId, userId },
-      });
+      // // 5. Check for duplicate feedback
+      // const existingResponse = await this.surveyResponseRepository.findOne({
+      //   where: { surveyId, sessionId: feedbackDto.sessionId, userId },
+      // });
 
-      if (existingResponse) {
-        throw new DuplicateResourceException(
-          `You have already submitted feedback for session: ${session.name}`,
-        );
-      }
+      // if (existingResponse) {
+      //   throw new DuplicateResourceException(
+      //     `You have already submitted feedback for session: ${session.name}`,
+      //   );
+      // }
 
       // 6. Create feedback response
       const response = new SurveyResponse();

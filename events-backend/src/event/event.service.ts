@@ -121,17 +121,29 @@ export class EventService {
       }
 
       const today = new Date();
-      if (new Date(eventDto.startDate) < today)
-        throw new ValidationException('Start date cannot be in the past');
-      if (new Date(eventDto.endDate) < new Date(eventDto.startDate))
-        throw new ValidationException('End date must be after start date');
-      if (
-        today.toDateString() === new Date(eventDto.startDate).toDateString() &&
-        new Date(eventDto.endDate) <= today
-      ) {
-        throw new ValidationException(
-          'If start date is today, end date must be at least tomorrow',
-        );
+      const startDateTime = new Date(`${eventDto.startDate}T${eventDto.startTime}`);
+      const endDateTime = new Date(`${eventDto.endDate}T${eventDto.endTime}`);
+
+      if (startDateTime < today)
+        throw new ValidationException('Start date and time cannot be in the past');
+
+      if (endDateTime <= startDateTime)
+        throw new ValidationException('End date and time must be after start date and time');
+
+      // Additional validation for same day events
+      const startDateOnly = new Date(startDateTime.toDateString());
+      const endDateOnly = new Date(endDateTime.toDateString());
+
+      if (startDateOnly.getTime() === endDateOnly.getTime()) {
+        const startTimeInMinutes = startDateTime.getHours() * 60 + startDateTime.getMinutes();
+        const endTimeInMinutes = endDateTime.getHours() * 60 + endDateTime.getMinutes();
+        
+        if (endTimeInMinutes <= startTimeInMinutes) {
+          throw new ValidationException(
+            'For events on the same day, end time must be after start time. ' +
+            'If you want the event to end the next day, please set the end date to the next day.'
+          );
+        }
       }
 
       if (eventDto.location) {
@@ -223,57 +235,6 @@ export class EventService {
     }
   }
 
-  // // Helper function to find which fields match the keyword
-  // private findMatchedFields(event: any, keyword: string): string[] {
-  //   const matchedFields: string[] = [];
-  //   const keywordLower = keyword.toLowerCase();
-
-  //   // Check each field for keyword match
-  //   if (event.name && event.name.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('name');
-  //   }
-  //   if (
-  //     event.description &&
-  //     event.description.toLowerCase().includes(keywordLower)
-  //   ) {
-  //     matchedFields.push('description');
-  //   }
-  //   if (event.venue && event.venue.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('venue');
-  //   }
-  //   if (event.location && event.location.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('location');
-  //   }
-  //   if (event.country && event.country.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('country');
-  //   }
-  //   if (event.type && event.type.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('type');
-  //   }
-  //   if (
-  //     event.price &&
-  //     event.price.toString().toLowerCase().includes(keywordLower)
-  //   ) {
-  //     matchedFields.push('price');
-  //   }
-  //   if (event.currency && event.currency.toLowerCase().includes(keywordLower)) {
-  //     matchedFields.push('currency');
-  //   }
-  //   if (
-  //     event.latitude &&
-  //     event.latitude.toString().toLowerCase().includes(keywordLower)
-  //   ) {
-  //     matchedFields.push('latitude');
-  //   }
-  //   if (
-  //     event.longitude &&
-  //     event.longitude.toString().toLowerCase().includes(keywordLower)
-  //   ) {
-  //     matchedFields.push('longitude');
-  //   }
-
-  //   return matchedFields;
-  // }
 
   async getAllEvents(
     filters: {
@@ -819,46 +780,6 @@ export class EventService {
     return matchedFields;
   }
 
-  private async createEventAssociations(eventId: string, eventDto: EventDto) {
-    // Create category associations
-    if (eventDto.categoryIds) {
-      const categoryIdsArray = eventDto.categoryIds.split(',');
-      await Promise.all(
-        categoryIdsArray.map(async (categoryId) => {
-          const eventCategory = new EventCategory();
-          eventCategory.eventId = eventId;
-          eventCategory.categoryId = categoryId.trim();
-          await this.eventCategoryRepository.save(eventCategory);
-        }),
-      );
-    }
-
-    // Create speaker associations
-    if (eventDto.speakerIds) {
-      const speakerIdsArray = eventDto.speakerIds.split(',');
-      await Promise.all(
-        speakerIdsArray.map(async (speakerId) => {
-          const eventSpeaker = new EventSpeaker();
-          eventSpeaker.eventId = eventId;
-          eventSpeaker.speakerId = speakerId.trim();
-          await this.eventSpeakerRepository.save(eventSpeaker);
-        }),
-      );
-    }
-
-    // Create exhibitor associations
-    if (eventDto.exhibitorIds) {
-      const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
-      await Promise.all(
-        exhibitorIdsArray.map(async (exhibitorId) => {
-          const eventExhibitor = new EventExhibitor();
-          eventExhibitor.eventId = eventId;
-          eventExhibitor.exhibitorId = exhibitorId.trim();
-          await this.eventExhibitorRepository.save(eventExhibitor);
-        }),
-      );
-    }
-  }
 
   private async updateEventAssociations(
     eventId: string,
@@ -942,22 +863,45 @@ export class EventService {
     existingEvent?: Event,
   ) {
     const today = new Date();
-    const startDate = eventDto.startDate
-      ? new Date(eventDto.startDate)
+    
+    // Get start and end dates with times
+    const startDateTime = eventDto.startDate && eventDto.startTime
+      ? new Date(`${eventDto.startDate}T${eventDto.startTime}`)
       : existingEvent
-        ? new Date(existingEvent.startDate)
+        ? new Date(`${existingEvent.startDate}T${existingEvent.startTime}`)
         : null;
-    const endDate = eventDto.endDate
-      ? new Date(eventDto.endDate)
+        
+    const endDateTime = eventDto.endDate && eventDto.endTime
+      ? new Date(`${eventDto.endDate}T${eventDto.endTime}`)
       : existingEvent
-        ? new Date(existingEvent.endDate)
+        ? new Date(`${existingEvent.endDate}T${existingEvent.endTime}`)
         : null;
 
-    if (startDate && startDate < today) {
-      throw new ValidationException('Start date cannot be in the past');
+    if (startDateTime && startDateTime < today) {
+      throw new ValidationException('Start date and time cannot be in the past');
     }
-    if (startDate && endDate && endDate < startDate) {
-      throw new ValidationException('End date must be after start date');
+    
+    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
+      throw new ValidationException('End date and time must be after start date and time');
+    }
+    
+    // Additional validation for same day events with AM/PM time conflicts
+    if (startDateTime && endDateTime) {
+      const startDateOnly = new Date(startDateTime.toDateString());
+      const endDateOnly = new Date(endDateTime.toDateString());
+      
+      // If dates are the same, check if end time is before start time
+      if (startDateOnly.getTime() === endDateOnly.getTime()) {
+        const startTimeInMinutes = startDateTime.getHours() * 60 + startDateTime.getMinutes();
+        const endTimeInMinutes = endDateTime.getHours() * 60 + endDateTime.getMinutes();
+        
+        if (endTimeInMinutes <= startTimeInMinutes) {
+          throw new ValidationException(
+            'For events on the same day, end time must be after start time. ' +
+            'If you want the event to end the next day, please set the end date to the next day.'
+          );
+        }
+      }
     }
   }
 
