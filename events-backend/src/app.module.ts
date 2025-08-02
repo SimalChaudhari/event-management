@@ -24,13 +24,10 @@ import { GalleryModule } from 'gallery/gallery.module';
 import { ExhibitorModule } from 'exhibitor/exhibitor.module';
 import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.module';
 import { SurveyModule } from 'survey/survey.module';
-
-import { APP_FILTER, APP_PIPE } from '@nestjs/core';
-import { GlobalExceptionFilter } from './utils/global-exception.filter';
-import { ValidationPipe } from './validation/validation.pipe';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { PollingModule } from 'polling/polling.module';
 import { ChatModule } from 'chat/chat.module';
+import { QnaModule } from 'qna/qna.module';
 
 @Module({
   imports: [
@@ -56,6 +53,7 @@ import { ChatModule } from 'chat/chat.module';
     PromotionalOfferModule,
     ChatModule,
     SurveyModule,
+    QnaModule,
     PollingModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     CacheModule.register({
