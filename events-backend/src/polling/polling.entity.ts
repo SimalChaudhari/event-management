@@ -13,20 +13,13 @@ import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { Speaker } from 'speaker/speaker.entity';
 
-export enum PollType {
+export enum ExternalPlatform {
   INTERNAL = 'internal',
   EXTERNAL = 'external'
 }
 
-export enum ExternalPlatform {
-  KAHOOT = 'kahoot',
-  SLIDO = 'slido',
-  MENTIMETER = 'mentimeter',
-  OTHER = 'other'
-}
-
-@Entity('quiz_questions')
-export class QuizQuestion {
+@Entity('polls')
+export class Poll {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -40,17 +33,10 @@ export class QuizQuestion {
   eventId!: string;
 
 
-  @Column({ nullable: true })
-  speakerId?: string;
-
   @ManyToOne(() => Event, { eager: false })
   @JoinColumn({ name: 'eventId' })
   event?: Event;
 
-
-  @ManyToOne(() => Speaker, { eager: false })
-  @JoinColumn({ name: 'speakerId' })
-  speaker?: Speaker;
 
   @Column()
   createdById!: string;
@@ -63,34 +49,7 @@ export class QuizQuestion {
   isActive!: boolean;
 
   @Column({ type: 'boolean', default: false })
-  allowMultipleSelection!: boolean;
-
-  @Column({ type: 'boolean', default: true })
-  hasCorrectAnswer!: boolean;
-
-  @Column({ type: 'boolean', default: true })
-  showCorrectAnswer!: boolean;
-
-  @Column({
-    type: 'enum',
-    enum: PollType,
-    default: PollType.INTERNAL
-  })
-  pollType!: PollType;
-
-  // For external polls only
-  @Column({ type: 'varchar', nullable: true })
-  externalUrl?: string;
-
-  @Column({
-    type: 'enum',
-    enum: ExternalPlatform,
-    nullable: true
-  })
-  platform?: ExternalPlatform;
-
-  @Column({ type: 'boolean', default: false })
-  isLive!: boolean; // Currently showing to users
+  isLive!: boolean;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -98,16 +57,21 @@ export class QuizQuestion {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  // CASCADE DELETE: When question is deleted, all options will be deleted
-  @OneToMany(() => QuizOption, (option) => option.question, {
+  @OneToMany(() => PollOption, (option) => option.poll, {
     cascade: true,
     onDelete: 'CASCADE'
   })
-  options!: QuizOption[];
+  options!: PollOption[];
+
+  @OneToMany(() => PollVote, (vote) => vote.poll, {
+    cascade: true,
+    onDelete: 'CASCADE'
+  })
+  votes!: PollVote[];
 }
 
-@Entity('quiz_options')
-export class QuizOption {
+@Entity('polls_options')
+export class PollOption {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -115,25 +79,69 @@ export class QuizOption {
   optionText!: string;
 
   @Column()
-  questionId!: string;
+  pollId!: string;
 
-  @ManyToOne(() => QuizQuestion, (question) => question.options, {
+  @ManyToOne(() => Poll, (poll) => poll.options, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'questionId' })
-  question?: QuizQuestion;
+  @JoinColumn({ name: 'pollId' })
+  poll?: Poll;
 
-  @Column({ type: 'boolean', default: false })
-  isCorrectAnswer!: boolean;
+  @Column({ type: 'int', default: 0 })
+  voteCount!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
 }
 
-@Entity('quiz_user_attempts')
-export class UserQuizAttempt {
+@Entity('polls_votes')
+export class PollVote {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @Column()
+  pollId!: string;
+
+  @ManyToOne(() => Poll, (poll) => poll.votes, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'pollId' })
+  poll?: Poll;
+
+  @Column()
+  optionId!: string;
+
+  @Column()
+  speakerId?: string;
+
+  @ManyToOne(() => PollOption, { eager: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'optionId' })
+  option?: PollOption;
+
+  @Column()
+  userId!: string;
+
+  @ManyToOne(() => UserEntity, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user?: UserEntity;
+
+  @CreateDateColumn()
+  votedAt!: Date;
+  updatedAt: any;
+  createdAt: any;
+}
+
+@Entity('polls_user_sessions')
+export class UserPollSession {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Column()
+  userId!: string;
+
+  @ManyToOne(() => UserEntity, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user?: UserEntity;
 
   @Column()
   eventId!: string;
@@ -149,18 +157,8 @@ export class UserQuizAttempt {
   @JoinColumn({ name: 'speakerId' })
   speaker?: Speaker;
 
-  @Column()
-  userId!: string;
-
-  @ManyToOne(() => UserEntity, { eager: false })
-  @JoinColumn({ name: 'userId' })
-  user?: UserEntity;
-
-  @Column({ type: 'boolean', default: false })
-  isCompleted!: boolean;
-
-  @Column({ type: 'timestamp', nullable: true })
-  completedAt?: Date;
+  @Column({ type: 'int', default: 0 })
+  currentQuestionIndex!: number; // Current question number (0-based)
 
   @Column({ type: 'int', default: 0 })
   totalQuestions!: number;
@@ -168,11 +166,11 @@ export class UserQuizAttempt {
   @Column({ type: 'int', default: 0 })
   answeredQuestions!: number;
 
-  @Column({ type: 'int', default: 0 })
-  correctAnswers!: number;
+  @Column({ type: 'boolean', default: false })
+  isCompleted!: boolean;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  scorePercentage!: number;
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt?: Date;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -180,41 +178,41 @@ export class UserQuizAttempt {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  // CASCADE DELETE: When attempt is deleted, all answers will be deleted
-  @OneToMany(() => UserQuizAnswer, (answer) => answer.attempt, {
+  @OneToMany(() => UserPollVote, (vote) => vote.session, {
     cascade: true,
     onDelete: 'CASCADE'
   })
-  answers!: UserQuizAnswer[];
+  votes!: UserPollVote[];
 }
 
-@Entity('quiz_user_answers')
-export class UserQuizAnswer {
+@Entity('polls_user_votes')
+export class UserPollVote {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Column()
-  attemptId!: string;
+  sessionId!: string;
 
-  @ManyToOne(() => UserQuizAttempt, (attempt) => attempt.answers, {
+  @ManyToOne(() => UserPollSession, (session) => session.votes, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'attemptId' })
-  attempt?: UserQuizAttempt;
+  @JoinColumn({ name: 'sessionId' })
+  session?: UserPollSession;
 
   @Column()
-  questionId!: string;
+  pollId!: string;
 
-  @ManyToOne(() => QuizQuestion, { eager: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'questionId' })
-  question?: QuizQuestion;
+  @ManyToOne(() => Poll, { eager: false })
+  @JoinColumn({ name: 'pollId' })
+  poll?: Poll;
 
-  @Column('simple-array')
-  selectedOptionIds!: string[];
+  @Column()
+  optionId!: string;
 
-  @Column({ type: 'boolean', default: false })
-  isCorrect!: boolean;
+  @ManyToOne(() => PollOption, { eager: false })
+  @JoinColumn({ name: 'optionId' })
+  option?: PollOption;
 
   @CreateDateColumn()
-  answeredAt!: Date;
+  votedAt!: Date;
 } 

@@ -1,1190 +1,594 @@
 // src/polling/polling.service.ts
 import { Injectable } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm'; // Add In import
 import { InjectRepository } from '@nestjs/typeorm';
-import { QuizQuestion, QuizOption, UserQuizAttempt, UserQuizAnswer } from './polling.entity';
-import { CreateQuizQuestionDto, UpdateQuizQuestionDto, SubmitAnswerDto } from './polling.dto';
+import { Poll, PollOption, PollVote } from './polling.entity';
+import { CreatePollDto, UpdatePollDto, VoteDto } from './polling.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
-import { ResourceNotFoundException, ValidationException } from '../utils/exceptions/custom-exceptions';
+import {
+  ResourceNotFoundException,
+  ValidationException,
+} from '../utils/exceptions/custom-exceptions';
 import { Event } from 'event/event.entity';
 import { Speaker } from 'speaker/speaker.entity';
-import {  Not, In } from 'typeorm';
-import { PollType, ExternalPlatform } from './polling.entity';
+import { UserEntity } from 'user/users.entity';
 
 @Injectable()
 export class PollingService {
   constructor(
-    @InjectRepository(QuizQuestion)
-    private quizQuestionRepository: Repository<QuizQuestion>,
-    @InjectRepository(QuizOption)
-    private quizOptionRepository: Repository<QuizOption>,
-    @InjectRepository(UserQuizAttempt)
-    private userQuizAttemptRepository: Repository<UserQuizAttempt>,
-    @InjectRepository(UserQuizAnswer)
-    private userQuizAnswerRepository: Repository<UserQuizAnswer>,
+    @InjectRepository(Poll)
+    private pollRepository: Repository<Poll>,
+    @InjectRepository(PollOption)
+    private pollOptionRepository: Repository<PollOption>,
+    @InjectRepository(PollVote)
+    private pollVoteRepository: Repository<PollVote>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
     @InjectRepository(Speaker)
     private speakerRepository: Repository<Speaker>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
   ) {}
 
-  // =============== ADMIN QUESTION MANAGEMENT ===============
-  async createQuizQuestion(createDto: CreateQuizQuestionDto, createdById: string) {
+  // Create Poll (Admin) - Event-based only, no speakerId
+  async createPoll(createDto: CreatePollDto, createdById: string) {
     try {
       // Validate event exists
       const event = await this.eventRepository.findOne({
-        where: { id: createDto.eventId }
+        where: { id: createDto.eventId },
       });
       if (!event) {
         throw new ResourceNotFoundException('Event', createDto.eventId);
       }
 
-      // Speaker validation
-      if (createDto.speakerId) {
-        const speaker = await this.speakerRepository.findOne({
-          where: { id: createDto.speakerId }
-        });
-        if (!speaker) {
-          throw new ResourceNotFoundException('Speaker', createDto.speakerId);
-        }
-      }
+      // Create poll
+      const poll = new Poll();
+      poll.question = createDto.question;
+      poll.description = createDto.description;
+      poll.eventId = createDto.eventId
+      poll.createdById = createdById;
 
-      // Validate correct answers
-      const correctAnswerCount = createDto.options.filter(opt => opt.isCorrectAnswer).length;
-      if (correctAnswerCount === 0) {
-        throw new ValidationException('At least one correct answer must be specified');
-      }
-      if (!createDto.allowMultipleSelection && correctAnswerCount > 1) {
-        throw new ValidationException('Only one correct answer allowed when multiple selection is disabled');
-      }
-
-      // Create question
-      const question = new QuizQuestion();
-      question.question = createDto.question;
-      question.description = createDto.description;
-      question.eventId = createDto.eventId;
-      question.speakerId = createDto.speakerId; // नया field
-      question.createdById = createdById;
-      question.allowMultipleSelection = createDto.allowMultipleSelection || false;
-
-      const savedQuestion = await this.quizQuestionRepository.save(question);
+      const savedPoll = await this.pollRepository.save(poll);
 
       // Create options
       const optionPromises = createDto.options.map(async (optionDto) => {
-        const option = new QuizOption();
+        const option = new PollOption();
         option.optionText = optionDto.optionText;
-        option.questionId = savedQuestion.id;
-        option.isCorrectAnswer = optionDto.isCorrectAnswer;
-        return await this.quizOptionRepository.save(option);
+        option.pollId = savedPoll.id;
+        option.voteCount = 0;
+        return await this.pollOptionRepository.save(option);
       });
 
       const savedOptions = await Promise.all(optionPromises);
 
       return {
-        ...savedQuestion,
+        ...savedPoll,
         options: savedOptions,
       };
     } catch (error: any) {
-      if (error instanceof ResourceNotFoundException || error instanceof ValidationException) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ValidationException
+      ) {
         throw error;
       }
-      this.errorHandler.logError(error, 'Create quiz question');
-      this.errorHandler.handleDatabaseError(error, 'Quiz question creation');
+      this.errorHandler.logError(error, 'Create poll');
+      this.errorHandler.handleDatabaseError(error, 'Poll creation');
     }
   }
 
-  async getQuizQuestionById(id: string) {
+  // Get All Questions List - Updated to show one event with multiple questions
+  async getAllQuestionsList(
+    eventId?: string,
+    isAdmin: boolean = false,
+  ) {
     try {
-      const question = await this.quizQuestionRepository.findOne({
-        where: { id },
-        relations: ['options', 'event', 'createdBy', 'speaker'], // speaker relation add करें
-      });
-
-      if (!question) {
-        throw new ResourceNotFoundException('Quiz Question', id);
-      }
-
-      return {
-        id: question.id,
-        question: question.question,
-        description: question.description,
-        eventId: question.eventId,
-        eventName: question.event?.name,
-        speakerId: question.speakerId,
-        speakerInfo: question.speaker ? {
-          id: question.speaker.id,
-          name: question.speaker.name,
-          companyName: question.speaker.companyName,
-          position: question.speaker.position,
-          email: question.speaker.email,
-          mobile: question.speaker.mobile,
-          location: question.speaker.location,
-          description: question.speaker.description,
-          speakerProfile: question.speaker.speakerProfile,
-        } : null,
-        isActive: question.isActive,
-        allowMultipleSelection: question.allowMultipleSelection,
-        hasCorrectAnswer: question.hasCorrectAnswer,
-        showCorrectAnswer: question.showCorrectAnswer,
-        createdAt: question.createdAt,
-        updatedAt: question.updatedAt,
-        createdBy: {
-          id: question.createdBy?.id,
-          name: `${question.createdBy?.firstName} ${question.createdBy?.lastName}`,
-        },
-        options: question.options.map(option => ({
-          id: option.id,
-          optionText: option.optionText,
-          isCorrectAnswer: option.isCorrectAnswer,
-        })),
-      };
-    } catch (error: any) {
-      if (error instanceof ResourceNotFoundException) {
-        throw error;
-      }
-      this.errorHandler.logError(error, 'Get quiz question by ID');
-      this.errorHandler.handleDatabaseError(error, 'Quiz question retrieval');
-    }
-  }
-
-  async updateQuizQuestion(id: string, updateDto: UpdateQuizQuestionDto) {
-    try {
-      const question = await this.quizQuestionRepository.findOne({
-        where: { id },
-        relations: ['options'],
-      });
-
-      if (!question) {
-        throw new ResourceNotFoundException('Quiz Question', id);
-      }
-
-      // Speaker validation add करें
-      if (updateDto.speakerId !== undefined) {
-        if (updateDto.speakerId) {
-          const speaker = await this.speakerRepository.findOne({
-            where: { id: updateDto.speakerId }
-          });
-          if (!speaker) {
-            throw new ResourceNotFoundException('Speaker', updateDto.speakerId);
-          }
-        }
-      }
-
-      // Validate correct answers if options are being updated
-      if (updateDto.options) {
-        const correctAnswerCount = updateDto.options.filter(opt => opt.isCorrectAnswer).length;
-        if (correctAnswerCount === 0) {
-          throw new ValidationException('At least one correct answer must be specified');
-        }
-        if (updateDto.allowMultipleSelection === false && correctAnswerCount > 1) {
-          throw new ValidationException('Only one correct answer allowed when multiple selection is disabled');
-        }
-      }
-
-      // Update question fields (with speakerId)
-      const fieldsToUpdate: any = {};
-      if (updateDto.question !== undefined) fieldsToUpdate.question = updateDto.question;
-      if (updateDto.description !== undefined) fieldsToUpdate.description = updateDto.description;
-      if (updateDto.isActive !== undefined) fieldsToUpdate.isActive = updateDto.isActive;
-      if (updateDto.allowMultipleSelection !== undefined) fieldsToUpdate.allowMultipleSelection = updateDto.allowMultipleSelection;
-      if (updateDto.speakerId !== undefined) fieldsToUpdate.speakerId = updateDto.speakerId; // नया field
-
-      if (Object.keys(fieldsToUpdate).length > 0) {
-        await this.quizQuestionRepository.update({ id }, fieldsToUpdate);
-      }
-
-      // Handle options separately if provided
-      if (updateDto.options && updateDto.options.length > 0) {
-        // First delete existing options
-        const existingOptions = await this.quizOptionRepository.find({
-          where: { questionId: id }
-        });
-
-        if (existingOptions.length > 0) {
-          await this.quizOptionRepository.remove(existingOptions);
-        }
-
-        // Wait a moment to ensure deletion is complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Create new options one by one
-        const savedOptions = [];
-        for (const optionDto of updateDto.options) {
-          const option = new QuizOption();
-          option.optionText = optionDto.optionText;
-          option.questionId = id;
-          option.isCorrectAnswer = optionDto.isCorrectAnswer;
-          
-          const savedOption = await this.quizOptionRepository.save(option);
-          savedOptions.push(savedOption);
-        }
-      }
-
-      // Return updated question with speaker info
-      return await this.getQuizQuestionById(id);
-
-    } catch (error: any) {
-      if (error instanceof ResourceNotFoundException || error instanceof ValidationException) {
-        throw error;
-      }
-      console.error('Update Quiz Question Error:', error);
-      this.errorHandler.logError(error, 'Update quiz question');
-      this.errorHandler.handleDatabaseError(error, 'Quiz question update');
-    }
-  }
-
-  async deleteQuizQuestion(id: string) {
-    try {
-      const question = await this.quizQuestionRepository.findOne({
-        where: { id },
-        relations: ['options']
-      });
-
-      if (!question) {
-        throw new ResourceNotFoundException('Quiz Question', id);
-      }
-
-      // Use transaction to ensure all deletions happen atomically
-      return await this.quizQuestionRepository.manager.transaction(async manager => {
-        
-        // 1. Delete all user answers related to this question
-        const userAnswersToDelete = await manager.find(UserQuizAnswer, {
-          where: { questionId: id }
-        });
-        
-        if (userAnswersToDelete.length > 0) {
-          await manager.remove(UserQuizAnswer, userAnswersToDelete);
-          console.log(`Deleted ${userAnswersToDelete.length} user answers for question ${id}`);
-        }
-
-        // 2. Find and update quiz attempts that included this question
-        const affectedAttempts = await manager
-          .createQueryBuilder(UserQuizAttempt, 'attempt')
-          .innerJoin(UserQuizAnswer, 'answer', 'answer.attemptId = attempt.id')
-          .where('answer.questionId = :questionId', { questionId: id })
-          .getMany();
-
-        // Update attempt statistics for affected attempts
-        for (const attempt of affectedAttempts) {
-          const remainingAnswers = await manager.find(UserQuizAnswer, {
-            where: { attemptId: attempt.id }
-          });
-          
-          const correctAnswers = remainingAnswers.filter(answer => answer.isCorrect).length;
-          const totalAnswers = remainingAnswers.length;
-          
-          attempt.answeredQuestions = totalAnswers;
-          attempt.correctAnswers = correctAnswers;
-          attempt.totalQuestions = Math.max(0, attempt.totalQuestions - 1);
-          attempt.scorePercentage = attempt.totalQuestions > 0 ? 
-            Math.round((correctAnswers / attempt.totalQuestions) * 100) : 0;
-          
-          await manager.save(UserQuizAttempt, attempt);
-        }
-
-        // 3. Delete all options (cascade should handle this, but doing explicitly for safety)
-        const optionsToDelete = await manager.find(QuizOption, {
-          where: { questionId: id }
-        });
-        
-        if (optionsToDelete.length > 0) {
-          await manager.remove(QuizOption, optionsToDelete);
-          console.log(`Deleted ${optionsToDelete.length} options for question ${id}`);
-        }
-
-        // 4. Finally delete the question itself
-        await manager.remove(QuizQuestion, question);
-        console.log(`Deleted question ${id}`);
-
-        return { 
-          message: 'Quiz question and all related data deleted successfully',
-          deletedData: {
-            question: 1,
-            options: optionsToDelete.length,
-            userAnswers: userAnswersToDelete.length,
-            affectedAttempts: affectedAttempts.length
-          }
-        };
-      });
-
-    } catch (error: any) {
-      if (error instanceof ResourceNotFoundException) {
-        throw error;
-      }
-      console.error('Delete Quiz Question Error:', error);
-      this.errorHandler.logError(error, 'Delete quiz question');
-      this.errorHandler.handleDatabaseError(error, 'Quiz question deletion');
-    }
-  }
-
-  async deleteAllQuizQuestionsForEvent(eventId: string) {
-    try {
-      const questions = await this.quizQuestionRepository.find({
-        where: { eventId }
-      });
-
-      if (questions.length === 0) {
-        return { message: 'No questions found for this event' };
-      }
-
-      let totalDeleted = {
-        questions: 0,
-        options: 0,
-        userAnswers: 0,
-        affectedAttempts: 0
+      const whereCondition: any = {
+        isActive: true,
+        // isLive: true,
       };
 
-      // Delete each question (which will trigger cascade deletes)
-      for (const question of questions) {
-        const result = await this.deleteQuizQuestion(question.id);
-        if (result.deletedData) {
-          totalDeleted.questions += result.deletedData.question;
-          totalDeleted.options += result.deletedData.options;
-          totalDeleted.userAnswers += result.deletedData.userAnswers;
-          totalDeleted.affectedAttempts += result.deletedData.affectedAttempts;
+      if (eventId) whereCondition.eventId = eventId;
+
+      // Debug logging
+      console.log('Searching polls with conditions:', whereCondition);
+
+      const polls = await this.pollRepository.find({
+        where: whereCondition,
+        relations: ['options', 'event']
+      });
+
+      // Get all votes for these polls if admin
+      let allVotes: PollVote[] = [];
+      if (isAdmin && polls.length > 0) {
+        const pollIds = polls.map((poll) => poll.id);
+        allVotes = await this.pollVoteRepository.find({
+          where: {
+            pollId: In(pollIds),
+          },
+          relations: ['user'],
+        });
+      }
+
+      // Group polls by event
+      const groupedByEvent = polls.reduce((acc: Record<string, any>, poll) => {
+        const eventKey = poll.eventId || 'no-event';
+        
+        if (!acc[eventKey]) {
+          acc[eventKey] = {
+            event: poll.event
+              ? {
+                  id: poll.event.id,
+                  name: poll.event.name,
+                }
+              : null,
+            questions: []
+          };
         }
-      }
 
-      return {
-        message: `All quiz questions for event deleted successfully`,
-        deletedData: totalDeleted
-      };
+        const totalVotes = poll.options.reduce(
+          (sum, opt) => sum + opt.voteCount,
+          0,
+        );
+        const pollVotes = isAdmin
+          ? allVotes.filter((vote) => vote.pollId === poll.id)
+          : [];
 
-    } catch (error: any) {
-      console.error('Delete All Quiz Questions Error:', error);
-      this.errorHandler.logError(error, 'Delete all quiz questions for event');
-      this.errorHandler.handleDatabaseError(error, 'Bulk quiz question deletion');
-    }
-  }
-
-  private calculateGrade(percentage: number): string {
-    if (percentage >= 90) return 'A+';
-    if (percentage >= 80) return 'A';
-    if (percentage >= 70) return 'B';
-    if (percentage >= 60) return 'C';
-    if (percentage >= 50) return 'D';
-    return 'F';
-  }
-
-  // =============== USER QUIZ RESULTS APIs ===============
-
-  async getUserQuizResultBySpeakerAndEvent(userId: string, speakerId: string, eventId: string) {
-    try {
-      // Get quiz attempt for specific user, speaker, and event
-      const attempt = await this.userQuizAttemptRepository.findOne({
-        where: { 
-          userId, 
-          speakerId, 
-          eventId 
-        },
-        relations: ['answers', 'event', 'speaker', 'user'],
-        order: { createdAt: 'DESC' } // Get latest attempt if multiple
-      });
-
-      if (!attempt) {
-        return {
-          hasAttempt: false,
-          message: 'No quiz attempt found for this user, speaker, and event'
-        };
-      }
-
-      // Get all questions for this speaker and event
-      const allQuestions = await this.quizQuestionRepository.find({
-        where: { 
-          eventId, 
-          speakerId, 
-          isActive: true 
-        },
-        relations: ['options'],
-        order: { createdAt: 'ASC' }
-      });
-
-      // Map questions with user answers
-      const questionsDetails = allQuestions.map(question => {
-        const userAnswer = attempt.answers.find(a => a.questionId === question.id);
-        const correctOptions = question.options.filter(opt => opt.isCorrectAnswer);
-        const selectedOptions = userAnswer ? 
-          question.options.filter(opt => userAnswer.selectedOptionIds.includes(opt.id)) : [];
-
-        return {
-          questionId: question.id,
-          question: question.question,
-          description: question.description,
-          options: question.options.map(option => ({
+        const questionData = {
+          id: poll.id,
+          question: poll.question,
+          description: poll.description,
+          totalVotes: totalVotes,
+          totalVoters: isAdmin ? pollVotes.length : 0,
+          options: poll.options.map((option) => ({
             id: option.id,
             optionText: option.optionText,
-            isCorrect: option.isCorrectAnswer,
-            isSelected: userAnswer ? userAnswer.selectedOptionIds.includes(option.id) : false,
+            voteCount: option.voteCount,
+            percentage:
+              totalVotes > 0
+                ? Math.round((option.voteCount / totalVotes) * 100)
+                : 0,
+            voters: isAdmin
+              ? pollVotes
+                  .filter((vote) => vote.optionId === option.id)
+                  .map((vote) => ({
+                    userId: vote.userId,
+                    user: vote.user
+                      ? {
+                          id: vote.user.id,
+                          firstName: vote.user.firstName,
+                          lastName: vote.user.lastName,
+                          email: vote.user.email,
+                          mobile: vote.user.mobile,
+                          fullName:
+                            `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+                        }
+                      : null,
+                    votedAt: vote.createdAt,
+                  }))
+              : [],
           })),
-          userAnswer: userAnswer ? {
-            selectedOptions: selectedOptions.map(opt => ({
-              id: opt.id,
-              optionText: opt.optionText,
-            })),
-            isCorrect: userAnswer.isCorrect,
-            answeredAt: userAnswer.answeredAt,
-          } : null,
-          correctAnswer: {
-            correctOptions: correctOptions.map(opt => ({
-              id: opt.id,
-              optionText: opt.optionText,
-            })),
-          },
-          status: userAnswer ? (userAnswer.isCorrect ? 'Correct' : 'Wrong') : 'Not Answered',
+          createdAt: poll.createdAt,
         };
-      });
 
+        acc[eventKey].questions.push(questionData);
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Convert to array format - each event with its questions
+      const data = Object.values(groupedByEvent).map((group: any) => ({
+        event: group.event,
+        questions: group.questions
+      }));
+
+      // Return the formatted response
       return {
-        hasAttempt: true,
-        attempt: {
-          id: attempt.id,
-          isCompleted: attempt.isCompleted,
-          startedAt: attempt.createdAt,
-          completedAt: attempt.completedAt,
-        },
-        user: {
-          id: attempt.user?.id,
-          name: `${attempt.user?.firstName} ${attempt.user?.lastName}`,
-          email: attempt.user?.email
-        },
-        event: {
-          id: attempt.event?.id,
-          name: attempt.event?.name,
-        },
-        speaker: {
-          id: attempt.speaker?.id,
-          name: attempt.speaker?.name,
-          companyName: attempt.speaker?.companyName,
-          position: attempt.speaker?.position,
-          email: attempt.speaker?.email,
-          mobile: attempt.speaker?.mobile,
-          speakerProfile: attempt.speaker?.speakerProfile,
-        },
-        performance: {
-          totalQuestions: attempt.totalQuestions,
-          answeredQuestions: attempt.answeredQuestions,
-          correctAnswers: attempt.correctAnswers,
-          wrongAnswers: attempt.answeredQuestions - attempt.correctAnswers,
-          unanswered: attempt.totalQuestions - attempt.answeredQuestions,
-          scorePercentage: attempt.scorePercentage,
-          grade: this.calculateGrade(attempt.scorePercentage),
-          scoreText: `${attempt.correctAnswers}/${attempt.totalQuestions}`,
-        },
-        questionsDetails: questionsDetails,
-        summary: {
-          quizType: "Speaker Quiz",
-          status: attempt.isCompleted ? 'Completed' : 'In Progress',
-          timeTaken: attempt.completedAt && attempt.createdAt ? 
-            Math.round((new Date(attempt.completedAt).getTime() - new Date(attempt.createdAt).getTime()) / 60000) + ' minutes' : null,
+        success: true,
+        message: "Questions list retrieved successfully",
+        data: data,
+     
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get all questions list');
+      return {
+        success: false,
+        message: "Failed to retrieve questions list",
+        data: [],
+        metadata: {
+          total: 0,
+          eventId: eventId || null,
+          isAdmin: isAdmin,
+          timestamp: new Date().toISOString(),
         }
       };
-
-    } catch (error: any) {
-      this.errorHandler.logError(error, 'Get user quiz result by speaker and event');
-      this.errorHandler.handleDatabaseError(error, 'User quiz result retrieval');
     }
   }
 
-  async getAllUsersQuizResultsBySpeakerAndEvent(speakerId: string, eventId: string) {
-  try {
-    // Get all quiz attempts for specific speaker and event
-    const attempts = await this.userQuizAttemptRepository.find({
-      where: { 
-        speakerId, 
-        eventId 
-      },
-      relations: ['answers', 'event', 'speaker', 'user'],
-      order: { createdAt: 'DESC' }
-    });
-
-    if (attempts.length === 0) {
-      return {
-        hasResults: false,
-        message: 'No quiz attempts found for this speaker and event',
-        speakerInfo: null,
-        eventInfo: null,
-        totalUsers: 0,
-        completedAttempts: 0,
-        inProgressAttempts: 0,
-        results: []
-      };
-    }
-
-    // Get speaker and event info from first attempt
-    const firstAttempt = attempts[0];
-    
-    const speakerInfo = firstAttempt.speaker ? {
-      id: firstAttempt.speaker.id,
-      name: firstAttempt.speaker.name,
-      companyName: firstAttempt.speaker.companyName,
-      position: firstAttempt.speaker.position,
-      email: firstAttempt.speaker.email,
-      mobile: firstAttempt.speaker.mobile,
-      speakerProfile: firstAttempt.speaker.speakerProfile,
-    } : null;
-
-    const eventInfo = firstAttempt.event ? {
-      id: firstAttempt.event.id,
-      name: firstAttempt.event.name,
-    } : null;
-
-    // Map all user results
-    const results = attempts.map(attempt => ({
-      user: {
-        id: attempt.user?.id,
-        name: `${attempt.user?.firstName} ${attempt.user?.lastName}`,
-        email: attempt.user?.email
-      },
-      attempt: {
-        id: attempt.id,
-        isCompleted: attempt.isCompleted,
-        startedAt: attempt.createdAt,
-        completedAt: attempt.completedAt,
-      },
-      performance: {
-        totalQuestions: attempt.totalQuestions,
-        answeredQuestions: attempt.answeredQuestions,
-        correctAnswers: attempt.correctAnswers,
-        wrongAnswers: attempt.answeredQuestions - attempt.correctAnswers,
-        unanswered: attempt.totalQuestions - attempt.answeredQuestions,
-        scorePercentage: attempt.scorePercentage,
-        grade: this.calculateGrade(attempt.scorePercentage),
-        scoreText: `${attempt.correctAnswers}/${attempt.totalQuestions}`,
-      },
-      status: attempt.isCompleted ? 'Completed' : 'In Progress',
-      timeTaken: attempt.completedAt && attempt.createdAt ? 
-        Math.round((new Date(attempt.completedAt).getTime() - new Date(attempt.createdAt).getTime()) / 60000) + ' minutes' : null,
-    }));
-
-    // Calculate summary statistics
-    const completedAttempts = attempts.filter(a => a.isCompleted);
-    const totalScore = completedAttempts.reduce((sum, a) => sum + a.scorePercentage, 0);
-    const averageScore = completedAttempts.length > 0 ? Math.round(totalScore / completedAttempts.length) : 0;
-    const highestScore = completedAttempts.length > 0 ? Math.max(...completedAttempts.map(a => a.scorePercentage)) : 0;
-    const lowestScore = completedAttempts.length > 0 ? Math.min(...completedAttempts.map(a => a.scorePercentage)) : 0;
-
-    return {
-      hasResults: true,
-      speakerInfo,
-      eventInfo,
-      totalUsers: attempts.length,
-      completedAttempts: completedAttempts.length,
-      inProgressAttempts: attempts.length - completedAttempts.length,
-      summary: {
-        averageScore,
-        highestScore,
-        lowestScore,
-        averageGrade: this.calculateGrade(averageScore),
-        passedUsers: completedAttempts.filter(a => a.scorePercentage >= 60).length,
-        failedUsers: completedAttempts.filter(a => a.scorePercentage < 60).length,
-      },
-      results: results.sort((a, b) => b.performance.scorePercentage - a.performance.scorePercentage) // Sort by score descending
-    };
-
-  } catch (error: any) {
-    this.errorHandler.logError(error, 'Get all users quiz results by speaker and event');
-    return {
-      hasResults: false,
-      message: 'Error retrieving quiz results',
-      speakerInfo: null,
-      eventInfo: null,
-      totalUsers: 0,
-      completedAttempts: 0,
-      inProgressAttempts: 0,
-      results: []
-    };
-  }
-}
-
-  // =============== SIMPLIFIED QUIZ APIs ===============
-  async getQuizForSpeaker(speakerId: string, eventId: string, userId: string) {
+  // Submit Vote Answer - Updated with proper vote count logic
+  async submitVoteAnswer(voteDto: VoteDto, userId: string) {
     try {
-      // Validate event exists
-      const event = await this.eventRepository.findOne({
-        where: { id: eventId }
+      // Get poll with event relation
+      const poll = await this.pollRepository.findOne({
+        where: {
+          id: voteDto.pollId,
+          isActive: true,
+          // isLive: true,
+        },
+        relations: ['options', 'event'],
       });
-      if (!event) {
-        throw new ResourceNotFoundException('Event', eventId);
+
+      if (!poll) {
+        throw new ResourceNotFoundException('Live Poll', voteDto.pollId);
       }
 
       // Validate speaker exists
       const speaker = await this.speakerRepository.findOne({
-        where: { id: speakerId }
+        where: { id: voteDto.speakerId },
       });
       if (!speaker) {
-        throw new ResourceNotFoundException('Speaker', speakerId);
+        throw new ResourceNotFoundException('Speaker', voteDto.speakerId);
       }
 
-      // Check if user has existing incomplete attempt
-      let attempt = await this.userQuizAttemptRepository.findOne({
-        where: { 
-          eventId, 
-          speakerId, 
-          userId, 
-          isCompleted: false 
-        },
-        relations: ['answers']
+      // Get event details
+      const event = await this.eventRepository.findOne({
+        where: { id: poll.eventId },
       });
 
-      // If no attempt, create new one
-      if (!attempt) {
-        attempt = await this.createNewAttempt(eventId, speakerId, userId);
+      if (!event) {
+        throw new ResourceNotFoundException('Event', poll.eventId);
       }
 
-      // Get current question
-      const currentQuestion = await this.getCurrentQuestionForAttempt(attempt);
-
-      if (!currentQuestion) {
-        throw new ValidationException('No questions available for this speaker');
+      // Check if option exists
+      const option = poll.options.find((opt) => opt.id === voteDto.optionId);
+      if (!option) {
+        throw new ValidationException('Invalid option selected');
       }
 
-      // Get progress
-      const progress = await this.getQuizProgress(attempt);
-
-      return {
-        attemptId: attempt.id,
-        speaker: {
-          name: speaker.name,
-          company: speaker.companyName,
-          position: speaker.position,
-          profile: speaker.speakerProfile
+      // Check if user already voted for this poll AND same speaker
+      const existingVote = await this.pollVoteRepository.findOne({
+        where: {
+          pollId: voteDto.pollId,
+          userId: userId,
+          speakerId: voteDto.speakerId, // Only check for same speaker
         },
-        currentQuestion,
-        progress
-      };
-
-    } catch (error: any) {
-      if (error instanceof ResourceNotFoundException || error instanceof ValidationException) {
-        throw error;
-      }
-      this.errorHandler.logError(error, 'Get quiz for speaker');
-      this.errorHandler.handleDatabaseError(error, 'Speaker quiz retrieval');
-    }
-  }
-
-  async submitAnswerAndGetNext(submitDto: SubmitAnswerDto, userId: string) {
-    try {
-      // Early validation
-      if (!submitDto.attemptId) {
-        throw new ValidationException('attemptId is required');
-      }
-
-      if (!submitDto.questionId) {
-        throw new ValidationException('questionId is required');
-      }
-
-      if (!Array.isArray(submitDto.selectedOptions)) {
-        throw new ValidationException('selectedOptions must be an array');
-      }
-
-      if (submitDto.selectedOptions.length === 0) {
-        throw new ValidationException('At least one option must be selected');
-      }
-
-      // Get attempt with current answers
-      const attempt = await this.userQuizAttemptRepository.findOne({
-        where: { 
-          id: submitDto.attemptId, 
-          userId, 
-          isCompleted: false 
-        },
-        relations: ['answers']
       });
 
-      if (!attempt) {
-        throw new ResourceNotFoundException('Active Quiz Attempt', submitDto.attemptId);
-      }
+      let isVoteModified = false;
+      let previousOptionId = null;
+      let isNewVote = false;
 
-      // Validate question
-      const question = await this.quizQuestionRepository.findOne({
-        where: { 
-          id: submitDto.questionId,
-          eventId: attempt.eventId,
-          speakerId: attempt.speakerId,
-          isActive: true 
-        },
-        relations: ['options']
-      });
+      if (existingVote) {
+        // Same speaker + same question = UPDATE vote count
+        isVoteModified = true;
+        previousOptionId = existingVote.optionId;
 
-      if (!question) {
-        throw new ResourceNotFoundException('Quiz Question', submitDto.questionId);
-      }
-
-      // Validate options
-      const validOptionIds = question.options.map(opt => opt.id);
-      const invalidOptions = submitDto.selectedOptions.filter(optId => !validOptionIds.includes(optId));
-      
-      if (invalidOptions.length > 0) {
-        throw new ValidationException(`Invalid option IDs: ${invalidOptions.join(', ')}`);
-      }
-
-      // ✅ SAVE CURRENT ANSWER FIRST
-      await this.saveQuizAnswer(submitDto, question);
-
-      // ✅ NOW CHECK IF QUIZ IS COMPLETE
-      // Get updated attempt with all answers including the one we just saved
-      const updatedAttempt = await this.userQuizAttemptRepository.findOne({
-        where: { id: submitDto.attemptId },
-        relations: ['answers']
-      });
-
-      // ✅ FIX: Add null check
-      if (!updatedAttempt) {
-        throw new ResourceNotFoundException('Quiz Attempt', submitDto.attemptId);
-      }
-
-      // Get total questions for this speaker
-      const totalQuestions = await this.quizQuestionRepository.count({
-        where: { 
-          eventId: attempt.eventId,
-          speakerId: attempt.speakerId,
-          isActive: true 
+        // Decrease vote count from previous option
+        const previousOption = poll.options.find(
+          (opt) => opt.id === existingVote.optionId,
+        );
+        if (previousOption) {
+          previousOption.voteCount = Math.max(0, previousOption.voteCount - 1);
+          await this.pollOptionRepository.save(previousOption);
         }
-      });
 
-      const answeredQuestions = updatedAttempt.answers.length;
-
-      // ✅ CHECK IF ALL QUESTIONS ARE ANSWERED
-      if (answeredQuestions >= totalQuestions) {
-        // Quiz is complete - don't try to get next question
-        const finalResult = await this.completeQuizAutomatically(updatedAttempt);
-        
-        return {
-          saved: true,
-          nextQuestion: null,
-          isLastQuestion: true,
-          completed: true,
-          score: finalResult.score,
-          progress: finalResult.progress
-        };
-      }
-
-      // ✅ GET NEXT QUESTION ONLY IF QUIZ IS NOT COMPLETE
-      const nextQuestion = await this.getNextQuestionForAttempt(updatedAttempt);
-      
-      // ✅ FIX: Use existing getQuizProgress method
-      const progress = await this.getQuizProgress(updatedAttempt);
-
-      if (!nextQuestion) {
-        // No more questions but total count says there should be more
-        // Complete anyway
-        const finalResult = await this.completeQuizAutomatically(updatedAttempt);
-        
-        return {
-          saved: true,
-          nextQuestion: null,
-          isLastQuestion: true,
-          completed: true,
-          score: finalResult.score,
-          progress: finalResult.progress
-        };
-      }
-
-      return {
-        saved: true,
-        nextQuestion,
-        progress,
-        isLastQuestion: (answeredQuestions + 1) >= totalQuestions,
-        completed: false
-      };
-
-    } catch (error: any) {
-      if (error instanceof ResourceNotFoundException || error instanceof ValidationException) {
-        throw error;
-      }
-      this.errorHandler.logError(error, 'Submit answer and get next');
-      this.errorHandler.handleDatabaseError(error, 'Answer submission');
-    }
-  }
-
-  // =============== HELPER METHODS ===============
-
-  private async createNewAttempt(eventId: string, speakerId: string, userId: string) {
-    try {
-      // Count total questions for this speaker
-      const totalQuestions = await this.quizQuestionRepository.count({
-        where: { eventId, speakerId, isActive: true }
-      });
-
-      if (totalQuestions === 0) {
-        throw new ValidationException('No active questions found for this speaker');
-      }
-
-      // Create new attempt
-      const attempt = new UserQuizAttempt();
-      attempt.eventId = eventId;
-      attempt.speakerId = speakerId;
-      attempt.userId = userId;
-      attempt.totalQuestions = totalQuestions;
-      attempt.answeredQuestions = 0;
-      attempt.correctAnswers = 0;
-      attempt.scorePercentage = 0;
-
-      return await this.userQuizAttemptRepository.save(attempt);
-
-    } catch (error: any) {
-      this.errorHandler.logError(error, 'Create new attempt');
-      throw error;
-    }
-  }
-
-  private async getCurrentQuestionForAttempt(attempt: UserQuizAttempt) {
-    try {
-      // Get all answered question IDs
-      const answeredQuestionIds = attempt.answers?.map(a => a.questionId) || [];
-      
-      // Find first unanswered question
-      const question = await this.quizQuestionRepository.findOne({
-        where: { 
-          eventId: attempt.eventId,
-          speakerId: attempt.speakerId,
-          isActive: true,
-          ...(answeredQuestionIds.length > 0 ? { id: Not(In(answeredQuestionIds)) } : {})
-        },
-        relations: ['options'],
-        order: { createdAt: 'ASC' }
-      });
-
-      if (!question) return null;
-
-      return {
-        id: question.id,
-        text: question.question,
-        description: question.description,
-        allowMultiple: question.allowMultipleSelection,
-        options: question.options.map(opt => ({
-          id: opt.id,
-          text: opt.optionText
-        }))
-      };
-
-    } catch (error: any) {
-      this.errorHandler.logError(error, 'Get current question for attempt');
-      return null;
-    }
-  }
-
-  private async getNextQuestionForAttempt(attempt: UserQuizAttempt) {
-    try {
-      // Refresh attempt to get latest answers
-      const updatedAttempt = await this.userQuizAttemptRepository.findOne({
-        where: { id: attempt.id },
-        relations: ['answers']
-      });
-
-      if (!updatedAttempt) return null;
-
-      return await this.getCurrentQuestionForAttempt(updatedAttempt);
-
-    } catch (error: any) {
-      this.errorHandler.logError(error, 'Get next question for attempt');
-      return null;
-    }
-  }
-
-  private async saveQuizAnswer(submitDto: SubmitAnswerDto, question: QuizQuestion) {
-    try {
-      // ✅ Validate inputs
-      if (!submitDto.attemptId || !submitDto.questionId) {
-        throw new ValidationException('attemptId and questionId are required');
-      }
-
-      // Check if answer already exists
-      let userAnswer = await this.userQuizAnswerRepository.findOne({
-        where: { 
-          attemptId: submitDto.attemptId,
-          questionId: submitDto.questionId
-        }
-      });
-
-      // Calculate if answer is correct
-      const correctOptionIds = question.options
-        .filter(opt => opt.isCorrectAnswer)
-        .map(opt => opt.id);
-      
-      const isCorrect = correctOptionIds.length === submitDto.selectedOptions.length &&
-                       correctOptionIds.every(optId => submitDto.selectedOptions.includes(optId));
-
-      if (userAnswer) {
-        // Update existing answer
-        userAnswer.selectedOptionIds = submitDto.selectedOptions;
-        userAnswer.isCorrect = isCorrect;
-        userAnswer.answeredAt = new Date();
-        await this.userQuizAnswerRepository.save(userAnswer);
+        // Update existing vote
+        existingVote.optionId = voteDto.optionId;
+        existingVote.updatedAt = new Date();
+        await this.pollVoteRepository.save(existingVote);
       } else {
-        // ✅ Create new answer using create method for safety
-        const newAnswer = this.userQuizAnswerRepository.create({
-          attemptId: submitDto.attemptId,
-          questionId: submitDto.questionId,
-          selectedOptionIds: submitDto.selectedOptions,
-          isCorrect: isCorrect
-        });
+        // Different speaker OR new vote = CREATE new vote (don't affect previous counts)
+        isNewVote = true;
         
-        await this.userQuizAnswerRepository.save(newAnswer);
+        // Create new vote
+        const vote = new PollVote();
+        vote.pollId = voteDto.pollId;
+        vote.optionId = voteDto.optionId;
+        vote.userId = userId;
+        vote.speakerId = voteDto.speakerId;
+        await this.pollVoteRepository.save(vote);
       }
 
-    } catch (error: any) {
-      console.error('❌ Error saving quiz answer:', error);
-      throw new ValidationException(`Failed to save answer: ${error.message}`);
-    }
-  }
+      // Increment vote count for new option
+      option.voteCount += 1;
+      await this.pollOptionRepository.save(option);
 
-  private async getQuizProgress(attempt: UserQuizAttempt) {
-    try {
-      const answeredCount = attempt.answers?.length || 0;
-      const totalQuestions = attempt.totalQuestions || 0;
-      
-      return {
-        current: answeredCount + 1,
-        total: totalQuestions,
-        answered: answeredCount,
-        remaining: Math.max(0, totalQuestions - answeredCount)
-      };
-    } catch (error: any) {
-      return {
-        current: 1,
-        total: attempt.totalQuestions || 0,
-        answered: 0,
-        remaining: attempt.totalQuestions || 0
-      };
-    }
-  }
-
-  private async completeQuizAutomatically(attempt: UserQuizAttempt) {
-    try {
-      // Get all answers for final calculation
-      const allAnswers = await this.userQuizAnswerRepository.find({
-        where: { attemptId: attempt.id }
+      // Get updated poll with results
+      const updatedPoll = await this.pollRepository.findOne({
+        where: { id: voteDto.pollId },
+        relations: ['options'],
       });
 
-      const correctAnswers = allAnswers.filter(a => a.isCorrect).length;
-      const totalQuestions = attempt.totalQuestions;
-      const answeredQuestions = allAnswers.length;
-      
-      // ✅ Calculate percentage safely
-      const percentage = totalQuestions > 0 ? 
-        Math.round((correctAnswers / totalQuestions) * 100) : 0;
-      
-      // Update attempt as completed
-      await this.userQuizAttemptRepository.update(
-        { id: attempt.id },
-        {
-          isCompleted: true,
-          completedAt: new Date(),
-          answeredQuestions: answeredQuestions,
-          correctAnswers: correctAnswers,
-          scorePercentage: percentage
-        }
+      if (!updatedPoll) {
+        throw new ResourceNotFoundException('Poll', voteDto.pollId);
+      }
+
+      const totalVotes = updatedPoll.options.reduce(
+        (sum, opt) => sum + opt.voteCount,
+        0,
+      );
+
+      // Get user details
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      // Determine message based on vote type
+      let message = 'Vote submitted successfully';
+      if (isVoteModified) {
+        message = 'Vote updated successfully for same speaker';
+      } else if (isNewVote) {
+        message = 'New vote submitted';
+      }
+
+      return {
+        success: true,
+        message: message,
+        poll: {
+          id: updatedPoll.id,
+          question: updatedPoll.question,
+          totalVotes: totalVotes,
+          speakerId: voteDto.speakerId,
+          eventId: poll.eventId,
+          options: updatedPoll.options.map((opt) => {
+            const percentage =
+              totalVotes > 0
+                ? Math.round((opt.voteCount / totalVotes) * 100)
+                : 0;
+            return {
+              id: opt.id,
+              optionText: opt.optionText,
+              voteCount: opt.voteCount,
+              percentage: percentage,
+            };
+          }),
+        },
+        userVote: {
+          userId: userId,
+          optionId: voteDto.optionId,
+          speakerId: voteDto.speakerId,
+          eventId: poll.eventId,
+          isModified: isVoteModified,
+          isNewVote: isNewVote,
+          previousOptionId: previousOptionId,
+          votedAt: existingVote ? existingVote.updatedAt : new Date(),
+          user: user
+            ? {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                mobile: user.mobile,
+                fullName: `${user.firstName} ${user.lastName}`.trim(),
+              }
+            : null,
+        },
+        event: {
+          id: event.id,
+          name: event.name,
+          // Add other event fields as needed
+        },
+        speaker: {
+          id: speaker.id,
+          name: speaker.name,
+          email: speaker.email,
+        },
+        voteDetails: {
+          selectedOption: option.optionText,
+          pollQuestion: updatedPoll.question,
+          eventName: event.name,
+          speakerName: speaker.name,
+          voteType: isVoteModified ? 'updated' : 'new',
+        },
+      };
+    } catch (error: any) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ValidationException
+      ) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Submit vote answer');
+      this.errorHandler.handleDatabaseError(error, 'Vote submission');
+    }
+  }
+//test
+  // Get User's Vote for a Poll with User Details
+  async getUserVote(pollId: string, userId: string) {
+    try {
+      const vote = await this.pollVoteRepository.findOne({
+        where: {
+          pollId: pollId,
+          userId: userId,
+        },
+      });
+
+      if (!vote) {
+        return {
+          hasVoted: false,
+          userVote: null,
+        };
+      }
+
+      // Get user details
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      return {
+        hasVoted: true,
+        userVote: {
+          userId: vote.userId,
+          optionId: vote.optionId,
+          votedAt: vote.createdAt,
+          updatedAt: vote.updatedAt,
+          user: user
+            ? {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                mobile: user.mobile,
+                fullName: `${user.firstName} ${user.lastName}`.trim(),
+              }
+            : null,
+        },
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get user vote');
+      return {
+        hasVoted: false,
+        userVote: null,
+      };
+    }
+  }
+
+
+  // Get Poll by ID
+  async getPollById(id: string) {
+    try {
+      const poll = await this.pollRepository.findOne({
+        where: { id },
+        relations: ['options', 'event', 'speaker', 'createdBy'],
+      });
+
+      if (!poll) {
+        throw new ResourceNotFoundException('Poll', id);
+      }
+
+      const totalVotes = poll.options.reduce(
+        (sum, opt) => sum + opt.voteCount,
+        0,
       );
 
       return {
-        score: {
-          correct: correctAnswers,
-          total: totalQuestions,
-          answered: answeredQuestions,
-          percentage: percentage,
-          grade: this.calculateGrade(percentage)
-        },
-        progress: {
-          current: totalQuestions,
-          total: totalQuestions,
-          answered: answeredQuestions,
-          remaining: 0
-        }
-      };
-
-    } catch (error: any) {
-      console.error('❌ Error completing quiz:', error);
-      throw new ValidationException(`Failed to complete quiz: ${error.message}`);
-    }
-  }
-
-  // Create External Poll
-  async createExternalPoll(createDto: {
-    question: string;
-    description?: string;
-    externalUrl: string;
-    platform: ExternalPlatform;
-    eventId: string;
-    speakerId?: string;
-    createdById: string;
-  }) {
-    try {
-      // Validate event exists
-      const event = await this.eventRepository.findOne({
-        where: { id: createDto.eventId }
-      });
-      if (!event) {
-        throw new ResourceNotFoundException('Event', createDto.eventId);
-      }
-
-      // Speaker validation
-      if (createDto.speakerId) {
-        const speaker = await this.speakerRepository.findOne({
-          where: { id: createDto.speakerId }
-        });
-        if (!speaker) {
-          throw new ResourceNotFoundException('Speaker', createDto.speakerId);
-        }
-      }
-
-      // Create external poll question
-      const question = new QuizQuestion();
-      question.question = createDto.question;
-      question.description = createDto.description;
-      question.eventId = createDto.eventId;
-      question.speakerId = createDto.speakerId;
-      question.createdById = createDto.createdById;
-      question.pollType = PollType.EXTERNAL;
-      question.externalUrl = createDto.externalUrl;
-      question.platform = createDto.platform;
-      question.allowMultipleSelection = false; // Not applicable for external
-      question.hasCorrectAnswer = false; // External platform handles this
-      question.showCorrectAnswer = false;
-
-      const savedQuestion = await this.quizQuestionRepository.save(question);
-
-      return {
-        ...savedQuestion,
-        options: [], // External polls don't have options in our system
+        id: poll.id,
+        question: poll.question,
+        description: poll.description,
+        eventId: poll.eventId,
+       
+        isActive: poll.isActive,
+        isLive: poll.isLive,
+        createdAt: poll.createdAt,
+        updatedAt: poll.updatedAt,
+        event: poll.event
+          ? {
+              id: poll.event.id,
+              name: poll.event.name,
+            }
+          : null,
+       
+        createdBy: poll.createdBy
+          ? {
+              id: poll.createdBy.id,
+              name: `${poll.createdBy.firstName} ${poll.createdBy.lastName}`,
+            }
+          : null,
+        options: poll.options.map((option) => {
+          const percentage =
+            totalVotes > 0
+              ? Math.round((option.voteCount / totalVotes) * 100)
+              : 0;
+          return {
+            id: option.id,
+            optionText: option.optionText,
+            voteCount: option.voteCount,
+            percentage: percentage,
+          };
+        }),
+        totalVotes: totalVotes,
       };
     } catch (error: any) {
-      if (error instanceof ResourceNotFoundException || error instanceof ValidationException) {
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
-      this.errorHandler.logError(error, 'Create external poll');
-      this.errorHandler.handleDatabaseError(error, 'External poll creation');
+      this.errorHandler.logError(error, 'Get poll by ID');
+      this.errorHandler.handleDatabaseError(error, 'Poll retrieval');
     }
   }
 
-  // Get Mixed Polls (Internal + External) by Speaker and Event
-  async getMixedPollsBySpeakerAndEvent(speakerId: string, eventId: string) {
+  // Get All Polls (Admin)
+  async getAllPolls(eventId?: string, speakerId?: string) {
     try {
-      const questions = await this.quizQuestionRepository.find({
-        where: { 
-          speakerId: speakerId,
-          eventId: eventId 
-        },
-        relations: ['options', 'event', 'createdBy', 'speaker'],
-        order: { createdAt: 'DESC' },
+      const whereConditions: any = {};
+
+      if (eventId) whereConditions.eventId = eventId;
+      if (speakerId) whereConditions.speakerId = speakerId;
+
+      const polls = await this.pollRepository.find({
+        where: whereConditions,
+        relations: ['options', 'event', 'speaker', 'createdBy'],
+     
       });
 
-      // If no questions found, return empty structure
-      if (!questions || questions.length === 0) {
+      return polls.map((poll) => {
+        const totalVotes = poll.options.reduce(
+          (sum, option) => sum + option.voteCount,
+          0,
+        );
+
         return {
-          speakerInfo: null,
-          eventInfo: null,
-          totalPolls: 0,
-          internalPolls: 0,
-          externalPolls: 0,
-          polls: []
-        };
-      }
-
-      // Speaker and event info from first question
-      const firstQuestion = questions[0];
-      
-      const speakerInfo = firstQuestion.speaker ? {
-        id: firstQuestion.speaker.id,
-        name: firstQuestion.speaker.name,
-        companyName: firstQuestion.speaker.companyName,
-        position: firstQuestion.speaker.position,
-        email: firstQuestion.speaker.email,
-        mobile: firstQuestion.speaker.mobile,
-        location: firstQuestion.speaker.location,
-        speakerProfile: firstQuestion.speaker.speakerProfile,
-      } : null;
-
-      const eventInfo = firstQuestion.event ? {
-        id: firstQuestion.event.id,
-        name: firstQuestion.event.name,
-      } : null;
-
-      // Separate internal and external polls
-      const internalPolls = questions.filter(q => q.pollType === PollType.INTERNAL);
-      const externalPolls = questions.filter(q => q.pollType === PollType.EXTERNAL);
-
-      // Format polls data
-      const pollsData = questions.map(question => {
-        const baseData = {
-          id: question.id,
-          question: question.question,
-          description: question.description,
-          pollType: question.pollType,
-          isActive: question.isActive,
-          isLive: question.isLive,
-          createdAt: question.createdAt,
-          createdBy: {
-            id: question.createdBy?.id,
-            name: `${question.createdBy?.firstName} ${question.createdBy?.lastName}`,
-          },
-        };
-
-        if (question.pollType === PollType.INTERNAL) {
-          return {
-            ...baseData,
-            allowMultipleSelection: question.allowMultipleSelection,
-            hasCorrectAnswer: question.hasCorrectAnswer,
-            showCorrectAnswer: question.showCorrectAnswer,
-            options: question.options.map(option => ({
+          id: poll.id,
+          question: poll.question,
+          description: poll.description,
+        
+          isActive: poll.isActive,
+          isLive: poll.isLive,
+          createdAt: poll.createdAt,
+          event: poll.event
+            ? {
+                id: poll.event.id,
+                name: poll.event.name,
+              }
+            : null,
+        
+          createdBy: poll.createdBy
+            ? {
+                id: poll.createdBy.id,
+                name: `${poll.createdBy.firstName} ${poll.createdBy.lastName}`,
+              }
+            : null,
+          options: poll.options.map((option) => {
+            const percentage =
+              totalVotes > 0
+                ? Math.round((option.voteCount / totalVotes) * 100)
+                : 0;
+            return {
               id: option.id,
               optionText: option.optionText,
-              isCorrectAnswer: option.isCorrectAnswer,
-            })),
-            totalOptions: question.options.length,
-            correctAnswers: question.options.filter(opt => opt.isCorrectAnswer).length,
-          };
-        } else {
-          return {
-            ...baseData,
-            externalUrl: question.externalUrl,
-            platform: question.platform,
-          };
-        }
+              voteCount: option.voteCount,
+              percentage: percentage,
+            };
+          }),
+          totalVotes: totalVotes,
+        };
       });
-
-      return {
-        speakerInfo,
-        eventInfo,
-        totalPolls: questions.length,
-        internalPolls: internalPolls.length,
-        externalPolls: externalPolls.length,
-        polls: pollsData
-      };
-
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get mixed polls by speaker and event');
-      return {
-        speakerInfo: null,
-        eventInfo: null,
-        totalPolls: 0,
-        internalPolls: 0,
-        externalPolls: 0,
-        polls: []
-      };
+      this.errorHandler.logError(error, 'Get all polls');
+      return [];
     }
   }
 
-  // Toggle Poll Live Status
-  async togglePollLive(questionId: string) {
+
+
+  // Toggle Poll Live Status (Admin)
+  async togglePollLive(pollId: string) {
     try {
-      const question = await this.quizQuestionRepository.findOne({
-        where: { id: questionId }
+      const poll = await this.pollRepository.findOne({
+        where: { id: pollId },
       });
 
-      if (!question) {
-        throw new ResourceNotFoundException('Poll', questionId);
+      if (!poll) {
+        throw new ResourceNotFoundException('Poll', pollId);
       }
 
-      question.isLive = !question.isLive;
-      await this.quizQuestionRepository.save(question);
+      poll.isLive = !poll.isLive;
+      await this.pollRepository.save(poll);
 
       return {
-        id: question.id,
-        isLive: question.isLive,
-        pollType: question.pollType,
-        message: question.isLive ? 'Poll is now live' : 'Poll is no longer live'
+        id: poll.id,
+        isLive: poll.isLive,
+        message: poll.isLive ? 'Poll is now live' : 'Poll is no longer live',
       };
     } catch (error: any) {
       if (error instanceof ResourceNotFoundException) {
@@ -1195,64 +599,302 @@ export class PollingService {
     }
   }
 
-  // Get Live Polls for Event/Speaker
-  async getLivePolls(eventId?: string, speakerId?: string) {
+  // Update Poll (Admin)
+  async updatePoll(id: string, updateDto: UpdatePollDto) {
     try {
-      const whereConditions: any = { 
-        isActive: true, 
-        isLive: true 
-      };
-
-      if (eventId) whereConditions.eventId = eventId;
-      if (speakerId) whereConditions.speakerId = speakerId;
-
-      const livePolls = await this.quizQuestionRepository.find({
-        where: whereConditions,
-        relations: ['options', 'event', 'speaker'],
-        order: { createdAt: 'DESC' },
+      const poll = await this.pollRepository.findOne({
+        where: { id },
       });
 
-      return livePolls.map(poll => {
-        const baseData = {
+      if (!poll) {
+        throw new ResourceNotFoundException('Poll', id);
+      }
+
+      Object.assign(poll, updateDto);
+      const savedPoll = await this.pollRepository.save(poll);
+
+      return savedPoll;
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Update poll');
+      this.errorHandler.handleDatabaseError(error, 'Poll update');
+    }
+  }
+
+  // Delete Poll (Admin)
+  async deletePoll(id: string) {
+    try {
+      const poll = await this.pollRepository.findOne({
+        where: { id },
+      });
+
+      if (!poll) {
+        throw new ResourceNotFoundException('Poll', id);
+      }
+
+      await this.pollRepository.remove(poll);
+
+      return { message: 'Poll deleted successfully' };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Delete poll');
+      this.errorHandler.handleDatabaseError(error, 'Poll deletion');
+    }
+  }
+
+
+
+  // Get All Votes by Event ID - Enhanced with detailed user, speaker, and question information
+  async getAllVotesByEventId(eventId: string, isAdmin: boolean = false) {
+    try {
+      // Get all polls for this event
+      const polls = await this.pollRepository.find({
+        where: {
+          eventId: eventId,
+          isActive: true,
+        },
+        relations: ['options', 'event'],
+      });
+
+      if (polls.length === 0) {
+        return {
+          success: true,
+          message: "No polls found for this event",
+          data: [],
+          metadata: {
+            eventId: eventId,
+            totalPolls: 0,
+            totalVotes: 0,
+            isAdmin: isAdmin,
+            timestamp: new Date().toISOString(),
+          }
+        };
+      }
+
+      // Get all votes for these polls with speaker information
+      const pollIds = polls.map((poll) => poll.id);
+      const allVotes = await this.pollVoteRepository.find({
+        where: {
+          pollId: In(pollIds),
+        },
+        relations: ['user', 'poll', 'option'],
+      });
+
+      // Get event details
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      // Get all speakers involved in votes
+      const speakerIds = [...new Set(allVotes.map(vote => vote.speakerId).filter(Boolean))];
+      const speakers = await this.speakerRepository.find({
+        where: { id: In(speakerIds) },
+      });
+
+      // Group votes by poll with detailed information
+      const pollsWithVotes = polls.map((poll) => {
+        const pollVotes = allVotes.filter((vote) => vote.pollId === poll.id);
+        const totalVotes = poll.options.reduce((sum, opt) => sum + opt.voteCount, 0);
+
+        // Group votes by speaker
+        const votesBySpeaker = pollVotes.reduce((acc: Record<string, any[]>, vote) => {
+          const speakerId = vote.speakerId || 'unknown';
+          if (!acc[speakerId]) {
+            acc[speakerId] = [];
+          }
+          acc[speakerId].push(vote);
+          return acc;
+        }, {} as Record<string, any[]>);
+
+        return {
           id: poll.id,
           question: poll.question,
           description: poll.description,
-          pollType: poll.pollType,
-          eventInfo: poll.event ? {
-            id: poll.event.id,
-            name: poll.event.name,
-          } : null,
-          speakerInfo: poll.speaker ? {
-            id: poll.speaker.id,
-            name: poll.speaker.name,
-            companyName: poll.speaker.companyName,
-            position: poll.speaker.position,
-          } : null,
-          isLive: poll.isLive,
+          totalVotes: totalVotes,
+          totalVoters: pollVotes.length,
           createdAt: poll.createdAt,
-        };
-
-        if (poll.pollType === PollType.INTERNAL) {
-          return {
-            ...baseData,
-            allowMultipleSelection: poll.allowMultipleSelection,
-            options: poll.options.map(option => ({
+          options: poll.options.map((option) => {
+            const optionVotes = pollVotes.filter((vote) => vote.optionId === option.id);
+            const percentage = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
+            
+            return {
               id: option.id,
               optionText: option.optionText,
-              // Don't show correct answers in live poll
-            })),
-          };
-        } else {
-          return {
-            ...baseData,
-            externalUrl: poll.externalUrl,
-            platform: poll.platform,
+              voteCount: option.voteCount,
+              percentage: percentage,
+              voters: isAdmin ? optionVotes.map((vote) => {
+                const speaker = speakers.find(s => s.id === vote.speakerId);
+                return {
+                  userId: vote.userId,
+                  speakerId: vote.speakerId,
+                  speaker: speaker ? {
+                    id: speaker.id,
+                    name: speaker.name,
+                    email: speaker.email,
+                  } : null,
+                  user: vote.user ? {
+                    id: vote.user.id,
+                    firstName: vote.user.firstName,
+                    lastName: vote.user.lastName,
+                    email: vote.user.email,
+                    mobile: vote.user.mobile,
+                    fullName: `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+                  } : null,
+                  votedAt: vote.createdAt,
+                  selectedOption: vote.option ? {
+                    id: vote.option.id,
+                    optionText: vote.option.optionText,
+                  } : null,
+                };
+              }) : [],
+            };
+          }),
+          votesBySpeaker: isAdmin ? Object.keys(votesBySpeaker).map(speakerId => {
+            const speaker = speakers.find(s => s.id === speakerId);
+            const speakerVotes = votesBySpeaker[speakerId];
+            
+            return {
+              speaker: speaker ? {
+                id: speaker.id,
+                name: speaker.name,
+                email: speaker.email,
+              } : { id: speakerId, name: 'Unknown Speaker' },
+              votes: speakerVotes.map((vote: any) => ({
+                userId: vote.userId,
+                user: vote.user ? {
+                  id: vote.user.id,
+                  firstName: vote.user.firstName,
+                  lastName: vote.user.lastName,
+                  email: vote.user.email,
+                  mobile: vote.user.mobile,
+                  fullName: `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+                } : null,
+                optionId: vote.optionId,
+                selectedOption: vote.option ? {
+                  id: vote.option.id,
+                  optionText: vote.option.optionText,
+                } : null,
+                votedAt: vote.createdAt,
+                updatedAt: vote.updatedAt,
+              })),
+              totalVotesBySpeaker: speakerVotes.length,
+            };
+          }) : [],
+          allVotes: isAdmin ? pollVotes.map((vote) => {
+            const speaker = speakers.find(s => s.id === vote.speakerId);
+            return {
+              userId: vote.userId,
+              speakerId: vote.speakerId,
+              optionId: vote.optionId,
+              votedAt: vote.createdAt,
+              updatedAt: vote.updatedAt,
+              user: vote.user ? {
+                id: vote.user.id,
+                firstName: vote.user.firstName,
+                lastName: vote.user.lastName,
+                email: vote.user.email,
+                mobile: vote.user.mobile,
+                fullName: `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+              } : null,
+              speaker: speaker ? {
+                id: speaker.id,
+                name: speaker.name,
+                email: speaker.email,
+              } : null,
+              selectedOption: vote.option ? {
+                id: vote.option.id,
+                optionText: vote.option.optionText,
+              } : null,
+            };
+          }) : [],
+        };
+      });
+
+      // Create summary by user and speaker
+      const userVoteSummary = isAdmin ? allVotes.reduce((acc: Record<string, any>, vote) => {
+        const key = `${vote.userId}-${vote.speakerId}`;
+        if (!acc[key]) {
+          const foundSpeaker = speakers.find(s => s.id === vote.speakerId);
+          acc[key] = {
+            userId: vote.userId,
+            speakerId: vote.speakerId,
+            user: vote.user ? {
+              id: vote.user.id,
+              firstName: vote.user.firstName,
+              lastName: vote.user.lastName,
+              email: vote.user.email,
+              mobile: vote.user.mobile,
+              fullName: `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+            } : null,
+            speaker: foundSpeaker ? {
+              id: foundSpeaker.id,
+              name: foundSpeaker.name,
+              email: foundSpeaker.email,
+            } : null,
+            votes: [],
           };
         }
-      });
+        acc[key].votes.push({
+          pollId: vote.pollId,
+          question: vote.poll?.question,
+          optionId: vote.optionId,
+          selectedOption: vote.option ? {
+            id: vote.option.id,
+            optionText: vote.option.optionText,
+          } : null,
+          votedAt: vote.createdAt,
+        });
+        return acc;
+      }, {} as Record<string, any>) : {};
+
+      return {
+        success: true,
+        message: "Votes retrieved successfully",
+        data: {
+          event: event ? {
+            id: event.id,
+            name: event.name,
+          } : null,
+          polls: pollsWithVotes,
+          userVoteSummary: isAdmin ? Object.values(userVoteSummary) : [],
+          summary: {
+            totalPolls: polls.length,
+            totalVotes: allVotes.length,
+            uniqueVoters: new Set(allVotes.map(vote => vote.userId)).size,
+            uniqueSpeakers: speakers.length,
+            speakers: speakers.map(speaker => ({
+              id: speaker.id,
+              name: speaker.name,
+              email: speaker.email,
+            })),
+          }
+        },
+        metadata: {
+          eventId: eventId,
+          totalPolls: polls.length,
+          totalVotes: allVotes.length,
+          isAdmin: isAdmin,
+          timestamp: new Date().toISOString(),
+        }
+      };
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get live polls');
-      return [];
+      this.errorHandler.logError(error, 'Get all votes by event ID');
+      return {
+        success: false,
+        message: "Failed to retrieve votes",
+        data: [],
+        metadata: {
+          eventId: eventId,
+          totalPolls: 0,
+          totalVotes: 0,
+          isAdmin: isAdmin,
+          timestamp: new Date().toISOString(),
+        }
+      };
     }
   }
-} 
+}

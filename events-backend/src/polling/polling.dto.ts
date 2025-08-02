@@ -1,19 +1,15 @@
 // src/polling/polling.dto.ts
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested, ArrayMinSize, IsEnum, IsUrl } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested, ArrayMinSize, IsEnum, IsUrl, IsNumber } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { PollType, ExternalPlatform } from './polling.entity';
+import { ExternalPlatform } from './polling.entity';
 
-export class QuizOptionDto {
+export class PollOptionDto {
   @IsNotEmpty()
   @IsString()
   optionText!: string;
-
-  @IsNotEmpty()
-  @IsBoolean()
-  isCorrectAnswer!: boolean;
 }
 
-export class CreateQuizQuestionDto {
+export class CreatePollDto {
   @IsNotEmpty()
   @IsString()
   question!: string;
@@ -26,32 +22,14 @@ export class CreateQuizQuestionDto {
   @IsUUID()
   eventId!: string;
 
-  // नया field add करें speaker के लिए
-  @IsOptional()
-  @IsUUID()
-  speakerId?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  allowMultipleSelection?: boolean;
-
-  @IsOptional()
-  pollType?: PollType;
-
-  @IsOptional()
-  externalUrl?: string;
-
-  @IsOptional()
-  platform?: ExternalPlatform;
-
   @IsNotEmpty()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => QuizOptionDto)
-  options!: QuizOptionDto[];
+  @Type(() => PollOptionDto)
+  options!: PollOptionDto[];
 }
 
-export class UpdateQuizQuestionDto {
+export class UpdatePollDto {
   @IsOptional()
   @IsString()
   question?: string;
@@ -66,30 +44,49 @@ export class UpdateQuizQuestionDto {
 
   @IsOptional()
   @IsBoolean()
-  allowMultipleSelection?: boolean;
-
-  // नया field add करें speaker update के लिए
-  @IsOptional()
-  @IsUUID()
-  speakerId?: string;
+  isLive?: boolean;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => QuizOptionDto)
-  options?: QuizOptionDto[];
+  @IsNumber()
+  questionOrder?: number;
 }
 
-// StartQuizDto में भी speakerId add करें
-export class StartQuizDto {
+export class VoteDto {
+  @IsNotEmpty()
+  @IsUUID()
+  pollId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  optionId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  speakerId!: string; // Add speakerId for voting
+}
+
+export class StartPollSessionDto {
   @IsNotEmpty()
   @IsUUID()
   eventId!: string;
 
-  // Remove @IsOptional - speakerId is now required
+  @IsOptional()
+  @IsUUID()
+  speakerId?: string;
+}
+
+export class SubmitVoteAndGetNextDto {
   @IsNotEmpty()
   @IsUUID()
-  speakerId!: string;
+  sessionId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  pollId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  optionId!: string;
 }
 
 export class QuizAnswerDto {
