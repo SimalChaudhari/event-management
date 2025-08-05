@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Row, Col, Card, Badge, Button, Tab, Nav, Alert, Container, Modal } from 'react-bootstrap';
 import { exhibitorById } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
-import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { id } = useParams();
 
-    const [exhibitor, setExhibitor] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    // Get exhibitor data from Redux store
+    const { exhibitorById: exhibitorData, loading, error } = useSelector(state => state.exhibitor);
+    const exhibitor = exhibitorData?.data;
 
-    // Zoomable functionality states - Events pattern के अनुसार exact same
+    // Image modal states for zoomable functionality
     const [showImageModal, setShowImageModal] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImageType, setCurrentImageType] = useState('');
@@ -25,25 +24,14 @@ const ViewExhibitorPage = () => {
     useEffect(() => {
         if (id) {
             loadExhibitorData();
-        } else {
-            setError('Exhibitor ID not found');
-            setLoading(false);
         }
     }, [id]);
 
     const loadExhibitorData = async () => {
         try {
-            setLoading(true);
-            const response = await dispatch(exhibitorById(id));
-            if (response && response.data) {
-                setExhibitor(response.data);
-            } else {
-                setError('Exhibitor not found');
-            }
+            await dispatch(exhibitorById(id));
         } catch (error) {
-            setError('Failed to load exhibitor data');
-        } finally {
-            setLoading(false);
+            console.error('Failed to load exhibitor data:', error);
         }
     };
 
@@ -55,7 +43,7 @@ const ViewExhibitorPage = () => {
         navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
     };
 
-    // Image Modal Functions - Events pattern के अनुसार exact same
+    // Image modal functions for zoomable functionality
     const getImageSrc = (image) => {
         if (typeof image === 'string') {
             if (image.startsWith('http')) {
@@ -109,6 +97,7 @@ const ViewExhibitorPage = () => {
         setShowImageModal(true);
     };
 
+    // Loading state
     if (loading) {
         return (
             <div className="text-center p-5">
@@ -119,6 +108,7 @@ const ViewExhibitorPage = () => {
         );
     }
 
+    // Error state
     if (error) {
         return (
             <Container fluid>
@@ -135,6 +125,7 @@ const ViewExhibitorPage = () => {
         );
     }
 
+    // No exhibitor found
     if (!exhibitor) {
         return (
             <Container fluid>
@@ -151,6 +142,7 @@ const ViewExhibitorPage = () => {
         );
     }
 
+    // Render promotional offers section
     const renderPromotionalOffers = () => {
         if (!exhibitor.promotionalOffers || exhibitor.promotionalOffers.length === 0) {
             return <p className="text-muted">No promotional offers available.</p>;
@@ -187,6 +179,7 @@ const ViewExhibitorPage = () => {
         );
     };
 
+    // Render flyers section
     const renderFlyers = () => {
         if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
             return <p className="text-muted">No flyers available.</p>;
@@ -215,6 +208,7 @@ const ViewExhibitorPage = () => {
         );
     };
 
+    // Render event images section
     const renderEventImages = () => {
         if (!exhibitor.eventImages || exhibitor.eventImages.length === 0) {
             return <p className="text-muted">No event images available.</p>;
@@ -243,6 +237,7 @@ const ViewExhibitorPage = () => {
         );
     };
 
+    // Render documents section
     const renderDocuments = () => {
         if (!exhibitor.documents || exhibitor.documents.length === 0) {
             return <p className="text-muted">No documents available.</p>;
@@ -278,6 +273,7 @@ const ViewExhibitorPage = () => {
         );
     };
 
+    // Render exhibitor statistics
     const renderExhibitorStats = () => (
         <div className="exhibitor-stats">
             <div className="text-center p-3 bg-light rounded">
@@ -303,7 +299,7 @@ const ViewExhibitorPage = () => {
         </div>
     );
 
-    // Events pattern के अनुसार exact same modal
+    // Render image modal for zoom functionality
     const renderImageModal = () => {
         if (!currentImages || currentImages.length === 0) return null;
 
@@ -331,7 +327,7 @@ const ViewExhibitorPage = () => {
                 style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
             >
                 <Modal.Body>
-                    {/* Close Button - Events pattern के अनुसार exact same */}
+                    {/* Close button */}
                     <Button
                         variant="light"
                         size="sm"
@@ -352,7 +348,7 @@ const ViewExhibitorPage = () => {
                         <i className="fas fa-times"></i>
                     </Button>
 
-                    {/* Download Button - Events pattern के अनुसार exact same */}
+                    {/* Download button */}
                     <Button
                         variant="light"
                         size="sm"
@@ -378,7 +374,7 @@ const ViewExhibitorPage = () => {
                         <i className="fas fa-download"></i>
                     </Button>
 
-                    {/* Navigation Arrows - Events pattern के अनुसार exact same */}
+                    {/* Navigation arrows */}
                     {currentImages.length > 1 && (
                         <>
                             <Button
@@ -425,7 +421,7 @@ const ViewExhibitorPage = () => {
                         </>
                     )}
 
-                    {/* Image Counter - Events pattern के अनुसार exact same */}
+                    {/* Image counter */}
                     <div
                         style={{
                             position: 'fixed',
@@ -444,7 +440,7 @@ const ViewExhibitorPage = () => {
                         {currentImageIndex + 1} / {currentImages.length}
                     </div>
 
-                    {/* Image Container - Events pattern के अनुसार exact same */}
+                    {/* Image container */}
                     <div
                         style={{
                             display: 'flex',
@@ -490,10 +486,7 @@ const ViewExhibitorPage = () => {
                                         <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                         Back
                                     </Button>
-                                    <Button variant="primary" onClick={handleEdit}>
-                                        <i className="feather icon-edit me-1"></i>
-                                        Edit
-                                    </Button>
+                                 
                                 </div>
                             </div>
                         </div>
@@ -598,7 +591,7 @@ const ViewExhibitorPage = () => {
                 </div>
             </div>
 
-            {/* Image Zoom Modal - Events pattern के अनुसार exact same */}
+            {/* Image Zoom Modal */}
             {renderImageModal()}
         </Container>
     );

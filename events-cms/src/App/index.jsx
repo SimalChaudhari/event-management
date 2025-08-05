@@ -2,6 +2,8 @@ import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, BrowserRouter } from 'react-router-dom';
 import {  useSelector, useDispatch } from 'react-redux';
 import Loader from './layout/Loader';
+import GlobalLoader from '../components/GlobalLoader';
+import GlobalError from '../components/GlobalError';
 import routesOnePage from '../route';
 import routes from '../routes';
 import Config from '../config';
@@ -17,14 +19,15 @@ const App = () => {
         dispatch(checkAuthStatus());
     }, [dispatch]);
 
-
     if (loading) {
+        console.log("loading", loading);
         return <Loader />;
     }
 
     return (
         <BrowserRouter basename={Config.basename}>
             <Suspense fallback={<Loader />}>
+                <GlobalLoader />
                 <Routes>
                     {/* Public Routes */}
                     {routesOnePage.map((route, index) =>

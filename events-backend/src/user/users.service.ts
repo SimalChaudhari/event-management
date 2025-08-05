@@ -26,7 +26,7 @@ export class UserService {
       const where = role ? { role } : {};
       const users = await this.userRepository.find({ 
         where,
-        order: { createdAt: 'DESC' },
+        order: { updatedAt: 'DESC' },
       });
       return users.map(({ password, ...rest }) => rest);
     } catch (error) {

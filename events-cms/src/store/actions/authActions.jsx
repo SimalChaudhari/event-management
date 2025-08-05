@@ -1,10 +1,20 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import { AUTH_DATA } from "../constants/actionTypes";
+import { AUTH_DATA, AUTH_LOADING, AUTH_ERROR } from "../constants/actionTypes";
 import { CACHE_CONFIG } from "../../configs/env";
+
+// Helper function to dispatch loading state
+const setLoading = (dispatch, loading) => {
+    dispatch({
+        type: AUTH_LOADING,
+        payload: loading
+    });
+};
+
 
 export const login = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
         const response = await axiosInstance.post('auth/admin', data);
         const { accessToken, refreshToken, user } = response.data;
         
@@ -24,26 +34,32 @@ export const login = (data) => async (dispatch) => {
 
     } catch (error) {
         // Handle specific error cases
+        let errorMessage = 'Network error. Please check your connection.';
+        
         if (error.response) {
             switch (error.response.status) {
                 case 401:
-                    toast.error('Invalid email or password');
+                    errorMessage = 'Invalid email or password';
                     break;
                 case 400:
-                    toast.error(error.response.data.message || 'Please check your credentials');
+                    errorMessage = error.response.data.message || 'Please check your credentials';
                     break;
                 default:
-                    toast.error(error.response.data.message || 'Login failed. Please try again.');
+                    errorMessage = error.response.data.message || 'Login failed. Please try again.';
             }
-        } else {
-            toast.error('Network error. Please check your connection.');
         }
+        
+        toast.error(errorMessage);
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const logout = () => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         // Clear localStorage
         localStorage.removeItem('userData');
         localStorage.removeItem('token');
@@ -61,120 +77,165 @@ export const logout = () => async (dispatch) => {
         return { success: true };
 
     } catch (error) {
-        toast.error('Error logging out');
+        const errorMessage = 'Error logging out';
+        toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const forgetPassword = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('/auth/forget', data);
        if (response.data) {
             toast.success(response.data.message);
             return { success: true };
         } else {
-            toast.error(response.data.message || 'Failed to send reset link');
+            const errorMessage = response.data.message || 'Failed to send reset link';
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
         toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const verifyOtp = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('auth/verify-otp', data);
         if (response.data.success) {
             toast.success(response.data.message || 'OTP verified successfully');
             return { success: true };
         } else {
-            toast.error(response.data.message);
+            const errorMessage = response.data.message;
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
         toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const verifyEmailOTP = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('auth/verify-email-otp', data);
         if (response.data.success) {
             toast.success(response.data.message || 'Email verified successfully');
             return { success: true };
         } else {
-            toast.error(response.data.message);
+            const errorMessage = response.data.message;
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
         toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const resendVerificationOTP = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('auth/resend-verification-otp', data);
         if (response.data.success) {
             toast.success(response.data.message || 'OTP sent successfully');
             return { success: true };
         } else {
-            toast.error(response.data.message);
+            const errorMessage = response.data.message;
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
         toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const resetPassword = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('/auth/reset', data);
         if (response.data) {
             toast.success(response.data.message || 'Password reset successfully');
             return { success: true };
         } else {
-            toast.error(response.data.message || 'Failed to reset password');
+            const errorMessage = response.data.message || 'Failed to reset password';
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
-        // console.log(error);
+        const errorMessage = 'Failed to reset password';
+        toast.error(errorMessage);
+      
         return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 export const changePassword = (data) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+        
         const response = await axiosInstance.post('/change-password', data);
         
         if (response.data.success) {
             toast.success(response.data.message);
             return { success: true };
         } else {
-            toast.error(response.data.message);
+            const errorMessage = response.data.message;
+            toast.error(errorMessage);
+          
             return { success: false };
         }
     } catch (error) {
-        const errorMessage = error?.response?.data?.message ;
+        const errorMessage = error?.response?.data?.message || 'Failed to change password';
         toast.error(errorMessage);
+      
+        return { success: false };
+    } finally {
+        setLoading(dispatch, false);
     }
-    return false;
 };
 
 export const checkAuthStatus = () => async (dispatch) => {
     try {
         // Set loading to true initially
-        dispatch({
-            type: "SET_LOADING",
-            payload: true
-        });
+        setLoading(dispatch, true);
+        
 
         const token = localStorage.getItem(CACHE_CONFIG.TOKEN_KEY);
         const userData = localStorage.getItem('userData');
@@ -186,6 +247,8 @@ export const checkAuthStatus = () => async (dispatch) => {
                     type: AUTH_DATA,
                     payload: { user }
                 });
+                // Set loading to false after successful auth data dispatch
+                setLoading(dispatch, false);
                 return true;
             } catch (parseError) {
                 console.error('Failed to parse user data:', parseError);
@@ -195,23 +258,19 @@ export const checkAuthStatus = () => async (dispatch) => {
                 dispatch({
                     type: "LOGOUT"
                 });
+              
+                setLoading(dispatch, false);
                 return false;
             }
         } else {
             // No token or user data, set loading to false
-            dispatch({
-                type: "SET_LOADING",
-                payload: false
-            });
+            setLoading(dispatch, false);
             return false;
         }
     } catch (error) {
         console.error('Auth check failed:', error);
         // Set loading to false on error
-        dispatch({
-            type: "SET_LOADING",
-            payload: false
-        });
+        setLoading(dispatch, false);
         return false;
     }
 };

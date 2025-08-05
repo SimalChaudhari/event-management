@@ -10,33 +10,6 @@ import { API_URL } from '../../configs/env';
 const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
     const [localError, setLocalError] = useState('');
 
-    // Validation function
-    const validateDocumentName = (name, allNames, currentIndex) => {
-        if (!name || name.trim() === '') {
-            return { isValid: true, error: '' };
-        }
-
-        if (name.trim().length < 2) {
-            return {
-                isValid: false,
-                error: 'Document name should be at least 2 characters'
-            };
-        }
-
-        const duplicateIndex = allNames.findIndex(
-            (docName, idx) => idx !== currentIndex && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
-        );
-
-        if (duplicateIndex !== -1) {
-            return {
-                isValid: false,
-                error: 'Document name already exists'
-            };
-        }
-
-        return { isValid: true, error: '' };
-    };
-
     const handleNameChange = (e) => {
         const newName = e.target.value;
 
@@ -164,31 +137,6 @@ const FlyerNameInput = ({ index, fileName, flyerName, onNameChange, onValidation
 const EventImageNameInput = ({ index, fileName, eventImageName, onNameChange, onValidationChange }) => {
     const [localError, setLocalError] = useState('');
 
-    const validateEventImageName = (name, allNames, currentIndex) => {
-        if (!name || name.trim() === '') {
-            return { isValid: true, error: '' };
-        }
-
-        if (name.trim().length < 2) {
-            return {
-                isValid: false,
-                error: 'Event image name should be at least 2 characters'
-            };
-        }
-
-        const duplicateIndex = allNames.findIndex(
-            (imageName, idx) => idx !== currentIndex && imageName && imageName.trim().toLowerCase() === name.trim().toLowerCase()
-        );
-
-        if (duplicateIndex !== -1) {
-            return {
-                isValid: false,
-                error: 'Event image name already exists'
-            };
-        }
-
-        return { isValid: true, error: '' };
-    };
 
     const handleNameChange = (e) => {
         const newName = e.target.value;
@@ -235,7 +183,6 @@ const EventImageNameInput = ({ index, fileName, eventImageName, onNameChange, on
     );
 };
 
-// Main component (Events pattern के अनुसार)
 function AddExhibitorPage() {
     const dispatch = useDispatch();
     const { id } = useParams(); // Edit mode
@@ -258,7 +205,7 @@ function AddExhibitorPage() {
         documentNames: []
     });
 
-    // Preview states (Events pattern के अनुसार)
+    // Preview states 
     const [flyerPreviewUrls, setFlyerPreviewUrls] = useState([]);
     const [eventImagePreviewUrls, setEventImagePreviewUrls] = useState([]);
     const [documentPreviewUrls, setDocumentPreviewUrls] = useState([]);
@@ -271,7 +218,7 @@ function AddExhibitorPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Load edit data if id exists (Events pattern के अनुसार)
+    // Load edit data if id exists 
     useEffect(() => {
         if (id) {
             const loadExhibitorData = async () => {
@@ -282,7 +229,7 @@ function AddExhibitorPage() {
                     if (response?.data) {
                         const editData = response.data;
 
-                        // Handle flyers data (Events pattern के अनुसार)
+                        // Handle flyers data
                         let flyersData = [];
                         let flyerNamesData = [];
                         let flyerPreviewUrls = [];
@@ -313,7 +260,7 @@ function AddExhibitorPage() {
                             }
                         }
 
-                        // Handle event images data (Events pattern के अनुसार)
+                        // Handle event images data
                         let eventImagesData = [];
                         let eventImageNamesData = [];
                         let eventImagePreviewUrls = [];
@@ -342,7 +289,7 @@ function AddExhibitorPage() {
                             }
                         }
 
-                        // Handle documents data (Events pattern के अनुसार)
+                        // Handle documents data 
                         let documentsData = [];
                         let documentNamesData = [];
                         let documentPreviewUrls = [];
@@ -406,7 +353,7 @@ function AddExhibitorPage() {
         }
     }, [id, dispatch]);
 
-    // Handle form changes (Events pattern के अनुसार)
+    // Handle form changes 
     const handleChange = (e) => {
         const { name, value, type, files } = e.target;
 
@@ -481,7 +428,7 @@ function AddExhibitorPage() {
         }
     };
 
-    // Drag and drop handlers (Events pattern के अनुसार)
+    // Drag and drop handlers 
     const handleFlyerDragOver = (e) => {
         e.preventDefault();
     };
@@ -575,7 +522,7 @@ function AddExhibitorPage() {
         }
     };
 
-    // Remove functions (Events pattern के अनुसार)
+    // Remove functions 
     const handleRemoveFlyer = (indexToRemove) => {
         setFormData((prev) => ({
             ...prev,
@@ -624,7 +571,7 @@ function AddExhibitorPage() {
         }));
     };
 
-    // Name change handlers (Events pattern के अनुसार)
+    // Name change handlers 
     const handleFlyerNameChange = (index, newName) => {
         setFormData((prev) => {
             const updatedNames = [...prev.flyerNames];
@@ -679,7 +626,7 @@ function AddExhibitorPage() {
         return true;
     };
 
-    // Handle form submission (Events pattern के अनुसार)
+    // Handle form submission 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -977,7 +924,7 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    {/* Flyers Section - Events pattern के अनुसार */}
+                                    {/* Flyers Section - Events pattern */}
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <Badge bg="info">
@@ -1159,7 +1106,7 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    {/* Event Images Section - Events pattern के अनुसार */}
+                                    {/* Event Images Section - Events pattern  */}
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <Badge bg="info">
@@ -1344,7 +1291,7 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    {/* Documents Section - Events pattern के अनुसार */}
+                                    {/* Documents Section - Events pattern  */}
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <Badge bg="info">

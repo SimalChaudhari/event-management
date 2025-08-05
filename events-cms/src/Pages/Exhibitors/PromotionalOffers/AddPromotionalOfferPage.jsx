@@ -4,7 +4,9 @@ import { useDispatch } from 'react-redux';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { 
     createOrUpdatePromotionalOffer, 
-    getPromotionalOfferById
+    createPromotionalOffer, 
+    getPromotionalOfferById,
+    updatePromotionalOffer
 } from '../../../store/actions/promotionalOfferActions';
 import { exhibitorById } from '../../../store/actions/exhibitorsActions';
 import { API_URL } from '../../../configs/env';
@@ -128,11 +130,13 @@ const AddPromotionalOfferPage = () => {
             submitData.append('exhibitorId', formData.exhibitorId);
             submitData.append('companyName', formData.companyName);
             
-            if (formData.image) {
-                submitData.append('image', formData.image);
+            let response;
+            if (id) {
+                response = await dispatch(updatePromotionalOffer(id, submitData));
+            } else {
+                response = await dispatch(createPromotionalOffer(submitData));
             }
-
-            const response = await dispatch(createOrUpdatePromotionalOffer(submitData, id));
+            
             if (response) {
                 navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${formData.exhibitorId}`);
             }

@@ -1,5 +1,41 @@
-export const AUTH_DATA = 'AUTH_DATA';
+// User Action Types
 export const USER_LIST = 'USER_LIST';
+export const USER_LOADING = 'USER_LOADING';
+export const USER_ERROR = 'USER_ERROR';
+export const CREATE_USER = 'CREATE_USER';
+export const UPDATE_USER = 'UPDATE_USER';
+export const DELETE_USER = 'DELETE_USER';
+export const USER_BY_ID = 'USER_BY_ID';
+
+// Auth Action Types
+export const AUTH_DATA = 'AUTH_DATA';
+export const AUTH_LOADING = 'AUTH_LOADING';
+export const AUTH_ERROR = 'AUTH_ERROR';
+
+// Loading Action Types for all reducers
+export const EVENT_LOADING = 'EVENT_LOADING';
+export const ORDER_LOADING = 'ORDER_LOADING';
+export const SPEAKER_LOADING = 'SPEAKER_LOADING';
+export const EXHIBITOR_LOADING = 'EXHIBITOR_LOADING';
+
+export const BANNER_LOADING = 'BANNER_LOADING';
+export const GALLERY_LOADING = 'GALLERY_LOADING';
+export const CATEGORY_LOADING = 'CATEGORY_LOADING';
+export const SETTINGS_LOADING = 'SETTINGS_LOADING';
+export const WITHDRAW_LOADING = 'WITHDRAW_LOADING';
+export const PROMOTIONAL_OFFER_LOADING = 'PROMOTIONAL_OFFER_LOADING';
+
+// Error Action Types for all reducers
+export const EVENT_ERROR = 'EVENT_ERROR';
+export const ORDER_ERROR = 'ORDER_ERROR';
+export const SPEAKER_ERROR = 'SPEAKER_ERROR';
+export const EXHIBITOR_ERROR = 'EXHIBITOR_ERROR';
+export const BANNER_ERROR = 'BANNER_ERROR';
+export const GALLERY_ERROR = 'GALLERY_ERROR';
+export const CATEGORY_ERROR = 'CATEGORY_ERROR';
+export const SETTINGS_ERROR = 'SETTINGS_ERROR';
+export const WITHDRAW_ERROR = 'WITHDRAW_ERROR';
+
 export const EVENT_LIST = 'EVENT_LIST';
 export const EVENT_BY_ID = 'EVENT_BY_ID';
 export const GALLERY_LIST = 'GALLERY_LIST';

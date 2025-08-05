@@ -1,17 +1,29 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { 
-    EXHIBITOR_LIST, 
-    EXHIBITOR_BY_ID, 
-    CREATE_EXHIBITOR, 
-    UPDATE_EXHIBITOR, 
-    DELETE_EXHIBITOR, 
+import {
+    EXHIBITOR_LIST,
+    EXHIBITOR_BY_ID,
+    CREATE_EXHIBITOR,
+    UPDATE_EXHIBITOR,
+    DELETE_EXHIBITOR,
+    EXHIBITOR_LOADING,
+    EXHIBITOR_ERROR,
     FETCH_PROMOTIONAL_OFFERS
 } from '../constants/actionTypes';
+
+// Helper function to dispatch loading state
+const setLoading = (dispatch, loading) => {
+    dispatch({
+        type: EXHIBITOR_LOADING,
+        payload: loading
+    });
+};
 
 // Get all exhibitors
 export const exhibitorList = () => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+
         const response = await axiosInstance.get('/exhibitors');
         dispatch({
             type: EXHIBITOR_LIST,
@@ -20,14 +32,21 @@ export const exhibitorList = () => async (dispatch) => {
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitors';
+        dispatch({
+            type: EXHIBITOR_ERROR,
+            payload: errorMessage
+        });
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Get exhibitor by ID
 export const exhibitorById = (id) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
         const response = await axiosInstance.get(`/exhibitors/${id}`);
         dispatch({
             type: EXHIBITOR_BY_ID,
@@ -36,8 +55,14 @@ export const exhibitorById = (id) => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitor';
+        dispatch({
+            type: EXHIBITOR_ERROR,
+            payload: errorMessage
+        });
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
@@ -56,6 +81,7 @@ export const createExhibitor = (data) => async (dispatch) => {
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to create exhibitor';
+
         toast.error(errorMessage);
         return false;
     }
@@ -76,6 +102,7 @@ export const updateExhibitor = (id, data) => async (dispatch) => {
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update exhibitor';
+
         toast.error(errorMessage);
         return false;
     }
@@ -96,14 +123,16 @@ export const deleteExhibitor = (id) => async (dispatch) => {
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete exhibitor';
+
         toast.error(errorMessage);
         return false;
     }
 };
 
-
+// Fetch promotional offers
 export const fetchPromotional = () => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
         const response = await axiosInstance.get('/promotional-offers');
         dispatch({
             type: FETCH_PROMOTIONAL_OFFERS,
@@ -112,7 +141,13 @@ export const fetchPromotional = () => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch promotional offers';
+        dispatch({
+            type: EXHIBITOR_ERROR,
+            payload: errorMessage
+        });
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
-}
+};

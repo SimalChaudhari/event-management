@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -16,164 +16,193 @@ import { USER_PATHS } from '../../utils/constants';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser) {
-    let tableZero = '#data-table-zero';
+function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser) {
+    let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
     // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Destroy the DataTable if it already exists
+    let currentPage = 0;
     if ($.fn.DataTable.isDataTable(tableZero)) {
+        currentPage = $(tableZero).DataTable().page();
         $(tableZero).DataTable().clear().destroy();
     }
 
     $(tableZero).DataTable({
-        data: data,
-        order: [[0, 'asc']], // Order by Name (First Name) column
-        searching: true, // Enable search
-        searchDelay: 500, // Delay in milliseconds
-        pageLength: 5, // Records per page
+        data: data || [],
+        order: [[0, 'asc']],
+        searching: true,
+        searchDelay: 500,
+        pageLength: 5, 
         lengthMenu: [
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
-        ], // Page length options
-        pagingType: 'full_numbers', // Type of pagination
-
-        // Add this dom configuration
+        ],
+        pagingType: 'full_numbers', 
         dom:
-            "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end'f<'add-user-button ml-2'>>>" +
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-user-button ml-2'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        // Add this initComplete function
-        initComplete: function (settings, json) {
-            $('.add-user-button').html(`
-                 <button class="btn btn-primary d-flex align-items-center ml-2" id="addUserBtn">
-                     <i class="feather icon-plus mr-1"></i>
-                     Add User
-                 </button>
-             `);
-
-            // Add click event listener
-            $('#addUserBtn').on('click', function () {
-                handleAddUser();
-            });
-        },
-
         columns: [
             {
-                data: 'profilePicture',
+                data: 'firstName',
+                title: 'User Details',
                 render: function (data, type, row) {
-                    // const imageUrl = row.profilePicture || DUMMY_PATH;
-                    const imageUrl = DUMMY_PATH_USER;
+                    const imageUrl = row.profilePicture 
+                        ? `${API_URL}/${row.profilePicture}` 
+                        : DUMMY_PATH_USER;
+                    
+                    let badgeClass = 'badge-light-success';
+                    let statusText = 'Active';
+                    
+                    // You can add user status logic here if needed
+                    // if (!row.isActive) {
+                    //     badgeClass = 'badge-light-danger';
+                    //     statusText = 'Inactive';
+                    // }
 
                     return `
-                            <div class="d-inline-block align-middle">
-                                <img src="${
-                                    row.profilePicture ? `${API_URL}/${row.profilePicture}` : imageUrl
-                                }" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
-                                  <div class="d-inline-block">
-                                    <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
-                                    <p class="m-b-0">${row.email}</p>
-                                </div>
+                        <div class="d-inline-block align-middle">
+                            <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15" 
+                                 style="width:50px; height:50px; object-fit:cover;" 
+                                 onerror="this.src='${DUMMY_PATH_USER}';">
+                            <div class="d-inline-block">
+                                <h6 class="m-b-0">${row.firstName || ''} ${row.lastName || ''}</h6>
+                                <p class="m-b-5 text-muted">${row.email || 'N/A'}</p>
+                                <span class="badge ${badgeClass}">
+                                    ${statusText}
+                                </span>
                             </div>
-                        `;
+                        </div>   
+                    `;
                 }
             },
-
-            { data: 'mobile', title: 'Mobile' },
-            { data: 'address', title: 'Address' },
-            { data: 'city', title: 'City' },
-            { data: 'state', title: 'State' },
-            { data: 'postalCode', title: 'Postal Code' },
             {
-                data: 'isMember',
-                render: function (data) {
-                    return data ? '<span class="badge badge-light-success">Yes</span>' : '<span class="badge badge-light-danger">No</span>';
-                },
-                title: 'Member'
-            },
-            {
-                data: 'biometricEnabled',
-                render: function (data) {
-                    return data
-                        ? '<span class="badge badge-light-success">Enabled</span>'
-                        : '<span class="badge badge-light-danger">Disabled</span>';
-                },
-                title: 'Biometric Enabled'
-            },
-
-            {
-                data: null,
+                data: 'mobile',
+                title: 'Contact & Location',
                 render: function (data, type, row) {
                     return `
-                    <div class="btn-group" role="group" aria-label="Actions">
-                        <button type="button" class="btn btn-icon btn-success" data-id="${row.id}" title="View" 
-                            style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                            <i class="feather icon-eye"></i>
-                        </button>
-                        <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
-                            style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                            <i class="feather icon-edit"></i>
-                        </button>
-                        <button type="button" class="btn btn-danger btn-circle btn-sm delete-btn" data-id="${row.id}" title="Delete" 
-                            style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                            <i class="feather icon-trash-2"></i>
-                        </button>
-                    </div>
-                `;
-                },
+                        <div class="d-inline-block align-middle">
+                            <h6 class="m-b-5">${row.mobile || 'N/A'}</h6>
+                            <p class="m-b-0">
+                                <span class="badge badge-success">
+                                    <i class="feather icon-phone mr-1"></i>
+                                    ${row.mobile || 'N/A'}
+                                </span>
+                            </p>
+                            <p class="m-b-0 text-muted small">${row.city || 'N/A'}, ${row.state || 'N/A'}</p>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'address',
+                title: 'Address',
+                render: function (data, type, row) {
+                    return `
+                        <div class="d-inline-block align-middle">
+                            <p class="m-b-0">
+                                <span class="badge badge-light-primary">
+                                    <i class="feather icon-map-pin mr-1"></i>
+                                    ${row.address || 'Not specified'}
+                                </span>
+                            </p>
+                            <p class="m-b-0 text-muted small">${row.postalCode || 'N/A'}</p>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'updatedAt',
+                title: 'Last Updated',
+                render: function (data, type, row) {
+                    if (data) {
+                        const date = new Date(data);
+                        return date.toLocaleDateString('en-IN') + ' ' + date.toLocaleTimeString('en-IN');
+                    }
+                    return 'N/A';
+                }
+            },
+            {
+                data: null,
                 title: 'Actions',
-                orderable: false
+                orderable: false,
+                render: function (data, type, row) {
+                    return `
+                        <div class="btn-group" role="group" aria-label="Actions">
+                            <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-eye"></i>
+                            </button>
+                            <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-circle btn-sm delete-btn" data-id="${row.id}" title="Delete" 
+                                style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-trash-2"></i>
+                            </button>
+                        </div>
+                    `;
+                }
             }
-        ]
-    });
+        ],
+        initComplete: function (settings, json) {
+            if (!$('#addUserBtn').length) {
+                $('.add-user-button').html(`
+                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addUserBtn">
+                        <i class="feather icon-plus mr-1"></i>
+                        Add
+                    </button>
+                `);
 
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
+                $('#addUserBtn').on('click', handleAddUser);
+            }
 
-    // Attach event listeners for actions
-    $(document).on('click', '.btn-icon', function () {
-        const userId = $(this).data('id');
-        const userData = data.find((user) => user.id === userId);
-        if (userData) {
-            handleViewUser(userData);
+            // Add event listeners for action buttons
+            $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
+                const id = $(this).data('id');
+                const userData = data.find((user) => user.id === id);
+                if (userData) {
+                    handleViewUser(userData);
+                }
+            });
+
+            $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
+                const id = $(this).data('id');
+                const userData = data.find((user) => user.id === id);
+                if (userData) {
+                    handleEditUser(userData);
+                }
+            });
+
+            $(tableZero + ' tbody').off('click', '.delete-btn').on('click', '.delete-btn', function () {
+                const id = $(this).data('id');
+                handleDeleteUser(id);
+            });
+        },
+        responsive: true,
+        language: {
+            search: 'Search Users:',
+            lengthMenu: 'Show _MENU_ users per page',
+            info: 'Showing _START_ to _END_ of _TOTAL_ users',
+            infoEmpty: 'No users found',
+            infoFiltered: '(filtered from _MAX_ total users)',
+            zeroRecords: 'No matching users found'
         }
     });
 
-    $(document).on('click', '.edit-btn', function () {
-        const userId = $(this).data('id');
-        const userData = data.find((user) => user.id === userId);
-        if (userData) {
-            handleEditUser(userData);
-        }
-    });
-
-    $(document).on('click', '.delete-btn', function () {
-        const userId = $(this).data('id');
-        handleDeleteUser(userId);
-    });
+    // Restore the current page
+    $(tableZero).DataTable().page(currentPage).draw('page');
 }
 
 const UserList = () => {
-    const { fetchData, deleteUserData } = FetchUsers(); // Destructure fetchData from the custom hook
-
-    const { user } = useSelector((state) => state.user); // Replace 'state.users' with the actual path in your Redux state
-
-    const [showModal, setShowModal] = React.useState(false);
-    const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
+    const { fetchData, deleteUserData } = FetchUsers();
+    const { user } = useSelector((state) => state.user);
     const navigate = useNavigate();
-    const [editData, setEditData] = React.useState(null);
-
-    const [viewData, setViewData] = React.useState(null); // State for user data to view
-
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const [userIdToDelete, setUserIdToDelete] = React.useState(null);
     const [isLoading, setIsLoading] = React.useState(false);
-
-    const handleCloseModal = () => {
-        setShowModal(false);
-    };
+    const [currentTable, setCurrentTable] = useState(null);
 
     const handleViewUser = (userData) => {
         navigate(`${USER_PATHS.VIEW_USER}/${userData.id}`);
@@ -196,9 +225,9 @@ const UserList = () => {
         setIsLoading(true);
         if (userIdToDelete) {
             try {
-                await deleteUserData(userIdToDelete); // Await the delete operation
+                await deleteUserData(userIdToDelete);
                 setShowConfirmModal(false);
-                fetchData(); // Refresh the user list after successful deletion
+                setIsLoading(false);
             } catch (error) {
                 console.error('Error deleting user:', error);
             }
@@ -206,44 +235,64 @@ const UserList = () => {
         setIsLoading(false);
     };
 
-    useEffect(() => {
-        if (user.data) {
-            atable(user.data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser); // Pass handleAddUser to atable
+    const destroyTable = () => {
+        if (currentTable) {
+            $('#user-data-table').off('click', '.delete-btn');
+            currentTable.destroy();
+            setCurrentTable(null);
         }
-    }, [user, handleAddUser]); // Add handleAddUser to dependencies
+    };
 
-    // Fetch data when the component mounts
+    const initializeTable = () => {
+        destroyTable();
+        if (Array.isArray(user) && user.length >= 0) {
+            const table = userTable(
+                user,
+                handleAddUser,
+                handleEditUser,
+                handleDeleteUser,
+                handleViewUser
+            );
+            setCurrentTable(table);
+        }
+    };
+
     useEffect(() => {
         fetchData();
-    }, []); // Only runs once when the component mounts
+        return () => destroyTable();
+    }, []);
+
+    useEffect(() => {
+        initializeTable();
+        return () => destroyTable();
+    }, [user]);
 
     return (
         <>
-       
             <DeleteConfirmationModal
                 show={showConfirmModal}
                 onHide={() => setShowConfirmModal(false)}
                 onConfirm={confirmDeleteUser}
                 isLoading={isLoading}
+                title="Delete User"
+                message="Are you sure you want to delete this user? This action cannot be undone."
             />
+            
             <Row>
                 <Col sm={12} className="btn-page">
-                    <Card className="user-profile-list">
+                    <Card className="user-list"> 
                         <Card.Body>
-                            <Table striped hover responsive id="data-table-zero">
+                            <Table striped hover responsive id="user-data-table">
                                 <thead>
                                     <tr>
-                                        <th>Name/ Email / Profile</th>
-                                        <th>Mobile</th>
+                                        <th>User Details</th>
+                                        <th>Contact & Location</th>
                                         <th>Address</th>
-                                        <th>City</th>
-                                        <th>State</th>
-                                        <th>Postal Code</th>
-                                        <th>Member</th>
-                                        <th>Biometric Enabled</th>
+                                        <th>Last Updated</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
+                                <tbody></tbody>
                             </Table>
                         </Card.Body>
                     </Card>

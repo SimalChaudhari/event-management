@@ -1,4 +1,19 @@
-import { ALL_PROMOTIONAL_OFFERS, CREATE_EXHIBITOR, CREATE_PROMOTIONAL_OFFER, DELETE_EXHIBITOR, DELETE_PROMOTIONAL_OFFER, EXHIBITOR_BY_ID, EXHIBITOR_LIST, FETCH_PROMOTIONAL_OFFERS, GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR, PROMOTIONAL_OFFER_BY_ID, UPDATE_EXHIBITOR, UPDATE_PROMOTIONAL_OFFER } from "../constants/actionTypes";
+import { 
+    ALL_PROMOTIONAL_OFFERS, 
+    CREATE_EXHIBITOR, 
+    CREATE_PROMOTIONAL_OFFER, 
+    DELETE_EXHIBITOR, 
+    DELETE_PROMOTIONAL_OFFER, 
+    EXHIBITOR_BY_ID, 
+    EXHIBITOR_LIST, 
+    EXHIBITOR_LOADING,
+    EXHIBITOR_ERROR,
+    FETCH_PROMOTIONAL_OFFERS, 
+    GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR, 
+    PROMOTIONAL_OFFER_BY_ID, 
+    UPDATE_EXHIBITOR, 
+    UPDATE_PROMOTIONAL_OFFER 
+} from "../constants/actionTypes";
 
 const initialState = {
     exhibitors: [],
@@ -11,6 +26,19 @@ const initialState = {
 
 const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
     switch (type) {
+        case EXHIBITOR_LOADING:
+            return {
+                ...state,
+                loading: payload
+            };
+
+        case EXHIBITOR_ERROR:
+            return {
+                ...state,
+                loading: false,
+                error: payload
+            };
+
         case EXHIBITOR_LIST:
             return {
                 ...state,
@@ -19,6 +47,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case EXHIBITOR_BY_ID:
             return {
                 ...state,
@@ -26,6 +55,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case CREATE_EXHIBITOR:
             return {
                 ...state,
@@ -33,6 +63,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case UPDATE_EXHIBITOR:
             return {
                 ...state,
@@ -43,6 +74,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case DELETE_EXHIBITOR:
             return {
                 ...state,
@@ -50,6 +82,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case FETCH_PROMOTIONAL_OFFERS:
             return {
                 ...state,
@@ -57,6 +90,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case CREATE_PROMOTIONAL_OFFER:
             return {
                 ...state,
@@ -64,6 +98,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case UPDATE_PROMOTIONAL_OFFER:
             return {
                 ...state,
@@ -73,6 +108,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case DELETE_PROMOTIONAL_OFFER:
             return {
                 ...state,
@@ -80,6 +116,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR:
             return {
                 ...state,
@@ -87,6 +124,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case ALL_PROMOTIONAL_OFFERS:
             return {
                 ...state,
@@ -94,6 +132,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         case PROMOTIONAL_OFFER_BY_ID:
             return {
                 ...state,
@@ -101,6 +140,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
                 loading: false,
                 error: null
             };
+
         default:
             return state;
     }

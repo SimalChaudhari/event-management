@@ -1,78 +1,98 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { USER_LIST } from '../constants/actionTypes';
+import { USER_LIST, USER_LOADING, USER_ERROR, CREATE_USER, UPDATE_USER, DELETE_USER, USER_BY_ID } from '../constants/actionTypes';
+
+// Helper function to dispatch loading state
+const setLoading = (dispatch, loading) => {
+    dispatch({
+        type: USER_LOADING,
+        payload: loading
+    });
+};
 
 export const userList = () => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
+
         const response = await axiosInstance.get('/users');
         dispatch({
             type: USER_LIST,
-            payload: response.data // Assuming response contains the customers data
+            payload: response.data?.data
         });
         return true;
     } catch (error) {
-        // Check if error response exists and handle error message
-        const errorMessage = error?.response?.data?.message;
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch users';
         toast.error(errorMessage);
+        return false;
+    } finally {
+        setLoading(dispatch, false);
     }
-    return false; // Return false for any errors
 };
 
 export const userById = (id) => async (dispatch) => {
     try {
+        setLoading(dispatch, true);
         const response = await axiosInstance.get(`/users/get/${id}`);
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
-}
-
-export const createUser = (data) => async (dispatch) => {
-    try {
-        const response = await axiosInstance.post('/auth/register-admin', data);
-        console.log({ response });
-        if (response && response.status >= 200 && response.status < 300) {
-            toast.success(response.data.message || 'User registered successfully!');
-            return true;
-        }
+        dispatch({
+            type: USER_BY_ID,
+            payload: response.data?.data
+        });
         return true;
     } catch (error) {
-        // Check if error response exists and handle error message
-        const errorMessage = error?.response?.data?.message;
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch user details';
         toast.error(errorMessage);
+
+        return null;
+    } finally {
+        setLoading(dispatch, false);
     }
-    return false; // Return false for any errors
 };
 
-export const editUser = (id, data) => async (dispatch) => {
+export const createUser = (userData) => async (dispatch) => {
     try {
-        const response = await axiosInstance.put(`/users/update/${id}`, data);
-
-        // Check if the response is successful
-        if (response && response.status >= 200 && response.status < 300) {
-            toast.success(response.data.message || 'User updated successfully!');
-            return response.data; // Return the entire response data
-        }
+        const response = await axiosInstance.post('/auth/register-admin', userData);
+        dispatch({
+            type: CREATE_USER,
+            payload: response.data?.data
+        });
+        toast.success('User created successfully');
+        return true;
     } catch (error) {
-        // Handle errors appropriately
-        const errorMessage = error?.response?.data?.message;
+        const errorMessage = error?.response?.data?.message || 'Failed to create user';
         toast.error(errorMessage);
+        return false;
     }
-    return false; // Return false for any errors or unsuccessful attempts
+};
+
+export const editUser = (id, userData) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.put(`/users/update/${id}`, userData);
+        dispatch({
+            type: UPDATE_USER,
+            payload: response.data?.data
+        });
+        toast.success('User updated successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update user';
+        toast.error(errorMessage);
+        return false;
+    }
 };
 
 export const deleteUser = (id) => async (dispatch) => {
     try {
-        const response = await axiosInstance.delete(`/users/delete/${id}`);
-        // Check if the response is successful
-        if (response && response.status >= 200 && response.status < 300) {
-            toast.success(response.data.message || 'User deleted successfully!');
-            return true; // Indicate successful deletion
-        }
+        await axiosInstance.delete(`/users/delete/${id}`);
+        dispatch({
+            type: DELETE_USER,
+            payload: id
+        });
+        toast.success('User deleted successfully');
+        return true;
     } catch (error) {
-        // Handle errors appropriately
-        const errorMessage = error?.response?.data?.message;
+        const errorMessage = error?.response?.data?.message || 'Failed to delete user';
         toast.error(errorMessage);
+
+        return false;
     }
-    return false; // Return false for any errors or unsuccessful attempts
 };

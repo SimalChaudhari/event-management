@@ -1,59 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Container, Nav, Tab, Modal, Badge } from 'react-bootstrap';
-import { useDispatch } from 'react-redux';
+import { Button, Row, Col, Card, Container, Modal, Badge } from 'react-bootstrap';
+import { useDispatch, useSelector } from 'react-redux';
 import { userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
+import NoDataFound from '../../components/NoDataFound';
+import { USER_PATHS } from '../../utils/constants';
 
 const ViewUserPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const [userData, setUserData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('personal');
+    const { userByID } = useSelector(state => state.user);
     const [showProfileImageModal, setShowProfileImageModal] = useState(false);
 
     useEffect(() => {
-        const loadUserData = async () => {
-            try {
-                const response = await dispatch(userById(id));
-                if (response?.data) {
-                    setUserData(response.data);
-                }
-                setLoading(false);
-            } catch (error) {
-                console.error('Error loading user data:', error);
-                setLoading(false);
-            }
-        };
-        
         if (id) {
-            loadUserData();
+            dispatch(userById(id));
         }
     }, [id, dispatch]);
 
-    if (loading) return <div>Loading...</div>;
-    if (!userData) return <div>No user found.</div>;
+    if (!userByID) {
+        return (
+            <NoDataFound
+                title="User Not Found"
+                message="The user you're looking for doesn't exist or has been removed."
+                icon="fas fa-user-slash"
+                variant="warning"
+                size="medium"
+                showBackButton={true}
+                backButtonText="Back"
+                backButtonPath={`${USER_PATHS.LIST_USERS}`}
+            />
+        );
+    }
 
-    const tabStyle = {
-        border: 'none',
-        backgroundColor: 'transparent',
-        color: '#6c757d',
-        fontWeight: '500',
-        padding: '12px 20px',
-        borderRadius: '8px 8px 0 0',
-        marginRight: '5px',
-        transition: 'all 0.3s ease',
-        fontSize: '14px'
-    };
-
-    const activeTabStyle = {
-        ...tabStyle,
-        backgroundColor: '#4680ff',
-        color: 'white',
-        fontWeight: '600'
-    };
+    const userData = userByID;
 
     const handleProfileImageClick = () => {
         if (userData.profilePicture) {
@@ -61,252 +43,334 @@ const ViewUserPage = () => {
         }
     };
 
+    const InfoCard = ({ title, icon, children, className = "" }) => (
+        <Card className={`mb-4 ${className}`} style={{ 
+            border: 'none', 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            borderRadius: '12px'
+        }}>
+            <Card.Body style={{ padding: '24px' }}>
+                <Card.Title style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    color: '#2c3e50',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                }}>
+                    <i className={icon} style={{ color: '#4680ff' }}></i>
+                    {title}
+                </Card.Title>
+                <hr style={{ margin: '0 0 20px 0', opacity: '0.3' }} />
+                {children}
+            </Card.Body>
+        </Card>
+    );
+
+    const InfoField = ({ label, value, icon = null }) => (
+        <div className="mb-3" style={{ 
+            padding: '12px 16px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef'
+        }}>
+            <div style={{ 
+                fontSize: '13px', 
+                fontWeight: '600', 
+                color: '#6c757d',
+                marginBottom: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+            }}>
+                {icon && <i className={icon} style={{ fontSize: '12px' }}></i>}
+                {label}
+            </div>
+            <div style={{ 
+                fontSize: '15px', 
+                color: '#2c3e50',
+                fontWeight: '500'
+            }}>
+                {value || 'N/A'}
+            </div>
+        </div>
+    );
+
     return (
         <>
             <Container fluid className="mt-4">
-                <div
-                    className="mb-3"
-                    style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
-                >
+                {/* Header */}
+                <div style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '12px', 
+                    padding: '24px', 
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    marginBottom: '24px'
+                }}>
                     <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View User</h4>
-                        <Button variant="secondary" onClick={() => navigate('/users')}>
-                            <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                        <div>
+                            <h4 style={{ 
+                                margin: 0, 
+                                color: '#2c3e50',
+                                fontWeight: '600'
+                            }}>
+                                <i className="feather icon-user mr-2" style={{ color: '#4680ff' }}></i>
+                                User Profile
+                            </h4>
+                            <p style={{ 
+                                margin: '8px 0 0 0', 
+                                color: '#6c757d',
+                                fontSize: '14px'
+                            }}>
+                                View detailed information about this user
+                            </p>
+                        </div>
+                        <Button 
+                            variant="outline-secondary" 
+                            onClick={() => navigate('/users')}
+                            style={{ 
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                border: '1px solid #dee2e6',
+                                fontWeight: '500'
+                            }}
+                        >
+                            <i className="fas fa-arrow-left me-2" style={{marginRight: '10px'}}></i>
                             Back
                         </Button>
                     </div>
                 </div>
 
-                <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                    {/* User Profile Image and Basic Info */}
-                    <Card className="mb-4">
-                        <Card.Body>
-                            <Card.Title>
-                                <i className="feather icon-user mr-2"></i>
-                                Personal Information
-                            </Card.Title>
-                            <hr />
-                            <Row className="align-items-center">
-                                <Col xs={12} md={4} className="text-center mb-3 mb-md-0">
-                                    {userData.profilePicture && (
-                                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                                            <img
-                                                src={`${API_URL}/${userData.profilePicture.replace(/\\/g, '/')}`}
-                                                alt="Profile"
-                                                style={{
-                                                    width: '100%',
-                                                    maxWidth: '200px',
-                                                    height: '200px',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '10%',
-                                                    border: '3px solid #4680ff',
-                                                    cursor: 'pointer',
-                                                    transition: 'transform 0.2s'
-                                                }}
-                                                onClick={handleProfileImageClick}
-                                                onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
-                                                onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-                                            />
-                                            <div
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '10px',
-                                                    right: '10px',
-                                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                                    color: 'white',
-                                                    padding: '5px',
-                                                    borderRadius: '50%',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
-                                                onClick={handleProfileImageClick}
-                                            >
-                                                <i className="fas fa-search-plus"></i>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {!userData.profilePicture && (
+                <Row>
+                    {/* Left Column - Profile Image and Basic Info */}
+                    <Col lg={4} md={12} className="mb-4">
+                        <InfoCard title="Profile Information" icon="feather icon-user">
+                            <div className="text-center mb-4">
+                                {userData.profilePicture ? (
+                                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                                        <img
+                                            src={`${API_URL}/${userData.profilePicture.replace(/\\/g, '/')}`}
+                                            alt="Profile"
+                                            style={{
+                                                width: '180px',
+                                                height: '180px',
+                                                objectFit: 'cover',
+                                                borderRadius: '50%',
+                                                border: '4px solid #4680ff',
+                                                cursor: 'pointer',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                boxShadow: '0 4px 12px rgba(70, 128, 255, 0.2)'
+                                            }}
+                                            onClick={handleProfileImageClick}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.transform = 'scale(1.05)';
+                                                e.target.style.boxShadow = '0 6px 20px rgba(70, 128, 255, 0.3)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                                e.target.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.2)';
+                                            }}
+                                        />
                                         <div
                                             style={{
-                                                width: '200px',
-                                                height: '200px',
-                                                backgroundColor: '#e9ecef',
-                                                borderRadius: '10%',
-                                                border: '3px solid #4680ff',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                margin: '0 auto'
+                                                position: 'absolute',
+                                                bottom: '10px',
+                                                right: '10px',
+                                                backgroundColor: '#4680ff',
+                                                color: 'white',
+                                                padding: '6px',
+                                                borderRadius: '50%',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                                             }}
+                                            onClick={handleProfileImageClick}
                                         >
-                                            <i className="feather icon-user" style={{ fontSize: '60px', color: '#6c757d' }}></i>
-                                        </div>
-                                    )}
-                                </Col>
-                                <Col xs={12} md={8}>
-                                    <div className="row">
-                                        <div className="col-12 mb-2">
-                                            <strong>Full Name:</strong> {userData.firstName} {userData.lastName}
-                                        </div>
-                                        <div className="col-12 mb-2">
-                                            <strong>Email:</strong> {userData.email}
-                                        </div>
-                                        <div className="col-12 mb-2">
-                                            <strong>Mobile:</strong> {userData.mobile || 'N/A'}
+                                            <i className="fas fa-search-plus"></i>
                                         </div>
                                     </div>
+                                ) : (
+                                    <div
+                                        style={{
+                                            width: '180px',
+                                            height: '180px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '50%',
+                                            border: '4px solid #4680ff',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            margin: '0 auto',
+                                            boxShadow: '0 4px 12px rgba(70, 128, 255, 0.2)'
+                                        }}
+                                    >
+                                        <i className="feather icon-user" style={{ fontSize: '60px', color: '#6c757d' }}></i>
+                                    </div>
+                                )}
+                            </div>
+
+                            <InfoField 
+                                label="Full Name" 
+                                value={`${userData.firstName} ${userData.lastName}`}
+                                icon="feather icon-user"
+                            />
+                            <InfoField 
+                                label="Email Address" 
+                                value={userData.email}
+                                icon="feather icon-mail"
+                            />
+                            <InfoField 
+                                label="Mobile Number" 
+                                value={userData.mobile}
+                                icon="feather icon-phone"
+                            />
+                        </InfoCard>
+                    </Col>
+
+                    {/* Right Column - Detailed Information */}
+                    <Col lg={8} md={12}>
+                        {/* Personal Details */}
+                        <InfoCard title="Personal Details" icon="feather icon-user">
+                            <Row>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="First Name" 
+                                        value={userData.firstName}
+                                        icon="feather icon-user"
+                                    />
+                                </Col>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="Last Name" 
+                                        value={userData.lastName}
+                                        icon="feather icon-user"
+                                    />
+                                </Col>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="Email Address" 
+                                        value={userData.email}
+                                        icon="feather icon-mail"
+                                    />
+                                </Col>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="Mobile Number" 
+                                        value={userData.mobile}
+                                        icon="feather icon-phone"
+                                    />
                                 </Col>
                             </Row>
-                        </Card.Body>
-                    </Card>
+                        </InfoCard>
 
-                    {/* Responsive Tab Navigation */}
-                    <div className="mb-4">
-                        <Nav 
-                            variant="tabs" 
-                            className="flex-column flex-sm-row"
-                            style={{
-                                borderBottom: '2px solid #e9ecef',
-                                gap: '5px'
-                            }}
-                        >
-                            <Nav.Item>
-                                <Nav.Link
-                                    active={activeTab === 'personal'}
-                                    onClick={() => setActiveTab('personal')}
-                                    style={activeTab === 'personal' ? activeTabStyle : tabStyle}
-                                    className="text-center"
-                                >
-                                    <i className="feather icon-user mr-2"></i>
-                                    <span className="d-none d-sm-inline">Personal</span>
-                                    <span className="d-sm-none">Personal</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            
-                            {(userData.address || userData.city || userData.state || userData.postalCode) && (
-                                <Nav.Item>
-                                    <Nav.Link
-                                        active={activeTab === 'address'}
-                                        onClick={() => setActiveTab('address')}
-                                        style={activeTab === 'address' ? activeTabStyle : tabStyle}
-                                        className="text-center"
-                                    >
-                                        <i className="feather icon-map-pin mr-2"></i>
-                                        <span className="d-none d-sm-inline">Address</span>
-                                        <span className="d-sm-none">Address</span>
-                                    </Nav.Link>
-                                </Nav.Item>
-                            )}
-
-                            {(userData.isMember !== undefined || userData.biometricEnabled !== undefined) && (
-                                <Nav.Item>
-                                    <Nav.Link
-                                        active={activeTab === 'membership'}
-                                        onClick={() => setActiveTab('membership')}
-                                        style={activeTab === 'membership' ? activeTabStyle : tabStyle}
-                                        className="text-center"
-                                    >
-                                        <i className="feather icon-shield mr-2"></i>
-                                        <span className="d-none d-sm-inline">Membership</span>
-                                        <span className="d-sm-none">Member</span>
-                                    </Nav.Link>
-                                </Nav.Item>
-                            )}
-                        </Nav>
-                    </div>
-
-                    {/* Tab Content */}
-                    <div>
-                        {/* Personal Tab */}
-                        {activeTab === 'personal' && (
-                            <Card>
-                                <Card.Body>
-                                    <Card.Title>
-                                        <i className="feather icon-user mr-2"></i>
-                                        Personal Details
-                                    </Card.Title>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>First Name:</strong><br />
-                                            <span className="text-muted">{userData.firstName || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Last Name:</strong><br />
-                                            <span className="text-muted">{userData.lastName || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Email:</strong><br />
-                                            <span className="text-muted">{userData.email || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Mobile:</strong><br />
-                                            <span className="text-muted">{userData.mobile || 'N/A'}</span>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
+                        {/* Address Details - Only show if address data exists */}
+                        {(userData.address || userData.city || userData.state || userData.postalCode) && (
+                            <InfoCard title="Address Details" icon="feather icon-map-pin">
+                                <Row>
+                                    <Col xs={12}>
+                                        <InfoField 
+                                            label="Address" 
+                                            value={userData.address}
+                                            icon="feather icon-map-pin"
+                                        />
+                                    </Col>
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="City" 
+                                            value={userData.city}
+                                            icon="feather icon-map-pin"
+                                        />
+                                    </Col>
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="State" 
+                                            value={userData.state}
+                                            icon="feather icon-map-pin"
+                                        />
+                                    </Col>
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="Postal Code" 
+                                            value={userData.postalCode}
+                                            icon="feather icon-map-pin"
+                                        />
+                                    </Col>
+                                </Row>
+                            </InfoCard>
                         )}
 
-                        {/* Address Tab */}
-                        {activeTab === 'address' && (userData.address || userData.city || userData.state || userData.postalCode) && (
-                            <Card>
-                                <Card.Body>
-                                    <Card.Title>
-                                        <i className="feather icon-map-pin mr-2"></i>
-                                        Address Details
-                                    </Card.Title>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={12} className="mb-3">
-                                            <strong>Address:</strong><br />
-                                            <span className="text-muted">{userData.address || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>City:</strong><br />
-                                            <span className="text-muted">{userData.city || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>State:</strong><br />
-                                            <span className="text-muted">{userData.state || 'N/A'}</span>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Postal Code:</strong><br />
-                                            <span className="text-muted">{userData.postalCode || 'N/A'}</span>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
-                        )}
-
-                        {/* Membership Tab */}
-                        {activeTab === 'membership' && (userData.isMember !== undefined || userData.biometricEnabled !== undefined) && (
-                            <Card>
-                                <Card.Body>
-                                    <Card.Title>
-                                        <i className="feather icon-shield mr-2"></i>
-                                        Membership Details
-                                    </Card.Title>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Member Status:</strong><br />
-                                            <Badge bg={userData.isMember ? 'success' : 'secondary'}>
+                        {/* Membership Details - Only show if membership data exists */}
+                        {(userData.isMember !== undefined || userData.biometricEnabled !== undefined) && (
+                            <InfoCard title="Membership Details" icon="feather icon-shield">
+                                <Row>
+                                    <Col xs={12} md={6}>
+                                        <div className="mb-3" style={{ 
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <div style={{ 
+                                                fontSize: '13px', 
+                                                fontWeight: '600', 
+                                                color: '#6c757d',
+                                                marginBottom: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}>
+                                                <i className="feather icon-shield" style={{ fontSize: '12px' }}></i>
+                                                Member Status
+                                            </div>
+                                            <Badge 
+                                                bg={userData.isMember ? 'success' : 'secondary'}
+                                                style={{ 
+                                                    fontSize: '12px',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px'
+                                                }}
+                                            >
                                                 {userData.isMember ? 'Active Member' : 'Not a Member'}
                                             </Badge>
-                                        </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong>Biometric Access:</strong><br />
-                                            <Badge bg={userData.biometricEnabled ? 'success' : 'warning'}>
+                                        </div>
+                                    </Col>
+                                    <Col xs={12} md={6}>
+                                        <div className="mb-3" style={{ 
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            <div style={{ 
+                                                fontSize: '13px', 
+                                                fontWeight: '600', 
+                                                color: '#6c757d',
+                                                marginBottom: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}>
+                                                <i className="feather icon-shield" style={{ fontSize: '12px' }}></i>
+                                                Biometric Access
+                                            </div>
+                                            <Badge 
+                                                bg={userData.biometricEnabled ? 'success' : 'warning'}
+                                                style={{ 
+                                                    fontSize: '12px',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px'
+                                                }}
+                                            >
                                                 {userData.biometricEnabled ? 'Enabled' : 'Disabled'}
                                             </Badge>
-                                        </Col>
-                                    </Row>
-                                </Card.Body>
-                            </Card>
+                                        </div>
+                                    </Col>
+                                </Row>
+                            </InfoCard>
                         )}
-                    </div>
-                </div>
+                    </Col>
+                </Row>
             </Container>
 
             {/* Profile Image Modal */}

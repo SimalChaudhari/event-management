@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createUser, editUser, userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
@@ -9,8 +9,9 @@ import { USER_PATHS } from '../../utils/constants';
 const AddUserPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams(); // Edit mode के लिए
-    
+    const { id } = useParams(); // Edit mode 
+    const { error, userByID } = useSelector(state => state.user); // Use state.user as per store structure
+    const [loading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -25,7 +26,6 @@ const AddUserPage = () => {
         biometricEnabled: false,
         profilePicture: null
     });
-    const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
 
     // Load edit data if id exists
@@ -33,38 +33,41 @@ const AddUserPage = () => {
         if (id) {
             const loadUserData = async () => {
                 try {
-                    const response = await dispatch(userById(id));
-                    if (response?.data) {
-                        const editData = response.data;
-                        setFormData({
-                            firstName: editData.firstName || '',
-                            lastName: editData.lastName || '',
-                            email: editData.email || '',
-                            password: '',
-                            mobile: editData.mobile || '',
-                            address: editData.address || '',
-                            city: editData.city || '',
-                            state: editData.state || '',
-                            postalCode: editData.postalCode || '',
-                            isMember: editData.isMember || false,
-                            biometricEnabled: editData.biometricEnabled || false,
-                            profilePicture: null
-                        });
-                        
-                        // Edit mode में पुरानी image का URL set करें
-                        if (editData.profilePicture) {
-                            setImagePreview(`${API_URL}/${editData.profilePicture.replace(/\\/g, '/')}`);
-                        } else {
-                            setImagePreview(null);
-                        }
-                    }
+                    await dispatch(userById(id));
                 } catch (error) {
                     console.error('Error loading user data:', error);
                 }
             };
             loadUserData();
         }
-    }, [id, dispatch]);
+    }, [id]);
+
+    // Watch for userByID changes in Redux store
+    useEffect(() => {
+        if (id && userByID) {
+            const editData = userByID;
+            setFormData({
+                firstName: editData.firstName || '',
+                lastName: editData.lastName || '',
+                email: editData.email || '',
+                password: '',
+                mobile: editData.mobile || '',
+                address: editData.address || '',
+                city: editData.city || '',
+                state: editData.state || '',
+                postalCode: editData.postalCode || '',
+                isMember: editData.isMember || false,
+                biometricEnabled: editData.biometricEnabled || false,
+                profilePicture: null
+            });
+            
+            if (editData.profilePicture) {
+                setImagePreview(`${API_URL}/${editData.profilePicture.replace(/\\/g, '/')}`);
+            } else {
+                setImagePreview(null);
+            }
+        }
+    }, [id, userByID]);
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
@@ -96,8 +99,6 @@ const AddUserPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
-       
 
         try {
             const formDataToSend = new FormData();
@@ -109,8 +110,10 @@ const AddUserPage = () => {
 
             let response;
             if (id) {
+                setIsLoading(true);
                 response = await dispatch(editUser(id, formDataToSend));
             } else {
+                setIsLoading(true);
                 response = await dispatch(createUser(formDataToSend));
             }
 
@@ -132,15 +135,12 @@ const AddUserPage = () => {
                     });
                     setImagePreview(null);
                 }
-               
-                    navigate(`${USER_PATHS.LIST_USERS}`);
-              
+                navigate(`${USER_PATHS.LIST_USERS}`);
+                setIsLoading(false);
             }
         } catch (error) {
-            setLoading(false);
-
-        } finally {
-            setLoading(false);
+            setIsLoading(false);
+            console.error('Error submitting form:', error);
         }
     };
 
@@ -166,7 +166,12 @@ const AddUserPage = () => {
                             </div>
                         </div>
                         <div className="card-body">
-                          
+                            {/* Show error if any */}
+                            {error && (
+                                <Alert variant="danger" className="mb-3">
+                                    <strong>Error: </strong>{error}
+                                </Alert>
+                            )}
 
                             <form onSubmit={handleSubmit}>
                                 <Row>
@@ -391,6 +396,7 @@ const AddUserPage = () => {
                                             <Button 
                                                 variant="danger" 
                                                 onClick={handleCancel}
+                                                disabled={loading}
                                             >
                                                 Cancel
                                             </Button>
@@ -399,7 +405,14 @@ const AddUserPage = () => {
                                                 type="submit"
                                                 disabled={loading || !formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || (!id && !formData.password.trim())}
                                             >
-                                                {loading ? (id ? 'Updating...' : 'Creating...') : (id ? 'Update User' : 'Create User')}
+                                                {loading ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                                        {id ? 'Updating...' : 'Creating...'}
+                                                    </>
+                                                ) : (
+                                                    id ? 'Update User' : 'Create User'
+                                                )}
                                             </Button>
                                         </div>
                                     </div>
