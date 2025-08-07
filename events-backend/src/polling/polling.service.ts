@@ -343,7 +343,7 @@ export class PollingService {
         session.userId = userId;
         session.eventId = eventId;
         session.speakerId = speakerId;
-        session.currentQuestionIndex = 1;
+        session.currentQuestionIndex = 0;
         session.totalQuestions = polls.length;
         session.answeredQuestions = 0;
         session.isCompleted = false;

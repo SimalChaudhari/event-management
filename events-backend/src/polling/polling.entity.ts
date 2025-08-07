@@ -162,7 +162,7 @@ export class UserPollSession {
   @JoinColumn({ name: 'speakerId' })
   speaker?: Speaker;
 
-  @Column({ type: 'int', default: 1 })
+  @Column({ type: 'int', default: 0 })
   currentQuestionIndex!: number; // Current question number (0-based)
 
   @Column({ type: 'int', default: 0 })
