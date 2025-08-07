@@ -1,5 +1,5 @@
 // src/polling/polling.dto.ts
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested, ArrayMinSize, IsEnum, IsUrl, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, IsUUID, ValidateNested, ArrayMinSize, IsEnum, IsUrl, IsNumber, Min, Max } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ExternalPlatform } from './polling.entity';
 
@@ -14,13 +14,19 @@ export class CreatePollDto {
   @IsString()
   question!: string;
 
-  @IsOptional()
-  @IsString()
-  description?: string;
-
   @IsNotEmpty()
   @IsUUID()
   eventId!: string;
+
+  @IsNotEmpty() // Add speakerId field
+  @IsUUID()
+  speakerId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(5, { message: 'Timer must be at least 5 seconds' })
+  @Max(300, { message: 'Timer cannot exceed 300 seconds (5 minutes)' })
+  timerSeconds?: number = 30; // Default 30 seconds
 
   @IsNotEmpty()
   @IsArray()
@@ -34,9 +40,6 @@ export class UpdatePollDto {
   @IsString()
   question?: string;
 
-  @IsOptional()
-  @IsString()
-  description?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -49,6 +52,12 @@ export class UpdatePollDto {
   @IsOptional()
   @IsNumber()
   questionOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(5, { message: 'Timer must be at least 5 seconds' })
+  @Max(300, { message: 'Timer cannot exceed 300 seconds (5 minutes)' })
+  timerSeconds?: number;
 }
 
 export class VoteDto {

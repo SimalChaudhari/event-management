@@ -1273,9 +1273,12 @@ export class SurveyService {
           break;
       }
 
-      if (!canSubmitFeedback) {
-        throw new BusinessLogicException(feedbackReason);
-      }
+      //Open when testing over-------------
+
+      // if (!canSubmitFeedback) {
+      //   throw new BusinessLogicException(feedbackReason);
+      // }
+      //Open when testing over-------------
 
       // // 5. Check for duplicate feedback
       // const existingResponse = await this.surveyResponseRepository.findOne({

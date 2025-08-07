@@ -842,6 +842,15 @@ const ViewRegisterEventPage = () => {
         setShowStampImageModal(true);
     };
 
+    // Helper function to format time
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const [hour, minute] = timeStr.split(':');
+        const date = new Date();
+        date.setHours(hour, minute);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
     return (
         <>
             <Container fluid className="mt-4">
@@ -990,6 +999,14 @@ const ViewRegisterEventPage = () => {
                                             </Nav.Link>
                                         </Nav.Item>
                                     )}
+                                    {eventData?.event?.surveyDetails && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="survey">
+                                                <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Survey
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
                                 </Nav>
                             </Col>
                         </Row>
@@ -997,9 +1014,10 @@ const ViewRegisterEventPage = () => {
                         <Tab.Content>
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <div className="p-3" style={{ padding: '10px' }}>
-                                    <h5>Event Information</h5>
-                                    <hr />
+                                <div
+                                    className="p-4"
+                                    style={{ padding: '25px', background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}
+                                >
                                     <Row className="g-4">
                                         <Col md={6}>
                                             {/* Event Basic Details Card */}
@@ -1032,7 +1050,6 @@ const ViewRegisterEventPage = () => {
                                                             fontSize: '0.85rem',
                                                             color: '#6c757d',
                                                             fontWeight: '500',
-
                                                             letterSpacing: '0.5px',
                                                             marginBottom: '5px'
                                                         }}
@@ -1057,7 +1074,6 @@ const ViewRegisterEventPage = () => {
                                                             fontSize: '0.85rem',
                                                             color: '#6c757d',
                                                             fontWeight: '500',
-
                                                             letterSpacing: '0.5px',
                                                             marginBottom: '5px'
                                                         }}
@@ -1086,7 +1102,6 @@ const ViewRegisterEventPage = () => {
                                                             fontSize: '0.85rem',
                                                             color: '#6c757d',
                                                             fontWeight: '500',
-
                                                             letterSpacing: '0.5px',
                                                             marginBottom: '5px'
                                                         }}
@@ -1114,7 +1129,6 @@ const ViewRegisterEventPage = () => {
                                                             fontSize: '0.85rem',
                                                             color: '#6c757d',
                                                             fontWeight: '500',
-
                                                             letterSpacing: '0.5px',
                                                             marginBottom: '5px'
                                                         }}
@@ -1169,7 +1183,6 @@ const ViewRegisterEventPage = () => {
                                                             fontSize: '0.85rem',
                                                             color: '#6c757d',
                                                             fontWeight: '500',
-
                                                             letterSpacing: '0.5px',
                                                             marginBottom: '15px'
                                                         }}
@@ -1205,11 +1218,9 @@ const ViewRegisterEventPage = () => {
                                                         style={{
                                                             backgroundColor: '#f8f9fa',
                                                             padding: '15px',
-
                                                             fontSize: '0.95rem',
                                                             color: '#495057',
                                                             lineHeight: '1.6',
-
                                                             fontStyle: eventData.event.description ? 'normal' : 'italic'
                                                         }}
                                                     >
@@ -1410,7 +1421,57 @@ const ViewRegisterEventPage = () => {
                             {/* Exhibitors Tab */}
                             {eventData?.event?.exhibitorsData?.exhibitors?.length > 0 && (
                                 <Tab.Pane eventKey="exhibitors">
-                                    <div className="p-3">{renderExhibitors()}</div>
+                                    <div className="p-3">
+                                        {eventData.event.exhibitorsData.exhibitorDescription && (
+                                            <div className="mb-4">
+                                                <h6>Exhibitor Description</h6>
+                                                <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
+                                                    {eventData.event.exhibitorsData.exhibitorDescription}
+                                                </p>
+                                                <hr />
+                                            </div>
+                                        )}
+                                        {eventData.event.exhibitorsData.exhibitors.map((exhibitor) => (
+                                            <div key={exhibitor.id} className="mb-5">
+                                                {/* Header */}
+                                                <div className="d-flex align-items-center mb-4" style={{ gap: 24 }}>
+                                                    <img
+                                                        src={getImageSrc(exhibitor.profile)}
+                                                        alt={exhibitor.name}
+                                                        style={{
+                                                            width: 90,
+                                                            height: 90,
+                                                            borderRadius: '12px',
+                                                            objectFit: 'cover',
+                                                            boxShadow: '0 4px 16px rgba(0,0,0,0.08)'
+                                                        }}
+                                                    />
+                                                    <div>
+                                                        <h4 className="mb-1 fw-bold">{exhibitor.name}</h4>
+                                                        <div className="mb-1 text-primary">{exhibitor.companyName}</div>
+                                                        <Badge bg={exhibitor.isActive ? 'success' : 'secondary'}>
+                                                            {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                                        </Badge>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline-primary"
+                                                        size="sm"
+                                                        onClick={() => navigate(`/exhibitors/view-exhibitor/${exhibitor.id}`)}
+                                                        style={{
+                                                            borderRadius: '8px',
+                                                            padding: '8px 16px',
+                                                            fontSize: '14px',
+                                                            fontWeight: '500'
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-eye me-2" style={{ marginRight: 5 }}></i>
+                                                        View More
+                                                    </Button>
+                                                </div>
+                                                {/* You can add more exhibitor details here if needed */}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </Tab.Pane>
                             )}
 
@@ -1418,6 +1479,118 @@ const ViewRegisterEventPage = () => {
                             {eventData?.event?.eventStamps && (
                                 <Tab.Pane eventKey="stamps">
                                     <div className="p-3">{renderEventStamps()}</div>
+                                </Tab.Pane>
+                            )}
+
+                            {/* Survey Tab */}
+                            {eventData?.event?.surveyDetails && (
+                                <Tab.Pane eventKey="survey">
+                                    <div className="survey-section">
+                                        {/* Main Survey Details */}
+                                        <div className="mb-4">
+                                            <div className="d-flex align-items-center mb-3">
+                                                <i className="fas fa-clipboard-list text-primary me-2"></i>
+                                                <h5 className="mb-0 fw-bold">Survey Overview</h5>
+                                            </div>
+                                            <div className="card border-0 shadow-sm">
+                                                <div className="card-body p-4">
+                                            <div className="row">
+                                                <div className="col-lg-6 mb-3">
+                                                    <div className="d-flex align-items-center mb-2">
+                                                        <i className="fas fa-heading text-primary me-2" style={{ marginRight: 8 }}></i>
+                                                        <strong>Survey Title:</strong>
+                                                    </div>
+                                                    <p className="mb-0 text-dark">{eventData.event.surveyDetails.title}</p>
+                                                </div>
+                                                <div className="col-lg-6 mb-3">
+                                                    <div className="d-flex align-items-center mb-2">
+                                                        <i className="fas fa-toggle-on text-primary me-2" style={{ marginRight: 8 }}></i>
+                                                        <strong>Status:</strong>
+                                                    </div>
+                                                            <Badge
+                                                                bg={eventData.event.surveyDetails.isActive ? 'success' : 'secondary'}
+                                                                className="px-3 py-2"
+                                                            >
+                                                                <i className={`fas fa-${eventData.event.surveyDetails.isActive ? 'check-circle' : 'pause-circle'} me-1`}></i>
+                                                                {eventData.event.surveyDetails.isActive ? 'Active' : 'Inactive'}
+                                                            </Badge>
+                                                </div>
+                                            </div>
+                                                    <hr className="my-3" />
+                                            <div className="row">
+                                                <div className="col-lg-6 mb-3">
+                                                    <div className="d-flex align-items-center mb-2">
+                                                                <i className="fas fa-calendar-alt text-primary" style={{ marginRight: 8 }}></i>
+                                                        <strong>Start Date & Time:</strong>
+                                                    </div>
+                                                    <p className="mb-0 text-dark">
+                                                        {eventData.event.surveyDetails.startDate}
+                                                        <span style={{ margin: '0 6px' }}></span>
+                                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
+                                                        {formatTime(eventData.event.surveyDetails.startTime)}
+                                                    </p>
+                                                </div>
+                                                <div className="col-lg-6 mb-3">
+                                                    <div className="d-flex align-items-center mb-2">
+                                                                <i className="fas fa-calendar-check text-primary" style={{ marginRight: 8 }}></i>
+                                                        <strong>End Date & Time:</strong>
+                                                    </div>
+                                                    <p className="mb-0 text-dark">
+                                                        {eventData.event.surveyDetails.endDate}
+                                                        <span style={{ margin: '0 6px' }}></span>
+                                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
+                                                        {formatTime(eventData.event.surveyDetails.endTime)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {/* Sessions List */}
+                                        {eventData.event.surveyDetails.sessions?.length > 0 && (
+                                            <div>
+                                                <div className="d-flex align-items-center mb-3 mt-4">
+                                                    <i className="fas fa-list-ol text-primary" style={{ marginRight: 8 }}></i>
+                                                    <h6 className="mb-0 fw-bold">Sessions</h6>
+                                                </div>
+                                                <div className="row">
+                                                    {eventData.event.surveyDetails.sessions.map((session, index) => (
+                                                        <div key={session.id} className="col-md-6 mb-4">
+                                                            <div className="card border-0 shadow-sm h-100">
+                                                                <div className="card-body">
+                                                                    <div className="d-flex align-items-center mb-2">
+                                                                        <span className="badge bg-primary me-2" style={{ minWidth: 60 }}>
+                                                                            Session {index + 1}
+                                                                        </span>
+                                                                        <h6 className="mb-0 fw-bold">{session.name}</h6>
+                                                                            </div>
+                                                                    <p className="mb-2 small text-muted">{session.description}</p>
+                                                                    <div className="row mb-2">
+                                                                        <div className="col-6">
+                                                                            <small>
+                                                                                <i className="fas fa-calendar-day" style={{ marginRight: 4 }}></i>
+                                                                                <strong>Date:</strong> {session.date}
+                                                                            </small>
+                                                                        </div>
+                                                                        <div className="col-6">
+                                                                            <small>
+                                                                                <i className="fas fa-clock" style={{ marginRight: 4 }}></i>
+                                                                                <strong>Time:</strong> {formatTime(session.startTime)} - {formatTime(session.endTime)}
+                                                                            </small>
+                                                                            </div>
+                                                                        </div>
+                                                                    <Badge bg={session.isActive ? 'success' : 'secondary'} className="mt-2">
+                                                                        <i className={`fas fa-${session.isActive ? 'check-circle' : 'pause-circle'}`} style={{ marginRight: 4 }}></i>
+                                                                        {session.isActive ? 'Active' : 'Inactive'}
+                                                                    </Badge>
+                                                                    </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </Tab.Pane>
                             )}
                         </Tab.Content>

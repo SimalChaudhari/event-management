@@ -7,7 +7,6 @@ import {
     UPDATE_EXHIBITOR,
     DELETE_EXHIBITOR,
     EXHIBITOR_LOADING,
-    EXHIBITOR_ERROR,
     FETCH_PROMOTIONAL_OFFERS
 } from '../constants/actionTypes';
 
@@ -32,10 +31,7 @@ export const exhibitorList = () => async (dispatch) => {
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitors';
-        dispatch({
-            type: EXHIBITOR_ERROR,
-            payload: errorMessage
-        });
+       
         toast.error(errorMessage);
         return false;
     } finally {
@@ -55,10 +51,7 @@ export const exhibitorById = (id) => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitor';
-        dispatch({
-            type: EXHIBITOR_ERROR,
-            payload: errorMessage
-        });
+       
         toast.error(errorMessage);
         return false;
     } finally {
@@ -141,10 +134,7 @@ export const fetchPromotional = () => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch promotional offers';
-        dispatch({
-            type: EXHIBITOR_ERROR,
-            payload: errorMessage
-        });
+       
         toast.error(errorMessage);
         return false;
     } finally {

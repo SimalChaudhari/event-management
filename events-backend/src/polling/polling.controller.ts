@@ -40,6 +40,115 @@ export class PollingController {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
+  // =============== TIMER-BASED POLLING APIs ===============
+
+  // Get or Create Session with Current Question - Single API
+  @Get('session/:eventId/:speakerId')
+  async getOrCreateSession(
+    @Param('eventId') eventId: string,
+    @Param('speakerId') speakerId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.pollingService.getOrCreateSession(
+        req.user?.id,
+        eventId,
+        speakerId,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'isCompleted' in result && result.isCompleted
+          ? 'Session already completed. Here are your results:' 
+          : 'Session retrieved successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          userId: req.user?.id,
+          eventId: eventId,
+          speakerId: speakerId,
+          isCompleted: 'isCompleted' in result ? result.isCompleted : false,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get or create session', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Submit Answer and Advance to Next Question - Updated to use eventId instead of sessionId
+  @Post('session/submit-answer/:eventId/:speakerId')
+  async submitAnswerAndAdvance(
+    @Param('eventId') eventId: string,
+    @Param('speakerId') speakerId: string,
+    @Body() body: { pollId: string; optionId: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.pollingService.submitAnswerAndAdvance(
+        req.user?.id,
+        eventId,
+        speakerId,
+        body.pollId,
+        body.optionId,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.isCompleted ? 'Session completed' : 'Answer submitted successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          userId: req.user?.id,
+          eventId: eventId,
+          speakerId: speakerId,
+          isCompleted: result.isCompleted,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Submit answer and advance', req.user?.id);
+      throw error;
+    }
+  }
+
+  
+    // Get All Votes by Event ID - Enhanced response
+    @Get('votes/:eventId')
+    async getAllVotesByEventId(
+      @Param('eventId') eventId: string,
+      @Res() response: Response,
+      @Request() req: any,
+    ) {
+      try {
+        const isAdmin = req.user?.role === UserRole.Admin;
+        const result = await this.pollingService.getAllVotesByEventId(
+          eventId,
+          isAdmin,
+        );
+  
+        const successResponse: SuccessResponse = {
+          success: true,
+          message: result.message,
+          data: result.data,
+          metadata: {
+            ...result.metadata,
+            userId: req.user?.id,
+          },
+        };
+  
+        return response.status(HttpStatus.OK).json(successResponse);
+      } catch (error: any) {
+        this.errorHandler.logError(error, 'Get votes by event ID', req.user?.id);
+        throw error;
+      }
+    }
+
   // =============== POLL MANAGEMENT APIs ===============
 
   // Create Poll (Admin only)
@@ -79,11 +188,13 @@ export class PollingController {
     @Res() response: Response,
     @Request() req: any,
     @Query('eventId') eventId?: string,
+    @Query('speakerId') speakerId?: string,
   ) {
     try {
       const isAdmin = req.user?.role === UserRole.Admin;
       const questions = await this.pollingService.getAllQuestionsList(
         eventId,
+        speakerId,
         isAdmin,
       );
 
@@ -94,7 +205,7 @@ export class PollingController {
         metadata: {
           total: questions.data.length,
           eventId: eventId,
-
+          speakerId: speakerId,
           isAdmin: isAdmin,
           timestamp: new Date().toISOString(),
         },
@@ -223,75 +334,4 @@ export class PollingController {
     }
   }
 
-
-  // Submit Vote Answer with speakerId as parameter
-    @Post('vote/answer/:speakerId')
-    async submitVoteAnswer(
-      @Param('speakerId') speakerId: string,
-      @Body() voteDto: VoteDto,
-      @Res() response: Response,
-      @Request() req: any,
-    ) {
-      try {
-        // Add speakerId to voteDto
-        const voteData = {
-          ...voteDto,
-          speakerId: speakerId,
-        };
-  
-        const result = await this.pollingService.submitVoteAnswer(
-          voteData,
-          req.user?.id,
-        );
-  
-        const successResponse: SuccessResponse = {
-          success: true,
-          message: result.message,
-          data: result,
-          metadata: {
-            timestamp: new Date().toISOString(),
-            userId: req.user?.id,
-            speakerId: speakerId,
-            isVoteModified: result.userVote?.isModified || false,
-          },
-        };
-  
-        return response.status(HttpStatus.OK).json(successResponse);
-      } catch (error: any) {
-        this.errorHandler.logError(error, 'Submit vote answer', req.user?.id);
-        throw error;
-      }
-    }
-  
-    // Get All Votes by Event ID
-    @Get('votes/:eventId')
-    async getAllVotesByEventId(
-      @Param('eventId') eventId: string,
-      @Res() response: Response,
-      @Request() req: any,
-    ) {
-      try {
-        const isAdmin = req.user?.role === UserRole.Admin;
-        const result = await this.pollingService.getAllVotesByEventId(
-          eventId,
-          isAdmin,
-        );
-  
-        const successResponse: SuccessResponse = {
-          success: true,
-          message: result.message,
-          data: result.data,
-          metadata: {
-            ...result.metadata,
-            userId: req.user?.id,
-          },
-        };
-  
-        return response.status(HttpStatus.OK).json(successResponse);
-      } catch (error: any) {
-        this.errorHandler.logError(error, 'Get votes by event ID', req.user?.id);
-        throw error;
-      }
-    }
-  
 }

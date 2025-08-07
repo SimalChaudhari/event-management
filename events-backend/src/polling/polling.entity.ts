@@ -26,17 +26,19 @@ export class Poll {
   @Column({ type: 'varchar' })
   question!: string;
 
-  @Column({ type: 'text', nullable: true })
-  description?: string;
-
   @Column()
   eventId!: string;
 
+  @Column() // Add speakerId field
+  speakerId!: string;
 
   @ManyToOne(() => Event, { eager: false })
   @JoinColumn({ name: 'eventId' })
   event?: Event;
 
+  @ManyToOne(() => Speaker, { eager: false }) // Add speaker relation
+  @JoinColumn({ name: 'speakerId' })
+  speaker?: Speaker;
 
   @Column()
   createdById!: string;
@@ -48,8 +50,11 @@ export class Poll {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: true })
   isLive!: boolean;
+
+  @Column({ type: 'int', default: 30 }) // Timer in seconds for each question
+  timerSeconds!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -171,6 +176,15 @@ export class UserPollSession {
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  currentQuestionStartTime?: Date; // When current question started
+
+  @Column({ type: 'int', nullable: true })
+  currentQuestionTimer?: number; // Timer for current question in seconds
+
+  @Column({ type: 'boolean', default: false })
+  isTimerExpired!: boolean; // Whether current question timer has expired
 
   @CreateDateColumn()
   createdAt!: Date;

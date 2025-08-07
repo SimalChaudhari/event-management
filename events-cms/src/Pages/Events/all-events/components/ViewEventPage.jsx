@@ -5,6 +5,7 @@ import { useDispatch } from 'react-redux';
 import { eventById } from '../../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
 import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
+import { EXHIBITOR_PATHS } from '../../../../utils/constants';
 
 // Google Maps API Key
 const GOOGLE_API_KEY = 'AIzaSyAh43XIafkwl_7xaqeES90e8FQWqhN4DEc';
@@ -148,6 +149,8 @@ const ViewEventPage = () => {
 
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
+
+    const [activeTab, setActiveTab] = useState('offers');
 
     useEffect(() => {
         dispatch(eventById(id)).then((res) => {
@@ -687,118 +690,19 @@ const ViewEventPage = () => {
 
     // Render exhibitors
     const renderExhibitors = () => {
-        if (!eventData?.exhibitorsData?.exhibitors?.length) {
+        if (!eventData?.exhibitors?.exhibitors?.length) {
             return <p>No exhibitors available.</p>;
         }
 
         return (
             <div>
-                {eventData.exhibitorsData.exhibitorDescription && (
+                {eventData.exhibitors?.exhibitorDescription && (
                     <div className="mb-4">
                         <h6>Exhibitor Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.exhibitorsData.exhibitorDescription}</p>
+                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.exhibitors.exhibitorDescription}</p>
                         <hr />
                     </div>
                 )}
-
-                <div className="exhibitors-grid">
-                    {eventData.exhibitorsData.exhibitors.map((exhibitor) => (
-                        <div key={exhibitor.id} className="exhibitor-card mb-4">
-                            <div className="exhibitor-header">
-                                <h6 className="exhibitor-name">{exhibitor.name}</h6>
-                                <p className="exhibitor-company">{exhibitor.companyName}</p>
-                            </div>
-
-                            <div className="exhibitor-info">
-                                {exhibitor.companyDescription && <p className="exhibitor-description">{exhibitor.companyDescription}</p>}
-
-                                <div className="exhibitor-contact">
-                                    {exhibitor.email && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-envelope"></i>
-                                            <span>{exhibitor.email}</span>
-                                        </div>
-                                    )}
-
-                                    {exhibitor.mobile && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-mobile"></i>
-                                            <span>{exhibitor.mobile}</span>
-                                        </div>
-                                    )}
-
-                                    {exhibitor.address && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-map-marker-alt"></i>
-                                            <span>{exhibitor.address}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Exhibitor Images */}
-                                {exhibitor.eventImages?.length > 0 && (
-                                    <div className="mt-3">
-                                        <h6>Event Images</h6>
-                                        <div
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                                                gap: '8px'
-                                            }}
-                                        >
-                                            {exhibitor.eventImages.map((image, index) => (
-                                                <img
-                                                    key={index}
-                                                    src={getImageSrc(image)}
-                                                    alt={`Exhibitor ${index + 1}`}
-                                                    style={{
-                                                        width: '100%',
-                                                        height: '80px',
-                                                        objectFit: 'cover',
-                                                        borderRadius: '4px'
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Promotional Offers */}
-                                {exhibitor.promotionalOffers?.length > 0 && (
-                                    <div className="mt-3">
-                                        <h6>Promotional Offers</h6>
-                                        {exhibitor.promotionalOffers.map((offer) => (
-                                            <div key={offer.id} className="offer-card mb-2">
-                                                <div className="d-flex align-items-center">
-                                                    {offer.image && (
-                                                        <img
-                                                            src={getImageSrc(offer.image)}
-                                                            alt={offer.title}
-                                                            style={{
-                                                                width: '50px',
-                                                                height: '50px',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '4px',
-                                                                marginRight: '10px'
-                                                            }}
-                                                        />
-                                                    )}
-                                                    <div>
-                                                        <h6 className="mb-1">{offer.title}</h6>
-                                                        <p className="mb-1 small">{offer.description}</p>
-                                                        <small className="text-muted">
-                                                            Valid until: {new Date(offer.validDate).toLocaleDateString()}
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
             </div>
         );
     };
@@ -881,6 +785,194 @@ const ViewEventPage = () => {
                         <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.eventStamps.description}</p>
                     </div>
                 )}
+            </div>
+        );
+    };
+
+    // Add new render functions for Survey, Promotional Offers, and Exhibitors
+    const renderSurvey = () => {
+        if (!eventData?.surveyDetails) {
+            return (
+                <div className="text-center py-5">
+                    <i className="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h5 className="text-muted mb-2">No Survey Available</h5>
+                    <p className="text-muted">This event doesn't have any surveys configured.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="survey-section">
+                {/* Main Survey Details */}
+                <div className="mb-4">
+                    <div className="d-flex align-items-center mb-3">
+                        <i className="fas fa-clipboard-list text-primary me-2"></i>
+                        <h5 className="mb-0 fw-bold">Survey Overview</h5>
+                    </div>
+                    
+                    <div className="card border-0 shadow-sm">
+                        <div className="card-body p-4">
+                            <div className="row">
+                                <div className="col-lg-6 mb-3">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <i className="fas fa-heading text-primary me-2" style={{ marginRight: 8 }}></i> 
+                                        <strong>Survey Title:</strong>
+                                    </div>
+                                    <p className="mb-0 text-dark">{eventData.surveyDetails.title}</p>
+                                </div>
+                                
+                                <div className="col-lg-6 mb-3">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <i className="fas fa-toggle-on text-primary me-2" style={{ marginRight: 8 }}></i> 
+                                        <strong>Status:</strong>
+                                    </div>
+                                    <Badge 
+                                        bg={eventData.surveyDetails.isActive ? 'success' : 'secondary'} 
+                                        className="px-3 py-2"
+                                    >
+                                        <i className={`fas fa-${eventData.surveyDetails.isActive ? 'check-circle' : 'pause-circle'} me-1`}></i>
+                                        {eventData.surveyDetails.isActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </div>
+                            </div>
+                            
+                            <hr className="my-3" />
+                            
+                            <div className="row">
+                                <div className="col-lg-6 mb-3">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <i className="fas fa-calendar-alt text-primary" style={{ marginRight: 8 }}></i>
+                                        <strong>Start Date & Time:</strong>
+                                    </div>
+                                    <p className="mb-0 text-dark">
+                                        {eventData.surveyDetails.startDate}
+                                        <span style={{ margin: '0 6px' }}></span>
+                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
+                                        {formatTime(eventData.surveyDetails.startTime)}
+                                    </p>
+                                </div>
+                                
+                                <div className="col-lg-6 mb-3">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <i className="fas fa-calendar-check text-primary" style={{ marginRight: 8 }}></i>
+                                        <strong>End Date & Time:</strong>
+                                    </div>
+                                    <p className="mb-0 text-dark">
+                                        {eventData.surveyDetails.endDate}
+                                        <span style={{ margin: '0 6px' }}></span>
+                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
+                                        {formatTime(eventData.surveyDetails.endTime)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sessions List */}
+                {eventData.surveyDetails.sessions?.length > 0 && (
+                    <div>
+                        <div className="d-flex align-items-center mb-3 mt-4">
+                            <i className="fas fa-list-ol text-primary" style={{ marginRight: 8 }}></i>
+                            <h6 className="mb-0 fw-bold">Sessions</h6>
+                        </div>
+                        <div className="row">
+                            {eventData.surveyDetails.sessions.map((session, index) => (
+                                <div key={session.id} className="col-md-6 mb-4">
+                                    <div className="card border-0 shadow-sm h-100">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center mb-2">
+                                                <span className="badge bg-primary me-2" style={{ minWidth: 60 }}>
+                                                    Session {index + 1}
+                                                </span>
+                                                <h6 className="mb-0 fw-bold">{session.name}</h6>
+                                            </div>
+                                            <p className="mb-2 small text-muted">{session.description}</p>
+                                            <div className="row mb-2">
+                                                <div className="col-6">
+                                                    <small>
+                                                        <i className="fas fa-calendar-day" style={{ marginRight: 4 }}></i>
+                                                        <strong>Date:</strong> {session.date}
+                                                    </small>
+                                                </div>
+                                                <div className="col-6">
+                                                    <small>
+                                                        <i className="fas fa-clock" style={{ marginRight: 4 }}></i>
+                                                        <strong>Time:</strong> {formatTime(session.startTime)} - {formatTime(session.endTime)}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <Badge bg={session.isActive ? 'success' : 'secondary'} className="mt-2">
+                                                <i className={`fas fa-${session.isActive ? 'check-circle' : 'pause-circle'}`} style={{ marginRight: 4 }}></i>
+                                                {session.isActive ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+ 
+
+    const renderExhibitorsDetailed = () => {
+        if (!eventData?.exhibitors?.exhibitors?.length) {
+            return (
+                <div className="text-center py-4">
+                    <i className="fas fa-store fa-2x text-muted mb-2"></i>
+                    <p className="text-muted">No exhibitors available.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                {eventData.exhibitors.exhibitors.map((exhibitor) => (
+                    <div key={exhibitor.id} className="mb-5">
+                        {/* Header */}
+                        <div className="d-flex align-items-center mb-4" style={{ gap: 24 }}>
+                            <img
+                                src={getImageSrc(exhibitor.profile)}
+                                alt={exhibitor.name}
+                                style={{
+                                    width: 90,
+                                    height: 90,
+                                    borderRadius: '12px',
+                                    objectFit: 'cover',
+                                    boxShadow: '0 4px 16px rgba(0,0,0,0.08)'
+                                }}
+                            />
+                            <div>
+                                <h4 className="mb-1 fw-bold">{exhibitor.name}</h4>
+                                <div className="mb-1 text-primary">{exhibitor.companyName}</div>
+                                <Badge bg={exhibitor.isActive ? 'success' : 'secondary'}>
+                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                            </div>
+
+                            <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => navigate(`${EXHIBITOR_PATHS.VIEW_EXHIBITOR}/${exhibitor.id}`)}
+                                style={{
+                                    borderRadius: '8px',
+                                    padding: '8px 16px',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                }}
+                            >
+                                <i className="fas fa-eye me-2" style={{marginRight: 5}}></i>
+                                View More
+                            </Button>
+                        </div>
+
+                  
+                    </div>
+                ))}
             </div>
         );
     };
@@ -1019,6 +1111,15 @@ const ViewEventPage = () => {
         </div>
     );
 
+    // 12-hour AM/PM format helper
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const [hour, minute] = timeStr.split(':');
+        const date = new Date();
+        date.setHours(hour, minute);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
     return (
         <>
             <Container fluid className="mt-4">
@@ -1066,38 +1167,44 @@ const ViewEventPage = () => {
                                             Media
                                         </Nav.Link>
                                     </Nav.Item>
-                                    {eventData?.floorPlan && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="floorplan">
-                                                <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Floor Plan
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.galleries?.length > 0 && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="gallery">
-                                                <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Gallery
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.exhibitorsData?.exhibitors?.length > 0 && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="exhibitors">
-                                                <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Exhibitors
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.eventStamps && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="stamps">
-                                                <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Event Stamps
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="floorplan">
+                                            <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Floor Plan
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="gallery">
+                                            <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Gallery
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                  
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="stamps">
+                                            <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Event Stamps
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="survey">
+                                            <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Survey
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="exhibitors">
+                                            <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Exhibitors
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                
                                 </Nav>
                             </Col>
                         </Row>
@@ -1366,32 +1473,39 @@ const ViewEventPage = () => {
                             </Tab.Pane>
 
                             {/* Floor Plan Tab */}
-                            {eventData?.floorPlan && (
-                                <Tab.Pane eventKey="floorplan">
-                                    <div className="p-3">{renderFloorPlan()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="floorplan">
+                                <div className="p-3">{renderFloorPlan()}</div>
+                            </Tab.Pane>
 
                             {/* Gallery Tab */}
-                            {eventData?.galleries?.length > 0 && (
-                                <Tab.Pane eventKey="gallery">
-                                    <div className="p-3">{renderGalleries()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="gallery">
+                                <div className="p-3">{renderGalleries()}</div>
+                            </Tab.Pane>
 
                             {/* Exhibitors Tab */}
-                            {eventData?.exhibitorsData?.exhibitors?.length > 0 && (
-                                <Tab.Pane eventKey="exhibitors">
-                                    <div className="p-3">{renderExhibitors()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="exhibitors">
+                                <div className="p-3">{renderExhibitors()}</div>
+                                <div className="p-3">{renderExhibitorsDetailed()}</div>
+                            </Tab.Pane>
 
                             {/* Event Stamps Tab */}
-                            {eventData?.eventStamps && (
-                                <Tab.Pane eventKey="stamps">
-                                    <div className="p-3">{renderEventStamps()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="stamps">
+                                <div className="p-3">{renderEventStamps()}</div>
+                            </Tab.Pane>
+
+                            {/* Survey Tab */}
+
+                            <Tab.Pane eventKey="survey">
+                                <div className="p-3">{renderSurvey()}</div>
+                            </Tab.Pane>
+
+                          
+
+                        
                         </Tab.Content>
                     </Tab.Container>
                 </div>

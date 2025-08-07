@@ -89,7 +89,7 @@ export const createPromotionalOffer = (data) => async (dispatch) => {
                 payload: response.data.data
             });
             toast.success(response.data.message || 'Promotional offer created successfully!');
-            return response.data;
+            return true;
         }
         return false;
     } catch (error) {

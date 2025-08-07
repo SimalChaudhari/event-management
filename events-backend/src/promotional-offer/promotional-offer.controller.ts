@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -79,11 +80,19 @@ export class PromotionalOfferController {
   }
 
   @Get()
-  async getAllPromotionalOffers(@Res() response: Response) {
-    const promotionalOffers = await this.promotionalOfferService.getAllPromotionalOffers();
+  async getAllPromotionalOffers(
+    @Res() response: Response,
+    @Query('exhibitorId') exhibitorId?: string,
+  ) {
+    const promotionalOffers = exhibitorId 
+      ? await this.promotionalOfferService.getPromotionalOffersByExhibitor(exhibitorId)
+      : await this.promotionalOfferService.getAllPromotionalOffers();
+    
     return response.status(200).json({
       success: true,
-      message: 'Promotional offers retrieved successfully',
+      message: exhibitorId 
+        ? `Promotional offers for exhibitor ${exhibitorId} retrieved successfully`
+        : 'All promotional offers retrieved successfully',
       data: promotionalOffers,
     });
   }

@@ -29,6 +29,7 @@ import { Roles } from 'jwt/roles.decorator';
 import { UserRole } from 'user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
+
 interface SuccessResponse {
   success: boolean;
   message: string;
@@ -45,6 +46,7 @@ export class QnaController {
   constructor(
     private readonly qnaService: QnaService,
     private readonly errorHandler: ErrorHandlerService,
+
   ) {}
 
   // Create Question (Always for a specific speaker)
@@ -79,7 +81,7 @@ export class QnaController {
     }
   }
 
-  // Get Questions (All users can see all questions)
+  // Get Questions (All users can see all questions) - Updated to require both eventId and speakerId
   @Get()
   async getQuestions(
     @Query() query: GetQuestionsDto,
@@ -87,6 +89,19 @@ export class QnaController {
     @Request() req: any,
   ) {
     try {
+      // Validate that both eventId and speakerId are provided
+      if (!query.eventId || !query.speakerId) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'Both eventId and speakerId are required',
+          data: null,
+          metadata: {
+            timestamp: new Date().toISOString(),
+            userId: req.user?.id,
+          },
+        });
+      }
+
       const result = await this.qnaService.getQuestions(query, req.user?.id);
 
       const successResponse: SuccessResponse = {
@@ -102,6 +117,56 @@ export class QnaController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get Q&A questions', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get All Questions List (Public) - Updated to require both eventId and speakerId
+  @Get('questions/list')
+  async getAllQuestionsList(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query('eventId') eventId?: string,
+    @Query('speakerId') speakerId?: string,
+  ) {
+    try {
+      // Validate that both eventId and speakerId are provided
+      if (!eventId || !speakerId) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'Both eventId and speakerId are required',
+          data: null,
+          metadata: {
+            timestamp: new Date().toISOString(),
+            userId: req.user?.id,
+          },
+        });
+      }
+
+      const isAdmin = req.user?.role === UserRole.Admin;
+      const getDto: GetQuestionsDto = {
+        eventId,
+        speakerId,
+        status: undefined,
+        sortBy: undefined,
+      };
+
+      const result = await this.qnaService.getQuestions(getDto, req.user?.id);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          ...result.metadata,
+          isAdmin: isAdmin,
+          userId: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get questions list', req.user?.id);
       throw error;
     }
   }

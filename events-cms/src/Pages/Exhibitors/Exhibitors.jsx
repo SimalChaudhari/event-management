@@ -47,7 +47,7 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
         columns: [
             {
                 data: 'name',
-                title: 'Exhibitor Details',
+                title: 'Name/Company Name/Status',
                 render: function (data, type, row) {
                  
                     const imageUrl = row.eventImages && row.eventImages.length > 0 
@@ -321,10 +321,9 @@ const Exhibitors = () => {
                             <Table striped hover responsive id="exhibitor-data-table">
                                 <thead>
                                     <tr>
-                                        <th>Exhibitor Details</th>
+                                        <th>Name/Company Name/Status</th>
                                         <th>Contact & Company</th>
-                                        <th>Location</th>
-                                       
+                                        <th>Location</th>  
                                         <th>Created Date</th>
                                         <th>Actions</th>
                                     </tr>

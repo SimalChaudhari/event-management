@@ -55,13 +55,13 @@ export class LikeQuestionDto {
 }
 
 export class GetQuestionsDto {
-  @IsOptional()
+  @IsNotEmpty() // Changed from @IsOptional() to @IsNotEmpty()
   @IsUUID()
-  eventId?: string;
+  eventId!: string; // Required
 
-  @IsOptional()
+  @IsNotEmpty() // Changed from @IsOptional() to @IsNotEmpty()
   @IsUUID()
-  speakerId?: string; // Optional filter by speaker
+  speakerId!: string; // Required - both event and speaker are compulsory
 
   @IsOptional()
   @IsEnum(QuestionStatus)

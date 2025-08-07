@@ -5,6 +5,7 @@ import { Row, Col, Card, Badge, Button, Tab, Nav, Alert, Container, Modal } from
 import { exhibitorById } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
+import NoDataFound from '../../components/NoDataFound';
 
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
@@ -33,10 +34,6 @@ const ViewExhibitorPage = () => {
         } catch (error) {
             console.error('Failed to load exhibitor data:', error);
         }
-    };
-
-    const handleEdit = () => {
-        navigate(`${EXHIBITOR_PATHS.ADD_EXHIBITOR}/${id}`);
     };
 
     const handleBack = () => {
@@ -97,50 +94,23 @@ const ViewExhibitorPage = () => {
         setShowImageModal(true);
     };
 
-    // Loading state
-    if (loading) {
-        return (
-            <div className="text-center p-5">
-                <div className="spinner-border" role="status">
-                    <span className="sr-only">Loading...</span>
-                </div>
-            </div>
-        );
-    }
-
-    // Error state
-    if (error) {
-        return (
-            <Container fluid>
-                <Row>
-                    <Col sm={12}>
-                        <Alert variant="danger">{error}</Alert>
-                        <Button variant="secondary" onClick={handleBack}>
-                            <i className="fas fa-arrow-left me-2"></i>
-                            Back to Exhibitors
-                        </Button>
-                    </Col>
-                </Row>
-            </Container>
-        );
-    }
 
     // No exhibitor found
-    if (!exhibitor) {
-        return (
-            <Container fluid>
-                <Row>
-                    <Col sm={12}>
-                        <Alert variant="warning">Exhibitor not found</Alert>
-                        <Button variant="secondary" onClick={handleBack}>
-                            <i className="fas fa-arrow-left me-2"></i>
-                            Back to Exhibitors
-                        </Button>
-                    </Col>
-                </Row>
-            </Container>
-        );
-    }
+        if (!exhibitor) {
+            return (
+                <NoDataFound
+                    title="Exhibitor Not Found"
+                    message="The exhibitor you're looking for doesn't exist or has been removed."
+                    icon="fas fa-building-slash"
+                    variant="warning"
+                    size="medium"
+                    showBackButton={true}
+                    backButtonText="Back"
+                    backButtonPath={`${EXHIBITOR_PATHS.LIST_EXHIBITORS}`}
+                />
+            );
+        }
+    
 
     // Render promotional offers section
     const renderPromotionalOffers = () => {
@@ -512,6 +482,7 @@ const ViewExhibitorPage = () => {
                                                         e.target.src = '/assets/images/user/avatar-1.jpg';
                                                     }}
                                                 />
+                                                
                                             )}
                                             <div className='m-1'>
                                                 <h4 className="mb-1">{exhibitor.name}</h4>

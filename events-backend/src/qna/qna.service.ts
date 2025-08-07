@@ -113,15 +113,21 @@ export class QnaService {
     }
   }
 
-  // Get Questions (All users can see all questions)
+  // Get Questions (All users can see all questions) - Updated to require both eventId and speakerId
   async getQuestions(getDto: GetQuestionsDto, userId?: string) {
     try {
+      // Both eventId and speakerId are now required
+      if (!getDto.eventId || !getDto.speakerId) {
+        throw new ValidationException(
+          'Both eventId and speakerId are required to retrieve Q&A questions',
+        );
+      }
+
       const whereConditions: any = {
         isActive: true,
+        eventId: getDto.eventId, // Always required
+        speakerId: getDto.speakerId, // Always required
       };
-
-      if (getDto.eventId) whereConditions.eventId = getDto.eventId;
-      if (getDto.speakerId) whereConditions.speakerId = getDto.speakerId;
 
       // Handle status filter
       if (getDto.status === QuestionStatus.ANSWERED) {
@@ -129,6 +135,9 @@ export class QnaService {
       } else if (getDto.status === QuestionStatus.UNANSWERED) {
         whereConditions.answeredAt = null;
       }
+
+      // Debug logging
+      console.log('Searching Q&A questions with conditions:', whereConditions);
 
       const questions = await this.qnaQuestionRepository.find({
         where: whereConditions,
@@ -148,7 +157,24 @@ export class QnaService {
         });
       }
 
-      // Process questions - show all questions to all users
+      // Get event and speaker details
+      const event = await this.eventRepository.findOne({
+        where: { id: getDto.eventId },
+      });
+
+      const speaker = await this.speakerRepository.findOne({
+        where: { id: getDto.speakerId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', getDto.eventId);
+      }
+
+      if (!speaker) {
+        throw new ResourceNotFoundException('Speaker', getDto.speakerId);
+      }
+
+      // Process questions for this specific event-speaker combination
       const processedQuestions = questions.map((question) => {
         const userLiked = userLikes.some(
           (like) => like.questionId === question.id,
@@ -157,12 +183,6 @@ export class QnaService {
         return {
           id: question.id,
           question: question.question,
-          event: question.event
-            ? {
-                id: question.event.id,
-                name: question.event.name,
-              }
-            : null,
           askedBy: question.isAnonymous
             ? null
             : question.askedBy
@@ -175,13 +195,6 @@ export class QnaService {
                     `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
                 }
               : null,
-          speaker: question.speaker
-            ? {
-                id: question.speaker.id,
-                name: question.speaker.name,
-                email: question.speaker.email,
-              }
-            : null,
           answeredBy: question.answeredByUser
             ? {
                 id: question.answeredByUser.id,
@@ -198,31 +211,50 @@ export class QnaService {
           isPinned: question.isPinned,
           isActive: question.isActive,
           answeredAt: question.answeredAt,
-          answer: question.answer || null, // Always show answer field (empty if no answer)
+          answer: question.answer || null,
           createdAt: question.createdAt,
           updatedAt: question.updatedAt,
-          // Additional info for better UX
           isAnswered: !!question.answeredAt,
           isMyQuestion: userId === question.askedById,
         };
       });
 
-      // Sort by pinned first, then by likes
+      // Sort questions by pinned first, then by likes
       const sortedQuestions = processedQuestions.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         return b.likesCount - a.likesCount;
       });
 
+      // Return structured response with event and speaker info
+      const data = {
+        event: {
+          id: event.id,
+          name: event.name,
+        },
+        speaker: {
+          id: speaker.id,
+          name: speaker.name,
+          email: speaker.email,
+        },
+        questions: sortedQuestions,
+      };
+
+      // Calculate summary statistics
+      const totalQuestions = questions.length;
+      const answeredQuestions = questions.filter((q) => q.answeredAt).length;
+      const unansweredQuestions = totalQuestions - answeredQuestions;
+      const pinnedQuestions = questions.filter((q) => q.isPinned).length;
+
       return {
         success: true,
         message: 'Questions retrieved successfully',
-        data: sortedQuestions,
+        data: data,
         metadata: {
-          total: sortedQuestions.length,
-          answered: sortedQuestions.filter((q) => q.isAnswered).length,
-          unanswered: sortedQuestions.filter((q) => !q.isAnswered).length,
-          pinned: sortedQuestions.filter((q) => q.isPinned).length,
+          total: totalQuestions,
+          answered: answeredQuestions,
+          unanswered: unansweredQuestions,
+          pinned: pinnedQuestions,
           eventId: getDto.eventId,
           speakerId: getDto.speakerId,
           status: getDto.status,
@@ -231,11 +263,18 @@ export class QnaService {
         },
       };
     } catch (error: any) {
+      if (error instanceof ValidationException || error instanceof ResourceNotFoundException) {
+        throw error;
+      }
       this.errorHandler.logError(error, 'Get Q&A questions');
       return {
         success: false,
         message: 'Failed to retrieve questions',
-        data: [],
+        data: {
+          event: null,
+          speaker: null,
+          questions: [],
+        },
         metadata: {
           total: 0,
           answered: 0,

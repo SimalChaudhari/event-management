@@ -16,6 +16,8 @@ import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from './pol
       Poll, 
       PollOption, 
       PollVote, 
+      UserPollSession,
+      UserPollVote,
       Event, 
       Speaker, 
       UserEntity // Add this

@@ -44,7 +44,7 @@ const AddPromotionalOfferPage = () => {
                         setFormData({
                             title: offer.title || '',
                             description: offer.description || '',
-                            validDate: offer.validDate || '',
+                            validDate: offer.validDate ? offer.validDate.split('T')[0] : '', // Parse date properly
                             exhibitorId: offer.exhibitorId || '',
                             companyName: offer.companyName || '',
                             image: null // Don't populate file input
@@ -129,6 +129,17 @@ const AddPromotionalOfferPage = () => {
             submitData.append('validDate', formData.validDate);
             submitData.append('exhibitorId', formData.exhibitorId);
             submitData.append('companyName', formData.companyName);
+
+            if (formData.image) {
+                submitData.append('image', formData.image);
+            }
+            
+            // Handle existing image for edit mode
+            if (id && !formData.image && imagePreview) {
+                // If editing and no new image selected, keep existing image
+                const existingImagePath = imagePreview.replace(`${API_URL}/`, '');
+                submitData.append('originalImage', existingImagePath);
+            }
             
             let response;
             if (id) {
@@ -206,13 +217,14 @@ const AddPromotionalOfferPage = () => {
                                                 Valid Date *
                                             </label>
                                             <input
-                                                type="text"
+                                                type="date"
                                                 className="form-control"
                                                 name="validDate"
                                                 value={formData.validDate}
                                                 onChange={handleInputChange}
-                                                placeholder="e.g., 2025-12-31 or December 2025"
+                                                placeholder="Select valid date"
                                                 required
+                                                min={new Date().toISOString().split('T')[0]}
                                             />
                                         </div>
                                     </Col>
