@@ -26,7 +26,6 @@ import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.modu
 import { SurveyModule } from 'survey/survey.module';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { PollingModule } from 'polling/polling.module';
-import { ChatModule } from 'chat/chat.module';
 import { QnaModule } from 'qna/qna.module';
 
 @Module({
@@ -51,7 +50,6 @@ import { QnaModule } from 'qna/qna.module';
     ExhibitorModule,
     GalleryModule,
     PromotionalOfferModule,
-    ChatModule,
     SurveyModule,
     QnaModule,
     PollingModule,
