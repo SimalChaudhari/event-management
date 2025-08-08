@@ -26,7 +26,7 @@ import {
   ValidationException,
   ForeignKeyConstraintException,
 } from '../utils/exceptions/custom-exceptions';
-import { SurveyUtilityService } from 'utils/services/survey-utility.service';
+import { SurveyUtils } from '../utils/survey-utils';
 
 @Injectable()
 export class EventService {
@@ -50,8 +50,7 @@ export class EventService {
     @InjectRepository(FavoriteEvent)
     private favoriteEventRepository: Repository<FavoriteEvent>,
     private readonly errorHandler: ErrorHandlerService,
-
-    private readonly surveyUtility: SurveyUtilityService,
+    private readonly surveyUtils: SurveyUtils,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -316,20 +315,12 @@ export class EventService {
 
       const events = await queryBuilder.getMany();
 
-      // Get survey details for all events efficiently using utility
-      const eventIds = events.map((event) => event.id);
-      const surveyMap = await this.surveyUtility.getBulkEventSurveyDetails(
-        eventIds,
-        userRole || 'user',
-        userId,
-      );
-
+  
       // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
-
-          const surveyDetails = surveyMap.get(event.id);
+          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (event.documents && event.documentNames) {
@@ -479,6 +470,9 @@ export class EventService {
       const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
       const attendanceCount = await this.getEventAttendanceCount(id);
 
+      // Get survey details for this event
+      const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(id);
+
       // Check if event is favorited by user
       let isFavorite = false;
       if (userId) {
@@ -488,11 +482,7 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
-      const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
-        id,
-        userRole || 'user',
-        userId,
-      );
+ 
       // Check if user has registered for this event
       let isRegistered = false;
       if (userId) {

@@ -21,7 +21,7 @@ import {
   DuplicateResourceException,
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
-import { SurveyUtilityService } from 'utils/services/survey-utility.service';
+import { SurveyUtils } from 'utils/survey-utils';
 
 @Injectable()
 export class RegisterEventService {
@@ -32,15 +32,12 @@ export class RegisterEventService {
     @InjectRepository(Event)
     private readonly eventRepository: Repository<Event>,
 
-    @InjectRepository(Order)
-    private readonly orderRepository: Repository<Order>,
-
     @InjectRepository(FavoriteEvent)
     private readonly favoriteEventRepository: Repository<FavoriteEvent>,
 
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
-    private readonly surveyUtility: SurveyUtilityService,
+    private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -163,11 +160,9 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
-          const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
-            registerEvent.eventId || '',
-            role,
-            registerEvent.userId,
-          );
+          const surveyDetails = registerEvent.eventId 
+          ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId)
+          : null;
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (
@@ -370,12 +365,11 @@ export class RegisterEventService {
         );
       }
 
-      const surveyDetails = await this.surveyUtility.getEventSurveyDetails(
-        registerEvent.eventId || '',
-        role,
-        registerEvent.userId,
-      );
-
+      console.log(registerEvent.eventId, 'registerEvent.eventId');
+      const surveyDetails = registerEvent.eventId 
+      ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId)
+      : null;
+    
       // Extract only speakers
       const speakers =
         registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];

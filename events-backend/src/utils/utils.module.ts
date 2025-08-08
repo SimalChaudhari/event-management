@@ -1,12 +1,15 @@
 // src/utils/utils.module.ts
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ErrorHandlerService } from './services/error-handler.service';
-import { SurveyUtilityService } from './services/survey-utility.service';
-import { SurveyModule } from '../survey/survey.module';
+import { SurveyUtils } from './survey-utils';
+import { Survey, SurveySession } from '../survey/survey.entity';
 
 @Module({
-  imports: [SurveyModule], // Import Survey Module
-  providers: [ErrorHandlerService, SurveyUtilityService],
-  exports: [ErrorHandlerService, SurveyUtilityService], // Export for other modules
+  imports: [
+    TypeOrmModule.forFeature([Survey, SurveySession]),
+  ],
+  providers: [ErrorHandlerService, SurveyUtils],
+  exports: [ErrorHandlerService, SurveyUtils],
 })
 export class UtilsModule {} 

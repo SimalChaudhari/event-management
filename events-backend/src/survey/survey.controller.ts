@@ -105,8 +105,7 @@ export class SurveyController {
   }
 
   // READ - Get all surveys with sessions (Admin only)
-  @Get('admin/all')
-  @Roles(UserRole.Admin)
+  @Get('current')
   async getAllSurveysWithSessions(
     @Res() response: Response,
     @Request() req: any,
@@ -135,107 +134,38 @@ export class SurveyController {
     }
   }
 
-  // READ - Get current time surveys with sessions (For users) - ENHANCED
-  @Get('current')
-  async getCurrentTimeSurveysWithSessions(
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const surveys =
-        await this.surveyService.getCurrentTimeSurveysWithSessions();
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Current time surveys with sessions retrieved successfully',
-        data: surveys,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error: any) {
-      this.errorHandler.logError(
-        error,
-        'Get current time surveys',
-        req.user?.id,
-      );
-      throw error;
-    }
-  }
-
-  // Get single survey with current sessions (For users) - ENHANCED
+    // Get single survey with all sessions (Admin only)
   @Get(':surveyId')
-  async getSurveyWithCurrentSessions(
-    @Param('surveyId') surveyId: string,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const survey =
-        await this.surveyService.getSurveyWithCurrentSessions(surveyId);
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Survey with current sessions retrieved successfully',
-        data: survey,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          surveyId,
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error: any) {
-      this.errorHandler.logError(
-        error,
-        'Get survey with current sessions',
-        req.user?.id,
-      );
-      throw error;
+    async getSurveyWithAllSessions(
+      @Param('surveyId') surveyId: string,
+      @Res() response: Response,
+      @Request() req: any,
+    ) {
+      try {
+        const survey =
+          await this.surveyService.getSurveyWithAllSessions(surveyId);
+  
+        const successResponse: SuccessResponse = {
+          success: true,
+          message: 'Survey with all sessions retrieved successfully',
+          data: survey,
+          metadata: {
+            timestamp: new Date().toISOString(),
+            surveyId,
+            requestedBy: req.user?.id,
+          },
+        };
+  
+        return response.status(HttpStatus.OK).json(successResponse);
+      } catch (error: any) {
+        this.errorHandler.logError(
+          error,
+          'Get survey with all sessions',
+          req.user?.id,
+        );
+        throw error;
+      }
     }
-  }
-
-  // Get survey detail by event ID and user role
-  @Get('event/:eventId')
-  async getSurveyDetailByEventId(
-    @Param('eventId') eventId: string,
-    @Request() req: any,
-    @Res() response: Response,
-  ) {
-    try {
-      const userRole = req.user?.role;
-      const userId = req.user?.id;
-
-      const survey = await this.surveyService.getSurveyDetailByEventId(
-        eventId,
-        userRole,
-        userId,
-      );
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Survey detail retrieved successfully by event ID',
-        data: survey,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          userRole,
-          eventId,
-          userId: userId || null,
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error: any) {
-      this.errorHandler.logError(
-        error,
-        'Get survey detail by event ID',
-        req.user?.id,
-      );
-      throw error;
-    }
-  }
 
   // Get survey detail based on user role - ENHANCED
   @Get('detail/:surveyId')
@@ -304,39 +234,6 @@ export class SurveyController {
     }
   }
 
-  // Get single survey with all sessions (Admin only)
-  @Get('admin/:surveyId')
-  @Roles(UserRole.Admin)
-  async getSurveyWithAllSessions(
-    @Param('surveyId') surveyId: string,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const survey =
-        await this.surveyService.getSurveyWithAllSessions(surveyId);
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Survey with all sessions retrieved successfully',
-        data: survey,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          surveyId,
-          requestedBy: req.user?.id,
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error: any) {
-      this.errorHandler.logError(
-        error,
-        'Get survey with all sessions',
-        req.user?.id,
-      );
-      throw error;
-    }
-  }
 
   // FEED BACK ENDPOINTS
 

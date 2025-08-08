@@ -8,7 +8,7 @@ import { UserEntity } from 'user/users.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteFilterType } from './favorite-event.dto';
-import { SurveyUtilityService } from 'utils/services/survey-utility.service';
+import { SurveyUtils } from 'utils/survey-utils';
 
 @Injectable()
 export class FavoriteEventService {
@@ -22,7 +22,8 @@ export class FavoriteEventService {
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
 
-    private readonly surveyUtility: SurveyUtilityService,
+    private readonly surveyUtils: SurveyUtils,
+
   ) {}
 
   // Private helper method for formatting documents
@@ -191,12 +192,6 @@ export class FavoriteEventService {
 
     const favorites = await query.getMany();
 
-    const eventIds = favorites.map((event) => event.eventId);
-    const surveyMap = await this.surveyUtility.getBulkEventSurveyDetails(
-      eventIds,
-      userRole || 'user',
-      userId,
-    );
 
     // Add attendance count and favorite status to each favorite event
     const favoritesWithAttendance = await Promise.all(
@@ -205,7 +200,9 @@ export class FavoriteEventService {
           ? await this.getEventAttendanceCount(favorite.eventId)
           : 0;
 
-        const surveyDetails = surveyMap.get(favorite.eventId); 
+        const surveyDetails = favorite.eventId 
+        ? await this.surveyUtils.getSurveyDetailsByEventId(favorite.eventId)
+        : null;
 
         // Format event documents using helper method
         const formattedDocuments = this.formatDocuments(
