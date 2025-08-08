@@ -6,6 +6,17 @@ import { registerEventById } from '../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../configs/env';
 import DateTimeFormatter from '../../../components/dateTime/DateTimeFormatter';
 import { EVENT_PATHS } from '../../../utils/constants';
+import EventBasicComponent from '../../../components/events/EventBasicComponent';
+import EventLocationComponent from '../../../components/events/EventLocationComponent';
+import EventSpeakersComponent from '../../../components/events/EventSpeakersComponent';
+import ImageModalComponent from '../../../components/events/ImageModalComponent';
+import EventImageGridComponent from '../../../components/events/EventImageGridComponent';
+import EventDocumentsComponent from '../../../components/events/EventDocumentsComponent';
+import EventFloorPlanComponent from '../../../components/events/EventFloorPlanComponent';
+import EventGalleriesComponent from '../../../components/events/EventGalleriesComponent';
+import EventStampsComponent from '../../../components/events/EventStampsComponent';
+import EventSurveyComponent from '../../../components/events/EventSurveyComponent';
+import EventExhibitorsComponent from '../../../components/events/EventExhibitorsComponent';
 
 // Google Maps API Key
 const GOOGLE_API_KEY = 'AIzaSyAh43XIafkwl_7xaqeES90e8FQWqhN4DEc';
@@ -269,66 +280,6 @@ const ViewRegisterEventPage = () => {
         );
     };
 
-    const renderSpeakers = () => {
-        if (!eventData?.event?.speakers?.length) {
-            return <p>No speakers listed.</p>;
-        }
-
-        return (
-            <div className="speakers-grid">
-                {eventData.event.speakers.map((speaker) => (
-                    <div key={speaker.id} className="speaker-card">
-                        <div className="speaker-header">
-                            <div className="speaker-image" onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}>
-                                <img
-                                    src={speaker.speakerProfile ? `${API_URL}/${speaker.speakerProfile}` : DUMMY_PATH_USER}
-                                    alt={speaker.name}
-                                />
-                            </div>
-
-                            <div className="speaker-info">
-                                <h6 className="speaker-name">{speaker.name}</h6>
-                                <p className="speaker-position">{speaker.position}</p>
-                            </div>
-                        </div>
-
-                        {speaker.companyName && (
-                            <div className="speaker-company">
-                                <i className="fas fa-building"></i>
-                                <span>{speaker.companyName}</span>
-                            </div>
-                        )}
-
-                        <div className="speaker-contact">
-                            {speaker.mobile && (
-                                <div className="contact-item">
-                                    <i className="fas fa-mobile"></i>
-                                    <span>{speaker.mobile}</span>
-                                </div>
-                            )}
-
-                            {speaker.email && (
-                                <div className="contact-item">
-                                    <i className="fas fa-envelope"></i>
-                                    <span>{speaker.email}</span>
-                                </div>
-                            )}
-
-                            {speaker.location && (
-                                <div className="contact-item">
-                                    <i className="fas fa-map-marker-alt"></i>
-                                    <span>{speaker.location}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
-                    </div>
-                ))}
-            </div>
-        );
-    };
-
     // Get image source
     const getImageSrc = (image) => {
         if (typeof image === 'string') {
@@ -350,201 +301,9 @@ const ViewRegisterEventPage = () => {
         setCurrentImageIndex((prevIndex) => (prevIndex === eventData.event.images.length - 1 ? 0 : prevIndex + 1));
     };
 
-    // Render simple image grid for UI
-    const renderImageGrid = () => {
-        if (!eventData?.event?.images || eventData.event.images.length === 0) {
-            return <p>No images available.</p>;
-        }
-
-        const handleImageClick = (index) => {
-            setCurrentImageIndex(index);
-            setShowImageModal(true);
-        };
-
-        return (
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                    gap: '10px',
-                    marginTop: '10px'
-                }}
-            >
-                {eventData.event.images.map((image, index) => {
-                    const imageSrc = getImageSrc(image);
-
-                    return (
-                        <div
-                            key={index}
-                            style={{
-                                position: 'relative',
-                                cursor: 'pointer',
-                                borderRadius: '8px',
-                                overflow: 'hidden',
-                                border: '2px solid #ddd',
-                                transition: 'transform 0.2s ease, border-color 0.2s ease'
-                            }}
-                            onClick={() => handleImageClick(index)}
-                        >
-                            <img
-                                src={imageSrc}
-                                alt={`Event ${index + 1}`}
-                                style={{
-                                    width: '100%',
-                                    height: '120px',
-                                    objectFit: 'cover'
-                                }}
-                                onError={(e) => {
-                                    console.error('Image failed to load:', imageSrc);
-                                    e.target.style.display = 'none';
-                                }}
-                            />
-
-                            {/* Image Index Badge */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: '5px',
-                                    left: '5px',
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '10px',
-                                    fontWeight: 'bold'
-                                }}
-                            >
-                                {index + 1}
-                            </div>
-
-                            {/* Zoom Icon */}
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: '5px',
-                                    right: '5px',
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    borderRadius: '50%',
-                                    fontSize: '10px'
-                                }}
-                            >
-                                <i className="fas fa-search-plus"></i>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
-
-    // Render documents
-    const renderDocuments = () => {
-        if (!eventData?.event?.documents || eventData.event.documents.length === 0) {
-            return <p>No documents available.</p>;
-        }
-
-        return (
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    marginTop: '15px'
-                }}
-            >
-                {eventData.event.documents.map((doc, index) => {
-                    let documentSrc = `${API_URL}/${doc?.document?.replace(/\\/g, '/')}`;
-                
-
-                    return (
-                        <div
-                            key={index}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                borderRadius: '8px',
-                                backgroundColor: '#f8f9fa',
-                                gap: '12px'
-                            }}
-                        >
-                            <div style={{ flexShrink: 0 }}>
-                                <i
-                                    className="fas fa-file-pdf text-danger"
-                                    style={{
-                                        fontSize: '1.5rem'
-                                    }}
-                                ></i>
-                            </div>
-
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                    style={{
-                                        fontWeight: 'bold',
-                                        fontSize: '14px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    {typeof doc === 'string' ? doc.split('/').pop() : doc.name}
-                                </div>
-                            
-                            </div>
-
-                            <Button
-                                size="sm"
-                                variant="outline-primary"
-                                onClick={() => window.open(documentSrc, '_blank')}
-                                style={{
-                                    marginLeft: 'auto',
-                                    fontSize: '12px',
-                                    padding: '6px 12px',
-                                    borderRadius: '6px'
-                                }}
-                            >
-                                <i className="fas fa-eye" style={{ marginRight: '4px' }}></i>
-                                View
-                            </Button>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
-
-    // Render floor plan
-    const renderFloorPlan = () => {
-        if (!eventData?.event?.floorPlan) {
-            return <p>No floor plan available.</p>;
-        }
-
-        const floorPlanSrc = getImageSrc(eventData.event.floorPlan);
-
-        return (
-            <div style={{ textAlign: 'center' }}>
-                <h5>Event Floor Plan</h5>
-                <hr />
-                <div style={{ border: '2px solid #ddd', borderRadius: '8px', padding: '10px', backgroundColor: '#f8f9fa' }}>
-                    <img
-                        src={floorPlanSrc}
-                        alt="Event Floor Plan"
-                        style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
-                        onError={(e) => {
-                            console.error('Floor plan failed to load:', floorPlanSrc);
-                            e.target.style.display = 'none';
-                        }}
-                    />
-                </div>
-                <Button variant="outline-primary" size="sm" className="mt-3" onClick={() => window.open(floorPlanSrc, '_blank')}>
-                    <i className="fas fa-external-link-alt me-2"></i>
-                    Open in New Tab
-                </Button>
-            </div>
-        );
+    const handleImageClick = (index) => {
+        setCurrentImageIndex(index);
+        setShowImageModal(true);
     };
 
     // Render galleries
@@ -967,46 +726,41 @@ const ViewRegisterEventPage = () => {
                                             Media
                                         </Nav.Link>
                                     </Nav.Item>
-                                    {eventData?.event?.floorPlan && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="floorplan">
-                                                <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Floor Plan
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.event?.galleries?.length > 0 && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="gallery">
-                                                <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Gallery
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.event?.exhibitorsData?.exhibitors?.length > 0 && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="exhibitors">
-                                                <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Exhibitors
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.event?.eventStamps && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="stamps">
-                                                <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Event Stamps
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
-                                    {eventData?.event?.surveyDetails && (
-                                        <Nav.Item>
-                                            <Nav.Link eventKey="survey">
-                                                <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                                Survey
-                                            </Nav.Link>
-                                        </Nav.Item>
-                                    )}
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="floorplan">
+                                            <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Floor Plan
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="gallery">
+                                            <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Gallery
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="stamps">
+                                            <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Event Stamps
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="survey">
+                                            <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Survey
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="exhibitors">
+                                            <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Exhibitors
+                                        </Nav.Link>
+                                    </Nav.Item>
                                 </Nav>
                             </Col>
                         </Row>
@@ -1014,372 +768,20 @@ const ViewRegisterEventPage = () => {
                         <Tab.Content>
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <div
-                                    className="p-4"
-                                    style={{ padding: '25px', background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}
-                                >
-                                    <Row className="g-4">
-                                        <Col md={6}>
-                                            {/* Event Basic Details Card */}
-                                            <div
-                                                style={{
-                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                                                    borderRadius: '15px',
-                                                    padding: '25px',
-                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
-                                                    height: '100%'
-                                                }}
-                                            >
-                                                <h6
-                                                    style={{
-                                                        color: '#4680ff',
-                                                        fontWeight: '600',
-                                                        marginBottom: '20px',
-                                                        fontSize: '1.1rem',
-                                                        borderBottom: '2px solid #e9ecef',
-                                                        paddingBottom: '10px'
-                                                    }}
-                                                >
-                                                    Basic Details
-                                                </h6>
-
-                                                <div className="info-item mb-3">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                    >
-                                                        Event Name
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            fontSize: '1.1rem',
-                                                            color: '#2c3e50',
-                                                            fontWeight: '600',
-                                                            lineHeight: '1.4'
-                                                        }}
-                                                    >
-                                                        {eventData.event.name}
-                                                    </div>
-                                                </div>
-
-                                                <div className="info-item mb-3">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                    >
-                                                        Event Type
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            display: 'inline-block',
-                                                            padding: '6px 12px',
-                                                            backgroundColor: eventData.event.type ? '#e8f4fd' : '#f8f9fa',
-                                                            color: eventData.event.type ? '#0066cc' : '#6c757d',
-                                                            borderRadius: '20px',
-                                                            fontSize: '0.9rem',
-                                                            fontWeight: '500',
-                                                            border: `1px solid ${eventData.event.type ? '#b3d9ff' : '#e9ecef'}`
-                                                        }}
-                                                    >
-                                                        {eventData.event.type || 'N/A'}
-                                                    </div>
-                                                </div>
-
-                                                <div className="info-item mb-3">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                    >
-                                                        Start Date & Time
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            padding: '10px 15px',
-                                                            backgroundColor: '#e8f5e8',
-                                                            borderLeft: '4px solid #28a745',
-                                                            borderRadius: '0 8px 8px 0',
-                                                            fontSize: '1rem',
-                                                            color: '#155724',
-                                                            fontWeight: '500'
-                                                        }}
-                                                    >
-                                                        <DateTimeFormatter date={eventData.event.startDate} time={eventData.event.startTime} />
-                                                    </div>
-                                                </div>
-
-                                                <div className="info-item mb-3">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                    >
-                                                        End Date & Time
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            padding: '10px 15px',
-                                                            backgroundColor: '#fff3cd',
-                                                            borderLeft: '4px solid #ffc107',
-                                                            borderRadius: '0 8px 8px 0',
-                                                            fontSize: '1rem',
-                                                            color: '#856404',
-                                                            fontWeight: '500'
-                                                        }}
-                                                    >
-                                                        <DateTimeFormatter date={eventData.event.endDate} time={eventData.event.endTime} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Col>
-
-                                        <Col md={6}>
-                                            {/* Event Description & Categories Card */}
-                                            <div
-                                                style={{
-                                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                                                    borderRadius: '15px',
-                                                    padding: '25px',
-                                                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-                                                    border: '1px solid rgba(70, 128, 255, 0.1)',
-                                                    height: '100%'
-                                                }}
-                                            >
-                                                <h6
-                                                    style={{
-                                                        color: '#4680ff',
-                                                        fontWeight: '600',
-                                                        marginBottom: '20px',
-                                                        fontSize: '1.1rem',
-                                                        borderBottom: '2px solid #e9ecef',
-                                                        paddingBottom: '10px'
-                                                    }}
-                                                >
-                                                    Categories & Description
-                                                </h6>
-
-                                                <div className="info-item">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '15px'
-                                                        }}
-                                                    >
-                                                        Categories
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            padding: '15px',
-                                                            backgroundColor: '#f8f9fa',
-                                                            borderRadius: '10px',
-                                                            border: '1px solid #e9ecef',
-                                                            minHeight: '80px'
-                                                        }}
-                                                    >
-                                                        {renderCategories()}
-                                                    </div>
-                                                </div>
-
-                                                <div className="info-item mb-4 mt-3">
-                                                    <div
-                                                        style={{
-                                                            fontSize: '0.85rem',
-                                                            color: '#6c757d',
-                                                            fontWeight: '500',
-                                                            letterSpacing: '0.5px',
-                                                            marginBottom: '10px'
-                                                        }}
-                                                    >
-                                                        Event Description
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            backgroundColor: '#f8f9fa',
-                                                            padding: '15px',
-                                                            fontSize: '0.95rem',
-                                                            color: '#495057',
-                                                            lineHeight: '1.6',
-                                                            fontStyle: eventData.event.description ? 'normal' : 'italic'
-                                                        }}
-                                                    >
-                                                        {eventData.event.description || 'No description available'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Col>
-                                    </Row>
-                                </div>
+                                <EventBasicComponent eventData={eventData?.event} />
                             </Tab.Pane>
 
                             {/* Location & Pricing Tab */}
                             <Tab.Pane eventKey="location">
-                                <div className="p-3" style={{ padding: '20px' }}>
-                                    <h5>Location & Pricing Information</h5>
-                                    <hr />
-                                    <Row>
-                                        <Col xs={12} md={3} className="mb-3">
-                                            <div
-                                                className="text-center p-3"
-                                                style={{
-                                                    backgroundColor: '#f8f9fa',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e9ecef',
-                                                    padding: '20px'
-                                                }}
-                                            >
-                                                <i className="fas fa-map-marker-alt text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                    Location
-                                                </h6>
-                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                    {eventData.event?.location || 'N/A'}
-                                                </p>
-                                            </div>
-                                        </Col>
-                                        <Col xs={12} md={3} className="mb-3">
-                                            <div
-                                                className="text-center p-3"
-                                                style={{
-                                                    backgroundColor: '#f8f9fa',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e9ecef',
-                                                    padding: '20px'
-                                                }}
-                                            >
-                                                <i className="fas fa-building text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                    Venue
-                                                </h6>
-                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                    {eventData.event?.venue || 'N/A'}
-                                                </p>
-                                            </div>
-                                        </Col>
-                                        <Col xs={12} md={3} className="mb-3">
-                                            <div
-                                                className="text-center p-3"
-                                                style={{
-                                                    backgroundColor: '#f8f9fa',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e9ecef',
-                                                    padding: '20px'
-                                                }}
-                                            >
-                                                <i className="fas fa-flag text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                    Country
-                                                </h6>
-                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                                                    {eventData.event?.country || 'N/A'}
-                                                </p>
-                                            </div>
-                                        </Col>
-                                        <Col xs={12} md={3} className="mb-3">
-                                            <div
-                                                className="text-center p-3"
-                                                style={{
-                                                    backgroundColor: '#f8f9fa',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #e9ecef',
-                                                    padding: '20px'
-                                                }}
-                                            >
-                                                <i className="fas fa-dollar-sign text-success mb-2" style={{ fontSize: '1.5rem' }}></i>
-                                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                                                    Price
-                                                </h6>
-                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
-                                                    {eventData.event?.price} {eventData.event?.currency}
-                                                </p>
-                                            </div>
-                                        </Col>
-                                    </Row>
-
-                                    {/* Coordinates Section with Map */}
-                                    {(eventData?.event?.latitude || eventData?.event?.longitude) && (
-                                        <Row className="mt-4">
-                                            <Col xs={12}>
-                                                <h6>Event Location</h6>
-                                                <div className="mb-3">
-                                                    <GoogleMap
-                                                        latitude={eventData.event.latitude}
-                                                        longitude={eventData.event.longitude}
-                                                        eventName={eventData.event.name}
-                                                        location={eventData.event.location}
-                                                    />
-                                                </div>
-
-                                                {/* Coordinates Display */}
-                                                <div className="d-flex gap-3">
-                                                    {eventData.event.latitude && (
-                                                        <div
-                                                            className="text-center p-2"
-                                                            style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}
-                                                        >
-                                                            <i className="fas fa-location-arrow text-primary"></i>
-                                                            <span className="ms-2">Latitude: {eventData.event.latitude}</span>
-                                                        </div>
-                                                    )}
-                                                    {eventData.event.longitude && (
-                                                        <div
-                                                            className="text-center p-2"
-                                                            style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', flex: 1 }}
-                                                        >
-                                                            <i className="fas fa-location-arrow text-primary"></i>
-                                                            <span className="ms-2">Longitude: {eventData.event.longitude}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Directions Button */}
-                                                <div className="mt-3 text-center">
-                                                    <Button
-                                                        variant="outline-primary"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            const url = `https://www.google.com/maps/dir/?api=1&destination=${eventData.event.latitude},${eventData.event.longitude}`;
-                                                            window.open(url, '_blank');
-                                                        }}
-                                                    >
-                                                        <i className="fas fa-directions me-2"></i>
-                                                        Get Directions
-                                                    </Button>
-                                                </div>
-                                            </Col>
-                                        </Row>
-                                    )}
-                                </div>
+                                <EventLocationComponent eventData={eventData?.event} />
                             </Tab.Pane>
 
                             {/* Speakers Tab */}
                             <Tab.Pane eventKey="speakers">
-                                <div className="p-3">
-                                    <h5>Speakers Details</h5>
-                                    <hr />
-                                    {renderSpeakers()}
-                                </div>
+                                <EventSpeakersComponent
+                                    speakers={eventData?.event?.speakers}
+                                    handleSpeakerImageClick={handleSpeakerImageClick}
+                                />
                             </Tab.Pane>
 
                             {/* Media Tab */}
@@ -1391,208 +793,66 @@ const ViewRegisterEventPage = () => {
                                                 Event Images <Badge bg="info">{eventData?.event?.images?.length || 0}</Badge>
                                             </h5>
                                             <hr />
-                                            {renderImageGrid()}
+                                            <EventImageGridComponent
+                                                images={eventData?.event?.images}
+                                                getImageSrc={getImageSrc}
+                                                handleEventImageClick={handleImageClick}
+                                            />
                                         </Col>
                                         <Col md={6} className="section-speakers">
                                             <h5>
                                                 Event Documents <Badge bg="info">{eventData?.event?.documents?.length || 0}</Badge>
                                             </h5>
                                             <hr />
-                                            {renderDocuments()}
+                                            <EventDocumentsComponent documents={eventData?.event?.documents} />
                                         </Col>
                                     </Row>
                                 </div>
                             </Tab.Pane>
 
                             {/* Floor Plan Tab */}
-                            {eventData?.event?.floorPlan && (
-                                <Tab.Pane eventKey="floorplan">
-                                    <div className="p-3">{renderFloorPlan()}</div>
-                                </Tab.Pane>
-                            )}
+                            <Tab.Pane eventKey="floorplan">
+                                <div className="p-3">
+                                    <EventFloorPlanComponent floorPlan={eventData?.event?.floorPlan} getImageSrc={getImageSrc} />
+                                </div>
+                            </Tab.Pane>
 
                             {/* Gallery Tab */}
-                            {eventData?.event?.galleries?.length > 0 && (
-                                <Tab.Pane eventKey="gallery">
-                                    <div className="p-3">{renderGalleries()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="gallery">
+                                <div className="p-3">
+                                    <EventGalleriesComponent
+                                        galleries={eventData?.event?.galleries}
+                                        getImageSrc={getImageSrc}
+                                        handleGalleryImageClick={handleGalleryImageClick}
+                                    />
+                                </div>
+                            </Tab.Pane>
 
                             {/* Exhibitors Tab */}
-                            {eventData?.event?.exhibitorsData?.exhibitors?.length > 0 && (
-                                <Tab.Pane eventKey="exhibitors">
-                                    <div className="p-3">
-                                        {eventData.event.exhibitorsData.exhibitorDescription && (
-                                            <div className="mb-4">
-                                                <h6>Exhibitor Description</h6>
-                                                <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
-                                                    {eventData.event.exhibitorsData.exhibitorDescription}
-                                                </p>
-                                                <hr />
-                                            </div>
-                                        )}
-                                        {eventData.event.exhibitorsData.exhibitors.map((exhibitor) => (
-                                            <div key={exhibitor.id} className="mb-5">
-                                                {/* Header */}
-                                                <div className="d-flex align-items-center mb-4" style={{ gap: 24 }}>
-                                                    <img
-                                                        src={getImageSrc(exhibitor.profile)}
-                                                        alt={exhibitor.name}
-                                                        style={{
-                                                            width: 90,
-                                                            height: 90,
-                                                            borderRadius: '12px',
-                                                            objectFit: 'cover',
-                                                            boxShadow: '0 4px 16px rgba(0,0,0,0.08)'
-                                                        }}
-                                                    />
-                                                    <div>
-                                                        <h4 className="mb-1 fw-bold">{exhibitor.name}</h4>
-                                                        <div className="mb-1 text-primary">{exhibitor.companyName}</div>
-                                                        <Badge bg={exhibitor.isActive ? 'success' : 'secondary'}>
-                                                            {exhibitor.isActive ? 'Active' : 'Inactive'}
-                                                        </Badge>
-                                                    </div>
-                                                    <Button
-                                                        variant="outline-primary"
-                                                        size="sm"
-                                                        onClick={() => navigate(`/exhibitors/view-exhibitor/${exhibitor.id}`)}
-                                                        style={{
-                                                            borderRadius: '8px',
-                                                            padding: '8px 16px',
-                                                            fontSize: '14px',
-                                                            fontWeight: '500'
-                                                        }}
-                                                    >
-                                                        <i className="fas fa-eye me-2" style={{ marginRight: 5 }}></i>
-                                                        View More
-                                                    </Button>
-                                                </div>
-                                                {/* You can add more exhibitor details here if needed */}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="exhibitors">
+                                <div className="p-3">
+                                    <EventExhibitorsComponent exhibitors={eventData?.event?.exhibitorsData} getImageSrc={getImageSrc} />
+                                </div>
+                            </Tab.Pane>
 
                             {/* Event Stamps Tab */}
-                            {eventData?.event?.eventStamps && (
-                                <Tab.Pane eventKey="stamps">
-                                    <div className="p-3">{renderEventStamps()}</div>
-                                </Tab.Pane>
-                            )}
+
+                            <Tab.Pane eventKey="stamps">
+                                <div className="p-3">
+                                    <EventStampsComponent
+                                        eventStamps={eventData?.event?.eventStamps}
+                                        getImageSrc={getImageSrc}
+                                        handleStampImageClick={handleStampImageClick}
+                                    />
+                                </div>
+                            </Tab.Pane>
 
                             {/* Survey Tab */}
-                            {eventData?.event?.surveyDetails && (
-                                <Tab.Pane eventKey="survey">
-                                    <div className="survey-section">
-                                        {/* Main Survey Details */}
-                                        <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-3">
-                                                <i className="fas fa-clipboard-list text-primary me-2"></i>
-                                                <h5 className="mb-0 fw-bold">Survey Overview</h5>
-                                            </div>
-                                            <div className="card border-0 shadow-sm">
-                                                <div className="card-body p-4">
-                                            <div className="row">
-                                                <div className="col-lg-6 mb-3">
-                                                    <div className="d-flex align-items-center mb-2">
-                                                        <i className="fas fa-heading text-primary me-2" style={{ marginRight: 8 }}></i>
-                                                        <strong>Survey Title:</strong>
-                                                    </div>
-                                                    <p className="mb-0 text-dark">{eventData.event.surveyDetails.title}</p>
-                                                </div>
-                                                <div className="col-lg-6 mb-3">
-                                                    <div className="d-flex align-items-center mb-2">
-                                                        <i className="fas fa-toggle-on text-primary me-2" style={{ marginRight: 8 }}></i>
-                                                        <strong>Status:</strong>
-                                                    </div>
-                                                            <Badge
-                                                                bg={eventData.event.surveyDetails.isActive ? 'success' : 'secondary'}
-                                                                className="px-3 py-2"
-                                                            >
-                                                                <i className={`fas fa-${eventData.event.surveyDetails.isActive ? 'check-circle' : 'pause-circle'} me-1`}></i>
-                                                                {eventData.event.surveyDetails.isActive ? 'Active' : 'Inactive'}
-                                                            </Badge>
-                                                </div>
-                                            </div>
-                                                    <hr className="my-3" />
-                                            <div className="row">
-                                                <div className="col-lg-6 mb-3">
-                                                    <div className="d-flex align-items-center mb-2">
-                                                                <i className="fas fa-calendar-alt text-primary" style={{ marginRight: 8 }}></i>
-                                                        <strong>Start Date & Time:</strong>
-                                                    </div>
-                                                    <p className="mb-0 text-dark">
-                                                        {eventData.event.surveyDetails.startDate}
-                                                        <span style={{ margin: '0 6px' }}></span>
-                                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
-                                                        {formatTime(eventData.event.surveyDetails.startTime)}
-                                                    </p>
-                                                </div>
-                                                <div className="col-lg-6 mb-3">
-                                                    <div className="d-flex align-items-center mb-2">
-                                                                <i className="fas fa-calendar-check text-primary" style={{ marginRight: 8 }}></i>
-                                                        <strong>End Date & Time:</strong>
-                                                    </div>
-                                                    <p className="mb-0 text-dark">
-                                                        {eventData.event.surveyDetails.endDate}
-                                                        <span style={{ margin: '0 6px' }}></span>
-                                                        <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
-                                                        {formatTime(eventData.event.surveyDetails.endTime)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {/* Sessions List */}
-                                        {eventData.event.surveyDetails.sessions?.length > 0 && (
-                                            <div>
-                                                <div className="d-flex align-items-center mb-3 mt-4">
-                                                    <i className="fas fa-list-ol text-primary" style={{ marginRight: 8 }}></i>
-                                                    <h6 className="mb-0 fw-bold">Sessions</h6>
-                                                </div>
-                                                <div className="row">
-                                                    {eventData.event.surveyDetails.sessions.map((session, index) => (
-                                                        <div key={session.id} className="col-md-6 mb-4">
-                                                            <div className="card border-0 shadow-sm h-100">
-                                                                <div className="card-body">
-                                                                    <div className="d-flex align-items-center mb-2">
-                                                                        <span className="badge bg-primary me-2" style={{ minWidth: 60 }}>
-                                                                            Session {index + 1}
-                                                                        </span>
-                                                                        <h6 className="mb-0 fw-bold">{session.name}</h6>
-                                                                            </div>
-                                                                    <p className="mb-2 small text-muted">{session.description}</p>
-                                                                    <div className="row mb-2">
-                                                                        <div className="col-6">
-                                                                            <small>
-                                                                                <i className="fas fa-calendar-day" style={{ marginRight: 4 }}></i>
-                                                                                <strong>Date:</strong> {session.date}
-                                                                            </small>
-                                                                        </div>
-                                                                        <div className="col-6">
-                                                                            <small>
-                                                                                <i className="fas fa-clock" style={{ marginRight: 4 }}></i>
-                                                                                <strong>Time:</strong> {formatTime(session.startTime)} - {formatTime(session.endTime)}
-                                                                            </small>
-                                                                            </div>
-                                                                        </div>
-                                                                    <Badge bg={session.isActive ? 'success' : 'secondary'} className="mt-2">
-                                                                        <i className={`fas fa-${session.isActive ? 'check-circle' : 'pause-circle'}`} style={{ marginRight: 4 }}></i>
-                                                                        {session.isActive ? 'Active' : 'Inactive'}
-                                                                    </Badge>
-                                                                    </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </Tab.Pane>
-                            )}
+                            <Tab.Pane eventKey="survey">
+                                <EventSurveyComponent surveyDetails={eventData?.event?.surveyDetails} formatTime={formatTime} />
+                            </Tab.Pane>
                         </Tab.Content>
                     </Tab.Container>
 
@@ -1687,657 +947,67 @@ const ViewRegisterEventPage = () => {
                     )}
                 </div>
             </Container>
-
             {/* Image Modal */}
-            <Modal
+            <ImageModalComponent
                 show={showImageModal}
                 onHide={() => setShowImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body>
-                    {/* Close Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = getImageSrc(eventData.event.images[currentImageIndex]);
-                            link.download = `event-image-${currentImageIndex + 1}.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Navigation Arrows */}
-                    {eventData.event?.images?.length > 1 && (
-                        <>
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToPreviousImage}
-                                style={{
-                                    position: 'fixed',
-                                    left: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-left"></i>
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToNextImage}
-                                style={{
-                                    position: 'fixed',
-                                    right: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-right"></i>
-                            </Button>
-                        </>
-                    )}
-
-                    {/* Image Counter */}
-                    <div
-                        style={{
-                            position: 'fixed',
-                            bottom: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            zIndex: 1000
-                        }}
-                    >
-                        {currentImageIndex + 1} / {eventData?.event?.images?.length}
-                    </div>
-
-                    {/* Image Container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={getImageSrc(eventData?.event?.images[currentImageIndex])}
-                            alt={`Event Image ${currentImageIndex + 1}`}
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                console.error('Modal image failed to load:', getImageSrc(eventData.event.images[currentImageIndex]));
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
+                imageSrc={getImageSrc(eventData.event.images[currentImageIndex])}
+                imageAlt={`Event Image ${currentImageIndex + 1}`}
+                downloadFileName={`event-image-${currentImageIndex + 1}.jpg`}
+                currentIndex={currentImageIndex}
+                totalImages={eventData?.event?.images?.length}
+                onPrevious={goToPreviousImage}
+                onNext={goToNextImage}
+            />
 
             {/* Speaker Image Modal */}
-            <Modal
+            <ImageModalComponent
                 show={showSpeakerImageModal}
                 onHide={() => setShowSpeakerImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body
-                    style={{
-                        padding: 0,
-                        backgroundColor: 'transparent',
-                        position: 'relative',
-                        minHeight: '90vh'
-                    }}
-                >
-                    {/* Close Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowSpeakerImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = `${API_URL}/${currentSpeakerImage}`;
-                            link.download = `speaker-profile.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Image Container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={`${API_URL}/${currentSpeakerImage}`}
-                            alt="Speaker Profile"
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                console.error('Speaker image failed to load:', currentSpeakerImage);
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
+                imageSrc={`${API_URL}/${currentSpeakerImage}`}
+                imageAlt="Speaker Profile"
+                downloadFileName="speaker-profile.jpg"
+                currentIndex={0}
+                totalImages={1}
+            />
 
             {/* Event Main Image Modal */}
-            <Modal
+            <ImageModalComponent
                 show={showEventMainImageModal}
                 onHide={() => setShowEventMainImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body
-                    style={{
-                        padding: 0,
-                        backgroundColor: 'transparent',
-                        position: 'relative',
-                        minHeight: '90vh'
-                    }}
-                >
-                    {/* Close Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowEventMainImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = `${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`;
-                            link.download = `event-main-image.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Image Container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={`${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`}
-                            alt="Event Main Image"
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                console.error('Event main image failed to load:', currentEventMainImage);
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
+                imageSrc={`${API_URL}/${currentEventMainImage.replace(/\\/g, '/')}`}
+                imageAlt="Event Main Image"
+                downloadFileName="event-main-image.jpg"
+                currentIndex={0}
+                totalImages={1}
+            />
 
             {/* Gallery Images Modal */}
-            <Modal
+            <ImageModalComponent
                 show={showGalleryImageModal}
                 onHide={() => setShowGalleryImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body>
-                    {/* Close Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowGalleryImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = getImageSrc(galleryImages[currentGalleryImageIndex]);
-                            link.download = `${currentGalleryTitle}-image-${currentGalleryImageIndex + 1}.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Gallery Title */}
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            zIndex: 1000
-                        }}
-                    >
-                        {currentGalleryTitle}
-                    </div>
-
-                    {/* Navigation Arrows */}
-                    {galleryImages.length > 1 && (
-                        <>
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToPreviousGalleryImage}
-                                style={{
-                                    position: 'fixed',
-                                    left: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-left"></i>
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToNextGalleryImage}
-                                style={{
-                                    position: 'fixed',
-                                    right: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-right"></i>
-                            </Button>
-                        </>
-                    )}
-
-                    {/* Image Counter */}
-                    <div
-                        style={{
-                            position: 'fixed',
-                            bottom: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            zIndex: 1000
-                        }}
-                    >
-                        {currentGalleryImageIndex + 1} / {galleryImages.length}
-                    </div>
-
-                    {/* Image Container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={getImageSrc(galleryImages[currentGalleryImageIndex])}
-                            alt={`Gallery Image ${currentGalleryImageIndex + 1}`}
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                console.error('Gallery modal image failed to load:', getImageSrc(galleryImages[currentGalleryImageIndex]));
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
+                imageSrc={getImageSrc(galleryImages[currentGalleryImageIndex])}
+                imageAlt={`Gallery Image ${currentGalleryImageIndex + 1}`}
+                downloadFileName={`${currentGalleryTitle}-image-${currentGalleryImageIndex + 1}.jpg`}
+                currentIndex={currentGalleryImageIndex}
+                totalImages={galleryImages.length}
+                onPrevious={goToPreviousGalleryImage}
+                onNext={goToNextGalleryImage}
+                title={currentGalleryTitle}
+            />
 
             {/* Stamp Images Modal */}
-            <Modal
+            <ImageModalComponent
                 show={showStampImageModal}
                 onHide={() => setShowStampImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body>
-                    {/* Close Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowStampImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download Button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = getImageSrc(stampImages[currentStampImageIndex]);
-                            link.download = `event-stamp-${currentStampImageIndex + 1}.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Navigation Arrows */}
-                    {stampImages.length > 1 && (
-                        <>
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToPreviousStampImage}
-                                style={{
-                                    position: 'fixed',
-                                    left: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-left"></i>
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToNextStampImage}
-                                style={{
-                                    position: 'fixed',
-                                    right: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-right"></i>
-                            </Button>
-                        </>
-                    )}
-
-                    {/* Image Counter */}
-                    <div
-                        style={{
-                            position: 'fixed',
-                            bottom: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            zIndex: 1000
-                        }}
-                    >
-                        {currentStampImageIndex + 1} / {stampImages.length}
-                    </div>
-
-                    {/* Image Container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={getImageSrc(stampImages[currentStampImageIndex])}
-                            alt={`Event Stamp ${currentStampImageIndex + 1}`}
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                console.error('Stamp modal image failed to load:', getImageSrc(stampImages[currentStampImageIndex]));
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
+                imageSrc={getImageSrc(stampImages[currentStampImageIndex])}
+                imageAlt={`Event Stamp ${currentStampImageIndex + 1}`}
+                downloadFileName={`event-stamp-${currentStampImageIndex + 1}.jpg`}
+                currentIndex={currentStampImageIndex}
+                totalImages={stampImages.length}
+                onPrevious={goToPreviousStampImage}
+                onNext={goToNextStampImage}
+            />
         </>
     );
 };

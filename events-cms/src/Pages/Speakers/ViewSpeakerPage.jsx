@@ -52,34 +52,16 @@ const ViewSpeakerPage = () => {
         }
     };
 
-    const tabStyle = {
-        border: 'none',
-        backgroundColor: 'transparent',
-        color: '#6c757d',
-        fontWeight: '500',
-        padding: '12px 20px',
-        borderRadius: '8px 8px 0 0',
-        marginRight: '5px',
-        transition: 'all 0.3s ease',
-        fontSize: '14px'
-    };
-
-    const activeTabStyle = {
-        ...tabStyle,
-        backgroundColor: '#4680ff',
-        color: 'white',
-        fontWeight: '600'
-    };
-
     return (
         <>
             <Container fluid className="mt-4">
+                {/* Header */}
                 <div
                     className="mb-3"
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
                     <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View</h4>
+                        <h4 className="card-title">Speaker Details</h4>
                         <Button variant="secondary" onClick={() => navigate(SPEAKER_PATHS.LIST_SPEAKERS)}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                             Back
@@ -87,207 +69,192 @@ const ViewSpeakerPage = () => {
                     </div>
                 </div>
 
-                <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                    {/* Speaker Image and Basic Info */}
-                    <Card className="mb-4">
-                        <Card.Body>
-                            <Card.Title>
-                                <i className="feather icon-user mr-2"></i>
-                                Speaker Information
-                            </Card.Title>
-                            <hr />
-                            <Row className="align-items-center">
-                                <Col xs={12} md={4} className="text-center mb-3 mb-md-0">
-                                    {speakerData.speakerProfile && (
-                                        <div style={{ position: 'relative', display: 'inline-block' }}>
-                                            <img 
-                                                src={imageUrl} 
-                                                alt="speaker" 
-                                                style={{
-                                                    width: '100%',
-                                                    maxWidth: '200px',
-                                                    height: '200px',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '10%',
-                                                    border: '3px solid #4680ff',
-                                                    cursor: 'pointer',
-                                                    transition: 'transform 0.2s'
-                                                }}
-                                                onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
-                                                onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
-                                                onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-                                            />
-                                            <div
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '10px',
-                                                    right: '10px',
-                                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                                    color: 'white',
-                                                    padding: '5px',
-                                                    borderRadius: '50%',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer'
-                                                }}
-                                                onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
-                                            >
-                                                <i className="fas fa-search-plus"></i>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {!speakerData.speakerProfile && (
+                {/* Product-like Layout */}
+                <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '30px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                    <Row>
+                        {/* Left Side - Image */}
+                        <Col lg={5} md={6} className="mb-4">
+                            <div className="text-center">
+                                {speakerData.speakerProfile && (
+                                    <div style={{ position: 'relative', display: 'inline-block' }}>
                                         <img 
                                             src={imageUrl} 
                                             alt="speaker" 
                                             style={{
                                                 width: '100%',
-                                                maxWidth: '200px',
-                                                height: '200px',
+                                                maxWidth: '400px',
+                                                height: '400px',
                                                 objectFit: 'cover',
-                                                borderRadius: '10%',
-                                                border: '3px solid #4680ff'
-                                            }} 
+                                                borderRadius: '12px',
+                                                border: '2px solid #e9ecef',
+                                                cursor: 'pointer',
+                                                transition: 'transform 0.2s, box-shadow 0.2s'
+                                            }}
+                                            onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.transform = 'scale(1.02)';
+                                                e.target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.transform = 'scale(1)';
+                                                e.target.style.boxShadow = 'none';
+                                            }}
                                         />
-                                    )}
-                                </Col>
-                                <Col xs={12} md={8}>
-                                    <div className="row">
-                                        <div className="col-12 mb-2">
-                                            <strong>Name:</strong> {speakerData.name}
-                                        </div>
-                                        <div className="col-12 mb-2">
-                                            <strong>Email:</strong> {speakerData.email || 'N/A'}
-                                        </div>
-                                        <div className="col-12 mb-2">
-                                            <strong>Mobile:</strong> {speakerData.mobile || 'N/A'}
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '15px',
+                                                right: '15px',
+                                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                                color: 'white',
+                                                padding: '8px',
+                                                borderRadius: '50%',
+                                                fontSize: '14px',
+                                                cursor: 'pointer',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.9)'}
+                                            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.7)'}
+                                        >
+                                            <i className="fas fa-search-plus"></i>
                                         </div>
                                     </div>
-                                </Col>
-                            </Row>
-                        </Card.Body>
-                    </Card>
+                                )}
+                                {!speakerData.speakerProfile && (
+                                    <img 
+                                        src={imageUrl} 
+                                        alt="speaker" 
+                                        style={{
+                                            width: '100%',
+                                            maxWidth: '400px',
+                                            height: '400px',
+                                            objectFit: 'cover',
+                                            borderRadius: '12px',
+                                            border: '2px solid #e9ecef'
+                                        }} 
+                                    />
+                                )}
+                                
+                                {/* Thumbnail */}
+                                <div className="mt-3">
+                                    <img 
+                                        src={imageUrl} 
+                                        alt="speaker thumbnail" 
+                                        style={{
+                                            width: '80px',
+                                            height: '80px',
+                                            objectFit: 'cover',
+                                            borderRadius: '8px',
+                                            border: '2px solid #e9ecef'
+                                        }} 
+                                    />
+                                </div>
+                                
+                                {/* Navigation indicator */}
+                                <div className="mt-2 text-muted" style={{ fontSize: '14px' }}>
+                                    1/1
+                                </div>
+                            </div>
+                        </Col>
 
-                    {/* Responsive Tab Navigation */}
-                    <div className="mb-4">
-                        <Nav 
-                            variant="tabs" 
-                            className="flex-column flex-sm-row"
-                            style={{
-                                borderBottom: '2px solid #e9ecef',
-                                gap: '5px'
-                            }}
-                        >
-                            <Nav.Item>
-                                <Nav.Link
-                                    active={activeTab === 'professional'}
-                                    onClick={() => setActiveTab('professional')}
-                                    style={activeTab === 'professional' ? activeTabStyle : tabStyle}
-                                    className="text-center"
-                                >
-                                    <i className="feather icon-briefcase mr-2"></i>
-                                    <span className="d-none d-sm-inline">Professional</span>
-                                    <span className="d-sm-none">Work</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            <Nav.Item>
-                                <Nav.Link
-                                    active={activeTab === 'location'}
-                                    onClick={() => setActiveTab('location')}
-                                    style={activeTab === 'location' ? activeTabStyle : tabStyle}
-                                    className="text-center"
-                                >
-                                    <i className="feather icon-map-pin mr-2"></i>
-                                    <span className="d-none d-sm-inline">Location</span>
-                                    <span className="d-sm-none">Location</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            {speakerData.description && (
-                                <Nav.Item>
-                                    <Nav.Link
-                                        active={activeTab === 'description'}
-                                        onClick={() => setActiveTab('description')}
-                                        style={activeTab === 'description' ? activeTabStyle : tabStyle}
-                                        className="text-center"
-                                    >
-                                        <i className="feather icon-file-text mr-2"></i>
-                                        <span className="d-none d-sm-inline">Description</span>
-                                        <span className="d-sm-none">About</span>
-                                    </Nav.Link>
-                                </Nav.Item>
-                            )}
-                        </Nav>
-                    </div>
+                        {/* Right Side - Details */}
+                        <Col lg={7} md={6}>
+                            {/* Speaker Title and Basic Info */}
+                            <div className="mb-4">
+                                <h2 style={{ color: '#333', marginBottom: '10px', fontWeight: '600' }}>
+                                    {speakerData.name}
+                                </h2>
+                                <p style={{ color: '#666', fontSize: '16px', marginBottom: '15px' }}>
+                                    {speakerData.position || 'Speaker'} at {speakerData.companyName || 'N/A'}
+                                </p>
+                                
+                                {/* Contact Info */}
+                                <div className="mb-4">
+                                    <div className="mb-2">
+                                        <i className="fas fa-envelope mr-2" style={{ color: '#4680ff' }}></i>
+                                        <span style={{ color: '#666' }}>{speakerData.email || 'N/A'}</span>
+                                    </div>
+                                    <div className="mb-2">
+                                        <i className="fas fa-phone mr-2" style={{ color: '#4680ff' }}></i>
+                                        <span style={{ color: '#666' }}>{speakerData.mobile || 'N/A'}</span>
+                                    </div>
+                                    {speakerData.location && (
+                                        <div className="mb-2">
+                                            <i className="fas fa-map-marker-alt mr-2" style={{ color: '#4680ff' }}></i>
+                                            <span style={{ color: '#666' }}>{speakerData.location}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
-                    {/* Tab Content */}
-                    <Tab.Content>
-                        {/* Professional Tab */}
-                        {activeTab === 'professional' && (
-                            <Tab.Pane active>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <i className="feather icon-briefcase mr-2"></i>
-                                            Professional Details
-                                        </Card.Title>
-                                        <hr />
-                                        <Row>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Position:</strong><br />
-                                                <span className="text-muted">{speakerData.position || 'N/A'}</span>
-                                            </Col>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Company:</strong><br />
-                                                <span className="text-muted">{speakerData.companyName || 'N/A'}</span>
-                                            </Col>
-                                        </Row>
-                                    </Card.Body>
-                                </Card>
-                            </Tab.Pane>
-                        )}
+                            {/* Detailed Information Sections */}
+                            <div>
+                                {/* Professional Details */}
+                                <div className="mb-4 mt-5">
+                                    <h5 style={{ color: '#333', borderBottom: '2px solid #e9ecef', paddingBottom: '8px', marginBottom: '15px' }}>
+                                        <i className="fas fa-briefcase mr-2" style={{ color: '#4680ff' }}></i>
+                                        Professional Information
+                                    </h5>
+                                    <Row>
+                                        <Col xs={12} md={6} className="mb-3">
+                                            <strong style={{ color: '#333' }}>Position:</strong><br />
+                                            <span style={{ color: '#666' }}>{speakerData.position || 'N/A'}</span>
+                                        </Col>
+                                        <Col xs={12} md={6} className="mb-3">
+                                            <strong style={{ color: '#333' }}>Company:</strong><br />
+                                            <span style={{ color: '#666' }}>{speakerData.companyName || 'N/A'}</span>
+                                        </Col>
+                                    </Row>
+                                </div>
 
-                        {/* Location Tab */}
-                        {activeTab === 'location' && (
-                            <Tab.Pane active>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <i className="feather icon-map-pin mr-2"></i>
+                                {/* Location Details */}
+                                {speakerData.location && (
+                                    <div className="mb-4">
+                                        <h5 style={{ color: '#333', borderBottom: '2px solid #e9ecef', paddingBottom: '8px', marginBottom: '15px' }}>
+                                            <i className="fas fa-map-marker-alt mr-2" style={{ color: '#4680ff' }}></i>
                                             Location Details
-                                        </Card.Title>
-                                        <hr />
-                                        <Row>
-                                            <Col xs={12}>
-                                                <strong>Location:</strong><br />
-                                                <span className="text-muted">{speakerData.location || 'N/A'}</span>
-                                            </Col>
-                                        </Row>
-                                    </Card.Body>
-                                </Card>
-                            </Tab.Pane>
-                        )}
+                                        </h5>
+                                        <div>
+                                            <strong style={{ color: '#333' }}>Location:</strong><br />
+                                            <span style={{ color: '#666' }}>{speakerData.location}</span>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {/* Description Tab */}
-                        {activeTab === 'description' && speakerData.description && (
-                            <Tab.Pane active>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <i className="feather icon-file-text mr-2"></i>
-                                            Description
-                                        </Card.Title>
-                                        <hr />
-                                        <Row>
-                                            <Col xs={12}>
-                                                <p className="text-muted" style={{ lineHeight: '1.6' }}>
-                                                    {speakerData.description}
-                                                </p>
-                                            </Col>
-                                        </Row>
-                                    </Card.Body>
-                                </Card>
-                            </Tab.Pane>
-                        )}
-                    </Tab.Content>
+                                {/* Description */}
+                                {speakerData.description && (
+                                    <div className="mb-4">
+                                        <h5 style={{ color: '#333', borderBottom: '2px solid #e9ecef', paddingBottom: '8px', marginBottom: '15px' }}>
+                                            <i className="fas fa-file-text mr-2" style={{ color: '#4680ff' }}></i>
+                                            About Speaker
+                                        </h5>
+                                        <p style={{ color: '#666', lineHeight: '1.6', marginBottom: '0' }}>
+                                            {speakerData.description}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Additional Information */}
+                                <div>
+                                    <h5 style={{ color: '#333', borderBottom: '2px solid #e9ecef', paddingBottom: '8px', marginBottom: '15px' }}>
+                                        <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                        Additional Information
+                                    </h5>
+                                    <Row>
+                                        <Col xs={12} md={6} className="mb-3">
+                                            <strong style={{ color: '#333' }}>Status:</strong><br />
+                                            <span style={{ color: '#28a745' }}>Active</span>
+                                        </Col>
+                                        <Col xs={12} md={6} className="mb-3">
+                                            <strong style={{ color: '#333' }}>Member Since:</strong><br />
+                                            <span style={{ color: '#666' }}>2023</span>
+                                        </Col>
+                                    </Row>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
                 </div>
             </Container>
 

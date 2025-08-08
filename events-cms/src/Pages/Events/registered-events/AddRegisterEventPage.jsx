@@ -10,7 +10,7 @@ const AddRegisterEventPage = () => {
     const navigate = useNavigate();
     const { id } = useParams(); // For edit mode
     const events = useSelector((state) => state.event?.event?.events || []);
-    const users = useSelector((state) => state.user?.user?.data || []);
+    const users = useSelector((state) => state.user?.user || []);
 
     const [formData, setFormData] = useState({
         userId: '',
@@ -53,7 +53,6 @@ const AddRegisterEventPage = () => {
                     }
                 } catch (error) {
                     setLoading(false);
-                   
                 } finally {
                     setLoading(false);
                 }
@@ -73,7 +72,6 @@ const AddRegisterEventPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-      
 
         try {
             let response;
@@ -132,7 +130,6 @@ const AddRegisterEventPage = () => {
                             </div>
                         </div>
                         <div className="card-body">
-                           
                             {loading && id ? (
                                 <div className="text-center">
                                     <div className="spinner-border" role="status">
@@ -245,13 +242,7 @@ const AddRegisterEventPage = () => {
                                                     type="submit"
                                                     disabled={loading || !formData.userId || !formData.eventId}
                                                 >
-                                                    {loading
-                                                        ? id
-                                                            ? 'Updating...'
-                                                            : 'Creating...'
-                                                        : id
-                                                        ? 'Update'
-                                                        : 'Create'}
+                                                    {loading ? (id ? 'Updating...' : 'Creating...') : id ? 'Update' : 'Create'}
                                                 </Button>
                                             </div>
                                         </div>
