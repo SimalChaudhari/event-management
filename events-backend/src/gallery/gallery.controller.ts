@@ -28,13 +28,16 @@ import * as fs from 'fs';
 import { EventService } from 'event/event.service';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
-import { ResourceNotFoundException, ValidationException } from '../utils/exceptions/custom-exceptions';
+import {
+  ResourceNotFoundException,
+  ValidationException,
+} from '../utils/exceptions/custom-exceptions';
 
 @Controller('api/gallery')
 @UseGuards(JwtAuthGuard)
 export class GalleryController {
   constructor(
-    private readonly galleryService: GalleryService, 
+    private readonly galleryService: GalleryService,
     private readonly eventService: EventService,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
@@ -52,8 +55,9 @@ export class GalleryController {
     @Request() req: any,
   ) {
     try {
-      const galleryItems = await this.galleryService.getAllGalleryItems(filters);
-      
+      const galleryItems =
+        await this.galleryService.getAllGalleryItems(filters);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Gallery items retrieved successfully',
@@ -63,10 +67,14 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Gallery items retrieval', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Gallery items retrieval',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -82,8 +90,11 @@ export class GalleryController {
     @Request() req: any,
   ) {
     try {
-      const galleryItems = await this.galleryService.getGalleryByEvent(eventId, filters);
-      
+      const galleryItems = await this.galleryService.getGalleryByEvent(
+        eventId,
+        filters,
+      );
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event gallery retrieved successfully',
@@ -99,20 +110,21 @@ export class GalleryController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Gallery retrieval by event', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Gallery retrieval by event',
+        req.user?.id,
+      );
       throw error;
     }
   }
 
-
   // For Event Gallery
-  
+
   @Post('create-or-update/:eventId')
   @Roles(UserRole.Admin)
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'galleryImages', maxCount: 500 },
-    ], {
+    FileFieldsInterceptor([{ name: 'galleryImages', maxCount: 500 }], {
       storage: diskStorage({
         destination: './uploads/gallery/images',
         filename: (req, file, cb) => {
@@ -121,11 +133,24 @@ export class GalleryController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (file.fieldname === 'galleryImages' && allowedImageTypes.includes(file.mimetype)) {
+        const allowedImageTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+        ];
+        if (
+          file.fieldname === 'galleryImages' &&
+          allowedImageTypes.includes(file.mimetype)
+        ) {
           cb(null, true);
         } else {
-          cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF.`), false);
+          cb(
+            new Error(
+              `Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF.`,
+            ),
+            false,
+          );
         }
       },
       limits: {
@@ -146,17 +171,14 @@ export class GalleryController {
           (img) => `uploads/gallery/images/${img.filename}`,
         );
       }
-      
-      // Check if event exists
-      const event = await this.eventService.getEventEntityById(eventId);
-      if (!event) {
-        throw new ResourceNotFoundException('Event', eventId);
-      }
 
-      const gallery = await this.galleryService.createOrUpdateGallery(eventId, galleryDto);
+      const gallery = await this.galleryService.createOrUpdateGallery(
+        eventId,
+        galleryDto,
+      );
 
-      // Check if gallery was created or updated
-      const isNewGallery = !gallery.data.id || gallery.data.createdAt === gallery.data.updatedAt;
+      // Use the isNew flag from service instead of comparing timestamps
+      const isNewGallery = gallery.isNew;
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -175,18 +197,30 @@ export class GalleryController {
       // Clean up uploaded files if error occurs
       if (files.galleryImages && files.galleryImages.length > 0) {
         files.galleryImages.forEach((file) => {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'gallery', 'images', file.filename);
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'gallery',
+            'images',
+            file.filename,
+          );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
           }
         });
       }
-      
+
       if (error.code === 'LIMIT_FILE_SIZE') {
         this.errorHandler.handleFileUploadError(error, 'Gallery Images Upload');
       }
-      
-      this.errorHandler.logError(error, 'Gallery creation/update', req.user?.id);
+
+      this.errorHandler.logError(
+        error,
+        'Gallery creation/update',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -195,7 +229,7 @@ export class GalleryController {
   async getAllGalleries(@Res() response: Response, @Request() req: any) {
     try {
       const galleries = await this.galleryService.getAllGalleries();
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Galleries retrieved successfully',
@@ -205,7 +239,7 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Galleries retrieval', req.user?.id);
@@ -221,7 +255,7 @@ export class GalleryController {
   ) {
     try {
       const gallery = await this.galleryService.getGalleryById(id);
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Gallery retrieved successfully',
@@ -230,20 +264,28 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Gallery retrieval by ID', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Gallery retrieval by ID',
+        req.user?.id,
+      );
       throw error;
     }
   }
 
   @Delete('delete/:id')
   @Roles(UserRole.Admin)
-  async deleteGallery(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+  async deleteGallery(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
     try {
       const result = await this.galleryService.deleteGallery(id);
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: result.message,
@@ -252,7 +294,7 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Gallery deletion', req.user?.id);
@@ -273,8 +315,11 @@ export class GalleryController {
         throw new ValidationException('Image path is required');
       }
 
-      const result = await this.galleryService.deleteSpecificGalleryImage(galleryId, body.imagePath);
-      
+      const result = await this.galleryService.deleteSpecificGalleryImage(
+        galleryId,
+        body.imagePath,
+      );
+
       const successResponse: SuccessResponse = {
         success: true,
         message: result.message,
@@ -283,7 +328,7 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Gallery image deletion', req.user?.id);
@@ -300,7 +345,7 @@ export class GalleryController {
   ) {
     try {
       const result = await this.galleryService.clearAllGalleryImages(galleryId);
-      
+
       const successResponse: SuccessResponse = {
         success: true,
         message: result.message,
@@ -309,10 +354,14 @@ export class GalleryController {
           timestamp: new Date().toISOString(),
         },
       };
-      
+
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Gallery images clearing', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Gallery images clearing',
+        req.user?.id,
+      );
       throw error;
     }
   }

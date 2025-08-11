@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert, Badge } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
-import { 
-    createOrUpdateGallery, 
-    getAllGalleries,
-    getGalleryById,
-    deleteGalleryImage
-} from '../../../store/actions/galleryActions';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { createOrUpdateGallery, getAllGalleries, getGalleryById, deleteGalleryImage, clearAllGalleryImages } from '../../../store/actions/galleryActions';
 import { API_URL } from '../../../configs/env';
 import { toast } from 'react-toastify';
+import { EVENT_PATHS } from '../../../utils/constants';
+import ConfirmationModal from '../../../components/modal/DeleteConfirmationImageModal';
 
 const AddGalleryPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams(); // Edit mode के लिए
+    const { EventId } = useParams(); // Edit mode
+
+    const [searchParams] = useSearchParams();
+    const id = searchParams.get('eventId');
+    const galleryId = searchParams.get('galleryId');
+
     const [formData, setFormData] = useState({
         title: '',
         eventId: id,
@@ -22,18 +24,19 @@ const AddGalleryPage = () => {
     });
     const [loading, setLoading] = useState(false);
     const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
-  
-    const [deletingImage, setDeletingImage] = useState(null);
 
+    const [deletingImage, setDeletingImage] = useState(null);
+    const [clearingAllImages, setClearingAllImages] = useState(false);
+    const [showClearModal, setShowClearModal] = useState(false);
     // Load edit data if id exists
     useEffect(() => {
-        if (id) {
+        if (galleryId) {
             const loadGalleryData = async () => {
                 try {
-                    const response = await dispatch(getGalleryById(id));
+                    const response = await dispatch(getGalleryById(galleryId));
                     if (response?.data) {
                         const gallery = response.data;
-                        
+
                         // Handle images
                         let imagesData = [];
                         let previewUrls = [];
@@ -54,21 +57,19 @@ const AddGalleryPage = () => {
 
                         setFormData({
                             title: gallery.title || '',
-                            eventId: gallery.eventId || id,
+                            eventId: gallery.eventId || EventId,
                             galleryImages: imagesData
                         });
-                        
+
                         setImagePreviewUrls(previewUrls);
                     }
                 } catch (error) {
                     console.error('Error loading gallery data:', error);
-              
                 }
             };
             loadGalleryData();
         }
     }, [id, dispatch]);
-
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -80,7 +81,7 @@ const AddGalleryPage = () => {
 
     const handleFileChange = (e) => {
         const newFiles = Array.from(e.target.files);
-        
+
         // Validate files
         const validFiles = newFiles.filter((file) => {
             const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
@@ -117,7 +118,7 @@ const AddGalleryPage = () => {
     const handleDrop = (e) => {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
-        
+
         // Validate files
         const validFiles = files.filter((file) => {
             const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
@@ -151,10 +152,10 @@ const AddGalleryPage = () => {
         const imageToRemove = formData.galleryImages[indexToRemove];
 
         // If it's an existing image (string), use API to delete
-        if (typeof imageToRemove === 'string' && id) {
+        if (typeof imageToRemove === 'string' && galleryId) {
             setDeletingImage(indexToRemove);
             try {
-                const updatedGallery = await dispatch(deleteGalleryImage(id, imageToRemove));
+                const updatedGallery = await dispatch(deleteGalleryImage(galleryId, imageToRemove));
                 if (updatedGallery) {
                     // Update form data with new image list
                     setFormData((prev) => ({
@@ -194,10 +195,47 @@ const AddGalleryPage = () => {
         }
     };
 
+    // Clear all images function
+    const handleClearAllImages = async () => {
+        if (!galleryId) {
+            toast.error('Gallery ID not found');
+            return;
+        }
+
+        if (formData.galleryImages.length === 0) {
+            toast.info('No images to clear');
+            return;
+        }
+
+     // Show modal instead of window.confirm
+     setShowClearModal(true);
+    };
+    
+    // New function for actual clearing
+    const confirmClearAllImages = async () => {
+        setClearingAllImages(true);
+        try {
+            const response = await dispatch(clearAllGalleryImages(galleryId));
+            if (response) {
+                // Clear all images from form data
+                setFormData((prev) => ({
+                    ...prev,
+                    galleryImages: []
+                }));
+                setImagePreviewUrls([]);
+                setShowClearModal(false); // Close modal
+            }
+        } catch (error) {
+            toast.error('Failed to clear all images');
+            console.error('Error clearing all images:', error);
+        } finally {
+            setClearingAllImages(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-     
 
         try {
             const submitData = new FormData();
@@ -207,30 +245,37 @@ const AddGalleryPage = () => {
                 submitData.append('id', id);
             }
 
-            // Handle images
+            // Handle images - separate existing and new images like AddEventPage
             if (formData.galleryImages.length > 0) {
+                // Send ONLY new images (File objects) in galleryImages field
+                const newImages = [];
                 formData.galleryImages.forEach((image) => {
                     if (image instanceof File) {
-                        // New files
+                        newImages.push(image);
                         submitData.append('galleryImages', image);
                     }
                 });
 
-                // For edit mode, also send existing images
+                // For edit mode, send existing images to preserve them in originalImages field
                 if (id) {
+                    const existingImages = [];
                     formData.galleryImages.forEach((image) => {
                         if (typeof image === 'string') {
+                            existingImages.push(image);
                             submitData.append('originalImages', image);
                         }
                     });
+
+                    // IMPORTANT: Only send galleryImages if there are actual new files
+                    if (newImages.length === 0) {
+                        submitData.delete('galleryImages');
+                    }
                 }
             }
-//test
-            const response = await dispatch(createOrUpdateGallery(submitData,id));
+
+            const response = await dispatch(createOrUpdateGallery(submitData, id));
             if (response) {
-               
-                    navigate('/media-manager/gallery');
-             
+                navigate(`${EVENT_PATHS.VIEW_GALLERY}/${galleryId}`);
             }
         } catch (error) {
             console.log('An error occurred while saving gallery');
@@ -240,13 +285,13 @@ const AddGalleryPage = () => {
     };
 
     const handleCancel = () => {
-        navigate('/media-manager/gallery');
+        navigate(`${EVENT_PATHS.VIEW_GALLERY}/${galleryId}`);
     };
 
     // Cleanup preview URLs
     useEffect(() => {
         return () => {
-            imagePreviewUrls.forEach(url => {
+            imagePreviewUrls.forEach((url) => {
                 if (url.startsWith('blob:')) {
                     URL.revokeObjectURL(url);
                 }
@@ -261,12 +306,9 @@ const AddGalleryPage = () => {
                     <div className="card">
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
-                                <h4 className="card-title">{id ? 'Edit Gallery' : 'Add Gallery'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={handleCancel}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
+                                <h4 className="card-title">{EventId ? 'Edit Gallery' : 'Add Gallery'}</h4>
+                                <Button variant="secondary" onClick={handleCancel}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>
                             </div>
@@ -290,8 +332,6 @@ const AddGalleryPage = () => {
                                             />
                                         </div>
                                     </Col>
-
-                                
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
@@ -365,16 +405,42 @@ const AddGalleryPage = () => {
                                             {/* Image Preview Grid */}
                                             {formData.galleryImages && formData.galleryImages.length > 0 && (
                                                 <div className="mt-3">
-                                                    <h6
-                                                        style={{
-                                                            fontSize: '16px',
-                                                            fontWeight: '600',
-                                                            marginBottom: '15px',
-                                                            color: '#333'
-                                                        }}
-                                                    >
-                                                        Selected Images ({formData.galleryImages.length})
-                                                    </h6>
+                                                    <div className="d-flex justify-content-between align-items-center mb-3">
+                                                        <h6
+                                                            style={{
+                                                                fontSize: '16px',
+                                                                fontWeight: '600',
+                                                                color: '#333',
+                                                                margin: 0
+                                                            }}
+                                                        >
+                                                            Selected Images ({formData.galleryImages.length})
+                                                        </h6>
+                                                        {id && formData.galleryImages.length > 0 && (
+                                                            <Button
+                                                                variant="outline-danger"
+                                                                size="sm"
+                                                                onClick={handleClearAllImages}
+                                                                disabled={clearingAllImages}
+                                                                style={{
+                                                                    fontSize: '12px',
+                                                                    padding: '6px 12px'
+                                                                }}
+                                                            >
+                                                                {clearingAllImages ? (
+                                                                    <>
+                                                                        <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                                        Clearing...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <i className="fas fa-trash-alt me-1"></i>
+                                                                        Clear All Images
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                     <div
                                                         style={{
                                                             display: 'grid',
@@ -447,7 +513,10 @@ const AddGalleryPage = () => {
                                                                             }}
                                                                         >
                                                                             <div style={{ textAlign: 'center' }}>
-                                                                                <div className="spinner-border spinner-border-sm mb-2" role="status"></div>
+                                                                                <div
+                                                                                    className="spinner-border spinner-border-sm mb-2"
+                                                                                    role="status"
+                                                                                ></div>
                                                                                 <div style={{ fontSize: '12px' }}>Deleting...</div>
                                                                             </div>
                                                                         </div>
@@ -554,10 +623,9 @@ const AddGalleryPage = () => {
                                                             >
                                                                 <span>💡</span>
                                                                 <span>
-                                                                    {id 
+                                                                    {id
                                                                         ? 'Existing images will be updated, new images will be added. Click ✕ to remove.'
-                                                                        : 'First image will be the gallery thumbnail. Click ✕ to remove images.'
-                                                                    }
+                                                                        : 'First image will be the gallery thumbnail. Click ✕ to remove images.'}
                                                                 </span>
                                                             </small>
                                                         </div>
@@ -567,16 +635,12 @@ const AddGalleryPage = () => {
                                         </div>
                                     </Col>
                                 </Row>
-                                
+
                                 {/* Form Actions */}
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button 
-                                                variant="danger" 
-                                                onClick={handleCancel}
-                                                disabled={loading}
-                                            >
+                                            <Button variant="danger" onClick={handleCancel} disabled={loading}>
                                                 Cancel
                                             </Button>
                                             <Button
@@ -595,8 +659,10 @@ const AddGalleryPage = () => {
                                                         <span className="spinner-border spinner-border-sm me-2" role="status"></span>
                                                         {id ? 'Updating...' : 'Creating...'}
                                                     </>
+                                                ) : id ? (
+                                                    'Update Gallery'
                                                 ) : (
-                                                    id ? 'Update Gallery' : 'Create Gallery'
+                                                    'Create Gallery'
                                                 )}
                                             </Button>
                                         </div>
@@ -607,8 +673,23 @@ const AddGalleryPage = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmationModal
+            show={showClearModal}
+            onHide={() => setShowClearModal(false)}
+            title="Confirm Clear All Images"
+            message="Are you sure you want to remove all gallery images?"
+            confirmText="Clear All Images"
+            cancelText="Cancel"
+            variant="danger"
+            onConfirm={confirmClearAllImages}
+            loading={clearingAllImages}
+            loadingText="Clearing..."
+            icon="fas fa-trash-alt"
+            iconColor="text-danger"
+        />
         </Container>
     );
 };
 
-export default AddGalleryPage; 
+export default AddGalleryPage;

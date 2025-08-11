@@ -201,7 +201,7 @@ const GalleryPage = () => {
     };
 
     const handleEdit = (data) => {
-        navigate(`${EVENT_PATHS.EDIT_GALLERY}/${data.id}`);
+        navigate(EVENT_PATHS.EDIT_GALLERY);
     };
 
     const handleView = (data) => {
@@ -252,8 +252,7 @@ const GalleryPage = () => {
                             <Table striped hover responsive id="data-table-zero">
                                 <thead>
                                     <tr>
-                                        <th>Gallery Name</th>
-                                      
+                                        <th>Gallery Name</th>                                     
                                         <th>Images</th>
                                         <th>Created Date</th>
                                         <th>Actions</th>

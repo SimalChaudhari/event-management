@@ -113,14 +113,14 @@ const ViewGalleryPage = () => {
                                 <Button 
                                     variant="warning" 
                                     size="sm"
-                                    onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}/${galleryData.id}`)}
+                                    onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?eventId=${galleryData.eventId}&galleryId=${galleryData.id}`)}
                                 >
                                     <i className="feather icon-edit mr-1"></i>
                                     Edit Gallery
                                 </Button>
                             </div>
                         </Card.Body>
-                    </Card>
+                    </Card> 
 
                     {/* Tab Navigation */}
                     <div className="mb-4">

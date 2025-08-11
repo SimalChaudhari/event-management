@@ -192,17 +192,32 @@ export class GalleryService {
       });
       
       if (existingGallery) {
-        // Delete previous images from upload folder
-        if (existingGallery.galleryImages && existingGallery.galleryImages.length > 0) {
-          await this.deleteFilesFromFolder(existingGallery.galleryImages);
-        }
+        // Check if user is updating images or just title
+        const hasNewImages = galleryDto.galleryImages && galleryDto.galleryImages.length > 0;
         
-        // Update existing gallery with new data (replace old images)
+        if (hasNewImages) {
+          // Instead of replacing, ADD new images to existing ones
+          const existingImages = existingGallery.galleryImages || [];
+          const newImages = galleryDto.galleryImages || [];
+          
+          // Combine existing and new images
+          existingGallery.galleryImages = [...existingImages, ...newImages];
+          
+        } else {
+          // If no new images, preserve existing images from originalImages field
+          if (galleryDto.originalImages && galleryDto.originalImages.length > 0) {
+            existingGallery.galleryImages = galleryDto.originalImages;
+          }
+        }
+        // Always update title
         existingGallery.title = galleryDto.title;
-        existingGallery.galleryImages = galleryDto.galleryImages || [];
         
         const result = await this.galleryRepository.save(existingGallery);
-        return { message: 'Gallery updated successfully', data: result };
+        return { 
+          message: hasNewImages ? 'Gallery updated successfully with new images added' : 'Gallery title updated successfully', 
+          data: result,
+          isNew: false 
+        };
       }
 
       // Create new gallery if none exists
@@ -211,7 +226,12 @@ export class GalleryService {
         eventId: eventId
       });
       const result = await this.galleryRepository.save(gallery);
-      return { message: 'Gallery created successfully', data: result };
+      return { 
+        message: 'Gallery created successfully', 
+        data: result,
+        isNew: true 
+      };
+      
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;

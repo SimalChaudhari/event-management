@@ -324,7 +324,7 @@ const eventRoutes = [
         component: eventComponents.AddGallery
     },
     {
-        path: EVENT_PATHS.EDIT_GALLERY + '/:id',
+        path: EVENT_PATHS.EDIT_GALLERY,
         exact: true,
         name: 'Edit Gallery',
         component: eventComponents.EditGallery

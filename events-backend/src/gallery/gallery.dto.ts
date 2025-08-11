@@ -19,6 +19,9 @@ import {
     @IsOptional()
     @IsArray()
     galleryImages?: string[];
+
+    @IsOptional()
+    originalImages?: any; // Add this line for preserving existing images
   }
   
   export class UpdateGalleryDto {
