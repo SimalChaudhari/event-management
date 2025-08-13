@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { ChatThread, ChatMessage, ChatParticipant, MessageType } from './chat.entity';
 import { UserEntity } from 'user/users.entity';
-import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, UpdateLastSeenDto } from './chat.dto';
+import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, UpdateLastSeenDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
 
 @Injectable()
 export class ChatService {
@@ -192,14 +192,23 @@ export class ChatService {
     const skip = (page - 1) * limit;
 
     try {
-      // Get messages with pagination
-      const [messages, total] = await this.messageRepo.findAndCount({
-        where: { threadID },
-        relations: ['sender', 'receiver', 'replyToMessage', 'replyToMessage.sender'],
-        order: { msgDateUTC: 'DESC' },
-        take: limit,
-        skip
-      });
+      // Get messages with pagination (only visible messages for current user)
+      const queryBuilder = this.messageRepo
+        .createQueryBuilder('msg')
+        .leftJoinAndSelect('msg.sender', 'sender')
+        .leftJoinAndSelect('msg.receiver', 'receiver')
+        .leftJoinAndSelect('msg.replyToMessage', 'replyToMessage')
+        .leftJoinAndSelect('replyToMessage.sender', 'replyToMessageSender')
+        .where('msg.threadID = :threadID', { threadID })
+        .andWhere(
+          '(msg.senderID = :userID AND msg.visibleToSender = true) OR (msg.receiverID = :userID AND msg.visibleToReceiver = true)',
+          { userID }
+        )
+        .orderBy('msg.msgDateUTC', 'DESC')
+        .take(limit)
+        .skip(skip);
+
+      const [messages, total] = await queryBuilder.getManyAndCount();
 
       // Get participant info for last seen
       const participant = await this.participantRepo.findOne({
@@ -225,6 +234,8 @@ export class ChatService {
         receiverID: msg.receiverID,
         isRead: msg.isRead,
         isDelivered: msg.isDelivered,
+        isEdited: msg.isEdited,
+        editedAt: msg.editedAt,
         msgDateUTC: msg.msgDateUTC,
         replyToMessage: msg.replyToMessage ? {
           msgID: msg.replyToMessage.msgID,
@@ -340,6 +351,258 @@ export class ChatService {
     }
   }
 
+  // Delete specific message (WhatsApp style)
+  async deleteMessage(userID: string, dto: DeleteMessageDto): Promise<any> {
+    try {
+      // Verify user is participant of this thread
+      const participant = await this.participantRepo.findOne({
+        where: { threadID: dto.threadID, userID }
+      });
 
+      if (!participant) {
+        throw new BadRequestException('You are not a participant of this thread');
+      }
+
+      // Find the message
+      const message = await this.messageRepo.findOne({
+        where: { msgID: dto.msgID, threadID: dto.threadID }
+      });
+
+      if (!message) {
+        throw new NotFoundException('Message not found');
+      }
+
+      let deleteType: 'both' | 'sender_only' | 'receiver_only' = 'sender_only';
+
+      if (message.senderID === userID) {
+        // User is deleting their own message - delete from both sides
+        deleteType = 'both';
+        await this.messageRepo.update(
+          { msgID: dto.msgID },
+          { 
+            visibleToSender: false,
+            visibleToReceiver: false
+          }
+        );
+      } else if (message.receiverID === userID) {
+        // User is deleting someone else's message - delete only from their side
+        deleteType = 'receiver_only';
+        await this.messageRepo.update(
+          { msgID: dto.msgID },
+          { visibleToReceiver: false }
+        );
+      } else {
+        throw new BadRequestException('You can only delete messages in your conversation');
+      }
+
+      // Update thread's last message if this message was visible and was the latest
+      const latestVisibleMessage = await this.messageRepo
+        .createQueryBuilder('msg')
+        .where('msg.threadID = :threadID', { threadID: dto.threadID })
+        .andWhere('(msg.visibleToSender = true OR msg.visibleToReceiver = true)')
+        .orderBy('msg.msgDateUTC', 'DESC')
+        .getOne();
+
+      if (latestVisibleMessage) {
+        await this.threadRepo.update(dto.threadID, {
+          lastMessage: latestVisibleMessage.msg.substring(0, 100),
+          updatedAt: new Date()
+        });
+      } else {
+        // No visible messages left in thread
+        await this.threadRepo.update(dto.threadID, {
+          lastMessage: '',
+          updatedAt: new Date()
+        });
+      }
+
+      return {
+        success: true,
+        msgID: dto.msgID,
+        threadID: dto.threadID,
+        deleteType,
+        deletedAt: new Date()
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete message');
+    }
+  }
+
+  // Delete all messages from current user's side only (WhatsApp style)
+  async deleteAllMessages(userID: string, dto: DeleteAllMessagesDto): Promise<any> {
+    try {
+      // Find or create thread to ensure it exists
+      const threadData = await this.createOrGetThread(userID, { receiverID: dto.receiverID });
+      const threadID = threadData.threadID;
+
+      if (threadID !== dto.threadID) {
+        throw new BadRequestException('Thread ID mismatch');
+      }
+
+      // Verify user is participant
+      const participant = await this.participantRepo.findOne({
+        where: { threadID: dto.threadID, userID }
+      });
+
+      if (!participant) {
+        throw new BadRequestException('You are not a participant of this thread');
+      }
+
+      // Count messages visible to user before deletion
+      const messageCount = await this.messageRepo
+        .createQueryBuilder('msg')
+        .where('msg.threadID = :threadID', { threadID: dto.threadID })
+        .andWhere(
+          '(msg.senderID = :userID AND msg.visibleToSender = true) OR (msg.receiverID = :userID AND msg.visibleToReceiver = true)',
+          { userID }
+        )
+        .getCount();
+
+      // Hide all messages from current user's perspective
+      // For messages sent by user - hide from sender side
+      await this.messageRepo.update(
+        { threadID: dto.threadID, senderID: userID },
+        { visibleToSender: false }
+      );
+
+      // For messages received by user - hide from receiver side
+      await this.messageRepo.update(
+        { threadID: dto.threadID, receiverID: userID },
+        { visibleToReceiver: false }
+      );
+
+      // Reset unread count for current user only
+      await this.participantRepo.update(
+        { threadID: dto.threadID, userID },
+        { unreadCount: 0 }
+      );
+
+      // Update thread's last message based on what's still visible to either user
+      const latestVisibleMessage = await this.messageRepo
+        .createQueryBuilder('msg')
+        .where('msg.threadID = :threadID', { threadID: dto.threadID })
+        .andWhere('(msg.visibleToSender = true OR msg.visibleToReceiver = true)')
+        .orderBy('msg.msgDateUTC', 'DESC')
+        .getOne();
+
+      if (latestVisibleMessage) {
+        await this.threadRepo.update(dto.threadID, {
+          lastMessage: latestVisibleMessage.msg.substring(0, 100),
+          updatedAt: new Date()
+        });
+      } else {
+        // No visible messages left for anyone
+        await this.threadRepo.update(dto.threadID, {
+          lastMessage: '',
+          updatedAt: new Date()
+        });
+      }
+
+      return {
+        success: true,
+        threadID: dto.threadID,
+        messagesDeleted: messageCount,
+        deletedAt: new Date(),
+        deleteType: 'current_user_side_only'
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete all messages');
+    }
+  }
+
+  // Edit message (WhatsApp style - only sender can edit, visible to both)
+  async editMessage(userID: string, dto: EditMessageDto): Promise<any> {
+    try {
+      // Verify user is participant of this thread
+      const participant = await this.participantRepo.findOne({
+        where: { threadID: dto.threadID, userID }
+      });
+
+      if (!participant) {
+        throw new BadRequestException('You are not a participant of this thread');
+      }
+
+      // Find the message
+      const message = await this.messageRepo.findOne({
+        where: { msgID: dto.msgID, threadID: dto.threadID },
+        relations: ['sender', 'receiver']
+      });
+
+      if (!message) {
+        throw new NotFoundException('Message not found');
+      }
+
+      // Check if user is the sender (only sender can edit)
+      if (message.senderID !== userID) {
+        throw new BadRequestException('You can only edit your own messages');
+      }
+
+      // Check if message is still visible to sender
+      if (!message.visibleToSender) {
+        throw new BadRequestException('Cannot edit deleted message');
+      }
+
+      // Update the message
+      await this.messageRepo.update(
+        { msgID: dto.msgID },
+        { 
+          msg: dto.newMsg.trim(),
+          isEdited: true,
+          editedAt: new Date()
+        }
+      );
+
+      // Update thread's last message if this was the latest message
+      const latestMessage = await this.messageRepo.findOne({
+        where: { threadID: dto.threadID },
+        order: { msgDateUTC: 'DESC' }
+      });
+
+      if (latestMessage && latestMessage.msgID === dto.msgID) {
+        await this.threadRepo.update(dto.threadID, {
+          lastMessage: dto.newMsg.substring(0, 100),
+          updatedAt: new Date()
+        });
+      }
+
+      // Return updated message data
+      const updatedMessage = await this.messageRepo.findOne({
+        where: { msgID: dto.msgID },
+        relations: ['sender', 'receiver', 'replyToMessage', 'replyToMessage.sender']
+      });
+
+      return {
+        success: true,
+        msgID: dto.msgID,
+        threadID: dto.threadID,
+        msg: updatedMessage!.msg,
+        isEdited: updatedMessage!.isEdited,
+        editedAt: updatedMessage!.editedAt,
+        senderID: updatedMessage!.senderID,
+        receiverID: updatedMessage!.receiverID,
+        senderNick: updatedMessage!.sender?.firstName || 'Unknown',
+        msgDateUTC: updatedMessage!.msgDateUTC,
+        replyToMessage: updatedMessage!.replyToMessage ? {
+          msgID: updatedMessage!.replyToMessage.msgID,
+          msg: updatedMessage!.replyToMessage.msg,
+          senderNick: updatedMessage!.replyToMessage.sender?.firstName || 'Unknown'
+        } : null
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to edit message');
+    }
+  }
 
 }

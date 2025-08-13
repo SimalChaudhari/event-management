@@ -80,3 +80,38 @@ export class SendMessageWithReceiverDto {
   @IsOptional()
   msgJson?: any;
 }
+
+export class DeleteMessageDto {
+  @IsUUID(4, { message: 'MessageID must be a valid UUID' })
+  @IsNotEmpty({ message: 'MessageID is required' })
+  msgID!: string;
+
+  @IsUUID(4, { message: 'ThreadID must be a valid UUID' })
+  @IsNotEmpty({ message: 'ThreadID is required' })
+  threadID!: string;
+}
+
+export class DeleteAllMessagesDto {
+  @IsUUID(4, { message: 'ThreadID must be a valid UUID' })
+  @IsNotEmpty({ message: 'ThreadID is required' })
+  threadID!: string;
+
+  @IsUUID(4, { message: 'ReceiverID must be a valid UUID' })
+  @IsNotEmpty({ message: 'ReceiverID is required' })
+  receiverID!: string;
+}
+
+export class EditMessageDto {
+  @IsUUID(4, { message: 'MessageID must be a valid UUID' })
+  @IsNotEmpty({ message: 'MessageID is required' })
+  msgID!: string;
+
+  @IsUUID(4, { message: 'ThreadID must be a valid UUID' })
+  @IsNotEmpty({ message: 'ThreadID is required' })
+  threadID!: string;
+
+  @IsString({ message: 'New message must be a string' })
+  @IsNotEmpty({ message: 'New message cannot be empty' })
+  @Transform(({ value }) => value?.trim())
+  newMsg!: string;
+}

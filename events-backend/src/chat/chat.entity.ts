@@ -89,6 +89,18 @@ export class ChatMessage {
   @Column({ type: 'boolean', default: false })
   isDelivered!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  visibleToSender!: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  visibleToReceiver!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isEdited!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  editedAt?: Date;
+
   @CreateDateColumn()
   msgDateUTC!: Date;
 

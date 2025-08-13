@@ -16,44 +16,6 @@ const getAuthHeaders = (token) => ({
 });
 ```
 
-## 🔐 Authentication
-
-### 1. Login
-```javascript
-const login = async (email, password) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  
-  const data = await response.json();
-  if (data.success) {
-    localStorage.setItem('chat_token', data.token);
-    return data.token;
-  }
-  throw new Error(data.message);
-};
-```
-
-### 2. Register
-```javascript
-const register = async (userData) => {
-  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      password: userData.password
-    })
-  });
-  
-  return await response.json();
-};
-```
-
 ## 💬 Chat API Endpoints
 
 ### 1. Open Chat
@@ -78,9 +40,9 @@ const sendMessage = async (receiverID, messageData, token) => {
     headers: getAuthHeaders(token),
     body: JSON.stringify({
       msg: messageData.msg,
-      msgType: messageData.msgType || 'text',
-      reply: messageData.reply || null,
-      msgJson: messageData.msgJson || null
+      msgType: messageData.msgType || 'text', //Optional default he take "text" if not provided
+      reply: messageData.reply || null, //Optional(if You reply to a message so passed msgId He will be reply to that message)
+      msgJson: messageData.msgJson || null //Optional message json
     })
   });
   

@@ -16,6 +16,9 @@ import {
   CreateThreadDto,
   MarkReadDto,
   UpdateLastSeenDto,
+  DeleteMessageDto,
+  DeleteAllMessagesDto,
+  EditMessageDto,
 } from './chat.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
@@ -86,9 +89,52 @@ export class ChatController {
       throw new BadRequestException('User authentication failed');
     }
 
-
-
     const result = await this.chatService.updateLastSeen(userID, dto);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  // Delete specific message
+  @Post('delete-message')
+  async deleteMessage(@Req() req: any, @Body() dto: DeleteMessageDto) {
+    const userID = req.user?.sub || req.user?.id;
+    if (!userID) {
+      throw new BadRequestException('User authentication failed');
+    }
+
+    const result = await this.chatService.deleteMessage(userID, dto);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  // Delete all messages in a thread
+  @Post('delete-all-messages')
+  async deleteAllMessages(@Req() req: any, @Body() dto: DeleteAllMessagesDto) {
+    const userID = req.user?.sub || req.user?.id;
+    if (!userID) {
+      throw new BadRequestException('User authentication failed');
+    }
+
+    const result = await this.chatService.deleteAllMessages(userID, dto);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  // Edit message
+  @Post('edit-message')
+  async editMessage(@Req() req: any, @Body() dto: EditMessageDto) {
+    const userID = req.user?.sub || req.user?.id;
+    if (!userID) {
+      throw new BadRequestException('User authentication failed');
+    }
+
+    const result = await this.chatService.editMessage(userID, dto);
     return {
       success: true,
       data: result,

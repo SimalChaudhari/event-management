@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ChatService } from './chat.service';
-import { MarkReadDto, UpdateLastSeenDto } from './chat.dto';
+import { MarkReadDto, UpdateLastSeenDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
 import { MessageType } from './chat.entity';
 
 @WebSocketGateway({
@@ -334,6 +334,107 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       lastSeen,
       timestamp: new Date()
     });
+  }
+
+  @SubscribeMessage('delete_message')
+  async handleDeleteMessage(@ConnectedSocket() client: Socket, @MessageBody() data: DeleteMessageDto) {
+    try {
+      const userId = this.userSockets.get(client.id);
+      if (!userId) return;
+
+      const result = await this.chatService.deleteMessage(userId, data);
+
+      // Notify users based on delete type
+      if (result.deleteType === 'both') {
+        // Own message deleted - notify both users
+        this.server.to(`thread:${data.threadID}`).emit('message_deleted', {
+          msgID: data.msgID,
+          threadID: data.threadID,
+          deletedBy: userId,
+          deleteType: result.deleteType,
+          timestamp: new Date()
+        });
+      } else {
+        // Other's message deleted - only notify current user
+        client.emit('message_deleted', {
+          msgID: data.msgID,
+          threadID: data.threadID,
+          deletedBy: userId,
+          deleteType: result.deleteType,
+          timestamp: new Date()
+        });
+      }
+
+      client.emit('delete_success', result);
+
+    } catch (error: any) {
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @SubscribeMessage('delete_all_messages')
+  async handleDeleteAllMessages(@ConnectedSocket() client: Socket, @MessageBody() data: DeleteAllMessagesDto) {
+    try {
+      const userId = this.userSockets.get(client.id);
+      if (!userId) return;
+
+      const result = await this.chatService.deleteAllMessages(userId, data);
+
+      // For delete all - only notify current user since it's only their side
+      client.emit('all_messages_deleted', {
+        threadID: data.threadID,
+        receiverID: data.receiverID,
+        deletedBy: userId,
+        messagesDeleted: result.messagesDeleted,
+        deleteType: result.deleteType,
+        timestamp: new Date()
+      });
+
+      client.emit('delete_all_success', result);
+
+    } catch (error: any) {
+      client.emit('error', { message: error.message });
+    }
+  }
+
+  @SubscribeMessage('edit_message')
+  async handleEditMessage(@ConnectedSocket() client: Socket, @MessageBody() data: EditMessageDto) {
+    try {
+      const userId = this.userSockets.get(client.id);
+      if (!userId) return;
+
+      const result = await this.chatService.editMessage(userId, data);
+
+      // Notify both users in the thread about message edit (WhatsApp style)
+      this.server.to(`thread:${data.threadID}`).emit('message_edited', {
+        msgID: data.msgID,
+        threadID: data.threadID,
+        newMsg: result.msg,
+        isEdited: result.isEdited,
+        editedAt: result.editedAt,
+        editedBy: userId,
+        timestamp: new Date()
+      });
+
+      // Also notify both participants directly
+      const participants = await this.chatService.getThreadParticipants(data.threadID);
+      participants.forEach(participant => {
+        this.server.to(`user:${participant.userID}`).emit('message_edited', {
+          msgID: data.msgID,
+          threadID: data.threadID,
+          newMsg: result.msg,
+          isEdited: result.isEdited,
+          editedAt: result.editedAt,
+          editedBy: userId,
+          timestamp: new Date()
+        });
+      });
+
+      client.emit('edit_success', result);
+
+    } catch (error: any) {
+      client.emit('error', { message: error.message });
+    }
   }
 
 }
