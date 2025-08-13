@@ -102,6 +102,7 @@ export class QnaService {
         answeredBy: null,
       };
     } catch (error: any) {
+      console.log(error);
       if (
         error instanceof ResourceNotFoundException ||
         error instanceof ValidationException

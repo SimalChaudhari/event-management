@@ -1,0 +1,261 @@
+{
+  "info": {
+    "name": "Chat API Collection",
+    "description": "Complete Chat API with Authentication, Messaging, and WebSocket features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "AUTH_TOKEN",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{AUTH_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat Management",
+      "item": [
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"msg\": \"Hello! This is a test message\",\n  \"msgType\": \"text\",\n  \"reply\": null,\n  \"msgJson\": null\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/chat/send/:receiverID",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "chat", "send", ":receiverID"],
+              "variable": [
+                {
+                  "key": "receiverID",
+                  "value": "RECEIVER_USER_ID_HERE"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Open Chat",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/chat/open-chat?receiverID=RECEIVER_USER_ID&paginationCount=20&paginationCurrentPage=1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "chat", "open-chat"],
+              "query": [
+                {
+                  "key": "receiverID",
+                  "value": "RECEIVER_USER_ID"
+                },
+                {
+                  "key": "paginationCount",
+                  "value": "20"
+                },
+                {
+                  "key": "paginationCurrentPage",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark as Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threadID\": \"THREAD_ID_HERE\",\n  \"msgID\": \"MESSAGE_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/chat/read",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "chat", "read"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Last Seen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threadID\": \"THREAD_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/chat/seen",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "chat", "seen"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WebSocket Events",
+      "item": [
+        {
+          "name": "Socket Connection Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/chat",
+              "host": ["{{BASE_URL}}"],
+              "path": ["chat"]
+            },
+            "description": "WebSocket connection endpoint: ws://localhost:5000/chat\n\nConnection with auth:\n```javascript\nconst socket = io('http://localhost:5000/chat', {\n  auth: { token: 'YOUR_JWT_TOKEN' }\n});\n```"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/users/profile",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "users", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/users",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "users"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

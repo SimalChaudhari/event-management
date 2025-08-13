@@ -27,6 +27,7 @@ import { SurveyModule } from 'survey/survey.module';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { PollingModule } from 'polling/polling.module';
 import { QnaModule } from 'qna/qna.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { QnaModule } from 'qna/qna.module';
     QnaModule,
     PollingModule,
     EventModule, SpeakerModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
+    ChatModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
