@@ -15,7 +15,6 @@ import {
   GetChatDto,
   CreateThreadDto,
   MarkReadDto,
-  UpdateLastSeenDto,
   DeleteMessageDto,
   DeleteAllMessagesDto,
   EditMessageDto,
@@ -81,20 +80,7 @@ export class ChatController {
     };
   }
 
-  // Update last seen
-  @Post('seen')
-  async updateLastSeen(@Req() req: any, @Body() dto: UpdateLastSeenDto) {
-    const userID = req.user?.sub || req.user?.id;
-    if (!userID) {
-      throw new BadRequestException('User authentication failed');
-    }
 
-    const result = await this.chatService.updateLastSeen(userID, dto);
-    return {
-      success: true,
-      data: result,
-    };
-  }
 
   // Delete specific message
   @Post('delete-message')
@@ -140,5 +126,7 @@ export class ChatController {
       data: result,
     };
   }
+
+
 
 }

@@ -53,11 +53,7 @@ export class MarkReadDto {
   msgID?: string;
 }
 
-export class UpdateLastSeenDto {
-  @IsUUID(4, { message: 'ThreadID must be a valid UUID' })
-  @IsNotEmpty({ message: 'ThreadID is required' })
-  threadID!: string;
-}
+
 
 export class SendMessageWithReceiverDto {
   @IsUUID(4, { message: 'ReceiverID must be a valid UUID' })

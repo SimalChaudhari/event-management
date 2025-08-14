@@ -1,18 +1,25 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { ChatThread, ChatMessage, ChatParticipant, MessageType } from './chat.entity';
 import { UserEntity } from 'user/users.entity';
-import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, UpdateLastSeenDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
+import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
 
 @Injectable()
 export class ChatService {
+  private chatGateway: any; // Will be injected by the gateway
+
   constructor(
     @InjectRepository(ChatThread) private threadRepo: Repository<ChatThread>,
     @InjectRepository(ChatMessage) private messageRepo: Repository<ChatMessage>,
     @InjectRepository(ChatParticipant) private participantRepo: Repository<ChatParticipant>,
     @InjectRepository(UserEntity) private userRepo: Repository<UserEntity>,
   ) {}
+
+  // Method to set gateway reference (called from gateway)
+  setGateway(gateway: any) {
+    this.chatGateway = gateway;
+  }
 
   // Create or get thread between user and speaker
   async createOrGetThread(userID: string, dto: CreateThreadDto): Promise<any> {
@@ -210,10 +217,7 @@ export class ChatService {
 
       const [messages, total] = await queryBuilder.getManyAndCount();
 
-      // Get participant info for last seen
-      const participant = await this.participantRepo.findOne({
-        where: { threadID, userID: dto.receiverID }
-      });
+
 
       // Mark messages as delivered for current user
       await this.messageRepo.update(
@@ -244,11 +248,26 @@ export class ChatService {
         } : null
       }));
 
+      // Get receiver's participant data for lastSeen
+      const receiverParticipant = await this.participantRepo.findOne({
+        where: { threadID, userID: dto.receiverID }
+      });
+
+      // Check if receiver is currently online via gateway
+      const isReceiverOnline = this.chatGateway?.isUserOnline(dto.receiverID) || false;
+      
+      let lastSeen: string | null = null;
+      if (isReceiverOnline) {
+        lastSeen = 'online';
+      } else if (receiverParticipant?.lastSeen) {
+        lastSeen = receiverParticipant.lastSeen.toISOString();
+      }
+
       return {
         threadID,
         receiverID: dto.receiverID,
         receiverName: threadData.receiverName,
-        lastSeen: participant?.lastSeen || null,
+        lastSeen,
         paginationCount: limit,
         paginationCurrentPage: page,
         totalMessages: total,
@@ -306,28 +325,9 @@ export class ChatService {
     }
   }
 
-  // Update last seen
-  async updateLastSeen(userID: string, dto: UpdateLastSeenDto): Promise<any> {
-    try {
-      const result = await this.participantRepo.update(
-        { threadID: dto.threadID, userID },
-        { lastSeen: new Date() }
-      );
 
-      if (result.affected === 0) {
-        throw new BadRequestException('You are not a participant of this thread');
-      }
 
-      return {
-        success: true,
-        lastSeen: new Date(),
-        threadID: dto.threadID
-      };
 
-    } catch (error) {
-      throw new BadRequestException('Failed to update last seen');
-    }
-  }
 
 
   // Get thread participants
@@ -342,7 +342,6 @@ export class ChatService {
         userID: p.userID,
         threadID: p.threadID,
         unreadCount: p.unreadCount,
-        lastSeen: p.lastSeen,
         userName: p.user?.firstName || 'Unknown'
       }));
 

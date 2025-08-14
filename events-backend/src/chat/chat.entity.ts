@@ -24,9 +24,6 @@ export class ChatThread {
   @Column({ type: 'text', nullable: true })
   lastMessage?: string;
 
-  @Column({ type: 'timestamp', nullable: true })
-  lastSeen?: Date;
-
   @CreateDateColumn()
   createdAt!: Date;
 
@@ -128,11 +125,11 @@ export class ChatParticipant {
   @JoinColumn({ name: 'userID' })
   user!: UserEntity;
 
-  @Column({ type: 'timestamp', nullable: true })
-  lastSeen?: Date;
-
   @Column({ type: 'int', default: 0 })
   unreadCount!: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastSeen?: Date;
 
   @CreateDateColumn()
   joinedAt!: Date;

@@ -10,8 +10,11 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ChatService } from './chat.service';
-import { MarkReadDto, UpdateLastSeenDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
+import { MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
 import { MessageType } from './chat.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ChatParticipant } from './chat.entity';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -25,12 +28,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private userSockets = new Map<string, string>(); // socketId -> userId
   private typingUsers = new Map<string, NodeJS.Timeout>(); // threadID:userId -> timeout
   private typingStatus = new Map<string, boolean>(); // threadID:userId -> isTyping
-  private userLastSeen = new Map<string, Date>(); // userId -> last seen timestamp
+
 
   constructor(
     private readonly jwt: JwtService,
-    private readonly chatService: ChatService
-  ) {}
+    private readonly chatService: ChatService,
+    @InjectRepository(ChatParticipant) private participantRepo: Repository<ChatParticipant>
+  ) {
+    // Set gateway reference in service for online status checking
+    this.chatService.setGateway(this);
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -54,15 +61,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.userSockets.set(client.id, userId);
 
       await client.join(`user:${userId}`);
+      
+      // Update lastSeen for all threads where this user is a participant
+      await this.participantRepo.update(
+        { userID: userId },
+        { lastSeen: new Date() }
+      );
+      
       client.emit('connected', { userId, timestamp: new Date() });
 
-      // Update last seen to now (user is online)
-      this.userLastSeen.set(userId, new Date());
-
-      // Broadcast user online status with last seen
+      // Broadcast user online status
       this.server.emit('user_online', { 
         userId,
-        lastSeen: new Date(),
         isOnline: true 
       });
       
@@ -78,6 +88,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleDisconnect(client: Socket) {
     const userId = this.userSockets.get(client.id);
     if (userId) {
+      // Update lastSeen for all threads where this user is a participant
+      await this.participantRepo.update(
+        { userID: userId },
+        { lastSeen: new Date() }
+      );
+      
       // Clear any typing status for this user
       for (const [typingKey, timeout] of this.typingUsers.entries()) {
         if (typingKey.endsWith(`:${userId}`)) {
@@ -92,14 +108,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.connectedUsers.delete(userId);
       this.userSockets.delete(client.id);
       
-      // Update last seen timestamp when user goes offline
-      const lastSeenTime = new Date();
-      this.userLastSeen.set(userId, lastSeenTime);
-      
-      // Broadcast offline status with last seen
+      // Broadcast offline status
       this.server.emit('user_offline', { 
         userId,
-        lastSeen: lastSeenTime,
         isOnline: false
       });
     }
@@ -187,25 +198,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('update_last_seen')
-  async handleLastSeen(@ConnectedSocket() client: Socket, @MessageBody() data: UpdateLastSeenDto) {
-    try {
-      const userId = this.userSockets.get(client.id);
-      if (!userId) return;
 
-      const result = await this.chatService.updateLastSeen(userId, data);
-
-      // Notify thread participants
-      this.server.to(`thread:${data.threadID}`).emit('user_seen', {
-        threadID: data.threadID,
-        userId,
-        lastSeen: result.lastSeen
-      });
-
-    } catch (error: any) {
-      client.emit('error', { message: error.message });
-    }
-  }
 
   @SubscribeMessage('join_thread')
   async handleJoinThread(@ConnectedSocket() client: Socket, @MessageBody() data: { threadID: string }) {
@@ -322,18 +315,34 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.connectedUsers.has(userId);
   }
 
-  // Get user's last seen status
+  // Get all connected user IDs
+  getConnectedUserIds(): string[] {
+    return Array.from(this.connectedUsers.keys());
+  }
+
+  // Get user's status (only online/offline)
   @SubscribeMessage('get_user_status')
   async getUserStatus(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
-    const isOnline = this.isUserOnline(data.userId);
-    const lastSeen = this.userLastSeen.get(data.userId) || new Date();
-    
-    client.emit('user_status', {
-      userId: data.userId,
-      isOnline,
-      lastSeen,
-      timestamp: new Date()
-    });
+    try {
+      const isOnline = this.isUserOnline(data.userId);
+      
+      client.emit('user_status', {
+        userId: data.userId,
+        isOnline,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error(`Failed to get user status for ${data.userId}:`, error);
+      
+      const isOnline = this.isUserOnline(data.userId);
+      
+      client.emit('user_status', {
+        userId: data.userId,
+        isOnline,
+        timestamp: new Date(),
+        error: 'Status fetch failed'
+      });
+    }
   }
 
   @SubscribeMessage('delete_message')
