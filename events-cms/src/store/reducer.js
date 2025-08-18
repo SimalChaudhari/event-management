@@ -10,6 +10,7 @@ import galleryReducer from './reducer/galleryReducer';
 import categoryReducer from './reducer/categoryReducer';
 import settingsReducer from './reducer/settingsReducer';
 import withdrawReducer from './reducer/withdrawReducer';
+import surveyReducer from './reducer/surveyReducer';
 import loadingReducer from './reducer/loadingReducer';
 import errorReducer from './reducer/errorReducer';
 import ableReducer from './ableReducer';
@@ -30,6 +31,7 @@ const reducer = combineReducers({
     category: categoryReducer,
     settings: settingsReducer,
     withdraw: withdrawReducer,
+    survey: surveyReducer,
     loading: loadingReducer,
     error: errorReducer
 });

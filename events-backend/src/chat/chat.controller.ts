@@ -18,6 +18,7 @@ import {
   DeleteMessageDto,
   DeleteAllMessagesDto,
   EditMessageDto,
+  GetChatListDto,
 } from './chat.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
@@ -127,6 +128,16 @@ export class ChatController {
     };
   }
 
+  // Get chat list (WhatsApp style contact list)
+  @Get('list')
+  async getChatList(@Req() req: any, @Query() dto: GetChatListDto) {
+    const userID = req.user?.sub || req.user?.id;
+    if (!userID) {
+      throw new BadRequestException('User authentication failed');
+    }
 
+    const result = await this.chatService.getChatList(userID, dto);
+    return result;
+  }
 
 }

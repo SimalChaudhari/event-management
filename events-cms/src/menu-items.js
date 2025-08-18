@@ -93,6 +93,13 @@ const chartData = {
                     icon: 'feather icon-tag',
                     url: '/categories'
                 },
+                {
+                    id: 'surveys',
+                    title: 'Surveys',
+                    type: 'item',
+                    icon: 'feather icon-clipboard',
+                    url: '/surveys'
+                },
                
                 {
                     id: 'order ',

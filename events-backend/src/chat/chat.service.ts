@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { ChatThread, ChatMessage, ChatParticipant, MessageType } from './chat.entity';
 import { UserEntity } from 'user/users.entity';
-import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto } from './chat.dto';
+import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto, GetChatListDto } from './chat.dto';
 
 @Injectable()
 export class ChatService {
@@ -601,6 +601,121 @@ export class ChatService {
         throw error;
       }
       throw new BadRequestException('Failed to edit message');
+    }
+  }
+
+  // Get chat list (WhatsApp style contact list)
+  async getChatList(userID: string, dto: GetChatListDto): Promise<any> {
+    try {
+      const limit = Math.min(dto.paginationCount || 20, 100);
+      const page = Math.max(dto.paginationCurrentPage || 1, 1);
+      const skip = (page - 1) * limit;
+
+      // First, get all threads where user is a participant
+      const participants = await this.participantRepo.find({
+        where: { userID },
+        relations: ['thread', 'thread.user', 'thread.receiver']
+      });
+
+      if (participants.length === 0) {
+        return {
+          success: true,
+          paginationCount: limit,
+          paginationCurrentPage: page,
+          totalChats: 0,
+          totalPages: 0,
+          chatList: []
+        };
+      }
+
+      // Filter threads that have messages
+      const threadsWithMessages = participants.filter(p => 
+        p.thread && p.thread.lastMessage && p.thread.lastMessage.trim() !== ''
+      );
+
+      // Apply search filter if provided
+      let filteredThreads = threadsWithMessages;
+      if (dto.search && dto.search.trim()) {
+        const searchTerm = dto.search.trim().toLowerCase();
+        filteredThreads = threadsWithMessages.filter(p => {
+          const otherUser = p.thread.userID === userID ? p.thread.receiver : p.thread.user;
+          return (
+            otherUser.firstName?.toLowerCase().includes(searchTerm) ||
+            otherUser.lastName?.toLowerCase().includes(searchTerm) ||
+            p.thread.lastMessage?.toLowerCase().includes(searchTerm)
+          );
+        });
+      }
+
+      // Sort by updated time
+      filteredThreads.sort((a, b) => 
+        new Date(b.thread.updatedAt).getTime() - new Date(a.thread.updatedAt).getTime()
+      );
+
+      // Apply pagination
+      const total = filteredThreads.length;
+      const paginatedThreads = filteredThreads.slice(skip, skip + limit);
+
+      // Build chat list
+      const chatList = await Promise.all(
+        paginatedThreads.map(async (participant) => {
+          const thread = participant.thread;
+          const otherUser = thread.userID === userID ? thread.receiver : thread.user;
+          
+          // Get last message details
+          const lastMessage = await this.messageRepo.findOne({
+            where: { 
+              threadID: thread.threadID,
+              // Only visible messages
+            },
+            relations: ['sender'],
+            order: { msgDateUTC: 'DESC' }
+          });
+
+          // Check if other user is online
+          const isOnline = this.chatGateway?.isUserOnline(otherUser.id) || false;
+          
+          // Get other user's last seen
+          const otherParticipant = await this.participantRepo.findOne({
+            where: { threadID: thread.threadID, userID: otherUser.id }
+          });
+
+          let lastSeen: string | null = null;
+          if (isOnline) {
+            lastSeen = 'online';
+          } else if (otherParticipant?.lastSeen) {
+            lastSeen = otherParticipant.lastSeen.toISOString();
+          }
+
+          return {
+            threadID: thread.threadID,
+            userID: otherUser.id,
+            userName: `${otherUser.firstName || ''} ${otherUser.lastName || ''}`.trim() || 'Unknown User',
+            userImage: otherUser.profilePicture || null,
+            lastMessage: thread.lastMessage || '',
+            lastMessageTime: thread.updatedAt,
+            unreadCount: participant.unreadCount || 0,
+            isOnline,
+            lastSeen,
+            lastMessageSender: lastMessage?.sender?.firstName || 'Unknown',
+            isLastMessageFromMe: lastMessage?.senderID === userID,
+            lastMessageType: lastMessage?.msgType || MessageType.TEXT
+          };
+        })
+      );
+
+      return {
+        success: true,
+        paginationCount: limit,
+        paginationCurrentPage: page,
+        totalChats: total,
+        totalPages: Math.ceil(total / limit),
+        chatList
+      };
+
+    } catch (error) {
+      console.error('Chat list error:', error);
+      throw new BadRequestException('Failed to get chat list');
     }
   }
 

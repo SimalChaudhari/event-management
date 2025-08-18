@@ -6,6 +6,7 @@ import {
     MEDIA_MANAGER_PATHS,
     SETTINGS_PATHS,
     SPEAKER_PATHS,
+    SURVEY_PATHS,
     TRANSACTION_PATHS,
     USER_PATHS
 } from './utils/constants.js';
@@ -94,6 +95,16 @@ const exhibitorComponents = {
     PromotionalOffers: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/PromotionalOffersPage.jsx')),
     AddPromotionalOffer: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/AddPromotionalOfferPage.jsx')),
     ViewPromotionalOffer: React.lazy(() => import('./Pages/Exhibitors/PromotionalOffers/ViewPromotionalOfferPage.jsx'))
+};
+
+/**
+ * Survey related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const surveyComponents = {
+    List: React.lazy(() => import('./Pages/Surveys/SurveyView.jsx')),
+    AddSurvey: React.lazy(() => import('./Pages/Surveys/AddSurveyPage.jsx')),
+    ViewSurvey: React.lazy(() => import('./Pages/Surveys/ViewSurveyPage.jsx'))
 };
 
 /**
@@ -432,6 +443,37 @@ const settingsRoutes = [
 ];
 
 /**
+ * Survey routes configuration
+ * @type {RouteConfig[]}
+ */
+const surveyRoutes = [
+    {
+        path: SURVEY_PATHS.LIST_SURVEYS,
+        exact: true,
+        name: 'Surveys List',
+        component: surveyComponents.List
+    },
+    {
+        path: SURVEY_PATHS.ADD_SURVEY,
+        exact: true,
+        name: 'Add Survey',
+        component: surveyComponents.AddSurvey
+    },
+    {
+        path: SURVEY_PATHS.EDIT_SURVEY + '/:id',
+        exact: true,
+        name: 'Edit Survey',
+        component: surveyComponents.AddSurvey
+    },
+    {
+        path: SURVEY_PATHS.VIEW_SURVEY + '/:id',
+        exact: true,
+        name: 'View Survey',
+        component: surveyComponents.ViewSurvey
+    }
+];
+
+/**
  * Combined routes configuration
  * @type {RouteConfig[]}
  */
@@ -442,6 +484,7 @@ const routes = [
     ...MediaManagerRoutes,
     ...exhibitorRoutes,
     ...speakerRoutes,
+    ...surveyRoutes,
     ...settingsRoutes,
     ...transactionRoutes,
     ...demoRoutes

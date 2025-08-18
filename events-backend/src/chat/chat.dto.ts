@@ -111,3 +111,22 @@ export class EditMessageDto {
   @Transform(({ value }) => value?.trim())
   newMsg!: string;
 }
+
+export class GetChatListDto {
+  @IsOptional()
+  @IsInt({ message: 'Pagination count must be an integer' })
+  @Min(1, { message: 'Pagination count must be at least 1' })
+  @Transform(({ value }) => parseInt(value))
+  paginationCount?: number = 20;
+
+  @IsOptional()
+  @IsInt({ message: 'Pagination page must be an integer' })
+  @Min(1, { message: 'Pagination page must be at least 1' })
+  @Transform(({ value }) => parseInt(value))
+  paginationCurrentPage?: number = 1;
+
+  @IsOptional()
+  @IsString({ message: 'Search query must be a string' })
+  @Transform(({ value }) => value?.trim())
+  search?: string;
+}

@@ -86,3 +86,10 @@ export const TRANSACTION_PATHS = {
     REPORTS: '/reports'
 };
 
+export const SURVEY_PATHS = {
+    LIST_SURVEYS: '/surveys',
+    ADD_SURVEY: '/surveys/add',
+    EDIT_SURVEY: '/surveys/edit',
+    VIEW_SURVEY: '/surveys/view'
+};
+
