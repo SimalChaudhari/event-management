@@ -1144,16 +1144,16 @@ export class SurveyService {
       // }
       //Open when testing over-------------
 
-      // // 5. Check for duplicate feedback
-      // const existingResponse = await this.surveyResponseRepository.findOne({
-      //   where: { surveyId, sessionId: feedbackDto.sessionId, userId },
-      // });
+      // 5. Check for duplicate feedback - ENABLED
+      const existingResponse = await this.surveyResponseRepository.findOne({
+        where: { surveyId, sessionId: feedbackDto.sessionId, userId },
+      });
 
-      // if (existingResponse) {
-      //   throw new DuplicateResourceException(
-      //     `You have already submitted feedback for session: ${session.name}`,
-      //   );
-      // }
+      if (existingResponse) {
+        throw new DuplicateResourceException(
+          `You have already submitted feedback for session: ${session.name}. Only one feedback per session is allowed.`,
+        );
+      }
 
       // 6. Create feedback response
       const response = new SurveyResponse();
@@ -1167,7 +1167,8 @@ export class SurveyService {
 
       const savedResponse = await this.surveyResponseRepository.save(response);
 
-      // 7. Simple response - केवल ID return करें
+  
+      // 7. Simple response - return the saved response
       return {
         feedbackId: savedResponse.id,
         message: 'Feedback created successfully',

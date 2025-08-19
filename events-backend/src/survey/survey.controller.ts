@@ -282,6 +282,23 @@ export class SurveyController {
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Submit feedback', req.user?.id);
+      
+      // Handle duplicate feedback with specific error response
+      if (error.constructor.name === 'DuplicateResourceException') {
+        const errorResponse = {
+          success: false,
+          message: error.message,
+          error: 'DUPLICATE_FEEDBACK',
+          metadata: {
+            timestamp: new Date().toISOString(),
+            userId: req.user?.id,
+            surveyId,
+            sessionId: feedbackDto.sessionId,
+          },
+        };
+        return response.status(HttpStatus.CONFLICT).json(errorResponse);
+      }
+      
       throw error;
     }
   }

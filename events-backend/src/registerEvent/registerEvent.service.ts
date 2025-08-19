@@ -160,8 +160,10 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
+          console.log(`🔄 RegisterEvent: ${registerEvent.id}, registerEvent.userId: ${registerEvent.userId}, current userId: ${userId}`);
+          
           const surveyDetails = registerEvent.eventId 
-          ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId)
+          ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId, userId)
           : null;
 
           let formattedDocuments: { name: string; document: string }[] = [];
@@ -366,8 +368,10 @@ export class RegisterEventService {
       }
 
       console.log(registerEvent.eventId, 'registerEvent.eventId');
+      console.log(`🔄 Single RegisterEvent: ${registerEvent.id}, registerEvent.userId: ${registerEvent.userId}, current userId: ${userId}`);
+      
       const surveyDetails = registerEvent.eventId 
-      ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId)
+      ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId, userId)
       : null;
     
       // Extract only speakers
