@@ -6,8 +6,8 @@ import { EventController } from './event.controller';
 import { Event, EventExhibitor } from './event.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EventCategory, EventSpeaker } from './event-speaker.entity';
-import { SpeakerService } from 'speaker/speaker.service';
-import { Speaker } from 'speaker/speaker.entity';
+import { UserEntity } from '../user/users.entity';
+import { UserService } from '../user/users.service';
 import { Cart } from 'cart/cart.entity';
 import { OrderModule } from 'order/order.module';
 import { Category } from 'category/category.entity';
@@ -23,7 +23,7 @@ import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
         Event,
         EventSpeaker,
         EventCategory,
-        Speaker,
+        UserEntity,
         Cart,
         Category,
         RegisterEvent,

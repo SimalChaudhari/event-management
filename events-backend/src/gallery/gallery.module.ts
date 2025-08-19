@@ -12,7 +12,6 @@ import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
-import { Speaker } from 'speaker/speaker.entity';
 import { Cart } from 'cart/cart.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { Survey, SurveySession, SurveyResponse } from 'survey/survey.entity'; // Add all survey entities
@@ -33,7 +32,7 @@ import { UserEntity } from 'user/users.entity';
       Category, 
       RegisterEvent, 
       FavoriteEvent, 
-      Speaker, 
+      UserEntity, 
       Cart,
       Survey,
       SurveySession,   // Add this

@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
 import { Event, EventExhibitor } from './event.entity';
 import { Between, Not } from 'typeorm';
-import { Speaker } from 'speaker/speaker.entity';
+import { UserEntity, UserRole } from '../user/users.entity';
 import { EventSpeaker, EventCategory } from './event-speaker.entity';
 import { Category } from 'category/category.entity';
 import path from 'path';
@@ -39,8 +39,8 @@ export class EventService {
     private eventCategoryRepository: Repository<EventCategory>,
     @InjectRepository(EventExhibitor)
     private eventExhibitorRepository: Repository<EventExhibitor>,
-    @InjectRepository(Speaker)
-    private speakerRepository: Repository<Speaker>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
     @InjectRepository(Exhibitor)
@@ -85,8 +85,8 @@ export class EventService {
       if (eventDto.speakerIds) {
         const speakerIdsArray = eventDto.speakerIds.split(',');
         for (const speakerId of speakerIdsArray) {
-          const speakerExists = await this.speakerRepository.findOne({
-            where: { id: speakerId.trim() },
+          const speakerExists = await this.userRepository.findOne({
+            where: { id: speakerId.trim(), role: UserRole.Speaker },
           });
           if (!speakerExists) {
             validationErrors.push(

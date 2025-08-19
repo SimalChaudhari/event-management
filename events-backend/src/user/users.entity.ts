@@ -12,6 +12,7 @@ import {
 export enum UserRole {
   Admin = 'admin',
   User = 'user',
+  Speaker = 'speaker',
 }
 export enum AuthProvider {
   LOCAL = 'local',
@@ -114,6 +115,16 @@ export class UserEntity {
   @Column({ nullable: true })
   socialTokenExpiry?: Date; // Token expiry from social provider
 
+  // Speaker-specific fields
+  @Column({ nullable: true })
+  companyName?: string; // Company/Organization name for speakers
+
+  @Column({ nullable: true })
+  position?: string; // Job title/position for speakers
+
+  @Column({ type: 'text', nullable: true })
+  description?: string; // Bio/description for speakers
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
 
@@ -125,4 +136,8 @@ export class UserEntity {
 
   @OneToMany(() => FavoriteEvent, (favoriteEvent) => favoriteEvent.user)
   favoriteEvents?: FavoriteEvent[];
+
+  // Speaker relationship - when user has Speaker role
+  @OneToMany('EventSpeaker', 'speaker')
+  eventSpeakers?: any[];
 }

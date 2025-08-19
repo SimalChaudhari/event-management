@@ -9,7 +9,6 @@ import { EventService } from 'event/event.service';
 import { Event, EventExhibitor } from 'event/event.entity';
 import { EventModule } from 'event/event.module';
 import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
-import { Speaker } from 'speaker/speaker.entity';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
@@ -27,7 +26,7 @@ import { UserEntity } from 'user/users.entity';
       UserEntity,
       SurveySession,    // Add this
       SurveyResponse,    // Add this
-      EventCategory,Category,Speaker,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey]),
+      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file

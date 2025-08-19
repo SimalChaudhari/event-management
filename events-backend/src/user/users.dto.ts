@@ -97,6 +97,19 @@ export class UserDto {
    @IsBoolean()
    acceptTerms?: boolean;
 
+  // Speaker-specific fields
+  @IsOptional()
+  @IsString()
+  companyName?: string; // Company/Organization name for speakers
+
+  @IsOptional()
+  @IsString()
+  position?: string; // Job title/position for speakers
+
+  @IsOptional()
+  @IsString()
+  description?: string; // Bio/description for speakers
+
   @IsOptional()
   createdAt?: Date;
 

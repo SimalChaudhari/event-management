@@ -19,8 +19,7 @@ import {
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
 import { Event } from 'event/event.entity';
-import { Speaker } from 'speaker/speaker.entity';
-import { UserEntity } from 'user/users.entity';
+import { UserEntity, UserRole } from '../user/users.entity';
 
 @Injectable()
 export class QnaService {
@@ -31,8 +30,7 @@ export class QnaService {
     private qnaLikeRepository: Repository<QnaLike>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
-    @InjectRepository(Speaker)
-    private speakerRepository: Repository<Speaker>,
+
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
@@ -50,8 +48,8 @@ export class QnaService {
       }
 
       // Validate speaker exists (required)
-      const speaker = await this.speakerRepository.findOne({
-        where: { id: createDto.speakerId },
+      const speaker = await this.userRepository.findOne({
+        where: { id: createDto.speakerId, role: UserRole.Speaker },
       });
       if (!speaker) {
         throw new ResourceNotFoundException('Speaker', createDto.speakerId);
@@ -94,7 +92,7 @@ export class QnaService {
         },
         speaker: {
           id: speaker.id,
-          name: speaker.name,
+          name: `${speaker.firstName} ${speaker.lastName}`.trim(),
           email: speaker.email,
         },
         answer: null, // Always show answer field
@@ -163,8 +161,8 @@ export class QnaService {
         where: { id: getDto.eventId },
       });
 
-      const speaker = await this.speakerRepository.findOne({
-        where: { id: getDto.speakerId },
+      const speaker = await this.userRepository.findOne({
+        where: { id: getDto.speakerId, role: UserRole.Speaker },
       });
 
       if (!event) {
@@ -235,7 +233,7 @@ export class QnaService {
         },
         speaker: {
           id: speaker.id,
-          name: speaker.name,
+          name: `${speaker.firstName} ${speaker.lastName}`.trim(),    
           email: speaker.email,
         },
         questions: sortedQuestions,
@@ -347,7 +345,7 @@ export class QnaService {
         speaker: question.speaker
           ? {
               id: question.speaker.id,
-              name: question.speaker.name,
+              name: `${question.speaker.firstName} ${question.speaker.lastName}`.trim(),
               email: question.speaker.email,
             }
           : null,

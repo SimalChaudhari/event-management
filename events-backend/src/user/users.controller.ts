@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Request,
+  Post,
 } from '@nestjs/common';
 
 import { Response } from 'express';
@@ -178,6 +179,222 @@ export class UserController {
       }
       
       this.errorHandler.logError(error, 'User update', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Speaker-specific endpoints
+  @Get('speakers')
+  async getAllSpeakers(@Res() response: Response, @Request() req: any) {
+    try {
+      const speakers = await this.userService.getAllSpeakers();
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Speakers retrieved successfully',
+        data: speakers,
+        metadata: {
+          total: speakers.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Speakers retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Post('speakers/create')
+  @Roles(UserRole.Admin)
+  @UseInterceptors(
+    FileInterceptor('profilePicture', {
+      storage: diskStorage({
+        destination: './uploads/images',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  async createSpeaker(
+    @Body() speakerData: Partial<UserEntity>,
+    @UploadedFile() file: Express.Multer.File,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      if (file) {
+        speakerData.profilePicture = `uploads/images/${file.filename}`;
+      }
+
+      const speaker = await this.userService.createSpeaker(speakerData);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Speaker created successfully',
+        data: speaker,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
+      // Delete uploaded file if speaker creation fails
+      if (file) {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'images', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      }
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Speaker Profile Upload');
+      }
+      
+      this.errorHandler.logError(error, 'Speaker creation', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get('speakers/:id')
+  async getSpeakerById(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const speaker = await this.userService.getSpeakerById(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Speaker retrieved successfully',
+        data: speaker,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Speaker retrieval by ID', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Put('speakers/update/:id')
+  @Roles(UserRole.Admin)
+  @UseInterceptors(
+    FileInterceptor('profilePicture', {
+      storage: diskStorage({
+        destination: './uploads/images',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  async updateSpeaker(
+    @Param('id') id: string,
+    @Body() updateData: Partial<UserEntity>,
+    @UploadedFile() file: Express.Multer.File,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    let existingSpeaker = null;
+    
+    try {
+      // Get existing speaker first
+      existingSpeaker = await this.userService.getSpeakerById(id);
+
+      if (file) {
+        // Delete old file if it exists
+        if (existingSpeaker.profilePicture) {
+          const oldPath = path.join(__dirname, '..', '..', existingSpeaker.profilePicture);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+
+        updateData.profilePicture = `uploads/images/${file.filename}`;
+      }
+
+      const result = await this.userService.updateSpeaker(id, updateData);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Speaker updated successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      // If speaker not found or update failed, delete newly uploaded file
+      if (file) {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'images', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      }
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Speaker Profile Upload');
+      }
+      
+      this.errorHandler.logError(error, 'Speaker update', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Delete('speakers/delete/:id')
+  @Roles(UserRole.Admin)
+  async deleteSpeaker(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
+    try {
+      const result = await this.userService.deleteSpeaker(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Speaker deletion', req.user?.id);
       throw error;
     }
   }

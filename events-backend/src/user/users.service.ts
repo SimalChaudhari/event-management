@@ -4,7 +4,7 @@ import { UserEntity, UserRole } from './users.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import * as fs from 'fs';
-import * as path from 'path';
+import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { 
   ResourceNotFoundException, 
@@ -169,4 +169,168 @@ async update(
   this.errorHandler.handleDatabaseError(error, 'User update');
 }
 }
+
+  // Speaker-specific methods
+  async getAllSpeakers(): Promise<Partial<UserEntity>[]> {
+    try {
+      const speakers = await this.userRepository.find({ 
+        where: { role: UserRole.Speaker },
+        order: { updatedAt: 'DESC' },
+      });
+      return speakers.map(({ password, ...rest }) => rest);
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Speakers retrieval');
+    }
+  }
+
+  async createSpeaker(speakerData: Partial<UserEntity>): Promise<Partial<UserEntity>> {
+    try {
+      // Check if speaker with same email already exists
+      if (speakerData.email) {
+        const existingUser = await this.userRepository.findOne({
+          where: { email: speakerData.email },
+        });
+
+        if (existingUser) {
+          throw new DuplicateResourceException(`User ${speakerData.email}`);
+        }
+      }
+
+      // Set role to Speaker and create user
+      const speakerUser = this.userRepository.create({
+        ...speakerData,
+        role: UserRole.Speaker,
+        password: speakerData.password || 'temp123', // Set temporary password if not provided
+      });
+
+      const savedSpeaker = await this.userRepository.save(speakerUser);
+      const { password, ...result } = savedSpeaker;
+      return result;
+    } catch (error) {
+      if (error instanceof DuplicateResourceException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Speaker creation');
+    }
+  }
+
+  async getSpeakerById(id: string): Promise<Partial<UserEntity>> {
+    try {
+      const speaker = await this.userRepository.findOne({
+        where: { id, role: UserRole.Speaker },
+      });
+      if (!speaker) {
+        throw new ResourceNotFoundException('Speaker', id);
+      }
+
+      const { password, ...speakerWithoutPassword } = speaker;
+      return speakerWithoutPassword;
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Speaker retrieval by ID');
+    }
+  }
+
+  async updateSpeaker(id: string, updateData: Partial<UserEntity>): Promise<Partial<UserEntity>> {
+    try {
+      const speaker = await this.userRepository.findOne({
+        where: { id, role: UserRole.Speaker },
+      });
+      if (!speaker) {
+        throw new ResourceNotFoundException('Speaker', id);
+      }
+
+      // Check if email is being updated and already exists for another user
+      if (updateData.email && updateData.email !== speaker.email) {
+        const existingUser = await this.userRepository.findOne({
+          where: { email: updateData.email, id: Not(id) },
+        });
+        if (existingUser) {
+          throw new DuplicateResourceException(`User ${updateData.email}`);
+        }
+      }
+
+      // Remove sensitive fields from updateData
+      const {
+        password,
+        id: userId,
+        role, // Don't allow role change through this method
+        ...safeUpdateData
+      } = updateData;
+
+      // Update the speaker
+      Object.assign(speaker, safeUpdateData);
+      const updatedSpeaker = await this.userRepository.save(speaker);
+
+      // Remove sensitive fields from response
+      const {
+        password: _,
+        ...result
+      } = updatedSpeaker;
+
+      return result;
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof DuplicateResourceException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Speaker update');
+    }
+  }
+
+  async deleteSpeaker(id: string): Promise<{ message: string }> {
+    try {
+      const speaker = await this.userRepository.findOne({ 
+        where: { id, role: UserRole.Speaker } 
+      });
+      if (!speaker) {
+        throw new ResourceNotFoundException('Speaker', id);
+      }
+
+      // Check if speaker is associated with any events
+      const relatedEventsCount = await this.errorHandler.getRelatedDataCount(
+        this.userRepository.manager.getRepository('EventSpeaker'),
+        { speakerId: id },
+        'Speaker Events'
+      );
+
+      if (relatedEventsCount > 0) {
+        throw new ForeignKeyConstraintException(
+          'Speaker',
+          'Event',
+          relatedEventsCount,
+          'delete'
+        );
+      }
+
+      // Delete profile picture from filesystem if exists
+      if (speaker.profilePicture) {
+        try {
+          const filePath = path.resolve(speaker.profilePicture);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (fileError) {
+          this.errorHandler.logError(fileError, 'Speaker Profile Picture Deletion', id);
+          // Continue with speaker deletion even if file deletion fails
+        }
+      }
+
+      await this.userRepository.remove(speaker);
+      return { message: 'Speaker deleted successfully' };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForeignKeyConstraintException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Speaker deletion');
+    }
+  }
 }
+

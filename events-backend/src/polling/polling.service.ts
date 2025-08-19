@@ -16,8 +16,7 @@ import {
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
 import { Event } from 'event/event.entity';
-import { Speaker } from 'speaker/speaker.entity';
-import { UserEntity } from 'user/users.entity';
+import { UserEntity, UserRole } from '../user/users.entity';
 
 @Injectable()
 export class PollingService {
@@ -34,8 +33,7 @@ export class PollingService {
     private userPollVoteRepository: Repository<UserPollVote>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
-    @InjectRepository(Speaker)
-    private speakerRepository: Repository<Speaker>,
+
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
@@ -54,8 +52,8 @@ export class PollingService {
 
       // Validate speaker exists if speakerId is provided
       if (createDto.speakerId) {
-        const speaker = await this.speakerRepository.findOne({
-          where: { id: createDto.speakerId },
+        const speaker = await this.userRepository.findOne({
+          where: { id: createDto.speakerId, role: UserRole.Speaker },
         });
         if (!speaker) {
           throw new ResourceNotFoundException('Speaker', createDto.speakerId);
@@ -113,8 +111,8 @@ export class PollingService {
 
       // Validate speaker exists if speakerId is provided
       if (speakerId) {
-        const speaker = await this.speakerRepository.findOne({
-          where: { id: speakerId },
+        const speaker = await this.userRepository.findOne({
+          where: { id: speakerId, role: UserRole.Speaker },
         });
         if (!speaker) {
           throw new ValidationException(`Speaker does not exist`);
@@ -534,7 +532,7 @@ export class PollingService {
         speaker: session.speaker
           ? {
               id: session.speaker.id,
-              name: session.speaker.name,
+              name: `${session.speaker.firstName} ${session.speaker.lastName}`.trim(),
               email: session.speaker.email,
             }
           : null,
@@ -788,7 +786,7 @@ export class PollingService {
               speaker: poll.speaker
                 ? {
                     id: poll.speaker.id,
-                    name: poll.speaker.name,
+                    name: `${poll.speaker.firstName} ${poll.speaker.lastName}`.trim(),
                     email: poll.speaker.email,
                   }
                 : null,
@@ -896,8 +894,8 @@ export class PollingService {
       }
 
       // Validate speaker exists
-      const speaker = await this.speakerRepository.findOne({
-        where: { id: voteDto.speakerId },
+      const speaker = await this.userRepository.findOne({
+        where: { id: voteDto.speakerId, role: UserRole.Speaker },
       });
       if (!speaker) {
         throw new ResourceNotFoundException('Speaker', voteDto.speakerId);
@@ -1043,14 +1041,14 @@ export class PollingService {
         },
         speaker: {
           id: speaker.id,
-          name: speaker.name,
+          name: `${speaker.firstName} ${speaker.lastName}`.trim(),
           email: speaker.email,
         },
         voteDetails: {
           selectedOption: option.optionText,
           pollQuestion: updatedPoll.question,
           eventName: event.name,
-          speakerName: speaker.name,
+          speakerName: speaker.firstName,
           voteType: isVoteModified ? 'updated' : 'new',
         },
       };
@@ -1144,7 +1142,7 @@ export class PollingService {
           ? {
               // Add speaker information
               id: poll.speaker.id,
-              name: poll.speaker.name,
+              name: `${poll.speaker.firstName} ${poll.speaker.lastName}`.trim(),
               email: poll.speaker.email,
             }
           : null,
@@ -1367,8 +1365,8 @@ export class PollingService {
       const speakerIds = [
         ...new Set(allVotes.map((vote) => vote.speakerId).filter(Boolean)),
       ];
-      const speakers = await this.speakerRepository.find({
-        where: { id: In(speakerIds) },
+      const speakers = await this.userRepository.find({
+        where: { id: In(speakerIds), role: UserRole.Speaker },
       });
 
       // Group votes by poll with detailed information
@@ -1428,7 +1426,7 @@ export class PollingService {
                       speaker: speaker
                         ? {
                             id: speaker.id,
-                            name: speaker.name,
+                            name: `${speaker.firstName} ${speaker.lastName}`.trim(),
                             email: speaker.email,
                           }
                         : null,
@@ -1464,7 +1462,7 @@ export class PollingService {
                   speaker: speaker
                     ? {
                         id: speaker.id,
-                        name: speaker.name,
+                        name: `${speaker.firstName} ${speaker.lastName}`.trim(),
                         email: speaker.email,
                       }
                     : { id: speakerId, name: 'Unknown Speaker' },
@@ -1518,7 +1516,7 @@ export class PollingService {
                   speaker: speaker
                     ? {
                         id: speaker.id,
-                        name: speaker.name,
+                        name: `${speaker.firstName} ${speaker.lastName}`.trim(),
                         email: speaker.email,
                       }
                     : null,
@@ -1560,7 +1558,7 @@ export class PollingService {
                   speaker: foundSpeaker
                     ? {
                         id: foundSpeaker.id,
-                        name: foundSpeaker.name,
+                        name: `${foundSpeaker.firstName} ${foundSpeaker.lastName}`.trim(),
                         email: foundSpeaker.email,
                       }
                     : null,
@@ -1604,7 +1602,7 @@ export class PollingService {
             uniqueSpeakers: speakers.length,
             speakers: speakers.map((speaker) => ({
               id: speaker.id,
-              name: speaker.name,
+              name: `${speaker.firstName} ${speaker.lastName}`.trim(),
               email: speaker.email,
             })),
           },

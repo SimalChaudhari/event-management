@@ -7,7 +7,6 @@ import { Event } from '../event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
-import { Speaker } from 'speaker/speaker.entity';
 import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from './polling.entity';
 
 @Module({
@@ -19,8 +18,7 @@ import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from './pol
       UserPollSession,
       UserPollVote,
       Event, 
-      Speaker, 
-      UserEntity // Add this
+      UserEntity
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,

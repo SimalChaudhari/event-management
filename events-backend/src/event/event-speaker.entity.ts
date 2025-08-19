@@ -1,7 +1,7 @@
 // src/entities/event-speaker.entity.ts
 import { Entity, Column, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Event } from './event.entity'; // Adjust the import path as necessary
-import { Speaker } from 'speaker/speaker.entity';
+import { UserEntity } from '../user/users.entity';
 import { EventType } from './event.dto';
 import { Category } from 'category/category.entity';
 
@@ -15,7 +15,7 @@ export class EventSpeaker {
   eventId?: string; // Store only the event ID
 
   @Column()
-  speakerId?: string; // Store only the speaker ID
+  speakerId?: string; // Store only the speaker (user) ID
 
   @ManyToOne(() => Event, (event) => event.eventSpeakers, {
     onDelete: 'CASCADE',
@@ -23,8 +23,8 @@ export class EventSpeaker {
   event?: Event;
   
 
-  @ManyToOne(() => Speaker, (speaker) => speaker.eventSpeakers)
-  speaker!: Speaker; // Define the relation to Speaker
+  @ManyToOne(() => UserEntity, (user) => user.eventSpeakers)
+  speaker!: UserEntity; // Define the relation to User (Speaker)
 }
 
 @Entity('event_category')

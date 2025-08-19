@@ -11,8 +11,7 @@ import {
   Index,
 } from 'typeorm';
 import { Event } from 'event/event.entity';
-import { UserEntity } from 'user/users.entity';
-import { Speaker } from 'speaker/speaker.entity';
+import { UserEntity } from '../user/users.entity';
 
 @Entity('qna_questions')
 @Index('IDX_QNA_EVENT_SPEAKER_LIKES', ['eventId', 'speakerId', 'likesCount'])
@@ -41,9 +40,9 @@ export class QnaQuestion {
   @Column()
   speakerId!: string;
 
-  @ManyToOne(() => Speaker, { eager: false })
+  @ManyToOne(() => UserEntity, { eager: false })
   @JoinColumn({ name: 'speakerId' })
-  speaker?: Speaker;
+  speaker?: UserEntity;
 
   @Column({ type: 'boolean', default: false })
   isAnonymous!: boolean;

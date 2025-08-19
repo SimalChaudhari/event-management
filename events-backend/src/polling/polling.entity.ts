@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
-import { Speaker } from 'speaker/speaker.entity';
+
 
 export enum ExternalPlatform {
   INTERNAL = 'internal',
@@ -36,9 +36,9 @@ export class Poll {
   @JoinColumn({ name: 'eventId' })
   event?: Event;
 
-  @ManyToOne(() => Speaker, { eager: false }) // Add speaker relation
+  @ManyToOne(() => UserEntity, { eager: false }) // Add speaker relation
   @JoinColumn({ name: 'speakerId' })
-  speaker?: Speaker;
+  speaker?: UserEntity;
 
   @Column()
   createdById!: string;
@@ -158,9 +158,9 @@ export class UserPollSession {
   @Column({ nullable: true })
   speakerId?: string;
 
-  @ManyToOne(() => Speaker, { eager: false })
+  @ManyToOne(() => UserEntity, { eager: false })
   @JoinColumn({ name: 'speakerId' })
-  speaker?: Speaker;
+  speaker?: UserEntity;
 
   @Column({ type: 'int', default: 0 })
   currentQuestionIndex!: number; // Current question number (0-based)
