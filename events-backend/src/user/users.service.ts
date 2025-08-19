@@ -6,6 +6,9 @@ import { Not, Repository } from 'typeorm';
 import * as fs from 'fs';
 import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { EmailService } from '../service/email.service';
+import { PasswordUtils } from '../utils/password.utils';
+import { EmailTemplateUtils, SpeakerCredentialsData } from '../utils/email-templates.utils';
 import { 
   ResourceNotFoundException, 
   DuplicateResourceException, 
@@ -19,7 +22,24 @@ export class UserService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private readonly errorHandler: ErrorHandlerService,
+    private readonly emailService: EmailService,
   ) {}
+
+  // Helper function to send speaker credentials via email
+  private async sendSpeakerCredentials(email: string, firstName: string, lastName: string, password: string): Promise<void> {
+    const credentialsData: SpeakerCredentialsData = {
+      email,
+      firstName,
+      lastName,
+      password
+    };
+
+    const mailOptions = EmailTemplateUtils.getSpeakerCredentialsEmailOptions(credentialsData);
+    
+    // Use the existing email service transporter
+    await this.emailService['transporter'].sendMail(mailOptions);
+    console.log(`Speaker credentials sent to ${email}: ${firstName} ${lastName}`);
+  }
 
   async getAll(role?: UserRole): Promise<Partial<UserEntity>[]> {
     try {
@@ -196,14 +216,36 @@ async update(
         }
       }
 
+      // Generate random password if not provided
+      const rawPassword = speakerData.password || PasswordUtils.generateRandomPassword();
+      
+      // Hash the password
+      const hashedPassword = await PasswordUtils.hashPassword(rawPassword);
+
       // Set role to Speaker and create user
       const speakerUser = this.userRepository.create({
         ...speakerData,
         role: UserRole.Speaker,
-        password: speakerData.password || 'temp123', // Set temporary password if not provided
+        password: hashedPassword,
       });
 
       const savedSpeaker = await this.userRepository.save(speakerUser);
+
+      // Send password to speaker's email
+      if (speakerData.email && speakerData.firstName && speakerData.lastName) {
+        try {
+          await this.sendSpeakerCredentials(
+            speakerData.email,
+            speakerData.firstName,
+            speakerData.lastName,
+            rawPassword
+          );
+        } catch (emailError) {
+          this.errorHandler.logError(emailError, 'Speaker Email Notification', savedSpeaker.id);
+          // Continue without throwing error - speaker was created successfully
+        }
+      }
+
       const { password, ...result } = savedSpeaker;
       return result;
     } catch (error) {

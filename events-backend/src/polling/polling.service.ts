@@ -17,6 +17,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { Event } from 'event/event.entity';
 import { UserEntity, UserRole } from '../user/users.entity';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class PollingService {
@@ -529,12 +530,8 @@ export class PollingService {
               name: session.event.name,
             }
           : null,
-        speaker: session.speaker
-          ? {
-              id: session.speaker.id,
-              name: `${session.speaker.firstName} ${session.speaker.lastName}`.trim(),
-              email: session.speaker.email,
-            }
+                speaker: session.speaker
+          ? UserUtils.getBasicSpeakerInfo(session.speaker)
           : null,
       };
     } catch (error: any) {
@@ -784,12 +781,8 @@ export class PollingService {
                   }
                 : null,
               speaker: poll.speaker
-                ? {
-                    id: poll.speaker.id,
-                    name: `${poll.speaker.firstName} ${poll.speaker.lastName}`.trim(),
-                    email: poll.speaker.email,
-                  }
-                : null,
+                                  ? UserUtils.getBasicSpeakerInfo(poll.speaker)
+                  : null,
               questions: [],
             };
           }
@@ -1039,11 +1032,7 @@ export class PollingService {
           name: event.name,
           // Add other event fields as needed
         },
-        speaker: {
-          id: speaker.id,
-          name: `${speaker.firstName} ${speaker.lastName}`.trim(),
-          email: speaker.email,
-        },
+                  speaker: UserUtils.getBasicSpeakerInfo(speaker),
         voteDetails: {
           selectedOption: option.optionText,
           pollQuestion: updatedPoll.question,
@@ -1140,10 +1129,8 @@ export class PollingService {
           : null,
         speaker: poll.speaker
           ? {
-              // Add speaker information
-              id: poll.speaker.id,
-              name: `${poll.speaker.firstName} ${poll.speaker.lastName}`.trim(),
-              email: poll.speaker.email,
+                              // Add speaker information
+                ...UserUtils.getBasicSpeakerInfo(poll.speaker),
             }
           : null,
         createdBy: poll.createdBy
@@ -1424,12 +1411,8 @@ export class PollingService {
                       userId: vote.userId,
                       speakerId: vote.speakerId,
                       speaker: speaker
-                        ? {
-                            id: speaker.id,
-                            name: `${speaker.firstName} ${speaker.lastName}`.trim(),
-                            email: speaker.email,
-                          }
-                        : null,
+                        ? UserUtils.getBasicSpeakerInfo(speaker)
+                          : null,
                       user: vote.user
                         ? {
                             id: vote.user.id,
@@ -1514,12 +1497,8 @@ export class PollingService {
                       }
                     : null,
                   speaker: speaker
-                    ? {
-                        id: speaker.id,
-                        name: `${speaker.firstName} ${speaker.lastName}`.trim(),
-                        email: speaker.email,
-                      }
-                    : null,
+                    ? UserUtils.getBasicSpeakerInfo(speaker)
+                          : null,
                   selectedOption: vote.option
                     ? {
                         id: vote.option.id,
@@ -1600,11 +1579,7 @@ export class PollingService {
             totalVotes: allVotes.length,
             uniqueVoters: new Set(allVotes.map((vote) => vote.userId)).size,
             uniqueSpeakers: speakers.length,
-            speakers: speakers.map((speaker) => ({
-              id: speaker.id,
-              name: `${speaker.firstName} ${speaker.lastName}`.trim(),
-              email: speaker.email,
-            })),
+                          speakers: speakers.map((speaker) => UserUtils.getBasicSpeakerInfo(speaker)),
           },
         },
         metadata: {

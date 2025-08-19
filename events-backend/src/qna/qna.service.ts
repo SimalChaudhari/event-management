@@ -20,6 +20,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { Event } from 'event/event.entity';
 import { UserEntity, UserRole } from '../user/users.entity';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class QnaService {
@@ -90,11 +91,7 @@ export class QnaService {
           id: event.id,
           name: event.name,
         },
-        speaker: {
-          id: speaker.id,
-          name: `${speaker.firstName} ${speaker.lastName}`.trim(),
-          email: speaker.email,
-        },
+        speaker: UserUtils.getBasicSpeakerInfo(speaker),
         answer: null, // Always show answer field
         answeredAt: null,
         answeredBy: null,
@@ -231,11 +228,7 @@ export class QnaService {
           id: event.id,
           name: event.name,
         },
-        speaker: {
-          id: speaker.id,
-          name: `${speaker.firstName} ${speaker.lastName}`.trim(),    
-          email: speaker.email,
-        },
+                speaker: UserUtils.getBasicSpeakerInfo(speaker),
         questions: sortedQuestions,
       };
 
@@ -343,11 +336,7 @@ export class QnaService {
               }
             : null,
         speaker: question.speaker
-          ? {
-              id: question.speaker.id,
-              name: `${question.speaker.firstName} ${question.speaker.lastName}`.trim(),
-              email: question.speaker.email,
-            }
+          ? UserUtils.getBasicSpeakerInfo(question.speaker)
           : null,
         answeredBy: question.answeredByUser
           ? {

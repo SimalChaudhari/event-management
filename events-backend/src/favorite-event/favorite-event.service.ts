@@ -9,6 +9,7 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteFilterType } from './favorite-event.dto';
 import { SurveyUtils } from 'utils/survey-utils';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class FavoriteEventService {
@@ -248,7 +249,7 @@ export class FavoriteEventService {
             ...eventData,
             color: getEventColor(favorite.event.type),
             documents: formattedDocuments, // Use formatted documents
-            speakers: eventSpeakers?.map((es) => es.speaker) || [],
+            speakers: eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [],
             categories: categories,
             eventStamps: {
               description: favorite.event.eventStampDescription,

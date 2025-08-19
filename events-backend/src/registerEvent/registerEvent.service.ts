@@ -22,6 +22,7 @@ import {
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from 'utils/survey-utils';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class RegisterEventService {
@@ -202,7 +203,7 @@ export class RegisterEventService {
           }
 
           const speakers =
-            registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
+            registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [];
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
@@ -376,7 +377,7 @@ export class RegisterEventService {
     
       // Extract only speakers
       const speakers =
-        registerEvent.event?.eventSpeakers?.map((es) => es.speaker) || [];
+        registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [];
       const categories =
         registerEvent.event?.category?.map((ec) => ec.category) || [];
 

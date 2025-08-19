@@ -27,6 +27,7 @@ import {
   ForeignKeyConstraintException,
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from '../utils/survey-utils';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class EventService {
@@ -380,7 +381,7 @@ export class EventService {
           return {
             ...eventFiltered,
             color: getEventColor(event.type),
-            speakersData: eventSpeakers.map((es) => es.speaker),
+            speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
             categoriesData: category?.map((ec) => ec.category) || [],
             documents: formattedDocuments,
             eventStamps: {
@@ -523,7 +524,7 @@ export class EventService {
       return {
         ...eventFiltered,
         color: getEventColor(event.type),
-        speakers: eventSpeakers.map((es) => es.speaker),
+        speakers: eventSpeakers.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)),
         categories: category?.map((ec) => ec.category) || [],
         documents: formattedDocuments, // New formatted documents
         eventStamps: {

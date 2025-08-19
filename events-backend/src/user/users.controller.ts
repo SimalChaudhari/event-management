@@ -28,9 +28,9 @@ import * as fs from 'fs';
 import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
+import { UserUtils } from '../utils/user.utils';
 
 @Controller('api/users')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class UserController {
   constructor(
     private readonly userService: UserService,
@@ -189,12 +189,18 @@ export class UserController {
     try {
       const speakers = await this.userService.getAllSpeakers();
       
+      // Filter speaker data based on user role
+      const userRole = req.user?.role;
+      const filteredSpeakers = speakers.map(speaker => 
+        UserUtils.getSpeakerInfoByPermission(speaker, userRole)
+      );
+      
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Speakers retrieved successfully',
-        data: speakers,
+        data: filteredSpeakers,
         metadata: {
-          total: speakers.length,
+          total: filteredSpeakers.length,
           timestamp: new Date().toISOString(),
         },
       };
@@ -279,10 +285,14 @@ export class UserController {
     try {
       const speaker = await this.userService.getSpeakerById(id);
       
+      // Filter speaker data based on user role
+      const userRole = req.user?.role;
+      const filteredSpeaker = UserUtils.getSpeakerInfoByPermission(speaker, userRole);
+      
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Speaker retrieved successfully',
-        data: speaker,
+        data: filteredSpeaker,
         metadata: {
           timestamp: new Date().toISOString(),
         },
