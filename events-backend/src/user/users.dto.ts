@@ -155,3 +155,16 @@ export class LinkedInLoginDto {
   @IsString()
   accessToken!: string;
 }
+
+export class RoleSwitchRequestDto {
+  @IsNotEmpty()
+  @IsEnum(UserRole)
+  newRole!: UserRole;
+}
+
+export class RoleSwitchVerifyDto {
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(6)
+  verificationCode!: string;
+}

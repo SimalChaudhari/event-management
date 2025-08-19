@@ -29,6 +29,7 @@ import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { UserUtils } from '../utils/user.utils';
+import { RoleSwitchRequestDto, RoleSwitchVerifyDto } from './users.dto';
 
 @Controller('api/users')
 export class UserController {
@@ -408,4 +409,66 @@ export class UserController {
       throw error;
     }
   }
+
+  // Role Switch Endpoints
+  @Post('role-switch/request')
+  @UseGuards(JwtAuthGuard)
+  async requestRoleSwitch(
+    @Body() roleSwitchDto: RoleSwitchRequestDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const result = await this.userService.requestRoleSwitch(userId, roleSwitchDto.newRole);
+      
+      const successResponse = {
+        success: true,
+        message: result.message,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Role switch request', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Post('role-switch/verify')
+  @UseGuards(JwtAuthGuard)
+  async verifyRoleSwitch(
+    @Body() verifyDto: RoleSwitchVerifyDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      await this.userService.verifyRoleSwitch(userId, verifyDto.verificationCode);
+      
+      const successResponse = {
+        success: true,
+        message: 'Role switch completed successfully',
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Role switch verification', req.user?.id);
+      throw error;
+    }
+  }
+
 }

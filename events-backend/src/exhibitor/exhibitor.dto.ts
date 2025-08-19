@@ -25,21 +25,34 @@ export class PromotionalOfferDto {
 }
 
 export class ExhibitorDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  name!: string;
+  userId?: string; // Reference to User table - optional for self-registration
 
-  @IsNotEmpty()
+  // User fields for admin to create full exhibitor with user
+  @IsOptional()
   @IsString()
-  userName!: string;
+  firstName?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  mobile!: string;
+  mobile?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  profilePicture?: string;
 
   @IsOptional()
   @IsString()
@@ -56,11 +69,6 @@ export class ExhibitorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
-
-  // Add new profile field
-  @IsOptional()
-  @IsString()
-  profile?: string;
 
   // Add new bothNumber field
   @IsOptional()

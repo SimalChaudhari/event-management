@@ -13,6 +13,7 @@ import {
     NotFoundException,
     Request,
     HttpStatus,
+    UseGuards,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -25,6 +26,12 @@ import { ExhibitorDto } from './exhibitor.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
+import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
+import { RolesGuard } from '../jwt/roles.guard';
+import { Roles } from '../jwt/roles.decorator';
+import { UserRole } from '../user/users.entity';
+import { PasswordUtils } from '../utils/password.utils';
+import { UserUtils } from '../utils/user.utils';
 
 @Controller('api/exhibitors')
 export class ExhibitorController {
@@ -34,12 +41,13 @@ export class ExhibitorController {
   ) {}
 
   @Post('create')
+  @UseGuards(JwtAuthGuard) // Only authentication required, any logged-in user can create
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'flyers', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'eventImages', maxCount: 10 },
-      { name: 'profile', maxCount: 1 }, // Add profile image upload
+      { name: 'profilePicture', maxCount: 1 }, // Add profile image upload
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -49,8 +57,8 @@ export class ExhibitorController {
             cb(null, './uploads/exhibitor/documents');
           } else if (file.fieldname === 'eventImages') {
             cb(null, './uploads/exhibitor/eventImages');
-          } else if (file.fieldname === 'profile') {
-            cb(null, './uploads/exhibitor/profile'); // Add profile directory
+          } else if (file.fieldname === 'profilePicture') {
+            cb(null, './uploads/exhibitor/profilePicture'); // Add profile directory
           } else {
             cb(null, './uploads/exhibitor/flyers'); // Default
           }
@@ -67,7 +75,7 @@ export class ExhibitorController {
           cb(null, true);
         } else if (file.fieldname === 'eventImages' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
-        } else if (file.fieldname === 'profile' && allowedImageTypes.includes(file.mimetype)) {
+        } else if (file.fieldname === 'profilePicture' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
@@ -81,20 +89,21 @@ export class ExhibitorController {
     }),
   )
   async createExhibitor(
-    @Body() exhibitorDto: ExhibitorDto,
+    @Body() exhibitorDto: Partial<ExhibitorDto>, // Make it partial to handle cases where userId is not provided
     @UploadedFiles() files: { 
       flyers?: Express.Multer.File[], 
       documents?: Express.Multer.File[], 
       eventImages?: Express.Multer.File[],
-      profile?: Express.Multer.File[] // Add profile field
+      profilePicture?: Express.Multer.File[] // Add profile field
     },
     @Res() response: Response,
     @Request() req: any, // Add this for user tracking
   ) {
     try {
+      // First, process all files regardless of creation type
       // Handle profile image
-      if (files.profile && files.profile.length > 0) {
-        exhibitorDto.profile = `uploads/exhibitor/profile/${files.profile[0].filename}`;
+      if (files.profilePicture && files.profilePicture.length > 0) {
+        exhibitorDto.profilePicture = `uploads/exhibitor/profilePicture/${files.profilePicture[0].filename}`;
       }
 
       // Handle flyers
@@ -158,76 +167,53 @@ export class ExhibitorController {
         }
       }
 
-      const exhibitor = await this.exhibitorService.createExhibitor(exhibitorDto);
       
-      // Format documents for response
-      let formattedDocuments: { name: string; document: string }[] = [];
-      if (exhibitor.documents && exhibitor.documentNames) {
-        formattedDocuments = exhibitor.documents.map((doc, index) => ({
-          name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
-          document: doc
-        }));
-      } else if (exhibitor.documents) {
-        formattedDocuments = exhibitor.documents.map((doc, index) => ({
-          name: `Document ${index + 1}`,
-          document: doc
-        }));
+
+      // Now handle user creation logic after all files are processed
+      let exhibitor;
+      
+      if (!exhibitorDto.userId) {
+        // Check if user fields are provided (admin creating full user+exhibitor)
+        if (exhibitorDto.firstName && exhibitorDto.lastName && exhibitorDto.email && exhibitorDto.mobile) {
+          // Admin is creating a full user + exhibitor
+          // Generate random password if not provided
+          const rawPassword = exhibitorDto.password || PasswordUtils.generateRandomPassword();
+          
+          // Hash the password
+          const hashedPassword = await PasswordUtils.hashPassword(rawPassword);
+
+          const userData = {
+            firstName: exhibitorDto.firstName,
+            lastName: exhibitorDto.lastName,
+            email: exhibitorDto.email,
+            mobile: exhibitorDto.mobile,
+            password: hashedPassword,
+            address: exhibitorDto.address,
+            profilePicture: exhibitorDto.profilePicture, // Add profile picture to user
+          };
+
+          // Remove user fields from exhibitor data
+          const { firstName, lastName, email, mobile, password, address, ...exhibitorData } = exhibitorDto;
+
+          exhibitor = await this.exhibitorService.createExhibitorWithUser(exhibitorData, userData);
+          
+          return this.formatExhibitorResponse(exhibitor, response, 'Exhibitor and user created successfully', HttpStatus.CREATED);
+        } else {
+          // Self-registration - use authenticated user
+          const userId = req.user?.id;
+          if (!userId) {
+            return response.status(HttpStatus.UNAUTHORIZED).json({
+              success: false,
+              message: 'User not authenticated or insufficient user data provided',
+            });
+          }
+          exhibitorDto.userId = userId;
+        }
       }
 
-      // Format flyers for response
-      let formattedFlyers: { name: string; flyer: string }[] = [];
-      if (exhibitor.flyers && exhibitor.flyerNames) {
-        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
-          name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
-          flyer: flyer
-        }));
-      } else if (exhibitor.flyers) {
-        formattedFlyers = exhibitor.flyers.map((flyer, index) => ({
-          name: `Flyer ${index + 1}`,
-          flyer: flyer
-        }));
-      }
-
-      // Format event images for response
-      let formattedEventImages: { name: string; eventImage: string }[] = [];
-      if (exhibitor.eventImages && exhibitor.eventImageNames) {
-        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
-          name: exhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
-          eventImage: eventImage
-        }));
-      } else if (exhibitor.eventImages) {
-        formattedEventImages = exhibitor.eventImages.map((eventImage, index) => ({
-          name: `Event Image ${index + 1}`,
-          eventImage: eventImage
-        }));
-      }
-
-      // Remove raw fields from response
-      const { 
-        documents, 
-        documentNames,
-        flyers,
-        flyerNames,
-        eventImages,
-        eventImageNames,
-        ...exhibitorData 
-      } = exhibitor;
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Exhibitor created successfully',
-        data: {
-          ...exhibitorData,
-          documents: formattedDocuments,
-          flyers: formattedFlyers,
-          eventImages: formattedEventImages
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.CREATED).json(successResponse);
+      // Create exhibitor with existing user
+      exhibitor = await this.exhibitorService.createExhibitor(exhibitorDto);
+      return this.formatExhibitorResponse(exhibitor, response, 'Exhibitor created successfully', HttpStatus.CREATED);
     } catch (error: any) {
       // Clean up uploaded files if error occurs
       this.cleanupFiles(files);
@@ -292,12 +278,14 @@ export class ExhibitorController {
   }
 
   @Put('update/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'flyers', maxCount: 10 },
       { name: 'documents', maxCount: 5 },
       { name: 'eventImages', maxCount: 10 },
-      { name: 'profile', maxCount: 1 }, // Add profile image upload
+      { name: 'profilePicture', maxCount: 1 }, // Add profile image upload
     ], {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -307,8 +295,8 @@ export class ExhibitorController {
             cb(null, './uploads/exhibitor/documents');
           } else if (file.fieldname === 'eventImages') {
             cb(null, './uploads/exhibitor/eventImages');
-          } else if (file.fieldname === 'profile') {
-            cb(null, './uploads/exhibitor/profile'); // Add profile directory
+          } else if (file.fieldname === 'profilePicture') {
+            cb(null, './uploads/exhibitor/profilePicture'); // Add profile directory
           } else {
             cb(null, './uploads/exhibitor/flyers'); // Default
           }
@@ -325,7 +313,7 @@ export class ExhibitorController {
           cb(null, true);
         } else if (file.fieldname === 'eventImages' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
-        } else if (file.fieldname === 'profile' && allowedImageTypes.includes(file.mimetype)) {
+        } else if (file.fieldname === 'profilePicture' && allowedImageTypes.includes(file.mimetype)) {
           cb(null, true);
         } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
           cb(null, true);
@@ -345,7 +333,7 @@ export class ExhibitorController {
       flyers?: Express.Multer.File[], 
       documents?: Express.Multer.File[], 
       eventImages?: Express.Multer.File[],
-      profile?: Express.Multer.File[] // Add profile field
+      profilePicture?: Express.Multer.File[] // Add profile field
     },
     @Res() response: Response,
     @Request() req: any,
@@ -356,11 +344,17 @@ export class ExhibitorController {
       // Get existing exhibitor first
       existingExhibitor = await this.exhibitorService.getExhibitorEntityById(id);
       
-      // Handle profile image
-      if (files.profile && files.profile.length > 0) {
-        exhibitorDto.profile = `uploads/exhibitor/profile/${files.profile[0].filename}`;
+      // Check permissions - exhibitors can only update their own profile
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+      
+      if (userRole === UserRole.Exhibitor && existingExhibitor.userId !== userId) {
+        return response.status(HttpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'You can only update your own exhibitor profile',
+        });
       }
-
+      
       // Handle flyers - combine existing and new
       const allFlyers = [];
       const allFlyerNames = [];
@@ -503,68 +497,13 @@ export class ExhibitorController {
 
       const updatedExhibitor = await this.exhibitorService.updateExhibitor(id, exhibitorDto);
 
-      // Format documents for response
-      let formattedDocuments: { name: string; document: string }[] = [];
-      if (updatedExhibitor.documents && updatedExhibitor.documentNames) {
-        formattedDocuments = updatedExhibitor.documents.map((doc, index) => ({
-          name: updatedExhibitor.documentNames?.[index] || `Document ${index + 1}`,
-          document: doc
-        }));
-      } else if (updatedExhibitor.documents) {
-        formattedDocuments = updatedExhibitor.documents.map((doc, index) => ({
-          name: `Document ${index + 1}`,
-          document: doc
-        }));
-      }
-
-      // Format flyers for response
-      let formattedFlyers: { name: string; flyer: string }[] = [];
-      if (updatedExhibitor.flyers && updatedExhibitor.flyerNames) {
-        formattedFlyers = updatedExhibitor.flyers.map((flyer, index) => ({
-          name: updatedExhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
-          flyer: flyer
-        }));
-      } else if (updatedExhibitor.flyers) {
-        formattedFlyers = updatedExhibitor.flyers.map((flyer, index) => ({
-          name: `Flyer ${index + 1}`,
-          flyer: flyer
-        }));
-      }
-
-      // Format event images for response
-      let formattedEventImages: { name: string; eventImage: string }[] = [];
-      if (updatedExhibitor.eventImages && updatedExhibitor.eventImageNames) {
-        formattedEventImages = updatedExhibitor.eventImages.map((eventImage, index) => ({
-          name: updatedExhibitor.eventImageNames?.[index] || `Event Image ${index + 1}`,
-          eventImage: eventImage
-        }));
-      } else if (updatedExhibitor.eventImages) {
-        formattedEventImages = updatedExhibitor.eventImages.map((eventImage, index) => ({
-          name: `Event Image ${index + 1}`,
-          eventImage: eventImage
-        }));
-      }
-
-      // Remove raw fields from response
-      const { 
-        documents, 
-        documentNames,
-        flyers,
-        flyerNames,
-        eventImages,
-        eventImageNames,
-        ...exhibitorData 
-      } = updatedExhibitor;
+      // Use UserUtils to format the exhibitor with sanitized user data
+      const formattedExhibitor = UserUtils.formatExhibitorDocuments(updatedExhibitor);
 
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Exhibitor updated successfully',
-        data: {
-          ...exhibitorData,
-          documents: formattedDocuments,
-          flyers: formattedFlyers,
-          eventImages: formattedEventImages
-        },
+        data: formattedExhibitor,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -585,6 +524,8 @@ export class ExhibitorController {
   }
 
   @Delete('delete/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
   async deleteExhibitor(
     @Param('id') id: string, 
     @Res() response: Response,
@@ -634,10 +575,13 @@ export class ExhibitorController {
       const updatedFlyers = exhibitor.flyers.filter(flyer => flyer !== flyerPath);
       await this.exhibitorService.updateExhibitorFiles(id, 'flyers', updatedFlyers);
 
+      // Get updated exhibitor and format response using UserUtils
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Flyer removed successfully',
-        data: { flyers: updatedFlyers },
+        data: updatedExhibitor,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -683,19 +627,13 @@ export class ExhibitorController {
       // Update both documents and documentNames
       await this.exhibitorService.updateExhibitorDocuments(id, updatedDocuments, updatedDocumentNames);
 
-      // Format response
-      let formattedDocuments: { name: string; document: string }[] = [];
-      if (updatedDocuments.length > 0) {
-        formattedDocuments = updatedDocuments.map((doc, index) => ({
-          name: updatedDocumentNames[index] || `Document ${index + 1}`,
-          document: doc
-        }));
-      }
+      // Get updated exhibitor and format response using UserUtils
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
 
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Document removed successfully',
-        data: { documents: formattedDocuments },
+        data: updatedExhibitor,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -734,10 +672,13 @@ export class ExhibitorController {
       const updatedEventImages = exhibitor.eventImages.filter(image => image !== eventImagePath);
       await this.exhibitorService.updateExhibitorFiles(id, 'eventImages', updatedEventImages);
 
+      // Get updated exhibitor and format response using UserUtils
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event image removed successfully',
-        data: { eventImages: updatedEventImages },
+        data: updatedExhibitor,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -776,13 +717,30 @@ export class ExhibitorController {
         }
       });
     }
-    if (files.profile) {
-      files.profile.forEach((file: any) => {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'profile', file.filename);
+    if (files.profilePicture) {
+      files.profilePicture.forEach((file: any) => {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'profilePicture', file.filename);
         if (fs.existsSync(uploadedPath)) {
           fs.unlinkSync(uploadedPath);
         }
       });
     }
+  }
+
+  // Helper method to format exhibitor response
+  private formatExhibitorResponse(exhibitor: any, response: Response, message: string, statusCode: number) {
+    // Use UserUtils to format the exhibitor with sanitized user data
+    const formattedExhibitor = UserUtils.formatExhibitorDocuments(exhibitor);
+
+    const successResponse: SuccessResponse = {
+      success: true,
+      message,
+      data: formattedExhibitor,
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    return response.status(statusCode).json(successResponse);
   }
 } 

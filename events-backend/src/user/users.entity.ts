@@ -13,6 +13,7 @@ export enum UserRole {
   Admin = 'admin',
   User = 'user',
   Speaker = 'speaker',
+  Exhibitor = 'exhibitor',
 }
 export enum AuthProvider {
   LOCAL = 'local',
@@ -91,6 +92,15 @@ export class UserEntity {
   @Column({ nullable: true, type: 'timestamp' })
   otpExpiry?: Date; // Updated field
 
+  // Role switch verification fields
+  @Column({ nullable: true })
+  roleSwitchCode?: string; // Code for role switching verification
+
+  @Column({ nullable: true, type: 'timestamp' })
+  roleSwitchCodeExpiry?: Date; // Expiry time for role switch code
+
+  @Column({ type: 'enum', enum: UserRole, nullable: true })
+  pendingRole?: UserRole; // Role user wants to switch to
 
   @Column({ nullable: true })
   refreshToken?: string; // Add this field
@@ -140,4 +150,8 @@ export class UserEntity {
   // Speaker relationship - when user has Speaker role
   @OneToMany('EventSpeaker', 'speaker')
   eventSpeakers?: any[];
+
+  // Exhibitor relationship - when user has Exhibitor role
+  @OneToMany('Exhibitor', 'user')
+  exhibitorProfile?: any[];
 }

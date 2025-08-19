@@ -81,56 +81,7 @@ export class FavoriteEventService {
     }
   }
 
-  private formatExhibitorDocuments(exhibitor: any) {
-    // Use the same formatting helper method for exhibitor documents
-    const formattedDocuments = this.formatDocuments(exhibitor.documents, exhibitor.documentNames);
 
-    // Format images with names
-    let formattedImages: { name: string; image: string }[] = [];
-    if (exhibitor.eventImages && exhibitor.eventImageNames) {
-      formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
-        name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
-        image: img
-      }));
-    } else if (exhibitor.eventImages) {
-      formattedImages = exhibitor.eventImages.map((img: string, index: number) => ({
-        name: `Image ${index + 1}`,
-        image: img
-      }));
-    }
-
-    // Format flyers with names
-    let formattedFlyers: { name: string; flyer: string }[] = [];
-    if (exhibitor.flyers && exhibitor.flyerNames) {
-      formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
-        name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
-        flyer: flyer
-      }));
-    } else if (exhibitor.flyers) {
-      formattedFlyers = exhibitor.flyers.map((flyer: string, index: number) => ({
-        name: `Flyer ${index + 1}`,
-        flyer: flyer
-      }));
-    }
-
-    // Remove raw documents and documentNames from response
-    const { 
-      documents, 
-      documentNames, 
-      eventImages,
-      eventImageNames,
-      flyers,
-      flyerNames,
-      ...exhibitorData 
-    } = exhibitor;
-
-    return {
-      ...exhibitorData,
-      documents: formattedDocuments, // Use formatted documents
-      flyers: formattedFlyers,
-      eventImages: formattedImages,
-    };
-  }
 
   async getUserFavorites(
     userId: string,
@@ -149,6 +100,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
+      .leftJoinAndSelect('exhibitor.user', 'exhibitorUser') // Add exhibitor user details
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
       .where('favorite.userId = :userId', { userId });
 
@@ -261,7 +213,7 @@ export class FavoriteEventService {
               exhibitors: eventExhibitors.map((ee) => {
                
                 // Format exhibitor documents
-                const formattedExhibitor = this.formatExhibitorDocuments(ee.exhibitor);
+                const formattedExhibitor = UserUtils.formatExhibitorDocuments(ee.exhibitor);
                 return {
                   ...formattedExhibitor,
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],

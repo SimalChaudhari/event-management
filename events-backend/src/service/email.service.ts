@@ -162,4 +162,134 @@ export class EmailService {
       throw new Error('Failed to send welcome email');
     }
   }
+
+  async sendExhibitorCredentials(
+    email: string, 
+    firstName: string, 
+    lastName: string, 
+    password: string
+  ): Promise<string> {
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: 'Welcome as Exhibitor - Your Account Credentials',
+      text: `Welcome ${firstName} ${lastName}! Your exhibitor account has been created. Email: ${email}, Password: ${password}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
+            <h2 style="color: #333; text-align: center;">🎪 Welcome as an Exhibitor!</h2>
+            <p style="color: #555; font-size: 16px;">
+                Dear <strong>${firstName} ${lastName}</strong>,
+            </p>
+            <p style="color: #555; font-size: 16px;">
+                Congratulations! Your exhibitor account has been successfully created on our event platform. Below are your login credentials:
+            </p>
+            
+            <div style="
+                background-color: #e7f3ff;
+                border: 1px solid #b3d9ff;
+                color: #004085;
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 8px;
+                text-align: center;
+            ">
+                <h3 style="margin: 0 0 15px 0; color: #004085;">🔑 Your Login Credentials</h3>
+                <div style="margin: 10px 0;">
+                    <strong>Email:</strong> 
+                    <div style="
+                        background-color: #fff;
+                        border: 1px solid #b3d9ff;
+                        padding: 8px;
+                        margin: 5px 0;
+                        border-radius: 4px;
+                        font-family: monospace;
+                        font-size: 14px;
+                    ">
+                        ${email}
+                    </div>
+                </div>
+                <div style="margin: 10px 0;">
+                    <strong>Password:</strong>
+                    <div style="
+                        background-color: #fff;
+                        border: 1px solid #b3d9ff;
+                        padding: 8px;
+                        margin: 5px 0;
+                        border-radius: 4px;
+                        font-family: monospace;
+                        font-size: 14px;
+                        letter-spacing: 2px;
+                    ">
+                        ${password}
+                    </div>
+                </div>
+            </div>
+
+            <div style="
+                background-color: #fff3cd;
+                border: 1px solid #ffeeba;
+                color: #856404;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+                text-align: center;
+            ">
+                <h4 style="margin: 0 0 10px 0; color: #856404;">⚠️ Important Security Notice</h4>
+                <p style="margin: 0; font-size: 14px;">
+                    Please change your password after your first login for enhanced security.
+                </p>
+            </div>
+
+            <div style="
+                background-color: #d4edda;
+                border: 1px solid #c3e6cb;
+                color: #155724;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 5px;
+            ">
+                <h4 style="margin: 0 0 10px 0; color: #155724;">🚀 What you can do as an Exhibitor:</h4>
+                <ul style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                    <li>Create and manage your exhibitor profile</li>
+                    <li>Upload flyers, documents, and event images</li>
+                    <li>Participate in events and showcase your business</li>
+                    <li>Connect with event attendees and other exhibitors</li>
+                    <li>Access event management tools and analytics</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" style="
+                    background-color: #007bff;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    display: inline-block;
+                ">
+                    Login to Your Account
+                </a>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+            <p style="color: #777; font-size: 12px; text-align: center;">
+                If you have any questions or need assistance setting up your exhibitor profile, please contact our support team.
+            </p>
+            <p style="color: #777; font-size: 12px; text-align: center;">
+                Welcome to the exhibitor community! 🎉
+            </p>
+        </div>
+        `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Exhibitor credentials sent to ${email}: ${firstName} ${lastName}`);
+      return 'Exhibitor credentials sent successfully';
+    } catch (error) {
+      console.error('Failed to send exhibitor credentials:', error);
+      throw new Error('Failed to send exhibitor credentials');
+    }
+  }
 }

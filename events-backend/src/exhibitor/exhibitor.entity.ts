@@ -7,30 +7,29 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
 import { PromotionalOffer } from '../promotional-offer/promotional-offer.entity';
 import { EventExhibitor } from 'event/event.entity';
+import { UserEntity } from '../user/users.entity';
 
 @Entity('exhibitors')
 export class Exhibitor {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar' })
-  name!: string;
+  // User relationship - basic info comes from User table
+  @Column({ type: 'uuid' })
+  userId!: string;
+
+  @ManyToOne(() => UserEntity, { nullable: false })
+  @JoinColumn({ name: 'userId' })
+  user!: UserEntity;
 
   @Column({ type: 'varchar' })
-  userName!: string;
-
-  @Column({ type: 'varchar', unique: true })
-  email!: string;
-
-  @Column({ type: 'varchar' })
-  mobile!: string;
-
-  @Column({ type: 'text', nullable: true })
-  address?: string;
+  userName!: string; 
 
   @Column({ type: 'varchar' })
   companyName!: string;
@@ -40,10 +39,6 @@ export class Exhibitor {
 
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
-
-  // Add new profile field
-  @Column({ type: 'varchar', nullable: true })
-  profile?: string;
 
   // Add new bothNumber field
   @Column({ type: 'varchar', nullable: true })

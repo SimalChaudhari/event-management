@@ -267,6 +267,7 @@ export class EventService {
         .leftJoinAndSelect('eventCategory.category', 'category')
         .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
         .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('exhibitor.user', 'exhibitorUser')
         .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
         .leftJoinAndSelect('event.galleries', 'galleries');
 
@@ -391,8 +392,8 @@ export class EventService {
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
-                // Format exhibitor documents
-                const formattedExhibitor = this.formatExhibitorDocuments(
+                // Format exhibitor documents using UserUtils
+                const formattedExhibitor = UserUtils.formatExhibitorDocuments(
                   ee.exhibitor,
                 );
                 return {
@@ -459,6 +460,7 @@ export class EventService {
         .leftJoinAndSelect('eventCategory.category', 'category')
         .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
         .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('exhibitor.user', 'exhibitorUser')
         .leftJoinAndSelect('event.galleries', 'galleries')
         .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
         .where('event.id = :id', { id })
@@ -534,8 +536,8 @@ export class EventService {
         exhibitors: {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: eventExhibitors.map((ee) => {
-            // Format exhibitor documents
-            const formattedExhibitor = this.formatExhibitorDocuments(
+            // Format exhibitor documents using UserUtils
+            const formattedExhibitor = UserUtils.formatExhibitorDocuments(
               ee.exhibitor,
             );
             return {
@@ -990,79 +992,5 @@ export class EventService {
     }
   }
 
-  private formatExhibitorDocuments(exhibitor: any) {
-    // Format documents with names
-    let formattedDocuments: { name: string; document: string }[] = [];
-    if (exhibitor.documents && exhibitor.documentNames) {
-      formattedDocuments = exhibitor.documents.map(
-        (doc: string, index: number) => ({
-          name: exhibitor.documentNames?.[index] || `Document ${index + 1}`,
-          document: doc,
-        }),
-      );
-    } else if (exhibitor.documents) {
-      // Fallback if no names are provided
-      formattedDocuments = exhibitor.documents.map(
-        (doc: string, index: number) => ({
-          name: `Document ${index + 1}`,
-          document: doc,
-        }),
-      );
-    }
 
-    // Format images with names
-    let formattedImages: { name: string; image: string }[] = [];
-    if (exhibitor.eventImages && exhibitor.eventImageNames) {
-      formattedImages = exhibitor.eventImages.map(
-        (img: string, index: number) => ({
-          name: exhibitor.eventImageNames?.[index] || `Image ${index + 1}`,
-          image: img,
-        }),
-      );
-    } else if (exhibitor.eventImages) {
-      formattedImages = exhibitor.eventImages.map(
-        (img: string, index: number) => ({
-          name: `Image ${index + 1}`,
-          image: img,
-        }),
-      );
-    }
-
-    // Format flyers with names
-    let formattedFlyers: { name: string; flyer: string }[] = [];
-    if (exhibitor.flyers && exhibitor.flyerNames) {
-      formattedFlyers = exhibitor.flyers.map(
-        (flyer: string, index: number) => ({
-          name: exhibitor.flyerNames?.[index] || `Flyer ${index + 1}`,
-          flyer: flyer,
-        }),
-      );
-    } else if (exhibitor.flyers) {
-      formattedFlyers = exhibitor.flyers.map(
-        (flyer: string, index: number) => ({
-          name: `Flyer ${index + 1}`,
-          flyer: flyer,
-        }),
-      );
-    }
-
-    // Remove raw documents and documentNames from response
-    const {
-      documents,
-      documentNames,
-      eventImages,
-      eventImageNames,
-      flyers,
-      flyerNames,
-
-      ...exhibitorData
-    } = exhibitor;
-
-    return {
-      ...exhibitorData,
-      documents: formattedDocuments,
-      flyers: formattedFlyers,
-      eventImages: formattedImages,
-    };
-  }
 }
