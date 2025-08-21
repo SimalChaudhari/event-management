@@ -274,17 +274,6 @@ export class EventService {
       type?: EventType;
       upcoming?: boolean;
       category?: string;
-      location?: string;
-      venue?: string;
-      country?: string;
-      minPrice?: number;
-      maxPrice?: number;
-      currency?: string;
-      page?: number;
-      limit?: number;
-      sortBy?: string;
-      sortOrder?: string;
-      include?: string;
     },
     userId?: string,
     userRole?: string,
@@ -308,92 +297,26 @@ export class EventService {
         .leftJoinAndSelect('eventCategory.category', 'category')
         .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
         .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+
         .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
         .leftJoinAndSelect('event.galleries', 'galleries');
 
-      // Enhanced keyword search with multiple strategies
+      // First, always filter for upcoming events if category is provided
+      if (filters.category) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today: today });
+      }
+
+      // Keyword search
       if (filters.keyword) {
-        const keyword = filters.keyword.toLowerCase().trim();
-        const searchTerms = this.generateSearchTerms(keyword);
-        
-        // Build complex search query with multiple strategies
-        const searchConditions: string[] = [];
-        const searchParams: { [key: string]: string } = {};
-        
-        // Exact match (highest priority)
-        searchConditions.push(
-          'LOWER(event.name) = :exactName OR LOWER(event.venue) = :exactVenue OR LOWER(event.location) = :exactLocation'
+        const keyword = filters.keyword.toLowerCase();
+        queryBuilder.where(
+          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
+          { keyword: `%${keyword}%` },
         );
-        searchParams.exactName = keyword;
-        searchParams.exactVenue = keyword;
-        searchParams.exactLocation = keyword;
-        
-        // Starts with (high priority)
-        searchConditions.push(
-          'LOWER(event.name) LIKE :startsWithName OR LOWER(event.venue) LIKE :startsWithVenue OR LOWER(event.location) LIKE :startsWithLocation'
-        );
-        searchParams.startsWithName = `${keyword}%`;
-        searchParams.startsWithVenue = `${keyword}%`;
-        searchParams.startsWithLocation = `${keyword}%`;
-        
-        // Contains (medium priority)
-        searchConditions.push(
-          'LOWER(event.name) LIKE :containsName OR LOWER(event.description) LIKE :containsDesc OR LOWER(event.venue) LIKE :containsVenue OR LOWER(event.location) LIKE :containsLocation OR LOWER(event.country) LIKE :containsCountry'
-        );
-        searchParams.containsName = `%${keyword}%`;
-        searchParams.containsDesc = `%${keyword}%`;
-        searchParams.containsVenue = `%${keyword}%`;
-        searchParams.containsLocation = `%${keyword}%`;
-        searchParams.containsCountry = `%${keyword}%`;
-        
-        // Price search (if keyword looks like a number)
-        if (!isNaN(Number(keyword))) {
-          searchConditions.push('CAST(event.price AS TEXT) LIKE :priceMatch');
-          searchParams.priceMatch = `%${keyword}%`;
-        }
-        
-        // Category search
-        searchConditions.push('LOWER(category.name) LIKE :categoryMatch');
-        searchParams.categoryMatch = `%${keyword}%`;
-        
-        // Speaker name search
-        searchConditions.push('LOWER(speaker.firstName) LIKE :speakerMatch OR LOWER(speaker.lastName) LIKE :speakerMatch');
-        searchParams.speakerMatch = `%${keyword}%`;
-        
-        // Exhibitor company search
-        searchConditions.push('LOWER(exhibitor.companyName) LIKE :exhibitorMatch');
-        searchParams.exhibitorMatch = `%${keyword}%`;
-        
-        // Combine all search conditions with OR
-        queryBuilder.where(`(${searchConditions.join(' OR ')})`, searchParams);
       }
 
-      // Enhanced location-based search
-      if (filters.location || filters.venue || filters.country) {
-        const locationConditions: string[] = [];
-        const locationParams: { [key: string]: string } = {};
-        
-        if (filters.location) {
-          locationConditions.push('LOWER(event.location) LIKE :locationMatch');
-          locationParams.locationMatch = `%${filters.location.toLowerCase()}%`;
-        }
-        
-        if (filters.venue) {
-          locationConditions.push('LOWER(event.venue) LIKE :venueMatch');
-          locationParams.venueMatch = `%${filters.venue.toLowerCase()}%`;
-        }
-        
-        if (filters.country) {
-          locationConditions.push('LOWER(event.country) LIKE :countryMatch');
-          locationParams.countryMatch = `%${filters.country.toLowerCase()}%`;
-        }
-        
-        if (locationConditions.length > 0) {
-          queryBuilder.andWhere(`(${locationConditions.join(' OR ')})`, locationParams);
-        }
-      }
-
-      // Date range filter - enhanced to handle various date formats
+      // Date range filter - one line code to consider both start and end date
       if (filters.startDate && filters.endDate) {
         queryBuilder.andWhere(
           'event.startDate >= :startDate AND event.endDate <= :endDate',
@@ -402,14 +325,6 @@ export class EventService {
             endDate: filters.endDate,
           },
         );
-      } else if (filters.startDate) {
-        queryBuilder.andWhere('event.startDate >= :startDate', {
-          startDate: filters.startDate,
-        });
-      } else if (filters.endDate) {
-        queryBuilder.andWhere('event.endDate <= :endDate', {
-          endDate: filters.endDate,
-        });
       }
 
       // Type filter
@@ -425,64 +340,14 @@ export class EventService {
         });
       }
 
-      // Price range filter
-      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-        if (filters.minPrice !== undefined && filters.maxPrice !== undefined) {
-          queryBuilder.andWhere('event.price BETWEEN :minPrice AND :maxPrice', {
-            minPrice: filters.minPrice,
-            maxPrice: filters.maxPrice,
-          });
-        } else if (filters.minPrice !== undefined) {
-          queryBuilder.andWhere('event.price >= :minPrice', { minPrice: filters.minPrice });
-        } else if (filters.maxPrice !== undefined) {
-          queryBuilder.andWhere('event.price <= :maxPrice', { maxPrice: filters.maxPrice });
-        }
-      }
-
-      // Currency filter
-      if (filters.currency) {
-        queryBuilder.andWhere('LOWER(event.currency) = :currency', {
-          currency: filters.currency.toLowerCase(),
-        });
-      }
-
-      // Upcoming events filter
       if (filters.upcoming) {
         const today = new Date();
         queryBuilder.andWhere('event.startDate >= :today', { today: today });
       }
 
-      // First, always filter for upcoming events if category is provided
-      if (filters.category) {
-        const today = new Date();
-        queryBuilder.andWhere('event.startDate >= :today', { today: today });
-      }
+      const events = await queryBuilder.getMany();
 
-      // Apply sorting
-      if (filters.sortBy) {
-        const validSortFields = ['name', 'startDate', 'endDate', 'price', 'createdAt', 'updatedAt'];
-        if (validSortFields.includes(filters.sortBy)) {
-          const sortOrder = filters.sortOrder === 'DESC' ? 'DESC' : 'ASC';
-          queryBuilder.orderBy(`event.${filters.sortBy}`, sortOrder);
-        }
-      } else {
-        // Default sorting by start date
-        queryBuilder.orderBy('event.startDate', 'ASC');
-      }
-
-      // Apply pagination
-      if (filters.page && filters.limit) {
-        const offset = (filters.page - 1) * filters.limit;
-        queryBuilder.offset(offset).limit(filters.limit);
-      }
-
-      let events = await queryBuilder.getMany();
-
-      // If no results with current filters, try fallback search
-      if (events.length === 0 && filters.keyword) {
-        events = await this.fallbackSearch(filters.keyword, userId, userRole);
-      }
-
+  
       // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
@@ -536,13 +401,10 @@ export class EventService {
             isRegistered = !!registration;
           }
 
-          // Find which fields matched the keyword search with relevance scoring
+          // Find which fields matched the keyword search
           let matchedFields: string[] = [];
-          let searchRelevance = 0;
           if (filters.keyword) {
-            const searchResult = this.findMatchedFieldsWithRelevance(event, filters.keyword);
-            matchedFields = searchResult.fields;
-            searchRelevance = searchResult.relevance;
+            matchedFields = this.findMatchedFields(event, filters.keyword);
           }
 
           const { exhibitorDescription, ...eventFiltered } = eventData;
@@ -569,18 +431,13 @@ export class EventService {
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
             hasSurvey: !!surveyDetails,
+
             isFavorite: isFavorite,
             isRegistered: isRegistered,
             searchFields: matchedFields, // Add matched fields to response
-            searchRelevance: searchRelevance, // Add relevance score
           };
         }),
       );
-
-      // Sort by relevance if keyword search was used
-      if (filters.keyword) {
-        eventsWithAttendance.sort((a, b) => (b.searchRelevance || 0) - (a.searchRelevance || 0));
-      }
 
       return eventsWithAttendance;
     } catch (error) {
@@ -941,215 +798,6 @@ export class EventService {
     return matchedFields;
   }
 
-  private findMatchedFieldsWithRelevance(event: any, keyword: string): { fields: string[], relevance: number } {
-    const matchedFields: string[] = [];
-    let relevance = 0;
-    const keywordLower = keyword.toLowerCase();
-
-    // Define field weights for relevance scoring
-    const fieldWeights: { [key: string]: number } = {
-      name: 100,           // Event name is most important
-      venue: 80,           // Venue is very important
-      location: 80,        // Location is very important
-      description: 60,     // Description is moderately important
-      country: 50,         // Country is somewhat important
-      type: 40,            // Event type is less important
-      price: 30,           // Price is less important
-      currency: 20,        // Currency is least important
-    };
-
-    // Check each field and calculate relevance
-    Object.keys(fieldWeights).forEach((field) => {
-      if (event[field]) {
-        const fieldValue = event[field].toString().toLowerCase();
-        
-        // Exact match gets highest score
-        if (fieldValue === keywordLower) {
-          matchedFields.push(field);
-          relevance += fieldWeights[field] * 2;
-        }
-        // Starts with gets high score
-        else if (fieldValue.startsWith(keywordLower)) {
-          matchedFields.push(field);
-          relevance += fieldWeights[field] * 1.5;
-        }
-        // Contains gets medium score
-        else if (fieldValue.includes(keywordLower)) {
-          matchedFields.push(field);
-          relevance += fieldWeights[field];
-        }
-        // Partial word match gets lower score
-        else if (this.hasPartialWordMatch(fieldValue, keywordLower)) {
-          matchedFields.push(field);
-          relevance += fieldWeights[field] * 0.7;
-        }
-      }
-    });
-
-    // Check category names
-    if (event.categoriesData && event.categoriesData.length > 0) {
-      event.categoriesData.forEach((cat: any) => {
-        if (cat.name && cat.name.toLowerCase().includes(keywordLower)) {
-          if (!matchedFields.includes('category')) {
-            matchedFields.push('category');
-            relevance += 70; // Category matches are important
-          }
-        }
-      });
-    }
-
-    // Check speaker names
-    if (event.speakersData && event.speakersData.length > 0) {
-      event.speakersData.forEach((speaker: any) => {
-        const speakerName = `${speaker.firstName || ''} ${speaker.lastName || ''}`.toLowerCase();
-        if (speakerName.includes(keywordLower)) {
-          if (!matchedFields.includes('speaker')) {
-            matchedFields.push('speaker');
-            relevance += 60; // Speaker matches are important
-          }
-        }
-      });
-    }
-
-    // Check exhibitor company names
-    if (event.exhibitorsData && event.exhibitorsData.exhibitors && event.exhibitorsData.exhibitors.length > 0) {
-      event.exhibitorsData.exhibitors.forEach((exhibitor: any) => {
-        if (exhibitor.companyName && exhibitor.companyName.toLowerCase().includes(keywordLower)) {
-          if (!matchedFields.includes('exhibitor')) {
-            matchedFields.push('exhibitor');
-            relevance += 65; // Exhibitor matches are important
-          }
-        }
-      });
-    }
-
-    return { fields: matchedFields, relevance: Math.round(relevance) };
-  }
-
-  private hasPartialWordMatch(text: string, keyword: string): boolean {
-    const words = text.split(/\s+/);
-    const keywordWords = keyword.split(/\s+/);
-    
-    return keywordWords.some(kw => 
-      words.some(word => word.includes(kw) || kw.includes(word))
-    );
-  }
-
-  private generateSearchTerms(keyword: string): string[] {
-    const terms: string[] = [];
-    const keywordLower = keyword.toLowerCase().trim();
-
-    // Add original keyword
-    terms.push(keywordLower);
-
-    // Remove common words and generate variations
-    const commonWords = ['the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with'];
-    const keywordWords = keywordLower.split(/\s+/).filter(word => 
-      word.length > 2 && !commonWords.includes(word)
-    );
-
-    // Add variations without common words
-    if (keywordWords.length > 1) {
-      terms.push(keywordWords.join(' '));
-    }
-
-    // Add partial matches for longer keywords
-    if (keywordLower.length > 3) {
-      for (let i = 3; i <= keywordLower.length; i++) {
-        terms.push(keywordLower.substring(0, i));
-      }
-    }
-
-    // Add phonetic variations (simple implementation)
-    const phoneticVariations = this.generatePhoneticVariations(keywordLower);
-    terms.push(...phoneticVariations);
-
-    return [...new Set(terms)]; // Remove duplicates
-  }
-
-  private generatePhoneticVariations(keyword: string): string[] {
-    const variations: string[] = [];
-    
-    // Common phonetic substitutions
-    const phoneticMap: { [key: string]: string[] } = {
-      'c': ['k', 's'],
-      'k': ['c'],
-      's': ['c', 'z'],
-      'z': ['s'],
-      'f': ['ph'],
-      'ph': ['f'],
-      'j': ['g'],
-      'g': ['j'],
-      'q': ['kw'],
-      'x': ['ks'],
-      'w': ['u'],
-      'u': ['w'],
-    };
-
-    // Generate variations with phonetic substitutions
-    for (let i = 0; i < keyword.length; i++) {
-      const char = keyword[i];
-      if (phoneticMap[char]) {
-        phoneticMap[char].forEach(substitution => {
-          const variation = keyword.substring(0, i) + substitution + keyword.substring(i + 1);
-          variations.push(variation);
-        });
-      }
-    }
-
-    return variations;
-  }
-
-  private async fallbackSearch(keyword: string, userId?: string, userRole?: string): Promise<Event[]> {
-    try {
-      // Try broader search with relaxed criteria
-      const queryBuilder = this.eventRepository
-        .createQueryBuilder('event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
-        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
-        .leftJoinAndSelect('event.category', 'eventCategory')
-        .leftJoinAndSelect('eventCategory.category', 'category')
-        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
-        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-        .leftJoinAndSelect('event.galleries', 'galleries');
-
-      // Generate multiple search terms for broader matching
-      const searchTerms = this.generateSearchTerms(keyword);
-      const searchConditions: string[] = [];
-      const searchParams: { [key: string]: string } = {};
-
-      // Build broader search conditions
-      searchTerms.forEach((term, index) => {
-        const paramName = `term${index}`;
-        searchConditions.push(
-          `LOWER(event.name) LIKE :${paramName} OR ` +
-          `LOWER(event.description) LIKE :${paramName} OR ` +
-          `LOWER(event.venue) LIKE :${paramName} OR ` +
-          `LOWER(event.location) LIKE :${paramName} OR ` +
-          `LOWER(event.country) LIKE :${paramName} OR ` +
-          `LOWER(category.name) LIKE :${paramName} OR ` +
-          `LOWER(speaker.firstName) LIKE :${paramName} OR ` +
-          `LOWER(speaker.lastName) LIKE :${paramName} OR ` +
-          `LOWER(exhibitor.companyName) LIKE :${paramName}`
-        );
-        searchParams[paramName] = `%${term}%`;
-      });
-
-      if (searchConditions.length > 0) {
-        queryBuilder.where(`(${searchConditions.join(' OR ')})`, searchParams);
-      }
-
-      // Limit results for fallback search
-      queryBuilder.limit(20);
-      queryBuilder.orderBy('event.startDate', 'ASC');
-
-      return await queryBuilder.getMany();
-    } catch (error) {
-      console.error('Fallback search failed:', error);
-      return [];
-    }
-  }
 
   private async updateEventAssociations(
     eventId: string,
