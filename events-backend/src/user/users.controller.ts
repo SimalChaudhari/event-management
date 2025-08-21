@@ -29,7 +29,7 @@ import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { UserUtils } from '../utils/user.utils';
-import { RoleSwitchRequestDto, RoleSwitchVerifyDto } from './users.dto';
+import { RoleSwitchDto } from './users.dto';
 
 @Controller('api/users')
 export class UserController {
@@ -410,11 +410,16 @@ export class UserController {
     }
   }
 
-  // Role Switch Endpoints
-  @Post('role-switch/request')
+  // Role Switch Endpoint
+  /**
+   * Switch user role directly
+   * - If switching TO exhibitor role: booth code is required
+   * - If switching FROM exhibitor role: no booth code needed
+   */
+  @Post('role-switch')
   @UseGuards(JwtAuthGuard)
-  async requestRoleSwitch(
-    @Body() roleSwitchDto: RoleSwitchRequestDto,
+  async switchRole(
+    @Body() roleSwitchDto: RoleSwitchDto,
     @Res() response: Response,
     @Request() req: any,
   ) {
@@ -427,46 +432,21 @@ export class UserController {
         });
       }
 
-      const result = await this.userService.requestRoleSwitch(userId, roleSwitchDto.newRole);
+      const updatedUser = await this.userService.switchRole(
+        userId, 
+        roleSwitchDto.newRole, 
+        roleSwitchDto.boothCode
+      );
       
       const successResponse = {
         success: true,
-        message: result.message,
+        message: 'Role switched successfully',
+        data: updatedUser,
       };
       
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Role switch request', req.user?.id);
-      throw error;
-    }
-  }
-
-  @Post('role-switch/verify')
-  @UseGuards(JwtAuthGuard)
-  async verifyRoleSwitch(
-    @Body() verifyDto: RoleSwitchVerifyDto,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User not authenticated',
-        });
-      }
-
-      await this.userService.verifyRoleSwitch(userId, verifyDto.verificationCode);
-      
-      const successResponse = {
-        success: true,
-        message: 'Role switch completed successfully',
-      };
-      
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Role switch verification', req.user?.id);
+      this.errorHandler.logError(error, 'Role switch', req.user?.id);
       throw error;
     }
   }

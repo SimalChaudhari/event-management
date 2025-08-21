@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventService } from './event.service';
 import { EventController } from './event.controller';
 import { Event, EventExhibitor } from './event.entity';
+import { EventBooth } from './event-booth.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EventCategory, EventSpeaker } from './event-speaker.entity';
 import { UserEntity } from '../user/users.entity';
@@ -16,6 +17,7 @@ import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
+import { EmailService } from '../service/email.service';
 
 @Module({
     imports: [
@@ -29,6 +31,7 @@ import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
         RegisterEvent,
         FavoriteEvent,
         EventExhibitor,
+        EventBooth,
         Exhibitor,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
@@ -38,7 +41,7 @@ import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
       }),
       OrderModule,
     ],
-    providers: [EventService, ErrorHandlerService],
+    providers: [EventService, ErrorHandlerService, EmailService],
     controllers: [EventController],
 })
 export class EventModule {}

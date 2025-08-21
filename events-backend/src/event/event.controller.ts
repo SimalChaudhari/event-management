@@ -204,6 +204,300 @@ export class EventController {
     }
   }
 
+  @Get('search/global')
+  async globalSearch(
+    @Query() queryParams: any,
+    @Request() req: any,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req?.user?.role;
+
+      // Parse and validate query parameters
+      const searchFilters = {
+        keyword: queryParams.keyword,
+        location: queryParams.location,
+        venue: queryParams.venue,
+        country: queryParams.country,
+        type: queryParams.type,
+        category: queryParams.category,
+        startDate: queryParams.startDate,
+        endDate: queryParams.endDate,
+        minPrice: queryParams.minPrice ? parseFloat(queryParams.minPrice) : undefined,
+        maxPrice: queryParams.maxPrice ? parseFloat(queryParams.maxPrice) : undefined,
+        currency: queryParams.currency,
+        page: queryParams.page ? parseInt(queryParams.page) : 1,
+        limit: queryParams.limit ? parseInt(queryParams.limit) : 20,
+        sortBy: queryParams.sortBy || 'startDate',
+        sortOrder: queryParams.sortOrder || 'ASC',
+        include: queryParams.include || 'all',
+      };
+
+      // Validate at least one search parameter is provided
+      if (!searchFilters.keyword && !searchFilters.location && !searchFilters.venue && 
+          !searchFilters.country && !searchFilters.type && !searchFilters.category && 
+          !searchFilters.startDate && !searchFilters.endDate && 
+          searchFilters.minPrice === undefined && searchFilters.maxPrice === undefined && 
+          !searchFilters.currency) {
+        throw new BadRequestException('At least one search parameter must be provided');
+      }
+
+      // Use the existing getAllEvents method with enhanced filters
+      const events = await this.eventService.getAllEvents(searchFilters, userId, userRole);
+      
+      // Generate search suggestions if no results found
+      let searchSuggestions: string[] = [];
+      let alternativeResults: any[] = [];
+      
+      if (events.length === 0) {
+        // Generate search suggestions based on the keyword
+        if (searchFilters.keyword) {
+          searchSuggestions = this.generateSearchSuggestions(searchFilters.keyword);
+          
+          // Try to find alternative results with broader search
+          const alternativeFilters = { ...searchFilters };
+          if (searchFilters.keyword.length > 3) {
+            alternativeFilters.keyword = searchFilters.keyword.substring(0, Math.floor(searchFilters.keyword.length * 0.7));
+            alternativeResults = await this.eventService.getAllEvents(alternativeFilters, userId, userRole);
+          }
+        }
+      }
+
+      const successResponse: any = {
+        success: true,
+        message: events.length > 0 ? 'Global search completed successfully' : 'No exact matches found',
+        events: events,
+        filters: searchFilters,
+        metadata: {
+          total: events.length,
+          timestamp: new Date().toISOString(),
+          searchQuality: this.calculateSearchQuality(searchFilters, events.length),
+        },
+      };
+
+      // Add search suggestions and alternatives if no results
+      if (events.length === 0) {
+        successResponse.searchSuggestions = searchSuggestions;
+        if (alternativeResults.length > 0) {
+          successResponse.alternativeResults = {
+            message: 'Showing similar results',
+            events: alternativeResults.slice(0, 5), // Limit to 5 alternative results
+            count: alternativeResults.length,
+          };
+        }
+      }
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Global search', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Advanced search with multiple filters
+  @Post('search/advanced')
+  async advancedSearch(
+    @Body() searchBody: {
+      keyword?: string;
+      filters?: {
+        location?: string;
+        venue?: string;
+        country?: string;
+        type?: EventType;
+        category?: string;
+        startDate?: string;
+        endDate?: string;
+        minPrice?: number;
+        maxPrice?: number;
+        currency?: string;
+        hasSurvey?: boolean;
+        hasSpeakers?: boolean;
+        hasExhibitors?: boolean;
+        isUpcoming?: boolean;
+      };
+      pagination?: {
+        page: number;
+        limit: number;
+      };
+      sorting?: {
+        field: string;
+        order: 'ASC' | 'DESC';
+      };
+    },
+    @Request() req: any,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req?.user?.role;
+
+      if (!searchBody.keyword && !searchBody.filters) {
+        throw new BadRequestException('Either keyword or filters must be provided');
+      }
+
+      // Build search filters
+      const searchFilters: any = {
+        keyword: searchBody.keyword,
+        ...searchBody.filters,
+        page: searchBody.pagination?.page || 1,
+        limit: searchBody.pagination?.limit || 20,
+        sortBy: searchBody.sorting?.field || 'startDate',
+        sortOrder: searchBody.sorting?.order || 'ASC',
+      };
+
+      // Use the enhanced getAllEvents method
+      const events = await this.eventService.getAllEvents(searchFilters, userId, userRole);
+
+      const successResponse: any = {
+        success: true,
+        message: 'Advanced search completed successfully',
+        events: events,
+        filters: searchFilters,
+        metadata: {
+          total: events.length,
+          timestamp: new Date().toISOString(),
+          searchQuality: this.calculateSearchQuality(searchFilters, events.length),
+          pagination: {
+            page: searchFilters.page,
+            limit: searchFilters.limit,
+            totalPages: Math.ceil(events.length / searchFilters.limit),
+          },
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Advanced search', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Search suggestions endpoint
+  @Get('search/suggestions')
+  async getSearchSuggestions(
+    @Query('q') query: string,
+    @Res() response: Response,
+  ) {
+    try {
+      if (!query || query.trim().length < 2) {
+        throw new BadRequestException('Query must be at least 2 characters long');
+      }
+
+      const suggestions = this.generateSearchSuggestions(query.trim());
+      
+      const successResponse: any = {
+        success: true,
+        message: 'Search suggestions generated successfully',
+        query: query.trim(),
+        suggestions: suggestions,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Helper method to generate search suggestions
+  private generateSearchSuggestions(keyword: string): string[] {
+    const suggestions: string[] = [];
+    const keywordLower = keyword.toLowerCase();
+
+    // Common search suggestions
+    const commonSuggestions = [
+      'Try searching with fewer words',
+      'Check spelling',
+      'Use broader terms',
+      'Try different date ranges',
+      'Search by location instead of venue',
+    ];
+
+    // Keyword-specific suggestions
+    if (keywordLower.includes('tech') || keywordLower.includes('technology')) {
+      suggestions.push('Try: "Technology Conference", "Tech Summit", "Digital Innovation"');
+    }
+    
+    if (keywordLower.includes('business') || keywordLower.includes('corporate')) {
+      suggestions.push('Try: "Business Conference", "Corporate Event", "Professional Development"');
+    }
+    
+    if (keywordLower.includes('music') || keywordLower.includes('concert')) {
+      suggestions.push('Try: "Music Festival", "Concert", "Live Performance"');
+    }
+    
+    if (keywordLower.includes('food') || keywordLower.includes('culinary')) {
+      suggestions.push('Try: "Food Festival", "Culinary Event", "Gastronomy"');
+    }
+
+    // Add common suggestions
+    suggestions.push(...commonSuggestions);
+
+    return suggestions;
+  }
+
+  // Helper method to calculate search quality score
+  private calculateSearchQuality(filters: any, resultCount: number): string {
+    let quality = 'Good';
+    
+    if (resultCount === 0) {
+      quality = 'No Results';
+    } else if (resultCount < 5) {
+      quality = 'Limited Results';
+    } else if (resultCount > 50) {
+      quality = 'Too Many Results';
+    }
+    
+    return quality;
+  }
+
+  @Get('search/quick')
+  async quickSearch(
+    @Query('q') query: string,
+    @Request() req: any,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req?.user?.role;
+
+      if (!query || query.trim().length === 0) {
+        throw new BadRequestException('Query parameter "q" is required');
+      }
+
+      if (query.trim().length < 2) {
+        throw new BadRequestException('Query must be at least 2 characters long');
+      }
+
+      // Use existing getAllEvents with minimal filters for quick search
+      const searchFilters = {
+        keyword: query.trim(),
+        upcoming: true, // Focus on upcoming events
+      };
+
+      const events = await this.eventService.getAllEvents(searchFilters, userId, userRole);
+      
+      const successResponse: any = {
+        success: true,
+        message: 'Quick search completed successfully',
+        events: events.slice(0, 10), // Limit to 10 results for quick search
+        query: query.trim(),
+        metadata: {
+          total: Math.min(events.length, 10),
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Quick search', req.user?.id);
+      throw error;
+    }
+  }
+
   @Get(':id')
   async getEventById(
     @Param('id') id: string, 
@@ -578,44 +872,71 @@ export class EventController {
     }
   
 
-    // Remove floor plan
-    @Delete('floor-plan/:id')
-    @Roles(UserRole.Admin)
-    async removeEventFloorPlan(
-      @Param('id') id: string,
-      @Res() response: Response,
-      @Request() req: any,
-    ) {
-      try {
-        const event = await this.eventService.getEventEntityById(id);
+      // Get event booths
+  @Get(':id/booths')
+  async getEventBooths(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const eventBooths = await this.eventService.getEventBooths(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Event booths retrieved successfully',
+        data: eventBooths,
+        metadata: {
+          total: eventBooths.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
 
-        if (!event.floorPlan) {
-          throw new ResourceNotFoundException('Floor plan', 'in this event');
-        }
-
-        // Delete floor plan from filesystem
-        const fullPath = path.join(__dirname, '..', '..', event.floorPlan);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
-
-        await this.eventService.updateEventFloorPlan(id, null);
-
-        const successResponse: SuccessResponse = {
-          success: true,
-          message: 'Floor plan removed successfully',
-          data: { floorPlan: "" },
-          metadata: {
-            timestamp: new Date().toISOString(),
-          },
-        };
-
-        return response.status(HttpStatus.OK).json(successResponse);
-      } catch (error) {
-        this.errorHandler.logError(error, 'Event floor plan removal', req.user?.id);
-        throw error;
-      }
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event booths retrieval', req.user?.id);
+      throw error;
     }
+  }
+
+  // Remove floor plan
+  @Delete('floor-plan/:id')
+  @Roles(UserRole.Admin)
+  async removeEventFloorPlan(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const event = await this.eventService.getEventEntityById(id);
+
+      if (!event.floorPlan) {
+        throw new ResourceNotFoundException('Floor plan', 'in this event');
+      }
+
+      // Delete floor plan from filesystem
+      const fullPath = path.join(__dirname, '..', '..', event.floorPlan);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+
+      await this.eventService.updateEventFloorPlan(id, null);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Floor plan removed successfully',
+        data: { floorPlan: "" },
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event floor plan removal', req.user?.id);
+      throw error;
+    }
+  }
 
   // Helper method to clean up uploaded files
   private cleanupUploadedFiles(files: any) {

@@ -100,7 +100,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
-      .leftJoinAndSelect('exhibitor.user', 'exhibitorUser') // Add exhibitor user details
+      
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
       .where('favorite.userId = :userId', { userId });
 
@@ -212,10 +212,8 @@ export class FavoriteEventService {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
                
-                // Format exhibitor documents
-                const formattedExhibitor = UserUtils.formatExhibitorDocuments(ee.exhibitor);
                 return {
-                  ...formattedExhibitor,
+                  ...ee.exhibitor,
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
                 };
               }) || [],

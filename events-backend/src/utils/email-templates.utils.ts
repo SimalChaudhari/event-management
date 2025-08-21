@@ -421,4 +421,218 @@ export class EmailTemplateUtils {
       html: this.generateRoleSwitchTemplate(data),
     };
   }
+
+
+     /**
+     * Generate HTML email template for booth code notification
+     */
+     static generateBoothCodeEmail(
+        uniqueCode: string,
+        eventName: string,
+        eventStartDate: string,
+        eventVenue: string,
+      ): string {
+        return `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2c3e50; margin-bottom: 10px;">Event Booth Access Code</h1>
+              <p style="color: #7f8c8d; font-size: 16px;">You have been assigned a booth for an upcoming event</p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h2 style="color: #2c3e50; margin-bottom: 20px;">Event Details</h2>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Event Name:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventName}</span>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Date:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventStartDate}</span>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Venue:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventVenue || 'To be announced'}</span>
+              </div>
+            </div>
+            
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px; text-align: center;">
+              <h3 style="color: #27ae60; margin-bottom: 15px;">Your Unique Booth Code</h3>
+              <div style="background-color: #27ae60; color: white; padding: 15px; border-radius: 6px; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 15px 0;">
+                ${uniqueCode}
+              </div>
+              <p style="color: #2c3e50; margin: 0;">Keep this code safe - you'll need it to access your booth</p>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h3 style="color: #856404; margin-bottom: 15px;">📱 How to Activate This Code in the App</h3>
+              <ol style="color: #856404; margin: 0; padding-left: 20px;">
+                <li>Open the event app on your mobile device</li>
+                <li>Go to the "Booth Management" or "Exhibitor" section</li>
+                <li>Enter your unique booth code: <strong>${uniqueCode}</strong></li>
+                <li>Follow the on-screen instructions to activate your booth</li>
+                <li>Once activated, you can manage your booth information and materials</li>
+              </ol>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="color: #7f8c8d; margin-bottom: 10px;">If you have any questions or need assistance, please contact the event organizers.</p>
+              <p style="color: #7f8c8d; font-size: 14px;">Thank you for participating in our event!</p>
+            </div>
+          </div>
+        `;
+      }
+    
+      /**
+       * Generate HTML email template for event registration confirmation
+       */
+      static generateEventRegistrationEmail(
+        eventName: string,
+        eventStartDate: string,
+        eventVenue: string,
+        userName: string,
+      ): string {
+        return `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2c3e50; margin-bottom: 10px;">Event Registration Confirmed</h1>
+              <p style="color: #7f8c8d; font-size: 16px;">Your registration has been successfully confirmed</p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h2 style="color: #2c3e50; margin-bottom: 20px;">Event Details</h2>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Event Name:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventName}</span>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Date:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventStartDate}</span>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Venue:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventVenue || 'To be announced'}</span>
+              </div>
+            </div>
+            
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px; text-align: center;">
+              <h3 style="color: #27ae60; margin-bottom: 15px;">Registration Confirmed</h3>
+              <p style="color: #2c3e50; margin: 0;">Hello ${userName}, your registration for this event has been confirmed!</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="color: #7f8c8d; margin-bottom: 10px;">We look forward to seeing you at the event!</p>
+              <p style="color: #7f8c8d; font-size: 14px;">If you have any questions, please contact the event organizers.</p>
+            </div>
+          </div>
+        `;
+      }
+    
+      /**
+       * Generate HTML email template for password reset
+       */
+      static generatePasswordResetEmail(
+        resetToken: string,
+        userName: string,
+      ): string {
+        return `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2c3e50; margin-bottom: 10px;">Password Reset Request</h1>
+              <p style="color: #7f8c8d; font-size: 16px;">You requested to reset your password</p>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h3 style="color: #856404; margin-bottom: 15px;">Reset Your Password</h3>
+              <p style="color: #856404; margin-bottom: 15px;">Hello ${userName},</p>
+              <p style="color: #856404; margin-bottom: 15px;">Click the button below to reset your password:</p>
+              <div style="text-align: center;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}" 
+                   style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Reset Password
+                </a>
+              </div>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h3 style="color: #2c3e50; margin-bottom: 15px;">Important Notes</h3>
+              <ul style="color: #2c3e50; margin: 0; padding-left: 20px;">
+                <li>This link will expire in 1 hour</li>
+                <li>If you didn't request this, please ignore this email</li>
+                <li>For security, never share this link with anyone</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="color: #7f8c8d; margin-bottom: 10px;">If you have any questions, please contact our support team.</p>
+            </div>
+          </div>
+        `;
+      }
+    
+      /**
+       * Generate HTML email template for booth removal notification
+       */
+      static generateBoothRemovalEmail(
+        eventName: string,
+        eventStartDate: string,
+        eventVenue: string,
+        uniqueCode: string,
+      ): string {
+        return `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #e74c3c; margin-bottom: 10px;">Booth Access Revoked</h1>
+              <p style="color: #7f8c8d; font-size: 16px;">Your booth access for this event has been removed</p>
+            </div>
+            
+            <div style="background-color: #fdf2f2; padding: 20px; border-radius: 6px; margin-bottom: 25px; border-left: 4px solid #e74c3c;">
+              <h2 style="color: #c0392b; margin-bottom: 20px;">Important Notice</h2>
+              <p style="color: #2c3e50; margin-bottom: 15px;">Your booth access for the following event has been revoked:</p>
+            </div>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h2 style="color: #2c3e50; margin-bottom: 20px;">Event Details</h2>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Event Name:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventName}</span>
+              </div>
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #34495e;">Date:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventStartDate}</span>
+              </div>
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+                <strong style="color: #34495e;">Venue:</strong>
+                <span style="color: #2c3e50; margin-left: 10px;">${eventVenue || 'To be announced'}</span>
+              </div>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h3 style="color: #856404; margin-bottom: 15px;">⚠️ Booth Code No Longer Valid</h3>
+              <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin: 15px 0; text-align: center; border: 1px solid #f5c6cb;">
+                ${uniqueCode}
+              </div>
+              <p style="color: #856404; margin: 0; text-align: center;"><strong>This booth code is no longer active and cannot be used.</strong></p>
+            </div>
+            
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+              <h3 style="color: #27ae60; margin-bottom: 15px;">What This Means</h3>
+              <ul style="color: #2c3e50; margin: 0; padding-left: 20px;">
+                <li>You no longer have access to a booth at this event</li>
+                <li>The booth code ${uniqueCode} is no longer valid</li>
+                <li>You cannot use this code to access booth management features</li>
+                <li>If you believe this is an error, please contact the event organizers</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="color: #7f8c8d; margin-bottom: 10px;">If you have any questions about this change, please contact the event organizers.</p>
+              <p style="color: #7f8c8d; font-size: 14px;">Thank you for your understanding.</p>
+            </div>
+          </div>
+        `;
+      }
 }
+
+
+
+  

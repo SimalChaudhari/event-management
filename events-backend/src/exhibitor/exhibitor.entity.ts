@@ -7,29 +7,16 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
 
 import { PromotionalOffer } from '../promotional-offer/promotional-offer.entity';
 import { EventExhibitor } from 'event/event.entity';
-import { UserEntity } from '../user/users.entity';
+import { EventBooth } from '../event/event-booth.entity';
 
 @Entity('exhibitors')
 export class Exhibitor {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
-
-  // User relationship - basic info comes from User table
-  @Column({ type: 'uuid' })
-  userId!: string;
-
-  @ManyToOne(() => UserEntity, { nullable: false })
-  @JoinColumn({ name: 'userId' })
-  user!: UserEntity;
-
-  @Column({ type: 'varchar' })
-  userName!: string; 
 
   @Column({ type: 'varchar' })
   companyName!: string;
@@ -44,6 +31,19 @@ export class Exhibitor {
   @Column({ type: 'varchar', nullable: true })
   bothNumber?: string;
 
+  // Add new fields: email, mobile, UEN, and logo
+  @Column({ type: 'varchar', nullable: true })
+  email?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  mobile?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  uen?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  logo?: string;
+
   // Multiple flyer images support
   @Column('simple-array', { nullable: true })
   flyers?: string[];
@@ -56,7 +56,7 @@ export class Exhibitor {
   @Column('simple-array', { nullable: true })
   documents?: string[];
 
-  // Add this new field for document names (Event जैसा ही)
+  // Add this new field for document names 
   @Column('simple-array', { nullable: true })
   documentNames?: string[];
 
@@ -78,6 +78,10 @@ export class Exhibitor {
   // Event relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.exhibitor)
   eventExhibitors!: EventExhibitor[];
+
+  // Event booth relationship
+  @OneToMany(() => EventBooth, (eventBooth) => eventBooth.exhibitor)
+  eventBooths!: EventBooth[];
 
   @CreateDateColumn()
   createdAt!: Date;

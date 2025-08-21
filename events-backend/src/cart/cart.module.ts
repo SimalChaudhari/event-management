@@ -18,6 +18,8 @@ import { Survey, SurveyResponse, SurveySession } from 'survey/survey.entity';
 import { SurveyService } from 'survey/survey.service';
 import { UtilsModule } from 'utils/utils.module';
 import { UserEntity } from 'user/users.entity';
+import { EventBooth } from 'event/event-booth.entity';
+import { EmailService } from 'service/email.service';
 
 
 @Module({
@@ -26,7 +28,7 @@ import { UserEntity } from 'user/users.entity';
       UserEntity,
       SurveySession,    // Add this
       SurveyResponse,    // Add this
-      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey]),
+      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
@@ -34,7 +36,7 @@ import { UserEntity } from 'user/users.entity';
     }),
     EventModule, // Add EventModule here
   ],
-    providers: [CartService,EventService,SurveyService,ErrorHandlerService  ],
+    providers: [CartService,EventService,SurveyService,ErrorHandlerService,EmailService],
     controllers: [CartController],
 })
 export class CartModule {}

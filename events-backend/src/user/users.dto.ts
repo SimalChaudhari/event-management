@@ -156,15 +156,12 @@ export class LinkedInLoginDto {
   accessToken!: string;
 }
 
-export class RoleSwitchRequestDto {
+export class RoleSwitchDto {
   @IsNotEmpty()
   @IsEnum(UserRole)
   newRole!: UserRole;
-}
 
-export class RoleSwitchVerifyDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  @MinLength(6)
-  verificationCode!: string;
+  boothCode?: string; // Required only when switching TO exhibitor role
 }

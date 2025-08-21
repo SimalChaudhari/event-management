@@ -130,7 +130,6 @@ export class RegisterEventService {
             'event.galleries',
             'event.eventExhibitors',
             'event.eventExhibitors.exhibitor',
-            'event.eventExhibitors.exhibitor.user',
             'event.eventExhibitors.exhibitor.promotionalOffers',
             'order',
           ],
@@ -149,7 +148,6 @@ export class RegisterEventService {
             'event.galleries',
             'event.eventExhibitors',
             'event.eventExhibitors.exhibitor',
-            'event.eventExhibitors.exhibitor.user',
             'event.eventExhibitors.exhibitor.promotionalOffers',
             'order',
           ],
@@ -239,12 +237,8 @@ export class RegisterEventService {
                 registerEvent.event?.eventExhibitors
                   ?.filter((ee) => ee.exhibitor.isActive)
                   ?.map((ee) => {
-                    // Format exhibitor documents using UserUtils
-                    const formattedExhibitor = UserUtils.formatExhibitorDocuments(
-                      ee.exhibitor,
-                    );
                     return {
-                      ...formattedExhibitor,
+                      ...ee.exhibitor,
                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
                     };
                   }) || [],
@@ -388,12 +382,8 @@ export class RegisterEventService {
         registerEvent.event?.eventExhibitors
           ?.filter((ee) => ee.exhibitor.isActive)
           ?.map((ee) => {
-            // Format exhibitor documents using UserUtils
-            const formattedExhibitor = UserUtils.formatExhibitorDocuments(
-              ee.exhibitor,
-            );
             return {
-              ...formattedExhibitor,
+              ...ee.exhibitor,
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
             };
           }) || [];

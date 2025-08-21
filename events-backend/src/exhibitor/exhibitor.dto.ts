@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsEmail, IsOptional, IsArray, IsBoolean } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsArray, IsBoolean, IsEmail } from 'class-validator';
 
 export class PromotionalOfferDto {
   @IsNotEmpty()
@@ -20,44 +20,9 @@ export class PromotionalOfferDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-
 }
 
 export class ExhibitorDto {
-  @IsOptional()
-  @IsString()
-  userId?: string; // Reference to User table - optional for self-registration
-
-  // User fields for admin to create full exhibitor with user
-  @IsOptional()
-  @IsString()
-  firstName?: string;
-
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  mobile?: string;
-
-  @IsOptional()
-  @IsString()
-  password?: string;
-
-  @IsOptional()
-  @IsString()
-  profilePicture?: string;
-
-  @IsOptional()
-  @IsString()
-  address?: string;
-
   @IsNotEmpty()
   @IsString()
   companyName!: string;
@@ -75,6 +40,23 @@ export class ExhibitorDto {
   @IsString()
   bothNumber?: string;
 
+  // Add new fields: email, mobile, UEN, and logo
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  mobile?: string;
+
+  @IsOptional()
+  @IsString()
+  uen?: string;
+
+  @IsOptional()
+  @IsString()
+  logo?: string;
+
   @IsOptional()
   @IsArray()
   flyers?: string[];
@@ -91,7 +73,7 @@ export class ExhibitorDto {
   @IsArray()
   documents?: string[];
 
-  // Add document names field (Event जैसा ही)
+  // Add document names field
   @IsOptional()
   @IsArray()
   documentNames?: string[];

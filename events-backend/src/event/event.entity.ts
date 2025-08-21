@@ -17,6 +17,7 @@ import { Category } from 'category/category.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Gallery } from 'gallery/gallery.entity';
 import { Survey } from '../survey/survey.entity';
+import { EventBooth } from './event-booth.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -137,6 +138,12 @@ export class Event {
   // Add this new field for document names
   @Column('simple-array', { nullable: true })
   documentNames?: string[];
+  
+  // Event booths relationship
+  @OneToMany(() => EventBooth, (eventBooth) => eventBooth.event)
+  eventBooths!: EventBooth[];
+  
+
 }
 
 @Entity('event_exhibitor')
@@ -157,4 +164,6 @@ export class EventExhibitor {
 
   @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventExhibitors)
   exhibitor!: Exhibitor;
+
+  
 }

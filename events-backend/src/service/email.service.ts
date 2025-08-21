@@ -292,4 +292,22 @@ export class EmailService {
       throw new Error('Failed to send exhibitor credentials');
     }
   }
+
+  async sendEmail(email: string, subject: string, html: string): Promise<string> {
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: subject,
+      html: html,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Email sent to ${email}: ${subject}`);
+      return 'Email sent successfully';
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      throw new Error('Failed to send email');
+    }
+  }
 }

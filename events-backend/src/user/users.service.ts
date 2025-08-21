@@ -377,43 +377,13 @@ async update(
 
   // Role Switch Methods
   /**
-   * Generate a 6-digit verification code for role switching
-   * @returns 6-digit verification code
-   */
-  private generateRoleSwitchCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
-  /**
-   * Send role switch verification code to user's email
-   * @param user User entity
+   * Switch user role directly
+   * @param userId User ID
    * @param newRole Role to switch to
-   * @param code Verification code
+   * @param boothCode Booth code (required only when switching TO exhibitor role)
+   * @returns Updated user without sensitive data
    */
-  private async sendRoleSwitchCode(user: UserEntity, newRole: UserRole, code: string): Promise<void> {
-    const roleSwitchData: RoleSwitchCodeData = {
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      code,
-      fromRole: user.role || 'user',
-      toRole: newRole,
-    };
-
-    const mailOptions = EmailTemplateUtils.getRoleSwitchEmailOptions(roleSwitchData);
-    
-    // Use the existing email service transporter
-    await this.emailService['transporter'].sendMail(mailOptions);
-    console.log(`Role switch verification code sent to ${user.email}: ${user.firstName} ${user.lastName}`);
-  }
-
-    /**
-   * Request role switch - generates and sends verification code
-   * @param userId User ID requesting role switch
-   * @param newRole Role to switch to
-   * @returns Success message
-   */
-  async requestRoleSwitch(userId: string, newRole: UserRole): Promise<{ message: string }> {
+  async switchRole(userId: string, newRole: UserRole, boothCode?: string): Promise<Partial<UserEntity>> {
     try {
       const user = await this.userRepository.findOne({
         where: { id: userId },
@@ -428,106 +398,79 @@ async update(
         throw new ConflictException(`You are already in the ${newRole} role`);
       }
 
-      // Check if user already has a pending role switch request
-      if (user.roleSwitchCode && user.roleSwitchCodeExpiry) {
-        // Check if the pending code is still valid (not expired)
-        if (new Date() <= user.roleSwitchCodeExpiry) {
-          const remainingTime = Math.ceil((user.roleSwitchCodeExpiry.getTime() - new Date().getTime()) / (60 * 1000));
-          throw new ConflictException(`You already have a pending role switch request. Please wait ${remainingTime} minute(s) or verify the code sent to your email.`);
-        } else {
-          // Clear expired code before proceeding
-          user.roleSwitchCode = undefined;
-          user.roleSwitchCodeExpiry = undefined;
-          user.pendingRole = undefined;
-          await this.userRepository.save(user);
+      // If switching TO exhibitor role, booth code verification is required
+      if (newRole === UserRole.Exhibitor) {
+        if (!boothCode) {
+          throw new ConflictException('Booth code is required when switching to exhibitor role');
+        }
+
+        // Import EventBooth repository to verify booth code
+        const { EventBooth } = await import('../event/event-booth.entity');
+        const eventBoothRepository = this.userRepository.manager.getRepository(EventBooth);
+
+        // Verify the booth code exists and is active
+        const eventBooth = await eventBoothRepository.findOne({
+          where: { 
+            uniqueCode: boothCode,
+            isActive: true 
+          },
+          relations: ['exhibitor'],
+        });
+
+        if (!eventBooth) {
+          throw new ConflictException('Invalid booth code. Please check your code and try again.');
+        }
+
+        // Check if code is already used by another user
+        if (eventBooth.usedBy && eventBooth.usedBy !== userId) {
+          throw new ConflictException('This booth code has already been used by another user. Each code can only be used once.');
+        }
+
+        // If code is used by this user, allow reuse (reactivation case)
+        if (eventBooth.usedBy === userId) {
+          // Allow reuse - this is the same user reactivating their code
+          console.log(`User ${userId} reusing their own booth code: ${boothCode}`);
+        }
+
+  
+
+        // Mark the booth code as used by this user
+        await eventBoothRepository.update(
+          { id: eventBooth.id },
+          { 
+            usedBy: userId,
+            usedAt: new Date(),
+            isActive: false // Deactivate the code after use
+          }
+        );
+      }
+
+      // If switching FROM exhibitor role TO user role, reactivate their booth code
+      if (user.role === UserRole.Exhibitor && newRole === UserRole.User) {
+        // Find and reactivate the user's booth code
+        const { EventBooth } = await import('../event/event-booth.entity');
+        const eventBoothRepository = this.userRepository.manager.getRepository(EventBooth);
+        
+        // Find the booth code used by this user
+        const userBooth = await eventBoothRepository.findOne({
+          where: { usedBy: userId }
+        });
+        
+        if (userBooth) {
+          // Reactivate the booth code for future use by the same user
+          await eventBoothRepository.update(
+            { id: userBooth.id },
+            { 
+              isActive: true,
+              usedBy: userId, // Keep the same user ID
+              usedAt: new Date() // Update timestamp
+            }
+          );
         }
       }
-
-      // Generate verification code
-      const verificationCode = this.generateRoleSwitchCode();
-      const codeExpiry = new Date();
-      codeExpiry.setMinutes(codeExpiry.getMinutes() + 15); // 15 minutes expiry
-
-      // Update user with pending role switch data
-      user.roleSwitchCode = verificationCode;
-      user.roleSwitchCodeExpiry = codeExpiry;
-      user.pendingRole = newRole;
-    
-      await this.userRepository.save(user);
-
-      // Send verification code via email
-      try {
-        await this.sendRoleSwitchCode(user, newRole, verificationCode);
-      } catch (emailError) {
-        this.errorHandler.logError(emailError, 'Role Switch Email Notification', userId);
-        // Clear the saved code if email fails
-        user.roleSwitchCode = undefined;
-        user.roleSwitchCodeExpiry = undefined;
-        user.pendingRole = undefined;
-        await this.userRepository.save(user);
-        throw new Error('Failed to send verification email. Please try again.');
-      }
-
-      return { message: 'Verification code sent to your email. Please check your inbox and enter the code to complete role switch.' };
-    } catch (error: any) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof ConflictException ||
-        error.message?.includes('Failed to send verification email')
-      ) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Role switch request');
-    }
-  }
-
-    /**
-   * Verify role switch code and complete the role switch
-   * @param userId User ID
-   * @param verificationCode Verification code from email
-   * @returns Updated user without sensitive data
-   */
-  async verifyRoleSwitch(userId: string, verificationCode: string): Promise<Partial<UserEntity>> {
-    try {
-      const user = await this.userRepository.findOne({
-        where: { id: userId },
-      });
-
-      if (!user) {
-        throw new ResourceNotFoundException('User', userId);
-      }
-
-      // Check if no code exists, no pending role, or code doesn't match (already used or invalid)
-      if (!user.roleSwitchCode || !user.pendingRole || user.roleSwitchCode !== verificationCode) {
-        throw new ConflictException('Invalid or already used verification code');
-      }
-
-      // Check if code has expired
-      if (!user.roleSwitchCodeExpiry || new Date() > user.roleSwitchCodeExpiry) {
-        // Clear expired code
-        user.roleSwitchCode = undefined;
-        user.roleSwitchCodeExpiry = undefined;
-        user.pendingRole = undefined;
-
-        await this.userRepository.save(user);
-        throw new ConflictException('Invalid or already used verification code');
-      }
-
- 
-      // Step 1: Update the role
-      await this.userRepository.update(userId, { role: user.pendingRole });
       
-      // Step 2: Clear verification data using query builder to ensure NULL values
-      await this.userRepository
-        .createQueryBuilder()
-        .update(UserEntity)
-        .set({
-          roleSwitchCode: () => 'NULL',
-          roleSwitchCodeExpiry: () => 'NULL',
-          pendingRole: () => 'NULL',
-        })
-        .where('id = :id', { id: userId })
-        .execute();
+      // Update the role
+      await this.userRepository.update(userId, { role: newRole });
       
       // Get the updated user to return
       const updatedUser = await this.userRepository.findOne({
@@ -537,7 +480,6 @@ async update(
       if (!updatedUser) {
         throw new ResourceNotFoundException('User', userId);
       }
-    
 
       // Remove sensitive fields from response
       const { password, ...result } = updatedUser;
@@ -549,38 +491,7 @@ async update(
       ) {
         throw error;
       }
-      this.errorHandler.handleDatabaseError(error, 'Role switch verification');
-    }
-  }
-
-  /**
-   * Cancel pending role switch
-   * @param userId User ID
-   * @returns Success message
-   */
-  async cancelRoleSwitch(userId: string): Promise<{ message: string }> {
-    try {
-      const user = await this.userRepository.findOne({
-        where: { id: userId },
-      });
-
-      if (!user) {
-        throw new ResourceNotFoundException('User', userId);
-      }
-
-      // Clear role switch data
-      user.roleSwitchCode = undefined;
-      user.roleSwitchCodeExpiry = undefined;
-      user.pendingRole = undefined;
-  
-      await this.userRepository.save(user);
-
-      return { message: 'Role switch request has been cancelled successfully' };
-    } catch (error) {
-      if (error instanceof ResourceNotFoundException) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Role switch cancellation');
+      this.errorHandler.handleDatabaseError(error, 'Role switch');
     }
   }
 }

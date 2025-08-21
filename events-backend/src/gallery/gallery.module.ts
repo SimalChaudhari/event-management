@@ -18,6 +18,8 @@ import { Survey, SurveySession, SurveyResponse } from 'survey/survey.entity'; //
 import { SurveyService } from 'survey/survey.service';
 import { UtilsModule } from 'utils/utils.module';
 import { UserEntity } from 'user/users.entity';
+import { EventBooth } from 'event/event-booth.entity';
+import { EmailService } from 'service/email.service';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { UserEntity } from 'user/users.entity';
       RegisterEvent, 
       FavoriteEvent, 
       UserEntity, 
+      EventBooth,
       Cart,
       Survey,
       SurveySession,   // Add this
@@ -45,7 +48,7 @@ import { UserEntity } from 'user/users.entity';
     }),
   ],
   controllers: [GalleryController],
-  providers: [GalleryService, EventService, SurveyService, ErrorHandlerService],
+  providers: [GalleryService, EventService, SurveyService, ErrorHandlerService,EmailService],
   exports: [GalleryService],
 })
 export class GalleryModule {}

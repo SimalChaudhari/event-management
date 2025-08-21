@@ -9,7 +9,8 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
 import { Event, EventExhibitor } from './event.entity';
-import { Between, Not } from 'typeorm';
+import { EventBooth } from './event-booth.entity';
+import { Between, Not, In } from 'typeorm';
 import { UserEntity, UserRole } from '../user/users.entity';
 import { EventSpeaker, EventCategory } from './event-speaker.entity';
 import { Category } from 'category/category.entity';
@@ -28,6 +29,8 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from '../utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { EmailService } from '../service/email.service';
+import { EmailTemplateUtils } from '../utils/email-templates.utils';
 
 @Injectable()
 export class EventService {
@@ -40,6 +43,8 @@ export class EventService {
     private eventCategoryRepository: Repository<EventCategory>,
     @InjectRepository(EventExhibitor)
     private eventExhibitorRepository: Repository<EventExhibitor>,
+    @InjectRepository(EventBooth)
+    private eventBoothRepository: Repository<EventBooth>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Category)
@@ -52,6 +57,7 @@ export class EventService {
     private favoriteEventRepository: Repository<FavoriteEvent>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
+    private readonly emailService: EmailService,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -215,10 +221,34 @@ export class EventService {
         const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
         await Promise.all(
           exhibitorIdsArray.map(async (exhibitorId) => {
+            // Get exhibitor details for email
+            const exhibitor = await this.exhibitorRepository.findOne({
+              where: { id: exhibitorId.trim() },
+            });
+
+            // Create EventExhibitor record
             const eventExhibitor = new EventExhibitor();
             eventExhibitor.eventId = savedEvent.id;
             eventExhibitor.exhibitorId = exhibitorId.trim();
             await this.eventExhibitorRepository.save(eventExhibitor);
+
+            // Create EventBooth record with unique code
+            const eventBooth = new EventBooth();
+            eventBooth.eventId = savedEvent.id;
+            eventBooth.exhibitorId = exhibitorId.trim();
+            eventBooth.uniqueCode = this.generateUniqueCode();
+            await this.eventBoothRepository.save(eventBooth);
+
+                         // Send email to exhibitor if email exists
+             if (exhibitor && exhibitor.email) {
+               await this.sendBoothCodeEmail(
+                 exhibitor.email,
+                 eventBooth.uniqueCode,
+                 savedEvent.name,
+                 this.formatDateForEmail(savedEvent.startDate),
+                 (savedEvent.venue || savedEvent.location) || 'To be announced',
+               );
+             }
           }),
         );
       }
@@ -244,6 +274,17 @@ export class EventService {
       type?: EventType;
       upcoming?: boolean;
       category?: string;
+      location?: string;
+      venue?: string;
+      country?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      currency?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: string;
+      include?: string;
     },
     userId?: string,
     userRole?: string,
@@ -267,26 +308,92 @@ export class EventService {
         .leftJoinAndSelect('eventCategory.category', 'category')
         .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
         .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-        .leftJoinAndSelect('exhibitor.user', 'exhibitorUser')
         .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
         .leftJoinAndSelect('event.galleries', 'galleries');
 
-      // First, always filter for upcoming events if category is provided
-      if (filters.category) {
-        const today = new Date();
-        queryBuilder.andWhere('event.startDate >= :today', { today: today });
-      }
-
-      // Keyword search
+      // Enhanced keyword search with multiple strategies
       if (filters.keyword) {
-        const keyword = filters.keyword.toLowerCase();
-        queryBuilder.where(
-          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
-          { keyword: `%${keyword}%` },
+        const keyword = filters.keyword.toLowerCase().trim();
+        const searchTerms = this.generateSearchTerms(keyword);
+        
+        // Build complex search query with multiple strategies
+        const searchConditions: string[] = [];
+        const searchParams: { [key: string]: string } = {};
+        
+        // Exact match (highest priority)
+        searchConditions.push(
+          'LOWER(event.name) = :exactName OR LOWER(event.venue) = :exactVenue OR LOWER(event.location) = :exactLocation'
         );
+        searchParams.exactName = keyword;
+        searchParams.exactVenue = keyword;
+        searchParams.exactLocation = keyword;
+        
+        // Starts with (high priority)
+        searchConditions.push(
+          'LOWER(event.name) LIKE :startsWithName OR LOWER(event.venue) LIKE :startsWithVenue OR LOWER(event.location) LIKE :startsWithLocation'
+        );
+        searchParams.startsWithName = `${keyword}%`;
+        searchParams.startsWithVenue = `${keyword}%`;
+        searchParams.startsWithLocation = `${keyword}%`;
+        
+        // Contains (medium priority)
+        searchConditions.push(
+          'LOWER(event.name) LIKE :containsName OR LOWER(event.description) LIKE :containsDesc OR LOWER(event.venue) LIKE :containsVenue OR LOWER(event.location) LIKE :containsLocation OR LOWER(event.country) LIKE :containsCountry'
+        );
+        searchParams.containsName = `%${keyword}%`;
+        searchParams.containsDesc = `%${keyword}%`;
+        searchParams.containsVenue = `%${keyword}%`;
+        searchParams.containsLocation = `%${keyword}%`;
+        searchParams.containsCountry = `%${keyword}%`;
+        
+        // Price search (if keyword looks like a number)
+        if (!isNaN(Number(keyword))) {
+          searchConditions.push('CAST(event.price AS TEXT) LIKE :priceMatch');
+          searchParams.priceMatch = `%${keyword}%`;
+        }
+        
+        // Category search
+        searchConditions.push('LOWER(category.name) LIKE :categoryMatch');
+        searchParams.categoryMatch = `%${keyword}%`;
+        
+        // Speaker name search
+        searchConditions.push('LOWER(speaker.firstName) LIKE :speakerMatch OR LOWER(speaker.lastName) LIKE :speakerMatch');
+        searchParams.speakerMatch = `%${keyword}%`;
+        
+        // Exhibitor company search
+        searchConditions.push('LOWER(exhibitor.companyName) LIKE :exhibitorMatch');
+        searchParams.exhibitorMatch = `%${keyword}%`;
+        
+        // Combine all search conditions with OR
+        queryBuilder.where(`(${searchConditions.join(' OR ')})`, searchParams);
       }
 
-      // Date range filter - one line code to consider both start and end date
+      // Enhanced location-based search
+      if (filters.location || filters.venue || filters.country) {
+        const locationConditions: string[] = [];
+        const locationParams: { [key: string]: string } = {};
+        
+        if (filters.location) {
+          locationConditions.push('LOWER(event.location) LIKE :locationMatch');
+          locationParams.locationMatch = `%${filters.location.toLowerCase()}%`;
+        }
+        
+        if (filters.venue) {
+          locationConditions.push('LOWER(event.venue) LIKE :venueMatch');
+          locationParams.venueMatch = `%${filters.venue.toLowerCase()}%`;
+        }
+        
+        if (filters.country) {
+          locationConditions.push('LOWER(event.country) LIKE :countryMatch');
+          locationParams.countryMatch = `%${filters.country.toLowerCase()}%`;
+        }
+        
+        if (locationConditions.length > 0) {
+          queryBuilder.andWhere(`(${locationConditions.join(' OR ')})`, locationParams);
+        }
+      }
+
+      // Date range filter - enhanced to handle various date formats
       if (filters.startDate && filters.endDate) {
         queryBuilder.andWhere(
           'event.startDate >= :startDate AND event.endDate <= :endDate',
@@ -295,6 +402,14 @@ export class EventService {
             endDate: filters.endDate,
           },
         );
+      } else if (filters.startDate) {
+        queryBuilder.andWhere('event.startDate >= :startDate', {
+          startDate: filters.startDate,
+        });
+      } else if (filters.endDate) {
+        queryBuilder.andWhere('event.endDate <= :endDate', {
+          endDate: filters.endDate,
+        });
       }
 
       // Type filter
@@ -310,14 +425,64 @@ export class EventService {
         });
       }
 
+      // Price range filter
+      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+        if (filters.minPrice !== undefined && filters.maxPrice !== undefined) {
+          queryBuilder.andWhere('event.price BETWEEN :minPrice AND :maxPrice', {
+            minPrice: filters.minPrice,
+            maxPrice: filters.maxPrice,
+          });
+        } else if (filters.minPrice !== undefined) {
+          queryBuilder.andWhere('event.price >= :minPrice', { minPrice: filters.minPrice });
+        } else if (filters.maxPrice !== undefined) {
+          queryBuilder.andWhere('event.price <= :maxPrice', { maxPrice: filters.maxPrice });
+        }
+      }
+
+      // Currency filter
+      if (filters.currency) {
+        queryBuilder.andWhere('LOWER(event.currency) = :currency', {
+          currency: filters.currency.toLowerCase(),
+        });
+      }
+
+      // Upcoming events filter
       if (filters.upcoming) {
         const today = new Date();
         queryBuilder.andWhere('event.startDate >= :today', { today: today });
       }
 
-      const events = await queryBuilder.getMany();
+      // First, always filter for upcoming events if category is provided
+      if (filters.category) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today: today });
+      }
 
-  
+      // Apply sorting
+      if (filters.sortBy) {
+        const validSortFields = ['name', 'startDate', 'endDate', 'price', 'createdAt', 'updatedAt'];
+        if (validSortFields.includes(filters.sortBy)) {
+          const sortOrder = filters.sortOrder === 'DESC' ? 'DESC' : 'ASC';
+          queryBuilder.orderBy(`event.${filters.sortBy}`, sortOrder);
+        }
+      } else {
+        // Default sorting by start date
+        queryBuilder.orderBy('event.startDate', 'ASC');
+      }
+
+      // Apply pagination
+      if (filters.page && filters.limit) {
+        const offset = (filters.page - 1) * filters.limit;
+        queryBuilder.offset(offset).limit(filters.limit);
+      }
+
+      let events = await queryBuilder.getMany();
+
+      // If no results with current filters, try fallback search
+      if (events.length === 0 && filters.keyword) {
+        events = await this.fallbackSearch(filters.keyword, userId, userRole);
+      }
+
       // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
@@ -371,10 +536,13 @@ export class EventService {
             isRegistered = !!registration;
           }
 
-          // Find which fields matched the keyword search
+          // Find which fields matched the keyword search with relevance scoring
           let matchedFields: string[] = [];
+          let searchRelevance = 0;
           if (filters.keyword) {
-            matchedFields = this.findMatchedFields(event, filters.keyword);
+            const searchResult = this.findMatchedFieldsWithRelevance(event, filters.keyword);
+            matchedFields = searchResult.fields;
+            searchRelevance = searchResult.relevance;
           }
 
           const { exhibitorDescription, ...eventFiltered } = eventData;
@@ -392,12 +560,8 @@ export class EventService {
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
-                // Format exhibitor documents using UserUtils
-                const formattedExhibitor = UserUtils.formatExhibitorDocuments(
-                  ee.exhibitor,
-                );
                 return {
-                  ...formattedExhibitor,
+                  ...ee.exhibitor,
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
                 };
               }),
@@ -405,13 +569,18 @@ export class EventService {
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
             hasSurvey: !!surveyDetails,
-
             isFavorite: isFavorite,
             isRegistered: isRegistered,
             searchFields: matchedFields, // Add matched fields to response
+            searchRelevance: searchRelevance, // Add relevance score
           };
         }),
       );
+
+      // Sort by relevance if keyword search was used
+      if (filters.keyword) {
+        eventsWithAttendance.sort((a, b) => (b.searchRelevance || 0) - (a.searchRelevance || 0));
+      }
 
       return eventsWithAttendance;
     } catch (error) {
@@ -460,7 +629,7 @@ export class EventService {
         .leftJoinAndSelect('eventCategory.category', 'category')
         .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
         .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-        .leftJoinAndSelect('exhibitor.user', 'exhibitorUser')
+
         .leftJoinAndSelect('event.galleries', 'galleries')
         .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
         .where('event.id = :id', { id })
@@ -536,12 +705,8 @@ export class EventService {
         exhibitors: {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: eventExhibitors.map((ee) => {
-            // Format exhibitor documents using UserUtils
-            const formattedExhibitor = UserUtils.formatExhibitorDocuments(
-              ee.exhibitor,
-            );
             return {
-              ...formattedExhibitor,
+              ...ee.exhibitor,
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
             };
           }),
@@ -628,6 +793,9 @@ export class EventService {
         { eventId: id },
         'Event Registrations',
       );
+
+      // Delete associated EventBooth records
+      await this.eventBoothRepository.delete({ eventId: id });
 
       if (registrationCount > 0) {
         throw new ForeignKeyConstraintException(
@@ -773,6 +941,215 @@ export class EventService {
     return matchedFields;
   }
 
+  private findMatchedFieldsWithRelevance(event: any, keyword: string): { fields: string[], relevance: number } {
+    const matchedFields: string[] = [];
+    let relevance = 0;
+    const keywordLower = keyword.toLowerCase();
+
+    // Define field weights for relevance scoring
+    const fieldWeights: { [key: string]: number } = {
+      name: 100,           // Event name is most important
+      venue: 80,           // Venue is very important
+      location: 80,        // Location is very important
+      description: 60,     // Description is moderately important
+      country: 50,         // Country is somewhat important
+      type: 40,            // Event type is less important
+      price: 30,           // Price is less important
+      currency: 20,        // Currency is least important
+    };
+
+    // Check each field and calculate relevance
+    Object.keys(fieldWeights).forEach((field) => {
+      if (event[field]) {
+        const fieldValue = event[field].toString().toLowerCase();
+        
+        // Exact match gets highest score
+        if (fieldValue === keywordLower) {
+          matchedFields.push(field);
+          relevance += fieldWeights[field] * 2;
+        }
+        // Starts with gets high score
+        else if (fieldValue.startsWith(keywordLower)) {
+          matchedFields.push(field);
+          relevance += fieldWeights[field] * 1.5;
+        }
+        // Contains gets medium score
+        else if (fieldValue.includes(keywordLower)) {
+          matchedFields.push(field);
+          relevance += fieldWeights[field];
+        }
+        // Partial word match gets lower score
+        else if (this.hasPartialWordMatch(fieldValue, keywordLower)) {
+          matchedFields.push(field);
+          relevance += fieldWeights[field] * 0.7;
+        }
+      }
+    });
+
+    // Check category names
+    if (event.categoriesData && event.categoriesData.length > 0) {
+      event.categoriesData.forEach((cat: any) => {
+        if (cat.name && cat.name.toLowerCase().includes(keywordLower)) {
+          if (!matchedFields.includes('category')) {
+            matchedFields.push('category');
+            relevance += 70; // Category matches are important
+          }
+        }
+      });
+    }
+
+    // Check speaker names
+    if (event.speakersData && event.speakersData.length > 0) {
+      event.speakersData.forEach((speaker: any) => {
+        const speakerName = `${speaker.firstName || ''} ${speaker.lastName || ''}`.toLowerCase();
+        if (speakerName.includes(keywordLower)) {
+          if (!matchedFields.includes('speaker')) {
+            matchedFields.push('speaker');
+            relevance += 60; // Speaker matches are important
+          }
+        }
+      });
+    }
+
+    // Check exhibitor company names
+    if (event.exhibitorsData && event.exhibitorsData.exhibitors && event.exhibitorsData.exhibitors.length > 0) {
+      event.exhibitorsData.exhibitors.forEach((exhibitor: any) => {
+        if (exhibitor.companyName && exhibitor.companyName.toLowerCase().includes(keywordLower)) {
+          if (!matchedFields.includes('exhibitor')) {
+            matchedFields.push('exhibitor');
+            relevance += 65; // Exhibitor matches are important
+          }
+        }
+      });
+    }
+
+    return { fields: matchedFields, relevance: Math.round(relevance) };
+  }
+
+  private hasPartialWordMatch(text: string, keyword: string): boolean {
+    const words = text.split(/\s+/);
+    const keywordWords = keyword.split(/\s+/);
+    
+    return keywordWords.some(kw => 
+      words.some(word => word.includes(kw) || kw.includes(word))
+    );
+  }
+
+  private generateSearchTerms(keyword: string): string[] {
+    const terms: string[] = [];
+    const keywordLower = keyword.toLowerCase().trim();
+
+    // Add original keyword
+    terms.push(keywordLower);
+
+    // Remove common words and generate variations
+    const commonWords = ['the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with'];
+    const keywordWords = keywordLower.split(/\s+/).filter(word => 
+      word.length > 2 && !commonWords.includes(word)
+    );
+
+    // Add variations without common words
+    if (keywordWords.length > 1) {
+      terms.push(keywordWords.join(' '));
+    }
+
+    // Add partial matches for longer keywords
+    if (keywordLower.length > 3) {
+      for (let i = 3; i <= keywordLower.length; i++) {
+        terms.push(keywordLower.substring(0, i));
+      }
+    }
+
+    // Add phonetic variations (simple implementation)
+    const phoneticVariations = this.generatePhoneticVariations(keywordLower);
+    terms.push(...phoneticVariations);
+
+    return [...new Set(terms)]; // Remove duplicates
+  }
+
+  private generatePhoneticVariations(keyword: string): string[] {
+    const variations: string[] = [];
+    
+    // Common phonetic substitutions
+    const phoneticMap: { [key: string]: string[] } = {
+      'c': ['k', 's'],
+      'k': ['c'],
+      's': ['c', 'z'],
+      'z': ['s'],
+      'f': ['ph'],
+      'ph': ['f'],
+      'j': ['g'],
+      'g': ['j'],
+      'q': ['kw'],
+      'x': ['ks'],
+      'w': ['u'],
+      'u': ['w'],
+    };
+
+    // Generate variations with phonetic substitutions
+    for (let i = 0; i < keyword.length; i++) {
+      const char = keyword[i];
+      if (phoneticMap[char]) {
+        phoneticMap[char].forEach(substitution => {
+          const variation = keyword.substring(0, i) + substitution + keyword.substring(i + 1);
+          variations.push(variation);
+        });
+      }
+    }
+
+    return variations;
+  }
+
+  private async fallbackSearch(keyword: string, userId?: string, userRole?: string): Promise<Event[]> {
+    try {
+      // Try broader search with relaxed criteria
+      const queryBuilder = this.eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
+        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
+        .leftJoinAndSelect('event.category', 'eventCategory')
+        .leftJoinAndSelect('eventCategory.category', 'category')
+        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
+        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+        .leftJoinAndSelect('event.galleries', 'galleries');
+
+      // Generate multiple search terms for broader matching
+      const searchTerms = this.generateSearchTerms(keyword);
+      const searchConditions: string[] = [];
+      const searchParams: { [key: string]: string } = {};
+
+      // Build broader search conditions
+      searchTerms.forEach((term, index) => {
+        const paramName = `term${index}`;
+        searchConditions.push(
+          `LOWER(event.name) LIKE :${paramName} OR ` +
+          `LOWER(event.description) LIKE :${paramName} OR ` +
+          `LOWER(event.venue) LIKE :${paramName} OR ` +
+          `LOWER(event.location) LIKE :${paramName} OR ` +
+          `LOWER(event.country) LIKE :${paramName} OR ` +
+          `LOWER(category.name) LIKE :${paramName} OR ` +
+          `LOWER(speaker.firstName) LIKE :${paramName} OR ` +
+          `LOWER(speaker.lastName) LIKE :${paramName} OR ` +
+          `LOWER(exhibitor.companyName) LIKE :${paramName}`
+        );
+        searchParams[paramName] = `%${term}%`;
+      });
+
+      if (searchConditions.length > 0) {
+        queryBuilder.where(`(${searchConditions.join(' OR ')})`, searchParams);
+      }
+
+      // Limit results for fallback search
+      queryBuilder.limit(20);
+      queryBuilder.orderBy('event.startDate', 'ASC');
+
+      return await queryBuilder.getMany();
+    } catch (error) {
+      console.error('Fallback search failed:', error);
+      return [];
+    }
+  }
 
   private async updateEventAssociations(
     eventId: string,
@@ -812,18 +1189,135 @@ export class EventService {
 
     // Update exhibitor associations if provided
     if (eventDto.exhibitorIds !== undefined) {
-      await this.eventExhibitorRepository.delete({ eventId });
+      // Get current event details for email
+      const currentEvent = await this.eventRepository.findOne({ where: { id: eventId } });
+      
+      // Get existing exhibitor IDs for this event
+      const existingExhibitorIds = await this.eventExhibitorRepository.find({
+        where: { eventId },
+        select: ['exhibitorId'],
+      });
+      const existingExhibitorIdSet = new Set(existingExhibitorIds.map(ee => ee.exhibitorId));
+      
       if (eventDto.exhibitorIds) {
-        const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
+        const newExhibitorIdsArray = eventDto.exhibitorIds.split(',');
+        
+        // Process each exhibitor ID
         await Promise.all(
-          exhibitorIdsArray.map(async (exhibitorId) => {
-            const eventExhibitor = new EventExhibitor();
-            eventExhibitor.eventId = eventId;
-            eventExhibitor.exhibitorId = exhibitorId.trim();
-            await this.eventExhibitorRepository.save(eventExhibitor);
+          newExhibitorIdsArray.map(async (exhibitorId) => {
+            const trimmedExhibitorId = exhibitorId.trim();
+            const isNewExhibitor = !existingExhibitorIdSet.has(trimmedExhibitorId);
+            
+            // Get exhibitor details
+            const exhibitor = await this.exhibitorRepository.findOne({
+              where: { id: trimmedExhibitorId },
+            });
+
+            if (isNewExhibitor) {
+              // Create new EventExhibitor record
+              const eventExhibitor = new EventExhibitor();
+              eventExhibitor.eventId = eventId;
+              eventExhibitor.exhibitorId = trimmedExhibitorId;
+              await this.eventExhibitorRepository.save(eventExhibitor);
+
+              // Create new EventBooth record with unique code
+              const eventBooth = new EventBooth();
+              eventBooth.eventId = eventId;
+              eventBooth.exhibitorId = trimmedExhibitorId;
+              eventBooth.uniqueCode = this.generateUniqueCode();
+              await this.eventBoothRepository.save(eventBooth);
+
+              // Send email only to new exhibitors
+              if (exhibitor && exhibitor.email && currentEvent) {
+                await this.sendBoothCodeEmail(
+                  exhibitor.email,
+                  eventBooth.uniqueCode,
+                  currentEvent.name,
+                  this.formatDateForEmail(currentEvent.startDate),
+                  (currentEvent.venue || currentEvent.location) || 'To be announced',
+                );
+              }
+            }
+            // If exhibitor already exists, no need to recreate booth or send email
           }),
         );
-      }
+        
+                 // Remove exhibitors who are no longer in the list
+         const newExhibitorIdSet = new Set(newExhibitorIdsArray.map(id => id.trim()));
+         const exhibitorsToRemove = existingExhibitorIds.filter(
+           ee => ee.exhibitorId && !newExhibitorIdSet.has(ee.exhibitorId)
+         );
+         
+         if (exhibitorsToRemove.length > 0) {
+           // Get booth details and exhibitor information for removal emails
+           const boothsToRemove = await this.eventBoothRepository.find({
+             where: {
+               eventId,
+               exhibitorId: In(exhibitorsToRemove.map(ee => ee.exhibitorId!).filter(id => id !== undefined)),
+             },
+             relations: ['exhibitor'],
+           });
+
+           // Send removal emails before deleting records
+           await Promise.all(
+             boothsToRemove.map(async (booth) => {
+               if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
+                 await this.sendBoothRemovalEmail(
+                   booth.exhibitor.email,
+                   booth.uniqueCode,
+                   currentEvent.name,
+                   this.formatDateForEmail(currentEvent.startDate),
+                   (currentEvent.venue || currentEvent.location) || 'To be announced',
+                 );
+               }
+             }),
+           );
+
+           const exhibitorIdsToRemove = exhibitorsToRemove
+             .map(ee => ee.exhibitorId)
+             .filter((id): id is string => id !== undefined);
+           
+           if (exhibitorIdsToRemove.length > 0) {
+             // Delete EventBooth records for removed exhibitors
+             await this.eventBoothRepository.delete({
+               eventId,
+               exhibitorId: In(exhibitorIdsToRemove),
+             });
+             
+             // Delete EventExhibitor records for removed exhibitors
+             await this.eventExhibitorRepository.delete({
+               eventId,
+               exhibitorId: In(exhibitorIdsToRemove),
+             });
+           }
+         }
+             } else {
+         // If no exhibitor IDs provided, remove all existing exhibitors
+         // Get booth details and exhibitor information for removal emails
+         const allBoothsToRemove = await this.eventBoothRepository.find({
+           where: { eventId },
+           relations: ['exhibitor'],
+         });
+
+         // Send removal emails before deleting records
+         await Promise.all(
+           allBoothsToRemove.map(async (booth) => {
+             if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
+               await this.sendBoothRemovalEmail(
+                 booth.exhibitor.email,
+                 booth.uniqueCode,
+                 currentEvent.name,
+                 this.formatDateForEmail(currentEvent.startDate),
+                 (currentEvent.venue || currentEvent.location) || 'To be announced',
+               );
+             }
+           }),
+         );
+
+         // Delete all EventBooth and EventExhibitor records
+         await this.eventBoothRepository.delete({ eventId });
+         await this.eventExhibitorRepository.delete({ eventId });
+       }
     }
   }
 
@@ -945,6 +1439,120 @@ export class EventService {
     ) {
       throw new ValidationException('Invalid longitude value');
     }
+  }
+
+  // Get event booths by event ID
+  async getEventBooths(eventId: string): Promise<any[]> {
+    try {
+      const eventBooths = await this.eventBoothRepository.find({
+        where: { eventId, isActive: true },
+        relations: ['exhibitor'],
+      });
+
+      // Format the response to include exhibitor details
+      return eventBooths.map(eventBooth => ({
+        id: eventBooth.id,
+        eventId: eventBooth.eventId,
+        exhibitorId: eventBooth.exhibitorId,
+        uniqueCode: eventBooth.uniqueCode,
+        isActive: eventBooth.isActive,
+        createdAt: eventBooth.createdAt,
+        updatedAt: eventBooth.updatedAt,
+        exhibitor: eventBooth.exhibitor ? {
+          id: eventBooth.exhibitor.id,
+          companyName: eventBooth.exhibitor.companyName,
+          companyDescription: eventBooth.exhibitor.companyDescription,
+          logo: eventBooth.exhibitor.logo,
+          email: eventBooth.exhibitor.email,
+          mobile: eventBooth.exhibitor.mobile,
+          uen: eventBooth.exhibitor.uen,
+        } : null,
+      }));
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Event booths retrieval');
+    }
+  }
+
+  // Send booth code email to exhibitor
+  private async sendBoothCodeEmail(
+    exhibitorEmail: string,
+    uniqueCode: string,
+    eventName: string,
+    eventStartDate: string,
+    eventVenue: string,
+  ): Promise<void> {
+    try {
+      const subject = 'Your Event Booth Access Code';
+      const html = EmailTemplateUtils.generateBoothCodeEmail(
+        uniqueCode,
+        eventName,
+        eventStartDate,
+        eventVenue,
+      );
+
+      await this.emailService.sendEmail(exhibitorEmail, subject, html);
+      console.log(`Booth code email sent to ${exhibitorEmail} for event: ${eventName}`);
+    } catch (error) {
+      console.error('Failed to send booth code email:', error);
+      // Don't throw error as email sending failure shouldn't break the main flow
+      this.errorHandler.logError(error, 'Booth code email sending', undefined);
+    }
+  }
+
+  // Send booth removal email to exhibitor
+  private async sendBoothRemovalEmail(
+    exhibitorEmail: string,
+    uniqueCode: string,
+    eventName: string,
+    eventStartDate: string,
+    eventVenue: string,
+  ): Promise<void> {
+    try {
+      const subject = 'Booth Access Revoked - Event Update';
+      const html = EmailTemplateUtils.generateBoothRemovalEmail(
+        eventName,
+        eventStartDate,
+        eventVenue,
+        uniqueCode,
+      );
+
+      await this.emailService.sendEmail(exhibitorEmail, subject, html);
+      console.log(`Booth removal email sent to ${exhibitorEmail} for event: ${eventName}`);
+    } catch (error) {
+      console.error('Failed to send booth removal email:', error);
+      // Don't throw error as email sending failure shouldn't break the main flow
+      this.errorHandler.logError(error, 'Booth removal email sending', undefined);
+    }
+  }
+
+  // Generate unique code for event booth
+  private generateUniqueCode(): string {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    return `EB${timestamp}${randomStr}`.toUpperCase();
+  }
+
+  // Format date for email display - handles both Date objects and string dates
+  private formatDateForEmail(date: Date | string): string {
+    if (date instanceof Date) {
+      return date.toDateString();
+    }
+    
+    // If it's a string, try to parse it and format it
+    if (typeof date === 'string') {
+      try {
+        const parsedDate = new Date(date);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toDateString();
+        }
+      } catch (error) {
+        // If parsing fails, return the original string
+        console.warn('Failed to parse date string:', date);
+      }
+      return date; // Return original string if parsing fails
+    }
+    
+    return 'Date not available';
   }
 
   private deleteEventFiles(event: Event) {

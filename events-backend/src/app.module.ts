@@ -49,7 +49,6 @@ import { ChatModule } from './chat/chat.module';
     UserModule,
     GalleryModule,
     ExhibitorModule,
-    GalleryModule,
     PromotionalOfferModule,
     SurveyModule,
     QnaModule,
