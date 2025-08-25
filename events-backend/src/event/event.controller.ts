@@ -18,12 +18,10 @@ import {
   BadRequestException,
   HttpStatus,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { EventService } from './event.service';
 import { EventDto, EventType } from './event.dto';
-import { diskStorage } from 'multer';
-import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -33,6 +31,7 @@ import { UserRole } from 'user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
+import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
 
 @Controller('api/events')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,82 +43,32 @@ export class EventController {
 
   @Post('create')
   @Roles(UserRole.Admin)
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'images', maxCount: 10 },
-      { name: 'documents', maxCount: 5 },
-      { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
-      { name: 'eventStampImages', maxCount: 10 }, // Add event stamp images
-
-    ], {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          if (file.fieldname === 'images') {
-            cb(null, './uploads/event/images');
-          } else if (file.fieldname === 'documents') {
-            cb(null, './uploads/event/documents');
-          } else if (file.fieldname === 'floorPlan') {
-            cb(null, './uploads/event/floorPlan'); // New directory for floor plan
-          } else if (file.fieldname === 'eventStampImages') {
-            cb(null, './uploads/eventStamps/images'); // Event stamp images
-          } else {
-            cb(null, './uploads/event/images'); // Default
-          }
-        },
-        filename: (req, file, cb) => {
-          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
-          cb(null, uniqueSuffix);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-
-        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-     
-        if (file.fieldname === 'images' && allowedImageTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
-          cb(null, true);
-        } else if (file.fieldname === 'floorPlan' && allowedImageTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else if (file.fieldname === 'eventStampImages' && allowedImageTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
-        }
-      },
-      limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit
-      },
-    }),
-  )
-  async createEvent(
+  @UseInterceptors(FileUploadUtils.createEventFileInterceptor())
+    async createEvent(
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { images?: Express.Multer.File[], documents?: Express.Multer.File[], 
-      floorPlan?: Express.Multer.File[],
-      eventStampImages?: Express.Multer.File[]
-    
-    },
+    @UploadedFiles() files: FileUploadConfig,
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      if (files.images && files.images.length > 0) {
-        eventDto.images = files.images.map(
-          (img) => `uploads/event/images/${img.filename}`,
-        );
+      // First validate and process files safely
+      const fileProcessing = FileUploadUtils.processFilesSafely(files);
+      if (!fileProcessing.success) {
+        // Files are invalid, they've already been cleaned up
+        throw new BadRequestException(`File validation failed: ${fileProcessing.errors?.join(', ')}`);
       }
 
-      if (files.eventStampImages && files.eventStampImages.length > 0) {
-        eventDto.eventStampImages = files.eventStampImages.map(
-          (img) => `uploads/eventStamps/images/${img.filename}`,
-        );
+      // Process files safely
+      if (fileProcessing.processedFiles?.images && fileProcessing.processedFiles.images.length > 0) {
+        eventDto.images = fileProcessing.processedFiles.images;
       }
 
-    
-      if (files.documents && files.documents.length > 0) {
-        eventDto.documents = files.documents.map(
-          (doc) => `uploads/event/documents/${doc.filename}`,
-        );
+      if (fileProcessing.processedFiles?.eventStampImages && fileProcessing.processedFiles.eventStampImages.length > 0) {
+        eventDto.eventStampImages = fileProcessing.processedFiles.eventStampImages;
+      }
+
+      if (fileProcessing.processedFiles?.documents && fileProcessing.processedFiles.documents.length > 0) {
+        eventDto.documents = fileProcessing.processedFiles.documents;
         
         // Handle document names - get from body or use original filenames
         if (eventDto.documentNames) {
@@ -130,18 +79,17 @@ export class EventController {
           eventDto.documentNames = names;
         } else {
           // Use original filenames as fallback
-          eventDto.documentNames = files.documents.map(
-            (doc) => doc.originalname
-          );
+          const originalNames = files.documents?.map((doc) => doc.originalname) || [];
+          eventDto.documentNames = originalNames;
         }
       }
 
-     // Handle floor plan
-     if (files.floorPlan && files.floorPlan.length > 0) {
-      eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
-    }
+      // Handle floor plan
+      if (fileProcessing.processedFiles?.floorPlan) {
+        eventDto.floorPlan = fileProcessing.processedFiles.floorPlan;
+      }
 
-    const savedEvent = await this.eventService.createEvent(eventDto);
+      const savedEvent = await this.eventService.createEvent(eventDto);
 
     const successResponse: SuccessResponse = {
       success: true,
@@ -153,17 +101,17 @@ export class EventController {
     };
 
     return response.status(HttpStatus.CREATED).json(successResponse);
-    } catch (error: any) {
-      // Clean up uploaded files if error occurs
-      this.cleanupUploadedFiles(files);
-      
-      if (error.code === 'LIMIT_FILE_SIZE') {
-        this.errorHandler.handleFileUploadError(error, 'Event File Upload');
-      }
-      
-      this.errorHandler.logError(error, 'Event creation', req.user?.id);
-      throw error;
-    }
+         } catch (error: any) {
+       // Clean up uploaded files if error occurs
+       FileUploadUtils.cleanupUploadedFiles(files);
+       
+       if (error.code === 'LIMIT_FILE_SIZE') {
+         this.errorHandler.handleFileUploadError(error, 'Event File Upload');
+       }
+       
+       this.errorHandler.logError(error, 'Event creation', req.user?.id);
+       throw error;
+     }
   }
 
   @Get()
@@ -204,7 +152,49 @@ export class EventController {
     }
   }
 
+  @Get('search/global')
+  async globalSearch(
+    @Query() filters: {
+      keyword?: string;
+      location?: string;
+      startDate?: string;
+      endDate?: string;
+      category?: string;
+      limit?: number;
+      page?: number;
+    },
+    @Request() req: any,
+    @Res() response: Response,
+  ) {
+    try {
+      // Use the new globalSearch method that returns organized results
+      const searchResults = await this.eventService.globalSearch(filters);
+      
+      const successResponse: any = {
+        success: true,
+        message: 'Global search completed successfully',
+        data: {
+          events: searchResults.events,
+          speakers: searchResults.speakers,
+          exhibitors: searchResults.exhibitors,
+          categories: searchResults.categories,
+          surveys: searchResults.surveys,
+          totalResults: searchResults.totalResults
+        },
+        metadata: {
+          total: searchResults.totalResults,
+          timestamp: new Date().toISOString(),
+          globalSearch: true,
+          searchKeyword: filters.keyword,
+        },
+      };
 
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Global search', req.user?.id);
+      throw error;
+    }
+  }
 
   @Get(':id')
   async getEventById(
@@ -235,62 +225,11 @@ export class EventController {
 
   @Put('update/:id')
   @Roles(UserRole.Admin)
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'images', maxCount: 10 },
-      { name: 'documents', maxCount: 5 },
-      { name: 'floorPlan', maxCount: 1 }, // Add floor plan field
-      { name: 'eventStampImages', maxCount: 10 }, // Add event stamp images
-    ], {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          if (file.fieldname === 'images') {
-            cb(null, './uploads/event/images');
-          } else if (file.fieldname === 'documents') {
-            cb(null, './uploads/event/documents');
-          } else if (file.fieldname === 'floorPlan') {
-            cb(null, './uploads/event/floorPlan'); // New directory for floor plan
-          } else if (file.fieldname === 'eventStampImages') {
-            cb(null, './uploads/eventStamps/images'); // Event stamp images
-          } else {
-            cb(null, './uploads/event/images'); // Default
-          }
-        },
-        filename: (req, file, cb) => {
-          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
-          cb(null, uniqueSuffix);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-
-      const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-     
-       if (file.fieldname === 'images' && allowedImageTypes.includes(file.mimetype)) {
-        cb(null, true);
-      } else if (file.fieldname === 'documents' && file.mimetype === 'application/pdf') {
-        cb(null, true);
-      } else if (file.fieldname === 'floorPlan' && allowedImageTypes.includes(file.mimetype)) {
-        cb(null, true);
-      } else if (file.fieldname === 'eventStampImages' && allowedImageTypes.includes(file.mimetype)) {
-        cb(null, true);
-      } else {
-        cb(new Error(`Invalid file type. Allowed types for images: JPEG, JPG, PNG, GIF. For documents: PDF only.`), false);
-      }
-    },
-    limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB limit
-    },
-  }),
-)
+  @UseInterceptors(FileUploadUtils.createEventFileInterceptor())
   async updateEvent(
     @Param('id') id: string,
     @Body() eventDto: EventDto,
-    @UploadedFiles() files: { 
-      images?: Express.Multer.File[], 
-      documents?: Express.Multer.File[], 
-      floorPlan?: Express.Multer.File[],
-      eventStampImages?: Express.Multer.File[]
-    },
+    @UploadedFiles() files: FileUploadConfig,
     @Res() response: Response,
     @Request() req: any,
   ) {
@@ -311,13 +250,21 @@ export class EventController {
         allImages.push(...originalImages);
       }
       
-      // Add new uploaded images
-      if (files.images && files.images.length > 0) {
-        const newImages = files.images.map(
-          (img) => `uploads/event/images/${img.filename}`,
-        );
-        allImages.push(...newImages);
-      }
+             // Add new uploaded images
+       if (files.images && files.images.length > 0) {
+         // Validate new images before processing
+         const imageValidation = FileUploadUtils.validateUploadedFiles({ images: files.images });
+         if (!imageValidation.isValid) {
+           // Clean up invalid images immediately
+           FileUploadUtils.cleanupUploadedFiles({ images: files.images });
+           throw new BadRequestException(`Image validation failed: ${imageValidation.errors.join(', ')}`);
+         }
+         
+         const newImages = files.images.map(
+           (img) => `uploads/event/images/${img.filename}`,
+         );
+         allImages.push(...newImages);
+       }
       
       // Set the combined images
       if (allImages.length > 0) {
@@ -344,12 +291,20 @@ export class EventController {
         }
       }
       
-      // Add new uploaded documents
-      if (files.documents && files.documents.length > 0) {
-        const newDocuments = files.documents.map(
-          (doc) => `uploads/event/documents/${doc.filename}`,
-        );
-        allDocuments.push(...newDocuments);
+             // Add new uploaded documents
+       if (files.documents && files.documents.length > 0) {
+         // Validate new documents before processing
+         const documentValidation = FileUploadUtils.validateUploadedFiles({ documents: files.documents });
+         if (!documentValidation.isValid) {
+           // Clean up invalid documents immediately
+           FileUploadUtils.cleanupUploadedFiles({ documents: files.documents });
+           throw new BadRequestException(`Document validation failed: ${documentValidation.errors.join(', ')}`);
+         }
+         
+         const newDocuments = files.documents.map(
+           (doc) => `uploads/event/documents/${doc.filename}`,
+         );
+         allDocuments.push(...newDocuments);
         
         // Handle document names for new uploads - get from body or use original filenames
         if (eventDto.documentNames) {
@@ -373,11 +328,19 @@ export class EventController {
         eventDto.documentNames = allDocumentNames;
       }
 
-      // Handle floor plan - single image only
-      if (files.floorPlan && files.floorPlan.length > 0) {
-        // New floor plan uploaded - replace existing
-        eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
-      } else if (eventDto.originalFloorPlan) {
+             // Handle floor plan - single image only
+       if (files.floorPlan && files.floorPlan.length > 0) {
+         // Validate new floor plan before processing
+         const floorPlanValidation = FileUploadUtils.validateUploadedFiles({ floorPlan: files.floorPlan });
+         if (!floorPlanValidation.isValid) {
+           // Clean up invalid floor plan immediately
+           FileUploadUtils.cleanupUploadedFiles({ floorPlan: files.floorPlan });
+           throw new BadRequestException(`Floor plan validation failed: ${floorPlanValidation.errors.join(', ')}`);
+         }
+         
+         // New floor plan uploaded - replace existing
+         eventDto.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
+       } else if (eventDto.originalFloorPlan) {
         // Keep existing floor plan if no new one uploaded
         eventDto.floorPlan = eventDto.originalFloorPlan;
       }
@@ -393,13 +356,21 @@ export class EventController {
         allEventStampImages.push(...originalEventStampImages);
       }
       
-      // Add new uploaded event stamp images
-      if (files.eventStampImages && files.eventStampImages.length > 0) {
-        const newEventStampImages = files.eventStampImages.map(
-          (img) => `uploads/eventStamps/images/${img.filename}`,
-        );
-        allEventStampImages.push(...newEventStampImages);
-      }
+             // Add new uploaded event stamp images
+       if (files.eventStampImages && files.eventStampImages.length > 0) {
+         // Validate new event stamp images before processing
+         const eventStampValidation = FileUploadUtils.validateUploadedFiles({ eventStampImages: files.eventStampImages });
+         if (!eventStampValidation.isValid) {
+           // Clean up invalid event stamp images immediately
+           FileUploadUtils.cleanupUploadedFiles({ eventStampImages: files.eventStampImages });
+           throw new BadRequestException(`Event stamp image validation failed: ${eventStampValidation.errors.join(', ')}`);
+         }
+         
+         const newEventStampImages = files.eventStampImages.map(
+           (img) => `uploads/eventStamps/images/${img.filename}`,
+         );
+         allEventStampImages.push(...newEventStampImages);
+       }
       
       // Set the combined event stamp images
       if (allEventStampImages.length > 0) {
@@ -418,17 +389,17 @@ export class EventController {
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error: any) {
-      // Clean up uploaded files if error occurs
-      this.cleanupUploadedFiles(files);
-      
-      if (error.code === 'LIMIT_FILE_SIZE') {
-        this.errorHandler.handleFileUploadError(error, 'Event File Upload');
-      }
-      
-      this.errorHandler.logError(error, 'Event update', req.user?.id);
-      throw error;
-    }
+         } catch (error: any) {
+       // Clean up uploaded files if error occurs
+       FileUploadUtils.cleanupUploadedFiles(files);
+       
+       if (error.code === 'LIMIT_FILE_SIZE') {
+         this.errorHandler.handleFileUploadError(error, 'Event File Upload');
+       }
+       
+       this.errorHandler.logError(error, 'Event update', req.user?.id);
+       throw error;
+     }
   }
 
   @Delete('delete/:id')
@@ -607,6 +578,7 @@ export class EventController {
     }
   }
 
+
   // Remove floor plan
   @Delete('floor-plan/:id')
   @Roles(UserRole.Admin)
@@ -646,39 +618,5 @@ export class EventController {
     }
   }
 
-  // Helper method to clean up uploaded files
-  private cleanupUploadedFiles(files: any) {
-    if (files.images) {
-      files.images.forEach((file: any) => {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'images', file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
-      });
-    }
-    if (files.documents) {
-      files.documents.forEach((file: any) => {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'documents', file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
-      });
-    }
-    if (files.floorPlan) {
-      files.floorPlan.forEach((file: any) => {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'event', 'floorPlan', file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
-      });
-    }
-    if (files.eventStampImages) {
-      files.eventStampImages.forEach((file: any) => {
-        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'eventStamps', 'images', file.filename);
-        if (fs.existsSync(uploadedPath)) {
-          fs.unlinkSync(uploadedPath);
-        }
-      });
-    }
-  }
+
 }

@@ -1,15 +1,11 @@
 // src/services/event.service.ts
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
 import { Event, EventExhibitor } from './event.entity';
 import { EventBooth } from './event-booth.entity';
+import { EventAgenda } from '../agenda/agenda.entity';
 import { Between, Not, In } from 'typeorm';
 import { UserEntity, UserRole } from '../user/users.entity';
 import { EventSpeaker, EventCategory } from './event-speaker.entity';
@@ -20,6 +16,7 @@ import { getEventColor } from 'utils/event-color.util';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
+import { Survey } from '../survey/survey.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
   ResourceNotFoundException,
@@ -29,8 +26,15 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from '../utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { EmailService } from '../service/email.service';
 import { EmailTemplateUtils } from '../utils/email-templates.utils';
+import { EmailUtils } from '../utils/email.utils';
+import { EventValidationUtils } from '../utils/validateEvents';
+import {
+  EventQueryBuilderUtils,
+  GlobalSearchUtils,
+} from '../utils/searchEvent';
 
 @Injectable()
 export class EventService {
@@ -55,6 +59,9 @@ export class EventService {
     private registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(FavoriteEvent)
     private favoriteEventRepository: Repository<FavoriteEvent>,
+    @InjectRepository(Survey)
+    private surveyRepository: Repository<Survey>,
+    @InjectRepository(EventAgenda)
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
@@ -71,86 +78,10 @@ export class EventService {
       }
 
       // Validate all IDs before creating the event
-      const validationErrors = [];
+      await this.validateEventReferences(eventDto);
 
-      // Validate category IDs if provided
-      if (eventDto.categoryIds) {
-        const categoryIdsArray = eventDto.categoryIds.split(',');
-        for (const categoryId of categoryIdsArray) {
-          const categoryExists = await this.categoryRepository.findOne({
-            where: { id: categoryId.trim() },
-          });
-          if (!categoryExists) {
-            validationErrors.push(
-              `Category with ID "${categoryId}" does not exist`,
-            );
-          }
-        }
-      }
-
-      // Validate speaker IDs if provided
-      if (eventDto.speakerIds) {
-        const speakerIdsArray = eventDto.speakerIds.split(',');
-        for (const speakerId of speakerIdsArray) {
-          const speakerExists = await this.userRepository.findOne({
-            where: { id: speakerId.trim(), role: UserRole.Speaker },
-          });
-          if (!speakerExists) {
-            validationErrors.push(
-              `Speaker with ID "${speakerId}" does not exist`,
-            );
-          }
-        }
-      }
-
-      // Validate exhibitor IDs if provided
-      if (eventDto.exhibitorIds) {
-        const exhibitorIdsArray = eventDto.exhibitorIds.split(',');
-        for (const exhibitorId of exhibitorIdsArray) {
-          const exhibitorExists = await this.exhibitorRepository.findOne({
-            where: { id: exhibitorId.trim() },
-          });
-          if (!exhibitorExists) {
-            validationErrors.push(
-              `Exhibitor with ID "${exhibitorId}" does not exist`,
-            );
-          }
-        }
-      }
-
-      // If there are validation errors, throw them
-      if (validationErrors.length > 0) {
-        throw new ValidationException(
-          'Invalid Category, Speaker, or Exhibitor references',
-          validationErrors,
-        );
-      }
-
-      const today = new Date();
-      const startDateTime = new Date(`${eventDto.startDate}T${eventDto.startTime}`);
-      const endDateTime = new Date(`${eventDto.endDate}T${eventDto.endTime}`);
-
-      if (startDateTime < today)
-        throw new ValidationException('Start date and time cannot be in the past');
-
-      if (endDateTime <= startDateTime)
-        throw new ValidationException('End date and time must be after start date and time');
-
-      // Additional validation for same day events
-      const startDateOnly = new Date(startDateTime.toDateString());
-      const endDateOnly = new Date(endDateTime.toDateString());
-
-      if (startDateOnly.getTime() === endDateOnly.getTime()) {
-        const startTimeInMinutes = startDateTime.getHours() * 60 + startDateTime.getMinutes();
-        const endTimeInMinutes = endDateTime.getHours() * 60 + endDateTime.getMinutes();
-        
-        if (endTimeInMinutes <= startTimeInMinutes) {
-          throw new ValidationException(
-            'For events on the same day, end time must be after start time. ' +
-            'If you want the event to end the next day, please set the end date to the next day.'
-          );
-        }
-      }
+      // Validate event dates
+      this.validateEventDates(eventDto);
 
       if (eventDto.location) {
         const conflictingEvents = await this.eventRepository.find({
@@ -173,18 +104,8 @@ export class EventService {
         }
       }
 
-      if (
-        eventDto.latitude &&
-        (eventDto.latitude < -90 || eventDto.latitude > 90)
-      ) {
-        throw new ValidationException('Invalid latitude value');
-      }
-      if (
-        eventDto.longitude &&
-        (eventDto.longitude < -180 || eventDto.longitude > 180)
-      ) {
-        throw new ValidationException('Invalid longitude value');
-      }
+      // Validate coordinates
+      this.validateCoordinates(eventDto);
 
       // Create and save the event
       const event = await this.eventRepository.create(eventDto);
@@ -239,32 +160,32 @@ export class EventService {
             eventBooth.uniqueCode = this.generateUniqueCode();
             await this.eventBoothRepository.save(eventBooth);
 
-                         // Send email to exhibitor if email exists
-             if (exhibitor && exhibitor.email) {
-               await this.sendBoothCodeEmail(
-                 exhibitor.email,
-                 eventBooth.uniqueCode,
-                 savedEvent.name,
-                 this.formatDateForEmail(savedEvent.startDate),
-                 (savedEvent.venue || savedEvent.location) || 'To be announced',
-               );
-             }
+            // Send email to exhibitor if email exists
+            if (exhibitor && exhibitor.email) {
+              await this.sendBoothCodeEmail(
+                exhibitor.email,
+                eventBooth.uniqueCode,
+                savedEvent.name,
+                this.formatDateForEmail(savedEvent.startDate),
+                savedEvent.venue || savedEvent.location || 'To be announced',
+              );
+            }
           }),
         );
       }
 
       return savedEvent;
     } catch (error) {
+      console.log({ error });
       if (
         error instanceof DuplicateResourceException ||
         error instanceof ValidationException
       ) {
         throw error;
       }
-      this.errorHandler.handleDatabaseError(error, 'Event creation');
+      throw error;
     }
   }
-
 
   async getAllEvents(
     filters: {
@@ -281,78 +202,32 @@ export class EventService {
     try {
       // Validate EventType enum if provided
       if (filters.type) {
-        const validTypes = Object.values(EventType);
-        if (!validTypes.includes(filters.type)) {
-          throw new ValidationException(
-            `Invalid event type. Valid types are: ${validTypes.join(', ')}`,
-          );
-        }
-      }
-
-      const queryBuilder = this.eventRepository
-        .createQueryBuilder('event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
-        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
-        .leftJoinAndSelect('event.category', 'eventCategory')
-        .leftJoinAndSelect('eventCategory.category', 'category')
-        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
-        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-
-        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-        .leftJoinAndSelect('event.galleries', 'galleries');
-
-      // First, always filter for upcoming events if category is provided
-      if (filters.category) {
-        const today = new Date();
-        queryBuilder.andWhere('event.startDate >= :today', { today: today });
-      }
-
-      // Keyword search
-      if (filters.keyword) {
-        const keyword = filters.keyword.toLowerCase();
-        queryBuilder.where(
-          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
-          { keyword: `%${keyword}%` },
+        EventValidationUtils.validateEventType(
+          filters.type,
+          Object.values(EventType),
         );
       }
 
-      // Date range filter - one line code to consider both start and end date
-      if (filters.startDate && filters.endDate) {
-        queryBuilder.andWhere(
-          'event.startDate >= :startDate AND event.endDate <= :endDate',
-          {
-            startDate: filters.startDate,
-            endDate: filters.endDate,
-          },
-        );
-      }
+      const queryBuilder = this.eventRepository.createQueryBuilder('event');
 
-      // Type filter
-      if (filters.type) {
-        queryBuilder.andWhere('event.type = :type', { type: filters.type });
-      }
-
-      // Category filter - using TypeORM's built-in join approach
-      if (filters.category) {
-        const categoryName = filters.category.toLowerCase();
-        queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
-          categoryName: `%${categoryName}%`,
-        });
-      }
-
-      if (filters.upcoming) {
-        const today = new Date();
-        queryBuilder.andWhere('event.startDate >= :today', { today: today });
-      }
+      // Build complete search query using the utility
+      EventQueryBuilderUtils.buildSearchQuery(queryBuilder, {
+        keyword: filters.keyword,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        type: filters.type,
+        upcoming: filters.upcoming,
+        category: filters.category,
+      });
 
       const events = await queryBuilder.getMany();
 
-  
       // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
-          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
+          const surveyDetails =
+            await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (event.documents && event.documentNames) {
@@ -404,7 +279,10 @@ export class EventService {
           // Find which fields matched the keyword search
           let matchedFields: string[] = [];
           if (filters.keyword) {
-            matchedFields = this.findMatchedFields(event, filters.keyword);
+            matchedFields = GlobalSearchUtils.findMatchedFields(
+              event,
+              filters.keyword,
+            );
           }
 
           const { exhibitorDescription, ...eventFiltered } = eventData;
@@ -412,7 +290,9 @@ export class EventService {
           return {
             ...eventFiltered,
             color: getEventColor(event.type),
-            speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
+            speakersData: eventSpeakers.map((es) =>
+              UserUtils.getBasicSpeakerInfo(es.speaker),
+            ),
             categoriesData: category?.map((ec) => ec.category) || [],
             documents: formattedDocuments,
             eventStamps: {
@@ -423,7 +303,7 @@ export class EventService {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
                 return {
-                  ...ee.exhibitor,
+                  ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
                 };
               }),
@@ -445,6 +325,235 @@ export class EventService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Events retrieval');
+    }
+  }
+
+  // New global search method that returns organized results by entity type
+  async globalSearch(filters: {
+    keyword?: string;
+    location?: string;
+    startDate?: string;
+    endDate?: string;
+    category?: string;
+    limit?: number;
+    page?: number;
+  }) {
+    try {
+      const { keyword, limit = 20, page = 1 } = filters;
+      const offset = (page - 1) * limit;
+
+      if (!keyword) {
+        throw new ValidationException('Keyword is required for global search');
+      }
+
+      const keywordLower = keyword.toLowerCase();
+      const results: any = {
+        events: [],
+        speakers: [],
+        exhibitors: [],
+        categories: [],
+        surveys: [],
+        totalResults: 0,
+      };
+
+      // Search Events
+      const eventQuery = this.eventRepository.createQueryBuilder('event');
+
+      EventQueryBuilderUtils.buildGlobalEventSearchQuery(eventQuery, keyword, {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        location: filters.location,
+      });
+
+      const events = await eventQuery.limit(limit).offset(offset).getMany();
+
+      // Format events with only essential data
+      results.events = events.map((event) => ({
+        id: event.id,
+        name: event.name,
+        description: event.description,
+        startDate: event.startDate,
+        startTime: event.startTime,
+        endDate: event.endDate,
+        endTime: event.endTime,
+        location: event.location,
+        venue: event.venue,
+        type: event.type,
+        price: event.price,
+        currency: event.currency,
+        images: event.images,
+        color: getEventColor(event.type),
+        matchedFields: GlobalSearchUtils.getMatchedEventFields(
+          event,
+          keywordLower,
+        ),
+      }));
+
+      // Search Speakers
+      const speakerQuery = this.userRepository.createQueryBuilder('user');
+
+      EventQueryBuilderUtils.buildSpeakerSearchQuery(
+        speakerQuery,
+        keyword,
+        limit,
+        offset,
+      );
+
+      const speakers = await speakerQuery.getMany();
+
+      // Format speakers with only essential data
+      results.speakers = speakers.map((speaker) => ({
+        id: speaker.id,
+        firstName: speaker.firstName,
+        lastName: speaker.lastName,
+        email: speaker.email,
+        position: speaker.speakerProfile?.position || '',
+        companyName: speaker.speakerProfile?.companyName || '',
+        profilePicture: speaker.profilePicture,
+        matchedFields: GlobalSearchUtils.getMatchedSpeakerFields(
+          speaker,
+          keywordLower,
+        ),
+        events:
+          speaker.eventSpeakers
+            ?.map((es) =>
+              es.event
+                ? {
+                    id: es.event.id,
+                    name: es.event.name,
+                    startDate: es.event.startDate,
+                    location: es.event.location,
+                  }
+                : null,
+            )
+            .filter(Boolean) || [],
+      }));
+
+      // Search Exhibitors
+      const exhibitorQuery =
+        this.exhibitorRepository.createQueryBuilder('exhibitor');
+
+      EventQueryBuilderUtils.buildExhibitorSearchQuery(
+        exhibitorQuery,
+        keyword,
+        limit,
+        offset,
+      );
+
+      const exhibitors = await exhibitorQuery.getMany();
+
+      // Format exhibitors with only essential data
+      results.exhibitors = exhibitors.map((exhibitor) => ({
+        ...ExhibitorUtils.getBasicExhibitorInfo(exhibitor),
+        matchedFields: GlobalSearchUtils.getMatchedExhibitorFields(
+          exhibitor,
+          keywordLower,
+        ),
+        events:
+          exhibitor.eventExhibitors
+            ?.map((ee) =>
+              ee.event
+                ? {
+                    id: ee.event.id,
+                    name: ee.event.name,
+                    startDate: ee.event.startDate,
+                    location: ee.event.location,
+                  }
+                : null,
+            )
+            .filter(Boolean) || [],
+      }));
+
+      // Search Categories - using EventCategory as the base entity
+      const categoryQuery =
+        this.eventCategoryRepository.createQueryBuilder('eventCategory');
+
+      EventQueryBuilderUtils.buildCategorySearchQuery(
+        categoryQuery,
+        keyword,
+        limit,
+        offset,
+      );
+
+      const eventCategories = await categoryQuery.getMany();
+
+      // Format categories with only essential data
+      results.categories = eventCategories
+        .filter(
+          (eventCategory) => eventCategory.category && eventCategory.event,
+        )
+        .map((eventCategory: any) => ({
+          id: eventCategory.category!.id,
+          name: eventCategory.category!.name,
+          description: eventCategory.category!.description,
+          status: eventCategory.category!.status,
+          matchedFields: GlobalSearchUtils.getMatchedCategoryFields(
+            eventCategory.category!,
+            keywordLower,
+          ),
+          events: [
+            {
+              id: eventCategory.event!.id,
+              name: eventCategory.event!.name,
+              startDate: eventCategory.event!.startDate,
+              location: eventCategory.event!.location,
+            },
+          ],
+        }));
+
+      // Search Surveys
+      const surveyQuery = this.surveyRepository.createQueryBuilder('survey');
+
+      EventQueryBuilderUtils.buildSurveySearchQuery(
+        surveyQuery,
+        keyword,
+        {
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        },
+        limit,
+        offset,
+      );
+
+      const surveys = await surveyQuery.getMany();
+
+      // Format surveys with only essential data
+      results.surveys = surveys.map((survey) => ({
+        id: survey.id,
+        title: survey.title,
+        startDate: survey.startDate,
+        startTime: survey.startTime,
+        endDate: survey.endDate,
+        endTime: survey.endTime,
+        isActive: survey.isActive,
+        matchedFields: GlobalSearchUtils.getMatchedSurveyFields(
+          survey,
+          keywordLower,
+        ),
+        event: survey.event
+          ? {
+              id: survey.event.id,
+              name: survey.event.name,
+              startDate: survey.event.startDate,
+              location: survey.event.location,
+            }
+          : null,
+      }));
+
+      // Calculate total results
+      results.totalResults =
+        results.events.length +
+        results.speakers.length +
+        results.exhibitors.length +
+        results.categories.length +
+        results.surveys.length;
+
+      return results;
+    } catch (error) {
+      if (error instanceof ValidationException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Global search');
     }
   }
 
@@ -478,19 +587,15 @@ export class EventService {
 
   async getEventById(id: string, userId?: string, userRole?: string) {
     try {
-      const event = await this.eventRepository
-        .createQueryBuilder('event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
-        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
-        .leftJoinAndSelect('event.category', 'eventCategory')
-        .leftJoinAndSelect('eventCategory.category', 'category')
-        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
-        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+      const queryBuilder = this.eventRepository.createQueryBuilder('event');
 
-        .leftJoinAndSelect('event.galleries', 'galleries')
-        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-        .where('event.id = :id', { id })
-        .getOne();
+      // Use the utility for consistent query building
+      EventQueryBuilderUtils.buildBaseQuery(queryBuilder);
+
+      // Add the specific ID filter
+      queryBuilder.where('event.id = :id', { id });
+
+      const event = await queryBuilder.getOne();
 
       if (!event) {
         throw new ResourceNotFoundException('Event', id);
@@ -500,7 +605,8 @@ export class EventService {
       const attendanceCount = await this.getEventAttendanceCount(id);
 
       // Get survey details for this event
-      const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(id);
+      const surveyDetails =
+        await this.surveyUtils.getSurveyDetailsByEventId(id);
 
       // Check if event is favorited by user
       let isFavorite = false;
@@ -511,7 +617,6 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
- 
       // Check if user has registered for this event
       let isRegistered = false;
       if (userId) {
@@ -552,7 +657,9 @@ export class EventService {
       return {
         ...eventFiltered,
         color: getEventColor(event.type),
-        speakers: eventSpeakers.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)),
+        speakers: eventSpeakers.map((es) =>
+          UserUtils.getBasicSpeakerInfo(es.speaker),
+        ),
         categories: category?.map((ec) => ec.category) || [],
         documents: formattedDocuments, // New formatted documents
         eventStamps: {
@@ -563,7 +670,7 @@ export class EventService {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: eventExhibitors.map((ee) => {
             return {
-              ...ee.exhibitor,
+              ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
               promotionalOffers: ee.exhibitor.promotionalOffers || [],
             };
           }),
@@ -594,12 +701,16 @@ export class EventService {
 
       // Check if name is being updated and if it conflicts
       if (eventDto.name && eventDto.name !== event.name) {
-        const existingEvent = await this.eventRepository.findOne({
-          where: { name: eventDto.name, id: Not(id) },
-        });
-        if (existingEvent) {
-          throw new DuplicateResourceException(`Event ${eventDto.name}`);
-        }
+        await EventValidationUtils.validateEventNameUniqueness(
+          eventDto.name,
+          async (name: string, excludeId?: string) => {
+            const existingEvent = await this.eventRepository.findOne({
+              where: { name, id: Not(excludeId || id) },
+            });
+            return !existingEvent;
+          },
+          id,
+        );
       }
 
       // Validate all IDs if provided
@@ -768,37 +879,6 @@ export class EventService {
     }
   }
 
-  // Helper methods
-  private findMatchedFields(event: any, keyword: string): string[] {
-    const matchedFields: string[] = [];
-    const keywordLower = keyword.toLowerCase();
-
-    const fieldsToCheck = [
-      'name',
-      'description',
-      'venue',
-      'location',
-      'country',
-      'type',
-      'price',
-      'currency',
-      'latitude',
-      'longitude',
-    ];
-
-    fieldsToCheck.forEach((field) => {
-      if (
-        event[field] &&
-        event[field].toString().toLowerCase().includes(keywordLower)
-      ) {
-        matchedFields.push(field);
-      }
-    });
-
-    return matchedFields;
-  }
-
-
   private async updateEventAssociations(
     eventId: string,
     eventDto: Partial<EventDto>,
@@ -838,24 +918,29 @@ export class EventService {
     // Update exhibitor associations if provided
     if (eventDto.exhibitorIds !== undefined) {
       // Get current event details for email
-      const currentEvent = await this.eventRepository.findOne({ where: { id: eventId } });
-      
+      const currentEvent = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
       // Get existing exhibitor IDs for this event
       const existingExhibitorIds = await this.eventExhibitorRepository.find({
         where: { eventId },
         select: ['exhibitorId'],
       });
-      const existingExhibitorIdSet = new Set(existingExhibitorIds.map(ee => ee.exhibitorId));
-      
+      const existingExhibitorIdSet = new Set(
+        existingExhibitorIds.map((ee) => ee.exhibitorId),
+      );
+
       if (eventDto.exhibitorIds) {
         const newExhibitorIdsArray = eventDto.exhibitorIds.split(',');
-        
+
         // Process each exhibitor ID
         await Promise.all(
           newExhibitorIdsArray.map(async (exhibitorId) => {
             const trimmedExhibitorId = exhibitorId.trim();
-            const isNewExhibitor = !existingExhibitorIdSet.has(trimmedExhibitorId);
-            
+            const isNewExhibitor =
+              !existingExhibitorIdSet.has(trimmedExhibitorId);
+
             // Get exhibitor details
             const exhibitor = await this.exhibitorRepository.findOne({
               where: { id: trimmedExhibitorId },
@@ -882,211 +967,168 @@ export class EventService {
                   eventBooth.uniqueCode,
                   currentEvent.name,
                   this.formatDateForEmail(currentEvent.startDate),
-                  (currentEvent.venue || currentEvent.location) || 'To be announced',
+                  currentEvent.venue ||
+                    currentEvent.location ||
+                    'To be announced',
                 );
               }
             }
             // If exhibitor already exists, no need to recreate booth or send email
           }),
         );
-        
-                 // Remove exhibitors who are no longer in the list
-         const newExhibitorIdSet = new Set(newExhibitorIdsArray.map(id => id.trim()));
-         const exhibitorsToRemove = existingExhibitorIds.filter(
-           ee => ee.exhibitorId && !newExhibitorIdSet.has(ee.exhibitorId)
-         );
-         
-         if (exhibitorsToRemove.length > 0) {
-           // Get booth details and exhibitor information for removal emails
-           const boothsToRemove = await this.eventBoothRepository.find({
-             where: {
-               eventId,
-               exhibitorId: In(exhibitorsToRemove.map(ee => ee.exhibitorId!).filter(id => id !== undefined)),
-             },
-             relations: ['exhibitor'],
-           });
 
-           // Send removal emails before deleting records
-           await Promise.all(
-             boothsToRemove.map(async (booth) => {
-               if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
-                 await this.sendBoothRemovalEmail(
-                   booth.exhibitor.email,
-                   booth.uniqueCode,
-                   currentEvent.name,
-                   this.formatDateForEmail(currentEvent.startDate),
-                   (currentEvent.venue || currentEvent.location) || 'To be announced',
-                 );
-               }
-             }),
-           );
+        // Remove exhibitors who are no longer in the list
+        const newExhibitorIdSet = new Set(
+          newExhibitorIdsArray.map((id) => id.trim()),
+        );
+        const exhibitorsToRemove = existingExhibitorIds.filter(
+          (ee) => ee.exhibitorId && !newExhibitorIdSet.has(ee.exhibitorId),
+        );
 
-           const exhibitorIdsToRemove = exhibitorsToRemove
-             .map(ee => ee.exhibitorId)
-             .filter((id): id is string => id !== undefined);
-           
-           if (exhibitorIdsToRemove.length > 0) {
-             // Delete EventBooth records for removed exhibitors
-             await this.eventBoothRepository.delete({
-               eventId,
-               exhibitorId: In(exhibitorIdsToRemove),
-             });
-             
-             // Delete EventExhibitor records for removed exhibitors
-             await this.eventExhibitorRepository.delete({
-               eventId,
-               exhibitorId: In(exhibitorIdsToRemove),
-             });
-           }
-         }
-             } else {
-         // If no exhibitor IDs provided, remove all existing exhibitors
-         // Get booth details and exhibitor information for removal emails
-         const allBoothsToRemove = await this.eventBoothRepository.find({
-           where: { eventId },
-           relations: ['exhibitor'],
-         });
+        if (exhibitorsToRemove.length > 0) {
+          // Get booth details and exhibitor information for removal emails
+          const boothsToRemove = await this.eventBoothRepository.find({
+            where: {
+              eventId,
+              exhibitorId: In(
+                exhibitorsToRemove
+                  .map((ee) => ee.exhibitorId!)
+                  .filter((id) => id !== undefined),
+              ),
+            },
+            relations: ['exhibitor'],
+          });
 
-         // Send removal emails before deleting records
-         await Promise.all(
-           allBoothsToRemove.map(async (booth) => {
-             if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
-               await this.sendBoothRemovalEmail(
-                 booth.exhibitor.email,
-                 booth.uniqueCode,
-                 currentEvent.name,
-                 this.formatDateForEmail(currentEvent.startDate),
-                 (currentEvent.venue || currentEvent.location) || 'To be announced',
-               );
-             }
-           }),
-         );
+          // Send removal emails before deleting records
+          await Promise.all(
+            boothsToRemove.map(async (booth) => {
+              if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
+                await this.sendBoothRemovalEmail(
+                  booth.exhibitor.email,
+                  booth.uniqueCode,
+                  currentEvent.name,
+                  this.formatDateForEmail(currentEvent.startDate),
+                  currentEvent.venue ||
+                    currentEvent.location ||
+                    'To be announced',
+                );
+              }
+            }),
+          );
 
-         // Delete all EventBooth and EventExhibitor records
-         await this.eventBoothRepository.delete({ eventId });
-         await this.eventExhibitorRepository.delete({ eventId });
-       }
+          const exhibitorIdsToRemove = exhibitorsToRemove
+            .map((ee) => ee.exhibitorId)
+            .filter((id): id is string => id !== undefined);
+
+          if (exhibitorIdsToRemove.length > 0) {
+            // Delete EventBooth records for removed exhibitors
+            await this.eventBoothRepository.delete({
+              eventId,
+              exhibitorId: In(exhibitorIdsToRemove),
+            });
+
+            // Delete EventExhibitor records for removed exhibitors
+            await this.eventExhibitorRepository.delete({
+              eventId,
+              exhibitorId: In(exhibitorIdsToRemove),
+            });
+          }
+        }
+      } else {
+        // If no exhibitor IDs provided, remove all existing exhibitors
+        // Get booth details and exhibitor information for removal emails
+        const allBoothsToRemove = await this.eventBoothRepository.find({
+          where: { eventId },
+          relations: ['exhibitor'],
+        });
+
+        // Send removal emails before deleting records
+        await Promise.all(
+          allBoothsToRemove.map(async (booth) => {
+            if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
+              await this.sendBoothRemovalEmail(
+                booth.exhibitor.email,
+                booth.uniqueCode,
+                currentEvent.name,
+                this.formatDateForEmail(currentEvent.startDate),
+                currentEvent.venue ||
+                  currentEvent.location ||
+                  'To be announced',
+              );
+            }
+          }),
+        );
+
+        // Delete all EventBooth and EventExhibitor records
+        await this.eventBoothRepository.delete({ eventId });
+        await this.eventExhibitorRepository.delete({ eventId });
+      }
     }
   }
 
   private async validateEventReferences(eventDto: Partial<EventDto>) {
-    const validationErrors = [];
-
-    // Validate category IDs if provided
-    if (eventDto.categoryIds) {
-      const categoryIdsArray = eventDto.categoryIds.split(',');
-      for (const categoryId of categoryIdsArray) {
+    await EventValidationUtils.validateEventReferences(eventDto, {
+      validateCategory: async (id: string) => {
         const categoryExists = await this.categoryRepository.findOne({
-          where: { id: categoryId.trim() },
+          where: { id: id.trim() },
         });
-        if (!categoryExists) {
-          validationErrors.push(
-            `Category with ID "${categoryId}" does not exist`,
-          );
-        }
-      }
-    }
-
-    // Similar validations for speakers and exhibitors...
-    if (validationErrors.length > 0) {
-      throw new ValidationException('Invalid references', validationErrors);
-    }
+        return !!categoryExists;
+      },
+      validateSpeaker: async (id: string) => {
+        const speakerExists = await this.userRepository.findOne({
+          where: { id: id.trim(), role: UserRole.Speaker },
+        });
+        return !!speakerExists;
+      },
+      validateExhibitor: async (id: string) => {
+        const exhibitorExists = await this.exhibitorRepository.findOne({
+          where: { id: id.trim() },
+        });
+        return !!exhibitorExists;
+      },
+    });
   }
 
   private validateEventDates(
     eventDto: Partial<EventDto>,
     existingEvent?: Event,
   ) {
-    const today = new Date();
-    
-    // Get start and end dates with times
-    const startDateTime = eventDto.startDate && eventDto.startTime
-      ? new Date(`${eventDto.startDate}T${eventDto.startTime}`)
-      : existingEvent
-        ? new Date(`${existingEvent.startDate}T${existingEvent.startTime}`)
-        : null;
-        
-    const endDateTime = eventDto.endDate && eventDto.endTime
-      ? new Date(`${eventDto.endDate}T${eventDto.endTime}`)
-      : existingEvent
-        ? new Date(`${existingEvent.endDate}T${existingEvent.endTime}`)
-        : null;
-
-    if (startDateTime && startDateTime < today) {
-      throw new ValidationException('Start date and time cannot be in the past');
-    }
-    
-    if (startDateTime && endDateTime && endDateTime <= startDateTime) {
-      throw new ValidationException('End date and time must be after start date and time');
-    }
-    
-    // Additional validation for same day events with AM/PM time conflicts
-    if (startDateTime && endDateTime) {
-      const startDateOnly = new Date(startDateTime.toDateString());
-      const endDateOnly = new Date(endDateTime.toDateString());
-      
-      // If dates are the same, check if end time is before start time
-      if (startDateOnly.getTime() === endDateOnly.getTime()) {
-        const startTimeInMinutes = startDateTime.getHours() * 60 + startDateTime.getMinutes();
-        const endTimeInMinutes = endDateTime.getHours() * 60 + endDateTime.getMinutes();
-        
-        if (endTimeInMinutes <= startTimeInMinutes) {
-          throw new ValidationException(
-            'For events on the same day, end time must be after start time. ' +
-            'If you want the event to end the next day, please set the end date to the next day.'
-          );
-        }
-      }
-    }
+    EventValidationUtils.validateEventDates(eventDto, existingEvent);
   }
 
   private async checkLocationConflict(
     eventDto: Partial<EventDto>,
     excludeId?: string,
   ) {
-    if (!eventDto.startDate || !eventDto.endDate) {
-      throw new ValidationException('Start date and end date must be provided');
-    }
+    await EventValidationUtils.validateLocationConflict(
+      eventDto,
+      async (
+        location: string,
+        startDate: string,
+        endDate: string,
+        excludeId?: string,
+      ) => {
+        const whereClause: any = {
+          location: location,
+          startDate: Between(new Date(startDate), new Date(endDate)),
+          endDate: Between(new Date(startDate), new Date(endDate)),
+        };
 
-    const whereClause: any = {
-      location: eventDto.location,
-      startDate: Between(
-        new Date(eventDto.startDate),
-        new Date(eventDto.endDate),
-      ),
-      endDate: Between(
-        new Date(eventDto.startDate),
-        new Date(eventDto.endDate),
-      ),
-    };
+        if (excludeId) {
+          whereClause.id = Not(excludeId);
+        }
 
-    if (excludeId) {
-      whereClause.id = Not(excludeId);
-    }
-
-    const conflictingEvents = await this.eventRepository.find({
-      where: whereClause,
-    });
-    if (conflictingEvents.length > 0) {
-      throw new ValidationException(
-        'Another event is already scheduled at this location during these dates and times',
-      );
-    }
+        const conflictingEvents = await this.eventRepository.find({
+          where: whereClause,
+        });
+        return conflictingEvents.length > 0;
+      },
+      excludeId,
+    );
   }
 
   private validateCoordinates(eventDto: Partial<EventDto>) {
-    if (
-      eventDto.latitude &&
-      (eventDto.latitude < -90 || eventDto.latitude > 90)
-    ) {
-      throw new ValidationException('Invalid latitude value');
-    }
-    if (
-      eventDto.longitude &&
-      (eventDto.longitude < -180 || eventDto.longitude > 180)
-    ) {
-      throw new ValidationException('Invalid longitude value');
-    }
+    EventValidationUtils.validateCoordinates(eventDto);
   }
 
   // Get event booths by event ID
@@ -1098,7 +1140,7 @@ export class EventService {
       });
 
       // Format the response to include exhibitor details
-      return eventBooths.map(eventBooth => ({
+      return eventBooths.map((eventBooth) => ({
         id: eventBooth.id,
         eventId: eventBooth.eventId,
         exhibitorId: eventBooth.exhibitorId,
@@ -1106,20 +1148,18 @@ export class EventService {
         isActive: eventBooth.isActive,
         createdAt: eventBooth.createdAt,
         updatedAt: eventBooth.updatedAt,
-        exhibitor: eventBooth.exhibitor ? {
-          id: eventBooth.exhibitor.id,
-          companyName: eventBooth.exhibitor.companyName,
-          companyDescription: eventBooth.exhibitor.companyDescription,
-          logo: eventBooth.exhibitor.logo,
-          email: eventBooth.exhibitor.email,
-          mobile: eventBooth.exhibitor.mobile,
-          uen: eventBooth.exhibitor.uen,
-        } : null,
+        exhibitor: eventBooth.exhibitor
+          ? {
+              ...ExhibitorUtils.getBasicExhibitorInfo(eventBooth.exhibitor),
+            }
+          : null,
       }));
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Event booths retrieval');
     }
   }
+
+  //----------------------------------Email Utils----------------------------------
 
   // Send booth code email to exhibitor
   private async sendBoothCodeEmail(
@@ -1129,22 +1169,15 @@ export class EventService {
     eventStartDate: string,
     eventVenue: string,
   ): Promise<void> {
-    try {
-      const subject = 'Your Event Booth Access Code';
-      const html = EmailTemplateUtils.generateBoothCodeEmail(
-        uniqueCode,
-        eventName,
-        eventStartDate,
-        eventVenue,
-      );
-
-      await this.emailService.sendEmail(exhibitorEmail, subject, html);
-      console.log(`Booth code email sent to ${exhibitorEmail} for event: ${eventName}`);
-    } catch (error) {
-      console.error('Failed to send booth code email:', error);
-      // Don't throw error as email sending failure shouldn't break the main flow
-      this.errorHandler.logError(error, 'Booth code email sending', undefined);
-    }
+    await EmailUtils.sendBoothCodeEmail(
+      this.emailService,
+      this.errorHandler,
+      exhibitorEmail,
+      uniqueCode,
+      eventName,
+      eventStartDate,
+      eventVenue,
+    );
   }
 
   // Send booth removal email to exhibitor
@@ -1155,52 +1188,25 @@ export class EventService {
     eventStartDate: string,
     eventVenue: string,
   ): Promise<void> {
-    try {
-      const subject = 'Booth Access Revoked - Event Update';
-      const html = EmailTemplateUtils.generateBoothRemovalEmail(
-        eventName,
-        eventStartDate,
-        eventVenue,
-        uniqueCode,
-      );
-
-      await this.emailService.sendEmail(exhibitorEmail, subject, html);
-      console.log(`Booth removal email sent to ${exhibitorEmail} for event: ${eventName}`);
-    } catch (error) {
-      console.error('Failed to send booth removal email:', error);
-      // Don't throw error as email sending failure shouldn't break the main flow
-      this.errorHandler.logError(error, 'Booth removal email sending', undefined);
-    }
+    await EmailUtils.sendBoothRemovalEmail(
+      this.emailService,
+      this.errorHandler,
+      exhibitorEmail,
+      uniqueCode,
+      eventName,
+      eventStartDate,
+      eventVenue,
+    );
   }
 
   // Generate unique code for event booth
   private generateUniqueCode(): string {
-    const timestamp = Date.now().toString(36);
-    const randomStr = Math.random().toString(36).substring(2, 8);
-    return `EB${timestamp}${randomStr}`.toUpperCase();
+    return EmailUtils.generateUniqueCode();
   }
 
   // Format date for email display - handles both Date objects and string dates
   private formatDateForEmail(date: Date | string): string {
-    if (date instanceof Date) {
-      return date.toDateString();
-    }
-    
-    // If it's a string, try to parse it and format it
-    if (typeof date === 'string') {
-      try {
-        const parsedDate = new Date(date);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toDateString();
-        }
-      } catch (error) {
-        // If parsing fails, return the original string
-        console.warn('Failed to parse date string:', date);
-      }
-      return date; // Return original string if parsing fails
-    }
-    
-    return 'Date not available';
+    return EmailUtils.formatDateForEmail(date);
   }
 
   private deleteEventFiles(event: Event) {
@@ -1248,5 +1254,5 @@ export class EventService {
     }
   }
 
-
+  //----------------------------------Email Utils----------------------------------
 }

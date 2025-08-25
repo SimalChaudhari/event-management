@@ -9,6 +9,8 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { EmailService } from '../service/email.service';
 import { PasswordUtils } from '../utils/password.utils';
 import { EmailTemplateUtils, SpeakerCredentialsData, RoleSwitchCodeData } from '../utils/email-templates.utils';
+import { SpeakerProfileService } from './speaker-profile.service';
+import { CreateSpeakerDto } from './users.dto';
 import { 
   ResourceNotFoundException, 
   DuplicateResourceException, 
@@ -23,6 +25,7 @@ export class UserService {
     private userRepository: Repository<UserEntity>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly emailService: EmailService,
+    private readonly speakerProfileService: SpeakerProfileService,
   ) {}
 
   // Helper function to send speaker credentials via email
@@ -191,19 +194,16 @@ async update(
 }
 
   // Speaker-specific methods
-  async getAllSpeakers(): Promise<Partial<UserEntity>[]> {
+  async getAllSpeakers(): Promise<any[]> {
     try {
-      const speakers = await this.userRepository.find({ 
-        where: { role: UserRole.Speaker },
-        order: { updatedAt: 'DESC' },
-      });
-      return speakers.map(({ password, ...rest }) => rest);
+      // Use SpeakerProfileService to get speakers with their profiles
+      return await this.speakerProfileService.getAllSpeakersWithProfiles();
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Speakers retrieval');
     }
   }
 
-  async createSpeaker(speakerData: Partial<UserEntity>): Promise<Partial<UserEntity>> {
+  async createSpeaker(speakerData: CreateSpeakerDto): Promise<Partial<UserEntity>> {
     try {
       // Check if speaker with same email already exists
       if (speakerData.email) {
@@ -227,9 +227,25 @@ async update(
         ...speakerData,
         role: UserRole.Speaker,
         password: hashedPassword,
+        isVerify: true,
       });
 
       const savedSpeaker = await this.userRepository.save(speakerUser);
+
+      // Create speaker profile if companyName, position, or description is provided
+      if (speakerData.companyName || speakerData.position || speakerData.description) {
+        try {
+          await this.speakerProfileService.createProfile({
+            userId: savedSpeaker.id,
+            companyName: speakerData.companyName,
+            position: speakerData.position,
+            description: speakerData.description,
+          });
+        } catch (profileError) {
+          this.errorHandler.logError(profileError, 'Speaker Profile Creation', savedSpeaker.id);
+          // Continue without throwing error - speaker was created successfully
+        }
+      }
 
       // Send password to speaker's email
       if (speakerData.email && speakerData.firstName && speakerData.lastName) {
@@ -256,17 +272,10 @@ async update(
     }
   }
 
-  async getSpeakerById(id: string): Promise<Partial<UserEntity>> {
+  async getSpeakerById(id: string): Promise<any> {
     try {
-      const speaker = await this.userRepository.findOne({
-        where: { id, role: UserRole.Speaker },
-      });
-      if (!speaker) {
-        throw new ResourceNotFoundException('Speaker', id);
-      }
-
-      const { password, ...speakerWithoutPassword } = speaker;
-      return speakerWithoutPassword;
+      // Use SpeakerProfileService to get speaker with profile
+      return await this.speakerProfileService.getSpeakerWithProfileById(id);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -275,7 +284,9 @@ async update(
     }
   }
 
-  async updateSpeaker(id: string, updateData: Partial<UserEntity>): Promise<Partial<UserEntity>> {
+
+
+  async updateSpeaker(id: string, updateData: Partial<UserEntity> & { companyName?: string; position?: string; description?: string }): Promise<Partial<UserEntity>> {
     try {
       const speaker = await this.userRepository.findOne({
         where: { id, role: UserRole.Speaker },
@@ -294,17 +305,46 @@ async update(
         }
       }
 
-      // Remove sensitive fields from updateData
+      // Extract profile data
+      const { companyName, position, description, ...userUpdateData } = updateData;
+
+      // Remove sensitive fields from userUpdateData
       const {
         password,
         id: userId,
         role, // Don't allow role change through this method
         ...safeUpdateData
-      } = updateData;
+      } = userUpdateData;
 
-      // Update the speaker
+      // Update the speaker user data
       Object.assign(speaker, safeUpdateData);
       const updatedSpeaker = await this.userRepository.save(speaker);
+
+      // Update speaker profile if profile data is provided
+      if (companyName !== undefined || position !== undefined || description !== undefined) {
+        try {
+          const existingProfile = await this.speakerProfileService.getSpeakerProfileByUserId(id);
+          if (existingProfile) {
+            // Update existing profile
+            await this.speakerProfileService.updateProfile(id, {
+              companyName,
+              position,
+              description,
+            });
+          } else {
+            // Create new profile
+            await this.speakerProfileService.createProfile({
+              userId: id,
+              companyName,
+              position,
+              description,
+            });
+          }
+        } catch (profileError) {
+          this.errorHandler.logError(profileError, 'Speaker Profile Update', id);
+          // Continue without throwing error - speaker was updated successfully
+        }
+      }
 
       // Remove sensitive fields from response
       const {
@@ -360,6 +400,14 @@ async update(
           this.errorHandler.logError(fileError, 'Speaker Profile Picture Deletion', id);
           // Continue with speaker deletion even if file deletion fails
         }
+      }
+
+      // Delete speaker profile if exists (CASCADE should handle this, but explicit deletion for better error handling)
+      try {
+        await this.speakerProfileService.deleteProfile(id);
+      } catch (profileError) {
+        this.errorHandler.logError(profileError, 'Speaker Profile Deletion', id);
+        // Continue with speaker deletion even if profile deletion fails
       }
 
       await this.userRepository.remove(speaker);

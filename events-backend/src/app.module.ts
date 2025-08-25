@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/users.module';
 import { EventModule } from 'event/event.module';
+import { AgendaModule } from './agenda/agenda.module';
 
 import { CartModule } from 'cart/cart.module';
 import { RegisterEventModule } from 'registerEvent/registerEvent.module';
@@ -48,12 +49,13 @@ import { ChatModule } from './chat/chat.module';
     SettingModule,
     UserModule,
     GalleryModule,
+  
     ExhibitorModule,
     PromotionalOfferModule,
     SurveyModule,
     QnaModule,
     PollingModule,
-    EventModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
+    EventModule, AgendaModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     ChatModule,
     CacheModule.register({
       isGlobal: true,

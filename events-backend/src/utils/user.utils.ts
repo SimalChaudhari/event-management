@@ -13,30 +13,46 @@ export class UserUtils {
 
   /**
    * Get public speaker information (only safe fields)
-   * @param user User entity (speaker)
+   * @param user User entity (speaker) with optional speakerProfile
    * @returns Public speaker data with only allowed fields
    */
-  static getPublicSpeakerInfo(user: Partial<UserEntity>) {
+  static getPublicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
     return {
       id: user.id,
       name: user.firstName && user.lastName 
         ? `${user.firstName} ${user.lastName}`.trim() 
         : user.firstName || 'Unknown Speaker',
       email: user.email || '',
-      position: user.position || '',
-      companyName: user.companyName || '',
-      description: user.description || '',
+      position: user.speakerProfile?.position || '',
+      companyName: user.speakerProfile?.companyName || '',
+      description: user.speakerProfile?.description || '',
+      location: user.city && user.state 
+        ? `${user.city}, ${user.state}`.trim() 
+        : user.city || user.state || '',
       profilePicture: user.profilePicture || '',
       linkedinProfile: user.linkedinProfile || '',
+      // Add more user fields for complete information
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      mobile: user.mobile || '',
+      address: user.address || '',
+      city: user.city || '',
+      state: user.state || '',
+      postalCode: user.postalCode || '',
+      countryCurrency: user.countryCurrency || '',
+      isVerify: user.isVerify || false,
+      role: user.role || '',
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 
   /**
    * Get admin speaker information (more detailed)
-   * @param user User entity (speaker)
+   * @param user User entity (speaker) with optional speakerProfile
    * @returns Speaker data for admin view
    */
-  static getAdminSpeakerInfo(user: Partial<UserEntity>) {
+  static getAdminSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
     return {
       id: user.id,
       name: user.firstName && user.lastName 
@@ -46,9 +62,9 @@ export class UserUtils {
       lastName: user.lastName || '',
       email: user.email || '',
       mobile: user.mobile || '',
-      position: user.position || '',
-      companyName: user.companyName || '',
-      description: user.description || '',
+      position: user.speakerProfile?.position || '',
+      companyName: user.speakerProfile?.companyName || '',
+      description: user.speakerProfile?.description || '',
       profilePicture: user.profilePicture || '',
       linkedinProfile: user.linkedinProfile || '',
       address: user.address || '',
@@ -64,18 +80,22 @@ export class UserUtils {
 
   /**
    * Get basic speaker info for events (minimal fields)
-   * @param user User entity (speaker)
+   * @param user User entity (speaker) with optional speakerProfile
    * @returns Basic speaker info for event displays
    */
-  static getBasicSpeakerInfo(user: Partial<UserEntity>) {
+  static getBasicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
     return {
       id: user.id,
       name: user.firstName && user.lastName 
         ? `${user.firstName} ${user.lastName}`.trim() 
         : user.firstName || 'Unknown Speaker',
       email: user.email || '',
-      position: user.position || '',
-      companyName: user.companyName || '',
+      position: user.speakerProfile?.position || '',
+      companyName: user.speakerProfile?.companyName || '',
+      description: user.speakerProfile?.description || '',
+      location: user.city && user.state && user.address
+        ? `${user.city}, ${user.state}, ${user.address}`.trim() 
+        : user.city || user.state || user.address || '',
       profilePicture: user.profilePicture || '',
     };
   }
@@ -118,11 +138,11 @@ export class UserUtils {
 
   /**
    * Check if user has required fields for specific role
-   * @param user User entity
+   * @param user User entity with optional speakerProfile
    * @param role User role to check
    * @returns Validation result
    */
-  static validateUserForRole(user: Partial<UserEntity>, role: string): {
+  static validateUserForRole(user: Partial<UserEntity> & { speakerProfile?: any }, role: string): {
     isValid: boolean;
     missingFields: string[];
   } {
@@ -135,8 +155,8 @@ export class UserUtils {
 
     // Role-specific validations
     if (role === 'speaker') {
-      if (!user.position) missingFields.push('position');
-      if (!user.companyName) missingFields.push('companyName');
+      if (!user.speakerProfile?.position) missingFields.push('position');
+      if (!user.speakerProfile?.companyName) missingFields.push('companyName');
     }
 
     return {
@@ -175,11 +195,11 @@ export class UserUtils {
 
   /**
    * Get speaker info based on user role/permission level
-   * @param user User entity (speaker)
+   * @param user User entity (speaker) with optional speakerProfile
    * @param viewerRole Role of the person viewing (admin, user, etc.)
    * @returns Appropriate speaker data based on viewer permissions
    */
-  static getSpeakerInfoByPermission(user: Partial<UserEntity>, viewerRole?: string) {
+  static getSpeakerInfoByPermission(user: Partial<UserEntity> & { speakerProfile?: any }, viewerRole?: string) {
     switch (viewerRole) {
       case 'admin':
         return this.getAdminSpeakerInfo(user);

@@ -29,7 +29,7 @@ import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { UserUtils } from '../utils/user.utils';
-import { RoleSwitchDto } from './users.dto';
+import { RoleSwitchDto, CreateSpeakerDto } from './users.dto';
 
 @Controller('api/users')
 export class UserController {
@@ -190,18 +190,12 @@ export class UserController {
     try {
       const speakers = await this.userService.getAllSpeakers();
       
-      // Filter speaker data based on user role
-      const userRole = req.user?.role;
-      const filteredSpeakers = speakers.map(speaker => 
-        UserUtils.getSpeakerInfoByPermission(speaker, userRole)
-      );
-      
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Speakers retrieved successfully',
-        data: filteredSpeakers,
+        data: speakers,
         metadata: {
-          total: filteredSpeakers.length,
+          total: speakers.length,
           timestamp: new Date().toISOString(),
         },
       };
@@ -241,7 +235,7 @@ export class UserController {
     }),
   )
   async createSpeaker(
-    @Body() speakerData: Partial<UserEntity>,
+    @Body() speakerData: CreateSpeakerDto,
     @UploadedFile() file: Express.Multer.File,
     @Res() response: Response,
     @Request() req: any,
@@ -286,14 +280,10 @@ export class UserController {
     try {
       const speaker = await this.userService.getSpeakerById(id);
       
-      // Filter speaker data based on user role
-      const userRole = req.user?.role;
-      const filteredSpeaker = UserUtils.getSpeakerInfoByPermission(speaker, userRole);
-      
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Speaker retrieved successfully',
-        data: filteredSpeaker,
+        data: speaker,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -305,6 +295,8 @@ export class UserController {
       throw error;
     }
   }
+
+
 
   @Put('speakers/update/:id')
   @Roles(UserRole.Admin)

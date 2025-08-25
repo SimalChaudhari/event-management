@@ -18,6 +18,7 @@ import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Gallery } from 'gallery/gallery.entity';
 import { Survey } from '../survey/survey.entity';
 import { EventBooth } from './event-booth.entity';
+import { EventAgenda } from '../agenda/agenda.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -142,6 +143,10 @@ export class Event {
   // Event booths relationship
   @OneToMany(() => EventBooth, (eventBooth) => eventBooth.event)
   eventBooths!: EventBooth[];
+  
+  // Event agendas relationship
+  @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.event)
+  eventAgendas!: EventAgenda[];
   
 
 }

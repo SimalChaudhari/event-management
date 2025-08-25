@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 
 export enum UserRole {
@@ -117,15 +118,8 @@ export class UserEntity {
   @Column({ nullable: true })
   socialTokenExpiry?: Date; // Token expiry from social provider
 
-  // Speaker-specific fields
-  @Column({ nullable: true })
-  companyName?: string; // Company/Organization name for speakers
-
-  @Column({ nullable: true })
-  position?: string; // Job title/position for speakers
-
-  @Column({ type: 'text', nullable: true })
-  description?: string; // Bio/description for speakers
+  // Speaker-specific fields - now in separate SpeakerProfile entity
+  // companyName, position, description moved to speaker_profiles table
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date;
@@ -142,6 +136,10 @@ export class UserEntity {
   // Speaker relationship - when user has Speaker role
   @OneToMany('EventSpeaker', 'speaker')
   eventSpeakers?: any[];
+
+  // Speaker profile relationship - one-to-one with SpeakerProfile
+  @OneToOne('SpeakerProfile', 'user')
+  speakerProfile?: any;
 
   // Exhibitor relationship - when user has Exhibitor role
   @OneToMany('Exhibitor', 'user')

@@ -10,6 +10,7 @@ import { getEventColor } from 'utils/event-color.util';
 import { FavoriteFilterType } from './favorite-event.dto';
 import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { ExhibitorUtils } from '../utils/exhibitor.utils';
 
 @Injectable()
 export class FavoriteEventService {
@@ -96,6 +97,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('favorite.event', 'event')
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
       .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+      .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
       .leftJoinAndSelect('event.category', 'eventCategory')
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
@@ -201,23 +203,23 @@ export class FavoriteEventService {
             ...eventData,
             color: getEventColor(favorite.event.type),
             documents: formattedDocuments, // Use formatted documents
-            speakers: eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [],
+            speakers: eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [],
             categories: categories,
             eventStamps: {
               description: favorite.event.eventStampDescription,
               images: favorite.event.eventStampImages,
             },
 
-            exhibitorsData: {
-              exhibitorDescription: exhibitorDescription || '',
-              exhibitors: eventExhibitors.map((ee) => {
-               
-                return {
-                  ...ee.exhibitor,
-                  promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                };
-              }) || [],
-            },
+                         exhibitorsData: {
+               exhibitorDescription: exhibitorDescription || '',
+               exhibitors: eventExhibitors.map((ee) => {
+                
+                 return {
+                   ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                 };
+               }) || [],
+             },
 
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,

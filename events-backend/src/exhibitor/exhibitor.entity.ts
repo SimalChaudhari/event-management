@@ -12,6 +12,7 @@ import {
 import { PromotionalOffer } from '../promotional-offer/promotional-offer.entity';
 import { EventExhibitor } from 'event/event.entity';
 import { EventBooth } from '../event/event-booth.entity';
+import { EventAgenda } from 'agenda/agenda.entity';
 
 @Entity('exhibitors')
 export class Exhibitor {
@@ -82,6 +83,9 @@ export class Exhibitor {
   // Event booth relationship
   @OneToMany(() => EventBooth, (eventBooth) => eventBooth.exhibitor)
   eventBooths!: EventBooth[];
+
+  @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.exhibitor)
+  agendas!: EventAgenda[];
 
   @CreateDateColumn()
   createdAt!: Date;

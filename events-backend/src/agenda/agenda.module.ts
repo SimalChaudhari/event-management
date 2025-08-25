@@ -1,0 +1,28 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgendaService } from './agenda.service';
+import { AgendaController } from './agenda.controller';
+import { EventAgenda } from './agenda.entity';
+import { Event } from '../event/event.entity';
+import { Exhibitor } from '../exhibitor/exhibitor.entity';
+import { UtilsModule } from '../utils/utils.module';
+import { JwtModule } from '@nestjs/jwt';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      EventAgenda,
+      Event,
+      Exhibitor,
+    ]),
+    UtilsModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
+      signOptions: { }, // Set your token expiration
+    }),
+  ],
+  providers: [AgendaService],
+  controllers: [AgendaController],
+  exports: [AgendaService],
+})
+export class AgendaModule {}

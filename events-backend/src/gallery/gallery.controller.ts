@@ -25,7 +25,7 @@ import { diskStorage } from 'multer';
 import { GalleryDto } from './gallery.dto';
 import path from 'path';
 import * as fs from 'fs';
-import { EventService } from 'event/event.service';
+
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import {
@@ -38,7 +38,6 @@ import {
 export class GalleryController {
   constructor(
     private readonly galleryService: GalleryService,
-    private readonly eventService: EventService,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 

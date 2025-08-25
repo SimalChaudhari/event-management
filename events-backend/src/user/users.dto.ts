@@ -156,6 +156,21 @@ export class LinkedInLoginDto {
   accessToken!: string;
 }
 
+export class CreateSpeakerDto extends UserDto {
+  // Speaker-specific fields for profile creation
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  position?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
 export class RoleSwitchDto {
   @IsNotEmpty()
   @IsEnum(UserRole)

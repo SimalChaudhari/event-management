@@ -20,6 +20,7 @@ import { UtilsModule } from 'utils/utils.module';
 import { UserEntity } from 'user/users.entity';
 import { EventBooth } from 'event/event-booth.entity';
 import { EmailService } from 'service/email.service';
+import { EventAgenda } from 'agenda/agenda.entity';
 
 
 @Module({
@@ -28,6 +29,7 @@ import { EmailService } from 'service/email.service';
       UserEntity,
       SurveySession,    // Add this
       SurveyResponse,    // Add this
+      EventAgenda,
       EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({

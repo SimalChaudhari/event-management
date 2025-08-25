@@ -23,6 +23,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { ExhibitorUtils } from '../utils/exhibitor.utils';
 
 @Injectable()
 export class RegisterEventService {
@@ -125,6 +126,7 @@ export class RegisterEventService {
             'event',
             'event.eventSpeakers',
             'event.eventSpeakers.speaker',
+            'event.eventSpeakers.speaker.speakerProfile',
             'event.category',
             'event.category.category',
             'event.galleries',
@@ -143,6 +145,7 @@ export class RegisterEventService {
             'event',
             'event.eventSpeakers',
             'event.eventSpeakers.speaker',
+            'event.eventSpeakers.speaker.speakerProfile',
             'event.category',
             'event.category.category',
             'event.galleries',
@@ -203,7 +206,7 @@ export class RegisterEventService {
           }
 
           const speakers =
-            registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [];
+            registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [];
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
@@ -231,18 +234,18 @@ export class RegisterEventService {
               images: registerEvent.event?.eventStampImages,
             },
 
-            exhibitorsData: {
-              exhibitorDescription: exhibitorDescription || '',
-              exhibitors:
-                registerEvent.event?.eventExhibitors
-                  ?.filter((ee) => ee.exhibitor.isActive)
-                  ?.map((ee) => {
-                    return {
-                      ...ee.exhibitor,
-                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                    };
-                  }) || [],
-            },
+                         exhibitorsData: {
+               exhibitorDescription: exhibitorDescription || '',
+               exhibitors:
+                 registerEvent.event?.eventExhibitors
+                   ?.filter((ee) => ee.exhibitor.isActive)
+                   ?.map((ee) => {
+                     return {
+                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                     };
+                   }) || [],
+             },
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
             hasSurvey: !!surveyDetails,
@@ -363,9 +366,6 @@ export class RegisterEventService {
           }),
         );
       }
-
-      console.log(registerEvent.eventId, 'registerEvent.eventId');
-      console.log(`🔄 Single RegisterEvent: ${registerEvent.id}, registerEvent.userId: ${registerEvent.userId}, current userId: ${userId}`);
       
       const surveyDetails = registerEvent.eventId 
       ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId, userId)
@@ -373,20 +373,20 @@ export class RegisterEventService {
     
       // Extract only speakers
       const speakers =
-        registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getPublicSpeakerInfo(es.speaker)) || [];
+        registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [];
       const categories =
         registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-      // Extract exhibitors (only active ones)
-      const exhibitors =
-        registerEvent.event?.eventExhibitors
-          ?.filter((ee) => ee.exhibitor.isActive)
-          ?.map((ee) => {
-            return {
-              ...ee.exhibitor,
-              promotionalOffers: ee.exhibitor.promotionalOffers || [],
-            };
-          }) || [];
+             // Extract exhibitors (only active ones)
+       const exhibitors =
+         registerEvent.event?.eventExhibitors
+           ?.filter((ee) => ee.exhibitor.isActive)
+           ?.map((ee) => {
+             return {
+               ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+               promotionalOffers: ee.exhibitor.promotionalOffers || [],
+             };
+           }) || [];
 
       // Clean up event object
       const {
