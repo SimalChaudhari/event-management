@@ -33,23 +33,7 @@ export const login = (data) => async (dispatch) => {
         return { success: true, user };
 
     } catch (error) {
-        // Handle specific error cases
-        let errorMessage = 'Network error. Please check your connection.';
-        
-        if (error.response) {
-            switch (error.response.status) {
-                case 401:
-                    errorMessage = 'Invalid email or password';
-                    break;
-                case 400:
-                    errorMessage = error.response.data.message || 'Please check your credentials';
-                    break;
-                default:
-                    errorMessage = error.response.data.message || 'Login failed. Please try again.';
-            }
-        }
-        
-        toast.error(errorMessage);
+        toast.error(error.response.data.message);
         return { success: false };
     } finally {
         setLoading(dispatch, false);

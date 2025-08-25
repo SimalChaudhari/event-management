@@ -16,6 +16,7 @@ import {
   DuplicateResourceException,
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
+import { UserEntity } from 'user/users.entity';
 
 @Injectable()
 export class AgendaService {
@@ -24,8 +25,9 @@ export class AgendaService {
     private agendaRepository: Repository<EventAgenda>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
-    @InjectRepository(Exhibitor)
-    private exhibitorRepository: Repository<Exhibitor>,
+  
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -40,11 +42,11 @@ export class AgendaService {
       }
 
       // Validate exhibitor exists
-      const exhibitor = await this.exhibitorRepository.findOne({
-        where: { id: createAgendaDto.exhibitorId },
+      const user = await this.userRepository.findOne({
+        where: { id: createAgendaDto.userId },
       });
-      if (!exhibitor) {
-        throw new ResourceNotFoundException('Exhibitor', createAgendaDto.exhibitorId);
+      if (!user) {
+        throw new ResourceNotFoundException('User', createAgendaDto.userId);
       }
 
       // Check for time conflicts within the same event
@@ -73,7 +75,7 @@ export class AgendaService {
     }
   }
 
-  async getAllAgendas(eventId?: string, exhibitorId?: string) {
+  async getAllAgendas(eventId?: string, userId?: string) {
     try {
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
@@ -83,8 +85,8 @@ export class AgendaService {
         queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
       }
 
-      if (exhibitorId) {
-        queryBuilder.andWhere('agenda.exhibitorId = :exhibitorId', { exhibitorId });
+      if (userId) {
+        queryBuilder.andWhere('agenda.userId = :userId', { userId });
       }
 
    

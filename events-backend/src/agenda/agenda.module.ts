@@ -4,16 +4,16 @@ import { AgendaService } from './agenda.service';
 import { AgendaController } from './agenda.controller';
 import { EventAgenda } from './agenda.entity';
 import { Event } from '../event/event.entity';
-import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { UtilsModule } from '../utils/utils.module';
 import { JwtModule } from '@nestjs/jwt';
+import { UserEntity } from 'user/users.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       EventAgenda,
+      UserEntity,
       Event,
-      Exhibitor,
     ]),
     UtilsModule,
     JwtModule.register({

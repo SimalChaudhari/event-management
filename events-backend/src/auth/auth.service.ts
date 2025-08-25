@@ -308,6 +308,7 @@ export class AuthService {
         where: { email: userDto.email },
       });
 
+   
       if (!user || user.role !== 'admin') {
         // Check if user is an admin
         throw new UnauthorizedException('Invalid admin credentials');
@@ -344,7 +345,7 @@ export class AuthService {
         refreshToken,
       };
     } catch (error) {
-      this.handleError(error);
+     throw this.handleError(error);
     }
   }
 

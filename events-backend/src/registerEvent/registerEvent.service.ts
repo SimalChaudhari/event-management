@@ -206,7 +206,11 @@ export class RegisterEventService {
           }
 
           const speakers =
-            registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [];
+            registerEvent.event?.eventSpeakers?.map((es) => ({
+              ...UserUtils.getBasicSpeakerInfo(es.speaker),
+              speakingStartTime: es.speakingStartTime,
+              speakingEndTime: es.speakingEndTime,
+            })) || [];
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
@@ -373,7 +377,11 @@ export class RegisterEventService {
     
       // Extract only speakers
       const speakers =
-        registerEvent.event?.eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [];
+        registerEvent.event?.eventSpeakers?.map((es) => ({
+          ...UserUtils.getBasicSpeakerInfo(es.speaker),
+          speakingStartTime: es.speakingStartTime,
+          speakingEndTime: es.speakingEndTime,
+        })) || [];
       const categories =
         registerEvent.event?.category?.map((ec) => ec.category) || [];
 

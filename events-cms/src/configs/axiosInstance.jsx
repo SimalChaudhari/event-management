@@ -35,13 +35,28 @@ axiosInstance.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+const AUTH_ENDPOINTS = [
+    '/auth/admin',
+    '/auth/login', 
+    '/auth/register',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/refresh-token'
+];
+
+// Helper function to check if endpoint should skip token refresh
+const shouldSkipTokenRefresh = (url) => {
+    return AUTH_ENDPOINTS.some(endpoint => url.endsWith(endpoint));
+};
+
 // Simple response interceptor
 axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Skip token refresh for authentication endpoints
+        if (error.response?.status === 401 && !originalRequest._retry && !shouldSkipTokenRefresh(originalRequest.url)) {
             originalRequest._retry = true;
 
             if (isRefreshing) {
@@ -75,7 +90,7 @@ axiosInstance.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 localStorage.clear();
-                if (!originalRequest.url.includes('auth/')) {
+                if (!shouldSkipTokenRefresh(originalRequest.url)) {
                     window.location.href = '/auth/signin';
                 }
                 return Promise.reject(refreshError);
@@ -87,7 +102,6 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
 // Cleanup function for component unmount
 export const cleanupTokenHandler = () => {
     // No state to clean up in the simple approach

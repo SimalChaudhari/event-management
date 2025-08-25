@@ -203,7 +203,11 @@ export class FavoriteEventService {
             ...eventData,
             color: getEventColor(favorite.event.type),
             documents: formattedDocuments, // Use formatted documents
-            speakers: eventSpeakers?.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)) || [],
+            speakers: eventSpeakers?.map((es) => ({
+              ...UserUtils.getBasicSpeakerInfo(es.speaker),
+              speakingStartTime: es.speakingStartTime,
+              speakingEndTime: es.speakingEndTime,
+            })) || [],
             categories: categories,
             eventStamps: {
               description: favorite.event.eventStampDescription,

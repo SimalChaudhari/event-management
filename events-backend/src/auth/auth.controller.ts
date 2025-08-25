@@ -148,10 +148,14 @@ export class AuthController {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
-    } catch (error) {
-      return response.status(HttpStatus.UNAUTHORIZED).json({
+    } catch (error:any) {
+      // Return the actual error message from the service
+      const status = error.status || HttpStatus.UNAUTHORIZED;
+      const message = error.message || 'Login failed. Please check your credentials and try again.';
+      
+      return response.status(status).json({
         success: false,
-        message: 'Login failed. Please check your credentials and try again.',
+        message: message,
       });
     }
   }

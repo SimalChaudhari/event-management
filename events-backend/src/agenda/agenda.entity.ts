@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Event } from '../event/event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
+import { UserEntity } from 'user/users.entity';
 
 export enum AgendaCategory {
   Brainstorm = 'Brainstorm',
@@ -32,7 +33,7 @@ export class EventAgenda {
   eventId!: string;
 
   @Column()
-  exhibitorId!: string;
+  userId!: string;
 
   @Column({ type: 'varchar', length: 255 })
   title!: string;
@@ -75,9 +76,9 @@ export class EventAgenda {
   @JoinColumn({ name: 'eventId' })
   event!: Event;
 
-  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.agendas, {
+  @ManyToOne(() => UserEntity, (user) => user.agendas, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'exhibitorId' })
-  exhibitor!: Exhibitor;
+  @JoinColumn({ name: 'userId' })
+  user!: UserEntity;
 }

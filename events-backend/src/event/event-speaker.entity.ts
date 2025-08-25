@@ -17,6 +17,13 @@ export class EventSpeaker {
   @Column()
   speakerId?: string; // Store only the speaker (user) ID
 
+  // Speaker speaking time fields
+  @Column({ type: 'time', nullable: true })
+  speakingStartTime?: string; // When the speaker starts speaking
+
+  @Column({ type: 'time', nullable: true })
+  speakingEndTime?: string; // When the speaker finishes speaking
+
   @ManyToOne(() => Event, (event) => event.eventSpeakers, {
     onDelete: 'CASCADE',
   })

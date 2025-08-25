@@ -315,7 +315,7 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('user.speakerProfile', 'speakerProfile')
       .where(
         'user.role = :role AND (LOWER(user.firstName) LIKE :keyword OR LOWER(user.lastName) LIKE :keyword OR LOWER(speakerProfile.companyName) LIKE :keyword OR LOWER(speakerProfile.position) LIKE :keyword)',
-        { role: 'Speaker', keyword: `%${keywordLower}%` }
+        { role: 'speaker', keyword: `%${keywordLower}%` }
       )
       .limit(limit)
       .offset(offset);

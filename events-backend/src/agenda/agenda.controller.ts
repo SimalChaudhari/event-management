@@ -65,10 +65,10 @@ export class AgendaController {
     @Res() response: Response,
 
     @Query('eventId') eventId?: string,
-    @Query('exhibitorId') exhibitorId?: string,
+    @Query('userId') userId?: string,
   ) {
     try {
-      const agendas = await this.agendaService.getAllAgendas(eventId, exhibitorId);
+      const agendas = await this.agendaService.getAllAgendas(eventId, userId);
       
       const successResponse: SuccessResponse = {
         success: true,

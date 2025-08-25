@@ -19,7 +19,7 @@ export class CreateEventAgendaDto {
 
   @IsNotEmpty()
   @IsUUID()
-  exhibitorId!: string;
+  userId!: string;
 
   @IsNotEmpty()
   @IsString()
@@ -102,7 +102,7 @@ export class UpdateEventAgendaDto {
 export class EventAgendaResponseDto {
   id!: string;
   eventId!: string;
-  exhibitorId!: string;
+  userId!: string;
   title!: string;
   time!: string;
   duration!: number;
@@ -113,21 +113,12 @@ export class EventAgendaResponseDto {
   createdBy!: string;
   createdAt!: Date;
   updatedAt!: Date;
-  exhibitor?: {
-    id: string;
-    companyName: string;
-    companyDescription?: string;
-    logo?: string;
-    email?: string;
-    mobile?: string;
-    uen?: string;
-  };
 }
 
 export class EventAgendaListResponseDto {
   id!: string;
   eventId!: string;
-  exhibitorId!: string;
+  userId!: string;
   title!: string;
   time!: string;
   duration!: number;
@@ -138,10 +129,5 @@ export class EventAgendaListResponseDto {
   isActive!: boolean;
   createdAt!: Date;
   updatedAt!: Date;
-  exhibitor?: {
-    id: string;
-    companyName: string;
-    companyDescription?: string;
-    logo?: string;
-  };
+
 }

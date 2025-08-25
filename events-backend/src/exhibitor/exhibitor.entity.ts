@@ -84,9 +84,6 @@ export class Exhibitor {
   @OneToMany(() => EventBooth, (eventBooth) => eventBooth.exhibitor)
   eventBooths!: EventBooth[];
 
-  @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.exhibitor)
-  agendas!: EventAgenda[];
-
   @CreateDateColumn()
   createdAt!: Date;
 

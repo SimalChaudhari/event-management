@@ -1,3 +1,4 @@
+import { EventAgenda } from 'agenda/agenda.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Order } from 'order/order.entity';
 import {
@@ -144,5 +145,8 @@ export class UserEntity {
   // Exhibitor relationship - when user has Exhibitor role
   @OneToMany('Exhibitor', 'user')
   exhibitorProfile?: any[];
+
+  @OneToMany(() => EventAgenda, (agenda) => agenda.user)
+  agendas?: EventAgenda[];
   
 }
