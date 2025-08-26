@@ -8,13 +8,15 @@ import { Repository } from 'typeorm';
 import { RegisterEvent } from './registerEvent.entity';
 import {
   CreateRegisterEventDto,
+  Type,
   UpdateRegisterEventDto,
 } from './registerEvent.dto';
 import { Event } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
-import { UserEntity } from 'user/users.entity';
+import { UserEntity, UserRole } from 'user/users.entity';
+import { EventAgenda } from '../agenda/agenda.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
   ResourceNotFoundException,
@@ -24,6 +26,7 @@ import {
 import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
+import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
 
 @Injectable()
 export class RegisterEventService {
@@ -39,6 +42,10 @@ export class RegisterEventService {
 
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+
+    @InjectRepository(EventAgenda)
+    private readonly agendaRepository: Repository<EventAgenda>,
+
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
@@ -48,8 +55,7 @@ export class RegisterEventService {
     createRegisterEventDto: CreateRegisterEventDto,
   ): Promise<RegisterEvent> {
     try {
-      const { eventId, type, registerCode, isCreatedByAdmin } =
-        createRegisterEventDto;
+      const { eventId, type, isCreatedByAdmin } = createRegisterEventDto;
 
       // Check if event exists
       const event = await this.eventRepository.findOne({
@@ -76,24 +82,39 @@ export class RegisterEventService {
       });
 
       if (existingRegistration) {
-        throw new DuplicateResourceException(
-          'Registration user-event combination'
-        );
+        // Check if user is trying to register with a different role
+        if (
+          user.role === UserRole.Exhibitor &&
+          existingRegistration.type !== Type.Exhibitor
+        ) {
+          // Update existing registration to exhibitor type
+          existingRegistration.type = Type.Exhibitor;
+          return await this.registerEventRepository.save(existingRegistration);
+        } else if (
+          user.role === UserRole.Exhibitor &&
+          existingRegistration.type === Type.Exhibitor
+        ) {
+          throw new DuplicateResourceException(
+            'User already registered as an exhibitor for this event',
+          );
+        } else {
+          throw new DuplicateResourceException(
+            'User already registered for this event',
+          );
+        }
       }
 
-      // Validate registerCode for Exhibitor type (only if not created by admin)
-      if (type === 'Exhibitor' && !registerCode && !isCreatedByAdmin) {
-        throw new ValidationException(
-          'Register code is required for Exhibitor',
-        );
+      // Auto-set type to 'Exhibitor' if user role is exhibitor
+      let finalType = type;
+      if (user.role === UserRole.Exhibitor) {
+        finalType = Type.Exhibitor;
       }
 
       // Create new registration
       const registerEventData = {
         userId: userId,
         eventId: eventId,
-        type: type,
-        registerCode: registerCode,
+        type: finalType,
         isCreatedByAdmin: isCreatedByAdmin || false,
         isRegister: true,
         orderId: isCreatedByAdmin ? undefined : createRegisterEventDto.orderId,
@@ -157,6 +178,7 @@ export class RegisterEventService {
         });
       }
 
+   
       // Add attendance count and favorite status to each registered event
       const registerEventsWithAttendance = await Promise.all(
         registerEvents.map(async (registerEvent) => {
@@ -164,11 +186,19 @@ export class RegisterEventService {
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
-          console.log(`🔄 RegisterEvent: ${registerEvent.id}, registerEvent.userId: ${registerEvent.userId}, current userId: ${userId}`);
-          
-          const surveyDetails = registerEvent.eventId 
-          ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId, userId)
-          : null;
+          const surveyDetails = registerEvent.eventId
+            ? await this.surveyUtils.getSurveyDetailsByEventId(
+                registerEvent.eventId,
+                userId,
+              )
+            : null;
+
+                   // Get user's personal agenda items for this specific event
+          const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
+            this.agendaRepository,
+            registerEvent.eventId || '',
+            registerEvent.userId || ''
+          );
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (
@@ -238,18 +268,20 @@ export class RegisterEventService {
               images: registerEvent.event?.eventStampImages,
             },
 
-                         exhibitorsData: {
-               exhibitorDescription: exhibitorDescription || '',
-               exhibitors:
-                 registerEvent.event?.eventExhibitors
-                   ?.filter((ee) => ee.exhibitor.isActive)
-                   ?.map((ee) => {
-                     return {
-                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                     };
-                   }) || [],
-             },
+            exhibitorsData: {
+              exhibitorDescription: exhibitorDescription || '',
+              exhibitors:
+                registerEvent.event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive)
+                  ?.map((ee) => {
+                    return {
+                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
+            },
+            myAgendas: formattedAgendas || [],
+
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
             hasSurvey: !!surveyDetails,
@@ -273,6 +305,7 @@ export class RegisterEventService {
             event,
             user: cleanedUser,
             isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+            // Add user's personal agenda data
           };
         }),
       );
@@ -303,6 +336,8 @@ export class RegisterEventService {
     }
   }
 
+
+
   async findOne(registrationId: string, userId: string, role: string) {
     try {
       // Query to find the specific register event
@@ -329,6 +364,13 @@ export class RegisterEventService {
       if (!registerEvent) {
         throw new ResourceNotFoundException('Register Event', registrationId);
       }
+
+      // Get user's personal agenda items for this registered event
+      const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
+        this.agendaRepository,
+        registerEvent.eventId || '',
+        registerEvent.userId || ''
+      );
 
       // Get attendance count for this event
       const attendanceCount = registerEvent.eventId
@@ -370,11 +412,14 @@ export class RegisterEventService {
           }),
         );
       }
-      
-      const surveyDetails = registerEvent.eventId 
-      ? await this.surveyUtils.getSurveyDetailsByEventId(registerEvent.eventId, userId)
-      : null;
-    
+
+      const surveyDetails = registerEvent.eventId
+        ? await this.surveyUtils.getSurveyDetailsByEventId(
+            registerEvent.eventId,
+            userId,
+          )
+        : null;
+
       // Extract only speakers
       const speakers =
         registerEvent.event?.eventSpeakers?.map((es) => ({
@@ -385,16 +430,16 @@ export class RegisterEventService {
       const categories =
         registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-             // Extract exhibitors (only active ones)
-       const exhibitors =
-         registerEvent.event?.eventExhibitors
-           ?.filter((ee) => ee.exhibitor.isActive)
-           ?.map((ee) => {
-             return {
-               ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-               promotionalOffers: ee.exhibitor.promotionalOffers || [],
-             };
-           }) || [];
+      // Extract exhibitors (only active ones)
+      const exhibitors =
+        registerEvent.event?.eventExhibitors
+          ?.filter((ee) => ee.exhibitor.isActive)
+          ?.map((ee) => {
+            return {
+              ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+              promotionalOffers: ee.exhibitor.promotionalOffers || [],
+            };
+          }) || [];
 
       // Clean up event object
       const {
@@ -423,6 +468,8 @@ export class RegisterEventService {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: exhibitors,
         },
+        myAgendas: formattedAgendas || [],
+
         attendanceCount: attendanceCount,
         surveyDetails: surveyDetails,
         hasSurvey: !!surveyDetails,
@@ -451,6 +498,7 @@ export class RegisterEventService {
           event,
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+          // Add user's personal agenda data
         },
       };
     } catch (error) {
@@ -512,9 +560,7 @@ export class RegisterEventService {
       if (updateRegisterEventDto.type !== undefined) {
         registration.type = updateRegisterEventDto.type;
       }
-      if (updateRegisterEventDto.registerCode !== undefined) {
-        registration.registerCode = updateRegisterEventDto.registerCode;
-      }
+
       if (updateRegisterEventDto.isCreatedByAdmin !== undefined) {
         registration.isCreatedByAdmin = updateRegisterEventDto.isCreatedByAdmin;
       }
@@ -563,6 +609,4 @@ export class RegisterEventService {
       this.errorHandler.handleDatabaseError(error, 'Register Event deletion');
     }
   }
-
-
 }

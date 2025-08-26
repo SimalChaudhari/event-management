@@ -9,18 +9,19 @@ import { Order } from 'order/order.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { UserEntity } from 'user/users.entity';
+import { EventAgenda } from '../agenda/agenda.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { UtilsModule } from 'utils/utils.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, Event, Order, FavoriteEvent,EventExhibitor,Exhibitor,UserEntity]),UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda]), UtilsModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration
         }),
     ],
-    providers: [RegisterEventService,ErrorHandlerService],
+    providers: [RegisterEventService, ErrorHandlerService],
     controllers: [RegisterEventController],
     exports: [RegisterEventService], // Export the service to be used in other modules
 })

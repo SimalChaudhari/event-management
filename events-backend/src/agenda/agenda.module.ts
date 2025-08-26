@@ -7,6 +7,8 @@ import { Event } from '../event/event.entity';
 import { UtilsModule } from '../utils/utils.module';
 import { JwtModule } from '@nestjs/jwt';
 import { UserEntity } from 'user/users.entity';
+import { EmailService } from 'service/email.service';
+import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 
 @Module({
   imports: [
@@ -14,6 +16,7 @@ import { UserEntity } from 'user/users.entity';
       EventAgenda,
       UserEntity,
       Event,
+      RegisterEvent,
     ]),
     UtilsModule,
     JwtModule.register({
@@ -21,7 +24,7 @@ import { UserEntity } from 'user/users.entity';
       signOptions: { }, // Set your token expiration
     }),
   ],
-  providers: [AgendaService],
+  providers: [AgendaService, EmailService],
   controllers: [AgendaController],
   exports: [AgendaService],
 })

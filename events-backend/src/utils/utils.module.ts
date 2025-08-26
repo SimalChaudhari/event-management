@@ -7,13 +7,14 @@ import { EmailUtils } from './email.utils';
 import { EventValidationUtils } from './validateEvents';
 import { EventQueryBuilderUtils, GlobalSearchUtils } from './searchEvent';
 import { FileUploadUtils } from './filesUploadFormat/file-upload.utils';
+import { AgendaUtils } from './agenda.utils';
 import { Survey, SurveySession, SurveyResponse } from '../survey/survey.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Survey, SurveySession, SurveyResponse]),
   ],
-  providers: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils],
-  exports: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils],
+  providers: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils],
+  exports: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils],
 })
 export class UtilsModule {} 

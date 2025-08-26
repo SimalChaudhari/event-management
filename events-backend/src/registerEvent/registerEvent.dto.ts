@@ -22,8 +22,6 @@ export class CreateRegisterEventDto {
   @IsEnum(Type)
   type: Type = Type.Attendee;  // Default type is 'Attendee'
 
-  @IsOptional()
-  registerCode?: string;
 
   @IsOptional()
   @IsUUID()
@@ -48,7 +46,6 @@ export class UpdateRegisterEventDto {
   userId?: string;
   eventId?: string;
   type?: 'Attendee' | 'Exhibitor';
-  registerCode?: string;
   isCreatedByAdmin?: boolean;
   orderId?: string;
   isRegister?: boolean;

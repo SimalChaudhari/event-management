@@ -6,11 +6,13 @@ import { FavoriteEvent } from './favorite-event.entity';
 import { Event } from 'event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { EventAgenda } from '../agenda/agenda.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { FavoriteFilterType } from './favorite-event.dto';
 import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
+import { AgendaUtils } from '../utils/agenda.utils';
 
 @Injectable()
 export class FavoriteEventService {
@@ -23,23 +25,27 @@ export class FavoriteEventService {
     private userRepository: Repository<UserEntity>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(EventAgenda)
+    private agendaRepository: Repository<EventAgenda>,
 
     private readonly surveyUtils: SurveyUtils,
-
   ) {}
 
   // Private helper method for formatting documents
-  private formatDocuments(documents?: string[], documentNames?: string[]): { name: string; document: string }[] {
+  private formatDocuments(
+    documents?: string[],
+    documentNames?: string[],
+  ): { name: string; document: string }[] {
     let formattedDocuments: { name: string; document: string }[] = [];
     if (documents && documentNames) {
       formattedDocuments = documents.map((doc, index) => ({
         name: documentNames[index] || `Document ${index + 1}`,
-        document: doc
+        document: doc,
       }));
     } else if (documents) {
       formattedDocuments = documents.map((doc, index) => ({
         name: `Document ${index + 1}`,
-        document: doc
+        document: doc,
       }));
     }
     return formattedDocuments;
@@ -82,8 +88,6 @@ export class FavoriteEventService {
     }
   }
 
-
-
   async getUserFavorites(
     userId: string,
     filter: FavoriteFilterType = FavoriteFilterType.ALL,
@@ -102,7 +106,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
-      
+
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
       .where('favorite.userId = :userId', { userId });
 
@@ -147,22 +151,28 @@ export class FavoriteEventService {
 
     const favorites = await query.getMany();
 
-
-    // Add attendance count and favorite status to each favorite event
+    // Add attendance count, favorite status, and agenda data to each favorite event
     const favoritesWithAttendance = await Promise.all(
       favorites.map(async (favorite) => {
         const attendanceCount = favorite.eventId
           ? await this.getEventAttendanceCount(favorite.eventId)
           : 0;
 
-        const surveyDetails = favorite.eventId 
-        ? await this.surveyUtils.getSurveyDetailsByEventId(favorite.eventId)
-        : null;
+        const surveyDetails = favorite.eventId
+          ? await this.surveyUtils.getSurveyDetailsByEventId(favorite.eventId)
+          : null;
+
+        // Get user's personal agenda items for this favorite event
+        const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
+          this.agendaRepository,
+          favorite.eventId || '',
+          userId,
+        );
 
         // Format event documents using helper method
         const formattedDocuments = this.formatDocuments(
-          favorite.event.documents, 
-          favorite.event.documentNames
+          favorite.event.documents,
+          favorite.event.documentNames,
         );
 
         // Since these are favorite events, isFavorite will always be true
@@ -181,16 +191,16 @@ export class FavoriteEventService {
           isRegistered = !!registration;
         }
 
-        const { 
-          eventSpeakers, 
-          documents, 
+        const {
+          eventSpeakers,
+          documents,
           exhibitorDescription,
-          documentNames, 
+          documentNames,
           eventStampDescription,
           eventStampImages,
           category,
           eventExhibitors,
-          ...eventData 
+          ...eventData
         } = favorite.event;
 
         // Extract categories
@@ -203,27 +213,30 @@ export class FavoriteEventService {
             ...eventData,
             color: getEventColor(favorite.event.type),
             documents: formattedDocuments, // Use formatted documents
-            speakers: eventSpeakers?.map((es) => ({
-              ...UserUtils.getBasicSpeakerInfo(es.speaker),
-              speakingStartTime: es.speakingStartTime,
-              speakingEndTime: es.speakingEndTime,
-            })) || [],
+            speakers:
+              eventSpeakers?.map((es) => ({
+                ...UserUtils.getBasicSpeakerInfo(es.speaker),
+                speakingStartTime: es.speakingStartTime,
+                speakingEndTime: es.speakingEndTime,
+              })) || [],
             categories: categories,
             eventStamps: {
               description: favorite.event.eventStampDescription,
               images: favorite.event.eventStampImages,
             },
-
-                         exhibitorsData: {
-               exhibitorDescription: exhibitorDescription || '',
-               exhibitors: eventExhibitors.map((ee) => {
-                
-                 return {
-                   ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                 };
-               }) || [],
-             },
+            exhibitorsData: {
+              exhibitorDescription: exhibitorDescription || '',
+              exhibitors:
+                eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive)
+                  ?.map((ee) => {
+                    return {
+                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
+            },
+            myAgendas: formattedAgendas || [],
 
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
@@ -231,6 +244,7 @@ export class FavoriteEventService {
             isFavorite: isFavorite, // Always true for favorite events
             isRegistered: isRegistered,
           },
+          // Add user's personal agenda data
         };
       }),
     );
@@ -246,5 +260,3 @@ export class FavoriteEventService {
     return count;
   }
 }
-
-

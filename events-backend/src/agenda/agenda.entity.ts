@@ -8,8 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Event } from '../event/event.entity';
-import { Exhibitor } from '../exhibitor/exhibitor.entity';
-import { UserEntity } from 'user/users.entity';
+import { UserEntity } from '../user/users.entity';
 
 export enum AgendaCategory {
   Brainstorm = 'Brainstorm',
@@ -21,7 +20,21 @@ export enum AgendaCategory {
   QnA = 'QnA',
   Panel = 'Panel',
   Demo = 'Demo',
+  Meeting = 'Meeting', // Added meeting category
   Other = 'Other',
+}
+
+export enum MeetingStatus {
+  Pending = 'pending',
+  Confirmed = 'confirmed',
+  Cancelled = 'cancelled',
+  Rescheduled = 'rescheduled',
+}
+
+export enum RequestStatus {
+  Pending = 'pending',
+  Accepted = 'accepted',
+  Rejected = 'rejected',
 }
 
 @Entity('event_agendas')
@@ -63,11 +76,50 @@ export class EventAgenda {
   @Column({ type: 'uuid' })
   createdBy!: string;
 
+   // New fields for table seating and lucky draw
+   @Column({ type: 'varchar', length: 100, nullable: true })
+   tableNumber?: string;
+ 
+   @Column({ type: 'varchar', length: 100, nullable: true })
+   luckyDrawTicketNumber?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  // New fields for meeting functionality
+  @Column({ 
+    type: 'enum', 
+    enum: MeetingStatus, 
+    nullable: true,
+    default: MeetingStatus.Confirmed 
+  })
+  meetingStatus?: MeetingStatus;
+
+  @Column({ 
+    type: 'enum', 
+    enum: RequestStatus, 
+    nullable: true,
+    default: RequestStatus.Accepted 
+  })
+  requestStatus?: RequestStatus;
+
+  @Column({ type: 'text', nullable: true, array: true })
+  attendees?: string[]; // Array of user IDs
+
+  @Column({ type: 'text', nullable: true })
+  meetingNotes?: string;
+
+  @Column({ type: 'boolean', default: false })
+  isMeetingRequest?: boolean; // True if this is a meeting request
+
+  @Column({ type: 'uuid', nullable: true })
+  parentMeetingId?: string; // For rescheduled meetings
+
+  @Column({ type: 'timestamp', nullable: true })
+  meetingDate?: Date; // Specific date for the meeting
 
   // Relationships
   @ManyToOne(() => Event, (event) => event.eventAgendas, {

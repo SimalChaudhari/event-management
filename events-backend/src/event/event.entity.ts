@@ -127,6 +127,14 @@ export class Event {
   @Column({ type: 'text', nullable: true })
   eventStampDescription?: string;
 
+
+  @Column({ type: 'boolean', default: false })
+  enableTableSeating!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  enableLuckyDraw!: boolean;
+  
+
   @Column('simple-array', { nullable: true })
   eventStampImages?: string[];
   // Exhibitor relationship

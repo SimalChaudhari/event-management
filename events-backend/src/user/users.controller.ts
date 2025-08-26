@@ -42,7 +42,8 @@ export class UserController {
   @Roles(UserRole.Admin)
   async getAllUsers(@Res() response: Response, @Request() req: any) {
     try {
-      const users = await this.userService.getAll(UserRole.User);
+      // const users = await this.userService.getAll(UserRole.User);
+      const users = await this.userService.getAll([UserRole.User, UserRole.Exhibitor]);
       
       const successResponse: SuccessResponse = {
         success: true,

@@ -11,17 +11,19 @@ import {
   UseGuards,
   Request,
   HttpStatus,
+  Header,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AgendaService } from './agenda.service';
-import { CreateEventAgendaDto, UpdateEventAgendaDto } from './agenda.dto';
+import { 
+  CreateMeetingRequestDto,
+  RespondToMeetingRequestDto,
+  RescheduleMeetingDto
+} from './agenda.dto';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
-import { Roles } from '../jwt/roles.decorator';
-import { UserRole } from '../user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
-import { AgendaCategory } from './agenda.entity';
 
 @Controller('api/agendas')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,22 +33,102 @@ export class AgendaController {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
-  @Post('create')
-  // @Roles(UserRole.Admin)
-  async createAgenda(
-    @Body() createAgendaDto: CreateEventAgendaDto,
+  // Get incoming meeting requests (for recipient)
+  @Get('meeting-requests/incoming')
+  async getIncomingMeetingRequests(
+    @Request() req: any,
+    @Res() response: Response,
+    @Query('eventId') eventId?: string,
+  ) {
+    try {
+      const requests = await this.agendaService.getIncomingMeetingRequests(req.user.id, eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Incoming meeting requests retrieved successfully',
+        data: requests,
+        metadata: {
+          total: requests.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Incoming meeting requests retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get sent meeting requests (for sender)
+  @Get('meeting-requests/sent')
+  async getSentMeetingRequests(
+    @Request() req: any,
+    @Res() response: Response,
+    @Query('eventId') eventId?: string,
+  ) {
+    try {
+      const requests = await this.agendaService.getSentMeetingRequests(req.user.id, eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Sent meeting requests retrieved successfully',
+        data: requests,
+        metadata: {
+          total: requests.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Sent meeting requests retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get all my meetings (confirmed, pending, etc.)
+  @Get('meetings/my')
+  async getMyMeetings(
+    @Request() req: any,
+    @Res() response: Response,
+    @Query('eventId') eventId?: string,
+    @Query('status') status?: string,
+  ) {
+    try {
+      const meetings = await this.agendaService.getMyMeetings(req.user.id, eventId, status);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'My meetings retrieved successfully',
+        data: meetings,
+        metadata: {
+          total: meetings.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'My meetings retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Create meeting request
+  @Post('meeting-request')
+  async createMeetingRequest(
+    @Body() createMeetingDto: CreateMeetingRequestDto,
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-
-      createAgendaDto.createdBy = req.user.id;
-      const agenda = await this.agendaService.createAgenda(createAgendaDto);
+      const meeting = await this.agendaService.createMeetingRequest(createMeetingDto, req.user);
 
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'Agenda created successfully',
-        data: agenda,
+        message: 'Meeting request sent successfully',
+        data: meeting,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -54,79 +136,26 @@ export class AgendaController {
 
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Agenda creation', req.user?.id);
+      this.errorHandler.logError(error, 'Meeting request creation', req.user?.id);
       throw error;
     }
   }
 
-  @Get()
-  async getAllAgendas(
-    @Request() req: any,
-    @Res() response: Response,
-
-    @Query('eventId') eventId?: string,
-    @Query('userId') userId?: string,
-  ) {
-    try {
-      const agendas = await this.agendaService.getAllAgendas(eventId, userId);
-      
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Agendas retrieved successfully',
-        data: agendas,
-        metadata: {
-          total: agendas.length,
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Agendas retrieval', req.user?.id);
-      throw error;
-    }
-  }
-
-  @Get(':id')
-  async getAgendaById(
+  // Respond to meeting request
+  @Put('meeting-request/:id/respond')
+  async respondToMeetingRequest(
     @Param('id') id: string,
-    @Request() req: any,
-    @Res() response: Response,
-  ) {
-    try {
-      const agenda = await this.agendaService.getAgendaById(id);
-      
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Agenda retrieved successfully',
-        data: agenda,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Agenda retrieval by ID', req.user?.id);
-      throw error;
-    }
-  }
-
-  @Put('update/:id')
-  @Roles(UserRole.Admin)
-  async updateAgenda(
-    @Param('id') id: string,
-    @Body() updateAgendaDto: UpdateEventAgendaDto,
+    @Body() responseDto: RespondToMeetingRequestDto,
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const agenda = await this.agendaService.updateAgenda(id, updateAgendaDto);
+      const meeting = await this.agendaService.respondToMeetingRequest(id, responseDto, req.user);
 
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'Agenda updated successfully',
-        data: agenda,
+        message: `Meeting request ${responseDto.response} successfully`,
+        data: meeting,
         metadata: {
           timestamp: new Date().toISOString(),
         },
@@ -134,60 +163,112 @@ export class AgendaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Agenda update', req.user?.id);
+      this.errorHandler.logError(error, 'Meeting request response', req.user?.id);
       throw error;
     }
   }
 
-  @Delete('delete/:id')
-  @Roles(UserRole.Admin)
-  async deleteAgenda(
+  // Reschedule meeting
+  @Put('meeting/:id/reschedule')
+  async rescheduleMeeting(
+    @Param('id') id: string,
+    @Body() rescheduleDto: RescheduleMeetingDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const meeting = await this.agendaService.rescheduleMeeting(id, rescheduleDto, req.user);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Meeting rescheduled successfully',
+        data: meeting,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Meeting rescheduling', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get meeting by ID
+  @Get('meeting/:id')
+  async getMeetingById(
     @Param('id') id: string,
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const result = await this.agendaService.deleteAgenda(id);
-      
+      const meeting = await this.agendaService.getMeetingById(id, req.user);
+
       const successResponse: SuccessResponse = {
         success: true,
-        message: result.message,
-        data: null,
+        message: 'Meeting retrieved successfully',
+        data: meeting,
         metadata: {
           timestamp: new Date().toISOString(),
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Agenda deletion', req.user?.id);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Meeting retrieval', req.user?.id);
       throw error;
     }
   }
 
-  @Get('category/:eventId/:category')
-  async getAgendasByCategory(
-    @Param('eventId') eventId: string,
-    @Param('category') category: AgendaCategory,
-    @Request() req: any,
+  // Delete a specific meeting
+  @Delete('meeting/:id')
+  async deleteMeeting(
+    @Param('id') id: string,
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
-      const agendas = await this.agendaService.getAgendasByCategory(eventId, category);
-      
+      const result = await this.agendaService.deleteMeeting(id, req.user);
+
       const successResponse: SuccessResponse = {
         success: true,
-        message: `Agendas for category ${category} retrieved successfully`,
-        data: agendas,
+        message: result.message,
+        data: result,
         metadata: {
-          total: agendas.length,
           timestamp: new Date().toISOString(),
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Agendas retrieval by category', req.user?.id);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Meeting deletion', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Delete all meetings for a user
+  @Delete('meetings')
+  async deleteAllMeetings(
+    @Body() body: { userId: string; eventId?: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.agendaService.deleteAllMeetings(body.userId, body.eventId, req.user);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: result.message,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Bulk meeting deletion', req.user?.id);
       throw error;
     }
   }

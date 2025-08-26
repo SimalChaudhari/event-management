@@ -41,8 +41,6 @@ export class RegisterEvent {
   })
   type?: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  registerCode?: string;
 
   @Column({ type: 'uuid', nullable: true })
   orderId?: string;
@@ -59,6 +57,7 @@ export class RegisterEvent {
 
   @Column({ type: 'boolean', default: true })
   isRegister?: boolean;
+  
 
   @CreateDateColumn()
   createdAt!: Date;
