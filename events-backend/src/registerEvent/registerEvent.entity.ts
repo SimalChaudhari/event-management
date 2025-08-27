@@ -7,9 +7,11 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  OneToOne,
 } from 'typeorm';
 import { UserEntity } from 'user/users.entity';
 import { Status } from './registerEvent.dto';
+import { AdminInfo } from './admin-info.entity';
 
 @Entity('registerEvents')
 export class RegisterEvent {
@@ -61,4 +63,8 @@ export class RegisterEvent {
 
   @CreateDateColumn()
   createdAt!: Date;
+
+  // Admin Info relationship
+  @OneToOne(() => AdminInfo, (adminInfo) => adminInfo.registerEvent)
+  adminInfo?: AdminInfo;
 }

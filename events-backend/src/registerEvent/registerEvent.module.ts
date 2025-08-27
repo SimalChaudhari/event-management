@@ -4,6 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { RegisterEvent } from './registerEvent.entity';
 import { RegisterEventService } from './registerEvent.service';
 import { RegisterEventController } from './registerEvent.controller';
+import { AdminInfo } from './admin-info.entity';
+import { AdminInfoService } from './admin-info.service';
+import { AdminInfoController } from './admin-info.controller';
 import { Event, EventExhibitor } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
@@ -15,14 +18,14 @@ import { UtilsModule } from 'utils/utils.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda]), UtilsModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration
         }),
     ],
-    providers: [RegisterEventService, ErrorHandlerService],
-    controllers: [RegisterEventController],
-    exports: [RegisterEventService], // Export the service to be used in other modules
+    providers: [RegisterEventService, AdminInfoService, ErrorHandlerService],
+    controllers: [RegisterEventController, AdminInfoController],
+    exports: [RegisterEventService, AdminInfoService], // Export the service to be used in other modules
 })
 export class RegisterEventModule {}

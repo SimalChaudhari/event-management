@@ -27,6 +27,7 @@ import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
+import { AdminInfo } from './admin-info.entity';
 
 @Injectable()
 export class RegisterEventService {
@@ -45,6 +46,9 @@ export class RegisterEventService {
 
     @InjectRepository(EventAgenda)
     private readonly agendaRepository: Repository<EventAgenda>,
+
+    @InjectRepository(AdminInfo)
+    private readonly adminInfoRepository: Repository<AdminInfo>,
 
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
@@ -155,6 +159,7 @@ export class RegisterEventService {
             'event.eventExhibitors.exhibitor',
             'event.eventExhibitors.exhibitor.promotionalOffers',
             'order',
+            'adminInfo',
           ],
         });
       } else {
@@ -174,6 +179,7 @@ export class RegisterEventService {
             'event.eventExhibitors.exhibitor',
             'event.eventExhibitors.exhibitor.promotionalOffers',
             'order',
+            'adminInfo',
           ],
         });
       }
@@ -300,11 +306,19 @@ export class RegisterEventService {
             ...cleanRegisterEvent
           } = registerEvent;
 
+          // Get admin info for this registration
+          const adminInfo = registerEvent.adminInfo ? {
+            luckyDrawNumber: registerEvent.adminInfo.luckyDrawNumber,
+            tableNumber: registerEvent.adminInfo.tableNumber,
+            additionalInformation: registerEvent.adminInfo.additionalInformation,
+          } : null;
+
           return {
             ...cleanRegisterEvent,
             event,
             user: cleanedUser,
             isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+            adminInfo, // Add admin info
             // Add user's personal agenda data
           };
         }),
@@ -358,6 +372,7 @@ export class RegisterEventService {
           'event.eventExhibitors.exhibitor',
           'event.eventExhibitors.exhibitor.promotionalOffers',
           'order',
+          'adminInfo',
         ],
       });
 
@@ -490,6 +505,13 @@ export class RegisterEventService {
         ...cleanRegisterEvent
       } = registerEvent;
 
+      // Get admin info for this registration
+      const adminInfo = registerEvent.adminInfo ? {
+        luckyDrawNumber: registerEvent.adminInfo.luckyDrawNumber,
+        tableNumber: registerEvent.adminInfo.tableNumber,
+        additionalInformation: registerEvent.adminInfo.additionalInformation,
+      } : null;
+
       return {
         success: true,
         message: 'Register event fetched successfully',
@@ -498,6 +520,7 @@ export class RegisterEventService {
           event,
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+          adminInfo, // Add admin info
           // Add user's personal agenda data
         },
       };
