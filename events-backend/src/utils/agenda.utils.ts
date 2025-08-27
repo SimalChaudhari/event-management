@@ -2,6 +2,9 @@ import { EventAgenda } from '../agenda/agenda.entity';
 
 export interface FormattedAgenda {
   id: string;
+  eventId: string;
+  userId: string;
+  createdBy: string;
   title: string;
   time: string;
   duration: number;
@@ -10,13 +13,12 @@ export interface FormattedAgenda {
   category: string;
   meetingStatus?: string;
   requestStatus?: string;
+  requestType?: string;
   meetingNotes?: string;
   meetingDate?: Date;
   isMeetingRequest?: boolean;
   durationFormatted: string;
   timeRange: string;
-  tableNumber?: string;
-  luckyDrawTicketNumber?: string;
 }
 
 export class AgendaUtils {
@@ -58,6 +60,69 @@ export class AgendaUtils {
   }
 
   /**
+   * Validate if a date is in the future
+   * @param dateString Date string to validate
+   * @returns boolean True if date is in the future
+   */
+  static isFutureDate(dateString: string): boolean {
+    const date = new Date(dateString);
+    const now = new Date();
+    return date > now;
+  }
+
+  /**
+   * Validate if a date is within reasonable future limit (not more than 1 year)
+   * @param dateString Date string to validate
+   * @param maxYears Maximum years in the future (default: 1)
+   * @returns boolean True if date is within reasonable future limit
+   */
+  static isReasonableFutureDate(dateString: string, maxYears: number = 1): boolean {
+    const date = new Date(dateString);
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + maxYears);
+    return date <= maxDate;
+  }
+
+  /**
+   * Validate meeting date (not in past, not too far in future)
+   * @param dateString Date string to validate
+   * @param maxYears Maximum years in the future (default: 1)
+   * @returns object with validation result and error message if any
+   */
+  static validateMeetingDate(dateString: string, maxYears: number = 1): { isValid: boolean; errorMessage?: string } {
+    if (!this.isFutureDate(dateString)) {
+      return { 
+        isValid: false, 
+        errorMessage: 'Meeting date cannot be in the past.' 
+      };
+    }
+
+    if (!this.isReasonableFutureDate(dateString, maxYears)) {
+      return { 
+        isValid: false, 
+        errorMessage: `Meeting date cannot be more than ${maxYears} year(s) in the future.` 
+      };
+    }
+
+    return { isValid: true };
+  }
+
+  /**
+   * Format date for display
+   * @param date Date to format
+   * @returns Formatted date string
+   */
+  static formatDate(date: Date | string): string {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  /**
    * Format agenda data to show only readable, essential information
    * @param agendas Array of EventAgenda entities
    * @returns Array of formatted agenda objects
@@ -65,6 +130,9 @@ export class AgendaUtils {
   static formatAgendas(agendas: EventAgenda[]): FormattedAgenda[] {
     return agendas.map(agenda => ({
       id: agenda.id,
+      eventId: agenda.eventId,
+      userId: agenda.userId,
+      createdBy: agenda.createdBy,
       title: agenda.title,
       time: agenda.time,
       duration: agenda.duration,
@@ -73,14 +141,11 @@ export class AgendaUtils {
       category: agenda.category,
       meetingStatus: agenda.meetingStatus,
       requestStatus: agenda.requestStatus,
+      requestType: agenda.requestType,
       meetingNotes: agenda.meetingNotes,
       meetingDate: agenda.meetingDate,
       isMeetingRequest: agenda.isMeetingRequest,
-      tableNumber: agenda.tableNumber,
-      luckyDrawTicketNumber: agenda.luckyDrawTicketNumber,
-      // Add readable duration format
       durationFormatted: this.formatDuration(agenda.duration),
-      // Add readable time range
       timeRange: this.getTimeRange(agenda.time, agenda.duration)
     }));
   }
@@ -90,14 +155,17 @@ export class AgendaUtils {
    * @param agendaRepository TypeORM repository for EventAgenda
    * @param eventId Event ID
    * @param userId User ID
+   * @param registerEventRepository Optional repository for RegisterEvent to get user's table/lucky draw info
    * @returns Promise of formatted agenda items
    */
   static async getUserPersonalAgendas(
     agendaRepository: any,
     eventId: string,
-    userId: string
+    userId: string,
+    registerEventRepository?: any
   ): Promise<FormattedAgenda[]> {
-    const myAgendas = await agendaRepository.find({
+    // Get all agendas where user is involved (either as recipient or creator)
+    const allAgendas = await agendaRepository.find({
       where: [
         { eventId: eventId, userId: userId, isActive: true },
         { eventId: eventId, createdBy: userId, isActive: true }
@@ -105,7 +173,75 @@ export class AgendaUtils {
       order: { time: 'ASC' }
     });
 
-    return this.formatAgendas(myAgendas);
+    // Filter and deduplicate agendas based on meeting request logic
+    const filteredAgendas = this.filterRelevantAgendas(allAgendas, userId);
+
+    let userRegistration = null;
+    let event = null;
+    if (registerEventRepository) {
+      try {
+        userRegistration = await registerEventRepository.findOne({
+          where: { eventId: eventId, userId: userId },
+          relations: ['event']
+        });
+        event = userRegistration?.event;
+      } catch (error) {
+        // If there's an error fetching registration, continue without table/lucky draw info
+        console.warn('Could not fetch user registration for table/lucky draw info:', error);
+      }
+    }
+
+    // Format agendas and include user's table/lucky draw info
+    const formattedAgendas = this.formatAgendas(filteredAgendas);
+    
+    // Add user's table and lucky draw info to each agenda item
+    return formattedAgendas.map(agenda => ({
+      ...agenda,
+      // No need to connect agenda with lucky draw functionality
+    }));
+  }
+
+  /**
+   * Filter agendas to show only relevant meeting requests based on user's role
+   * @param agendas Array of all agendas where user is involved
+   * @param userId Current user ID
+   * @returns Filtered array of relevant agendas
+   */
+  private static filterRelevantAgendas(agendas: any[], userId: string): any[] {
+    const agendaMap = new Map();
+    
+    agendas.forEach(agenda => {
+      // Create a unique key based on meeting content (excluding ID and requestType)
+      const meetingKey = `${agenda.eventId}-${agenda.title}-${agenda.time}-${agenda.duration}-${agenda.meetingDate}`;
+      
+      if (!agendaMap.has(meetingKey)) {
+        // For the first occurrence, determine the appropriate requestType
+        let finalRequestType = agenda.requestType;
+        
+        // If user is both creator and recipient, prioritize based on context
+        if (agenda.userId === userId && agenda.createdBy === userId) {
+          // Self-meeting - show as sent
+          finalRequestType = 'sent';
+        } else if (agenda.userId === userId) {
+          // User is recipient - show as incoming
+          finalRequestType = 'incoming';
+        } else if (agenda.createdBy === userId) {
+          // User is creator - show as sent
+          finalRequestType = 'sent';
+        }
+        
+        // Create a modified agenda object with the correct requestType
+        const relevantAgenda = {
+          ...agenda,
+          requestType: finalRequestType
+        };
+        
+        agendaMap.set(meetingKey, relevantAgenda);
+      }
+    });
+
+    // Convert map values to array
+    return Array.from(agendaMap.values());
   }
 
   /**
@@ -165,5 +301,67 @@ export class AgendaUtils {
    */
   static filterAgendasByStatus(agendas: FormattedAgenda[], status: string): FormattedAgenda[] {
     return agendas.filter(agenda => agenda.meetingStatus === status);
+  }
+
+  /**
+   * Filter agendas by request type
+   * @param agendas Array of formatted agendas
+   * @param requestType Request type to filter by ('incoming' or 'sent')
+   * @returns Filtered array of agendas
+   */
+  static filterAgendasByRequestType(agendas: FormattedAgenda[], requestType: string): FormattedAgenda[] {
+    return agendas.filter(agenda => agenda.requestType === requestType);
+  }
+
+  /**
+   * Get meeting requests summary
+   * @param agendas Array of formatted agendas
+   * @returns Summary object with request type counts
+   */
+  static getMeetingRequestsSummary(agendas: FormattedAgenda[]) {
+    const meetingRequests = agendas.filter(a => a.isMeetingRequest);
+    const incoming = meetingRequests.filter(a => a.requestType === 'incoming').length;
+    const sent = meetingRequests.filter(a => a.requestType === 'sent').length;
+    const pending = meetingRequests.filter(a => a.requestStatus === 'pending').length;
+    const accepted = meetingRequests.filter(a => a.requestStatus === 'accepted').length;
+    const rejected = meetingRequests.filter(a => a.requestStatus === 'rejected').length;
+
+    return {
+      total: meetingRequests.length,
+      byType: { incoming, sent },
+      byStatus: { pending, accepted, rejected },
+      hasIncomingRequests: incoming > 0,
+      hasSentRequests: sent > 0,
+      hasPendingRequests: pending > 0
+    };
+  }
+
+  /**
+   * Check if a user is registered for an event
+   * @param registerEventRepository Repository for RegisterEvent
+   * @param userId User ID to check
+   * @param eventId Event ID to check
+   * @returns Promise<boolean> True if user is registered, false otherwise
+   */
+  static async isUserRegisteredForEvent(
+    registerEventRepository: any,
+    userId: string,
+    eventId: string
+  ): Promise<boolean> {
+    try {
+      const registration = await registerEventRepository.findOne({
+        where: { 
+          userId, 
+          eventId, 
+          isRegister: true,
+          status: 'Sucesss' // Using the enum value from the entity
+        }
+      });
+      
+      return !!registration;
+    } catch (error) {
+      console.error('Error checking user event registration:', error);
+      return false;
+    }
   }
 }

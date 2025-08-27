@@ -11,17 +11,14 @@ export enum Status {
   Withdraw = 'Withdraw',
 }
 
+// DTO for regular user registration (userId comes from JWT token)
 export class CreateRegisterEventDto {
-  @IsUUID()
-  userId?: string;
-
   @IsOptional()
   @IsString()
   eventId?: string;
 
   @IsEnum(Type)
   type: Type = Type.Attendee;  // Default type is 'Attendee'
-
 
   @IsOptional()
   @IsUUID()
@@ -38,9 +35,13 @@ export class CreateRegisterEventDto {
   @IsOptional()
   @IsBoolean()
   isRegister?: boolean = true;
-
 }
-// ... existing code ...
+
+// DTO for admin registration (userId required in body)
+export class AdminCreateRegisterEventDto extends CreateRegisterEventDto {
+  @IsUUID()
+  userId!: string; // Required for admin to specify which user to register
+}
 
 export class UpdateRegisterEventDto {
   userId?: string;

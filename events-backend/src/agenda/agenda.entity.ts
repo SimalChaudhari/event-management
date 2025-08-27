@@ -37,6 +37,11 @@ export enum RequestStatus {
   Rejected = 'rejected',
 }
 
+export enum RequestType {
+  Incoming = 'incoming',  // Request received by the user
+  Sent = 'sent',          // Request sent by the user
+}
+
 @Entity('event_agendas')
 export class EventAgenda {
   @PrimaryGeneratedColumn('uuid')
@@ -76,13 +81,6 @@ export class EventAgenda {
   @Column({ type: 'uuid' })
   createdBy!: string;
 
-   // New fields for table seating and lucky draw
-   @Column({ type: 'varchar', length: 100, nullable: true })
-   tableNumber?: string;
- 
-   @Column({ type: 'varchar', length: 100, nullable: true })
-   luckyDrawTicketNumber?: string;
-
   @CreateDateColumn()
   createdAt!: Date;
 
@@ -115,8 +113,12 @@ export class EventAgenda {
   @Column({ type: 'boolean', default: false })
   isMeetingRequest?: boolean; // True if this is a meeting request
 
-  @Column({ type: 'uuid', nullable: true })
-  parentMeetingId?: string; // For rescheduled meetings
+  @Column({ 
+    type: 'enum', 
+    enum: RequestType, 
+    nullable: true 
+  })
+  requestType?: RequestType; // Type of request: incoming or sent
 
   @Column({ type: 'timestamp', nullable: true })
   meetingDate?: Date; // Specific date for the meeting

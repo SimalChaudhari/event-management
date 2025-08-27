@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus } from '@nestjs/common';
 import { RegisterEventService } from './registerEvent.service';
-import { CreateRegisterEventDto, UpdateRegisterEventDto } from './registerEvent.dto';
+import { CreateRegisterEventDto, UpdateRegisterEventDto, AdminCreateRegisterEventDto } from './registerEvent.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { Request, Response } from 'express';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -9,8 +9,6 @@ import { UserRole } from 'user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import {
-  ResourceNotFoundException,
-  DuplicateResourceException,
   ValidationException
 } from '../utils/exceptions/custom-exceptions';
 
@@ -26,11 +24,14 @@ export class RegisterEventController {
   @Post('create')
   async createRegisterEvent(
     @Req() req: Request,
-    @Body() createRegisterEventDto: CreateRegisterEventDto,
+    @Body() createRegisterEventDto: CreateRegisterEventDto, // No userId needed - comes from JWT token
     @Res() response: Response,
   ) {
     try {
+      // Get user ID from JWT token (authenticated user)
       const userId = req.user.id;
+      
+      // Create registration using the authenticated user's ID
       const registration = await this.registerEventService.createRegisterEvent(userId, createRegisterEventDto);
       
       const successResponse: SuccessResponse = {
@@ -52,7 +53,7 @@ export class RegisterEventController {
   @Post('admin/create')
   async adminCreateRegisterEvent(
     @Req() req: Request,
-    @Body() createRegisterEventDto: CreateRegisterEventDto,
+    @Body() createRegisterEventDto: AdminCreateRegisterEventDto, // userId required for admin
     @Res() response: Response,
   ) {
     try {

@@ -112,7 +112,7 @@ export class RegisterEventService {
 
       // Create new registration
       const registerEventData = {
-        userId: userId,
+        userId: userId, // Use the authenticated user's ID from token
         eventId: eventId,
         type: finalType,
         isCreatedByAdmin: isCreatedByAdmin || false,

@@ -11,8 +11,18 @@ import {
   Min,
   Max,
   Matches,
+  Validate,
 } from 'class-validator';
-import { AgendaCategory, MeetingStatus, RequestStatus } from './agenda.entity';
+import { AgendaCategory, MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
+
+// Custom validator for future dates
+export class FutureDateValidator {
+  static validate(value: string): boolean {
+    const date = new Date(value);
+    const now = new Date();
+    return date > now;
+  }
+}
 
 export class CreateEventAgendaDto {
   @IsNotEmpty()
@@ -226,6 +236,14 @@ export class RescheduleMeetingDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsString()
+  newLocation?: string;
+
+  @IsOptional()
+  @IsString()
+  newDetails?: string;
 }
 
 export class EventAgendaResponseDto {
@@ -246,6 +264,7 @@ export class EventAgendaResponseDto {
   // New meeting fields
   meetingStatus?: MeetingStatus;
   requestStatus?: RequestStatus;
+  requestType?: RequestType;
   attendees?: string[];
   meetingNotes?: string;
   isMeetingRequest?: boolean;
@@ -270,6 +289,7 @@ export class EventAgendaListResponseDto {
   // New meeting fields
   meetingStatus?: MeetingStatus;
   requestStatus?: RequestStatus;
+  requestType?: RequestType;
   attendees?: string[];
   meetingNotes?: string;
   isMeetingRequest?: boolean;

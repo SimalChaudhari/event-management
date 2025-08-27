@@ -4,13 +4,15 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EventAgenda, AgendaCategory, MeetingStatus, RequestStatus } from './agenda.entity';
+import { EventAgenda, AgendaCategory, MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
 import { 
   CreateMeetingRequestDto,
   RespondToMeetingRequestDto,
   RescheduleMeetingDto
 } from './agenda.dto';
 import { Event } from '../event/event.entity';
+import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { Status } from '../registerEvent/registerEvent.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
   ResourceNotFoundException,
@@ -19,7 +21,8 @@ import {
 import { UserEntity } from 'user/users.entity';
 import { EmailService } from '../service/email.service';
 import { MeetingEmailTemplates } from '../utils/meeting-email-templates.utils';
-import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { AgendaUtils } from '../utils/agenda.utils';
+
 
 @Injectable()
 export class AgendaService {
@@ -41,11 +44,47 @@ export class AgendaService {
 
 
   // New method for getting incoming meeting requests (for recipient)
-  async getIncomingMeetingRequests(userId: string, eventId?: string) {
+  async getIncomingMeetingRequests(userId: string, eventId?: string, currentUser?: any) {
     try {
+      // Admin can view all incoming meeting requests without restrictions
+      if (currentUser.role === 'admin') {
+        const queryBuilder = this.agendaRepository
+          .createQueryBuilder('agenda')
+          .where('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
+          .andWhere('agenda.isActive = :isActive', { isActive: true });
+
+        if (eventId) {
+          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
+        }
+
+        const requests = await queryBuilder.getMany();
+        
+        // Format the requests using AgendaUtils and ensure requestType is 'admin-view'
+        const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
+          ...request,
+          requestType: 'admin-view',
+          isAdminAccess: true
+        }));
+        
+        return formattedRequests;
+      }
+
+      // Regular users can only view their own incoming requests
+      if (currentUser.id !== userId) {
+        throw new BadRequestException('You can only view your own incoming meeting requests.');
+      }
+
+      // Check if user is registered for the event (if eventId is provided)
+      if (eventId) {
+        const userRegistration = await this.checkUserEventRegistration(userId, eventId);
+        if (!userRegistration) {
+          throw new BadRequestException('You must be registered for this event to view meeting requests.');
+        }
+      }
+
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
-        .where('agenda.userId = :userId', { userId })
+        .where('agenda.userId = :userId', { userId }) // User is the recipient
         .andWhere('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
 
@@ -54,18 +93,64 @@ export class AgendaService {
       }
 
       const requests = await queryBuilder.getMany();
-      return requests.map(request => this.formatAgendaResponse(request));
+      
+      // Format the requests using AgendaUtils and ensure requestType is 'incoming'
+      const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
+        ...request,
+        requestType: 'incoming' // This is always incoming for the recipient
+      }));
+      
+      return formattedRequests;
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.errorHandler.handleDatabaseError(error, 'Incoming meeting requests retrieval');
     }
   }
 
   // New method for getting sent meeting requests (for sender)
-  async getSentMeetingRequests(userId: string, eventId?: string) {
+  async getSentMeetingRequests(userId: string, eventId?: string, currentUser?: any) {
     try {
+      // Admin can view all sent meeting requests without restrictions
+      if (currentUser.role === 'admin') {
+        const queryBuilder = this.agendaRepository
+          .createQueryBuilder('agenda')
+          .where('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
+          .andWhere('agenda.isActive = :isActive', { isActive: true });
+
+        if (eventId) {
+          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
+        }
+
+        const requests = await queryBuilder.getMany();
+        
+        // Format the requests using AgendaUtils and ensure requestType is 'sent'
+        const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
+          ...request,
+          requestType: 'admin-view',
+          isAdminAccess: true
+        }));
+        
+        return formattedRequests;
+      }
+
+      // Regular users can only view their own sent requests
+      if (currentUser.id !== userId) {
+        throw new BadRequestException('You can only view your own sent meeting requests.');
+      }
+
+      // Check if user is registered for the event (if eventId is provided)
+      if (eventId) {
+        const userRegistration = await this.checkUserEventRegistration(userId, eventId);
+        if (!userRegistration) {
+          throw new BadRequestException('You must be registered for this event to view meeting requests.');
+        }
+      }
+
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
-        .where('agenda.createdBy = :userId', { userId })
+        .where('agenda.createdBy = :userId', { userId }) // User is the creator
         .andWhere('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
 
@@ -74,15 +159,83 @@ export class AgendaService {
       }
 
       const requests = await queryBuilder.getMany();
-      return requests.map(request => this.formatAgendaResponse(request));
+      
+      // Debug: Log the raw requests to see what's in the database
+      console.log('Raw sent requests:', requests.map(r => ({
+        id: r.id,
+        requestType: r.requestType,
+        isMeetingRequest: r.isMeetingRequest,
+        userId: r.userId,
+        createdBy: r.createdBy
+      })));
+      
+      // Format the requests using AgendaUtils and ensure requestType is 'sent'
+      const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
+        ...request,
+        requestType: 'sent' // This is always sent for the creator
+      }));
+      
+      // Debug: Log the formatted requests
+      console.log('Formatted sent requests:', formattedRequests.map(r => ({
+        id: r.id,
+        requestType: r.requestType,
+        isMeetingRequest: r.isMeetingRequest
+      })));
+      
+      return formattedRequests;
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.errorHandler.handleDatabaseError(error, 'Sent meeting requests retrieval');
     }
   }
 
   // New method for getting user's meetings (all types)
-  async getMyMeetings(userId: string, eventId?: string, status?: string) {
+  async getMyMeetings(userId: string, eventId?: string, status?: string, currentUser?: any) {
     try {
+      // Admin can view all meetings without restrictions
+      if (currentUser.role === 'admin') {
+        const queryBuilder = this.agendaRepository
+          .createQueryBuilder('agenda')
+          .where('agenda.isActive = :isActive', { isActive: true });
+
+        if (eventId) {
+          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
+        }
+
+        if (status) {
+          queryBuilder.andWhere('agenda.meetingStatus = :status', { status });
+        }
+
+        // Order by creation date (newest first)
+        queryBuilder.orderBy('agenda.createdAt', 'DESC');
+
+        const meetings = await queryBuilder.getMany();
+        
+        // Format the meetings using AgendaUtils
+        const formattedMeetings = AgendaUtils.formatAgendas(meetings).map(meeting => ({
+          ...meeting,
+          requestType: 'admin-view',
+          isAdminAccess: true
+        }));
+        
+        return formattedMeetings;
+      }
+
+      // Regular users can only view their own meetings
+      if (currentUser.id !== userId) {
+        throw new BadRequestException('You can only view your own meetings.');
+      }
+
+      // Check if user is registered for the event (if eventId is provided)
+      if (eventId) {
+        const userRegistration = await this.checkUserEventRegistration(currentUser.id, eventId);
+        if (!userRegistration) {
+          throw new BadRequestException('You must be registered for this event to view meetings.');
+        }
+      }
+
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
         .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId })
@@ -97,8 +250,31 @@ export class AgendaService {
       }
 
       const meetings = await queryBuilder.getMany();
-      return meetings.map(meeting => this.formatAgendaResponse(meeting));
+      
+      // Format the meetings using AgendaUtils and determine requestType based on user's role
+      const formattedMeetings = AgendaUtils.formatAgendas(meetings).map(meeting => {
+        let requestType = 'meeting'; // Default for regular meetings
+        
+        if (meeting.isMeetingRequest) {
+          // Determine if this is incoming or sent based on user's role
+          if (meeting.userId === userId) {
+            requestType = 'incoming'; // User is recipient
+          } else if (meeting.createdBy === userId) {
+            requestType = 'sent'; // User is creator
+          }
+        }
+        
+        return {
+          ...meeting,
+          requestType
+        };
+      });
+      
+      return formattedMeetings;
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.errorHandler.handleDatabaseError(error, 'My meetings retrieval');
     }
   }
@@ -122,22 +298,84 @@ export class AgendaService {
         throw new ResourceNotFoundException('User', createMeetingDto.targetUserId);
       }
 
+      // Allow both registered users and exhibitors to create and receive meeting requests
       if (!targetUser.role || (targetUser.role !== 'exhibitor' && targetUser.role !== 'user')) {
         throw new BadRequestException('Only exhibitors and regular users can receive meeting requests.');
       }
 
-      // Check if current user is registered for the event
-      await this.validateBothUsersRegistration(createMeetingDto.eventId, currentUser.id, createMeetingDto.targetUserId);
+      // Validate that current user also has appropriate role
+      if (!currentUser.role || (currentUser.role !== 'exhibitor' && currentUser.role !== 'user')) {
+        throw new BadRequestException('Only exhibitors and regular users can create meeting requests.');
+      }
 
-      // Check for time conflicts
-      await this.checkTimeConflicts(
+      // Prevent users from creating meeting requests with themselves
+      if (currentUser.id === createMeetingDto.targetUserId) {
+        throw new BadRequestException('You cannot create a meeting request with yourself.');
+      }
+
+      // Check if both users are registered for the event
+      const [senderRegistration, targetRegistration] = await Promise.all([
+        this.checkUserEventRegistration(currentUser.id, createMeetingDto.eventId),
+        this.checkUserEventRegistration(createMeetingDto.targetUserId, createMeetingDto.eventId)
+      ]);
+
+      if (!senderRegistration) {
+        throw new BadRequestException('You must be registered for this event to send meeting requests.');
+      }
+
+      if (!targetRegistration) {
+        throw new BadRequestException('The target user must be registered for this event to receive meeting requests.');
+      }
+
+      // Use AgendaUtils to validate meeting date
+      const dateValidation = AgendaUtils.validateMeetingDate(createMeetingDto.meetingDate, 1);
+      if (!dateValidation.isValid) {
+        throw new BadRequestException(dateValidation.errorMessage);
+      }
+
+      // Validate meeting duration is reasonable (already validated in DTO, but double-check)
+      if (createMeetingDto.duration < 15 || createMeetingDto.duration > 480) {
+        throw new BadRequestException('Meeting duration must be between 15 minutes and 8 hours.');
+      }
+
+      // Validate meeting time format (already validated in DTO, but double-check)
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (!timeRegex.test(createMeetingDto.time)) {
+        throw new BadRequestException('Meeting time must be in HH:MM format (24-hour).');
+      }
+
+      // Validate meeting location is provided (optional but recommended)
+      if (!createMeetingDto.location || createMeetingDto.location.trim() === '') {
+        console.warn('Meeting location not provided. Consider adding a location for better organization.');
+      }
+
+      // Validate meeting details are provided (optional but recommended)
+      if (!createMeetingDto.details || createMeetingDto.details.trim() === '') {
+        console.warn('Meeting details not provided. Consider adding details for better context.');
+      }
+
+      // Validate meeting notes are provided (optional but recommended)
+      if (!createMeetingDto.meetingNotes || createMeetingDto.meetingNotes.trim() === '') {
+        console.warn('Meeting notes not provided. Consider adding notes for better organization.');
+      }
+
+      // Ensure meeting attendees are properly set
+      const attendees = [currentUser.id, createMeetingDto.targetUserId];
+      if (attendees.length < 2) {
+        throw new BadRequestException('Meeting must have at least 2 attendees (sender and recipient).');
+      }
+
+      // All validations passed, proceed with meeting creation
+      // Check for time conflicts on the specific date
+      await this.checkTimeConflictsOnDate(
         createMeetingDto.eventId,
         createMeetingDto.time,
         createMeetingDto.duration,
+        new Date(createMeetingDto.meetingDate),
         undefined,
       );
 
-      // Create meeting request
+      // Create only ONE meeting entry - this will be used for both sender and recipient
       const meetingRequest = this.agendaRepository.create({
         eventId: createMeetingDto.eventId,
         userId: createMeetingDto.targetUserId, // Target user receives the request
@@ -149,19 +387,43 @@ export class AgendaService {
         category: AgendaCategory.Meeting,
         createdBy: currentUser.id,
         isMeetingRequest: true,
+        requestType: RequestType.Incoming, // Set as incoming for the recipient
         meetingStatus: MeetingStatus.Pending,
         requestStatus: RequestStatus.Pending,
-        attendees: [currentUser.id, createMeetingDto.targetUserId],
+        attendees: attendees,
         meetingNotes: createMeetingDto.meetingNotes,
         meetingDate: new Date(createMeetingDto.meetingDate),
       });
 
       const savedMeeting = await this.agendaRepository.save(meetingRequest);
 
+      // Debug: Log the saved meeting to see what was actually saved
+      console.log('Saved meeting data:', {
+        id: savedMeeting.id,
+        requestType: savedMeeting.requestType,
+        isMeetingRequest: savedMeeting.isMeetingRequest,
+        meetingStatus: savedMeeting.meetingStatus,
+        requestStatus: savedMeeting.requestStatus
+      });
+
       // Send notification to the target user about the meeting request
       await this.sendMeetingRequestNotification(savedMeeting, currentUser, targetUser);
 
-      return await this.getAgendaWithRelations(savedMeeting.id);
+      // Meeting request created successfully
+      console.log(`Meeting request created successfully: ${savedMeeting.id} by ${currentUser.id} for ${targetUser.id}`);
+
+      const response = await this.getAgendaWithRelations(savedMeeting.id);
+      
+      // Debug: Log the response to see what's being returned
+      console.log('Response data:', {
+        id: response?.id,
+        requestType: response?.requestType,
+        isMeetingRequest: response?.isMeetingRequest,
+        meetingStatus: response?.meetingStatus,
+        requestStatus: response?.requestStatus
+      });
+
+      return response;
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -192,7 +454,13 @@ export class AgendaService {
         throw new BadRequestException('This is not a meeting request.');
       }
 
-      // Update meeting status based on response
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to respond to meeting requests.');
+      }
+
+      // Update both statuses consistently based on response
       if (responseDto.response === RequestStatus.Accepted) {
         meeting.requestStatus = RequestStatus.Accepted;
         meeting.meetingStatus = MeetingStatus.Confirmed;
@@ -213,6 +481,9 @@ export class AgendaService {
       // Send notification to the meeting creator
       await this.sendMeetingResponseNotification(meeting, responseDto, currentUser);
 
+      // Meeting response processed successfully
+      console.log(`Meeting response processed successfully: ${meeting.id} by ${currentUser.id} with response: ${responseDto.response}`);
+
       return await this.getAgendaWithRelations(updatedMeeting.id);
     } catch (error) {
       if (
@@ -228,27 +499,91 @@ export class AgendaService {
   // New method for rescheduling meetings
   async rescheduleMeeting(meetingId: string, rescheduleDto: RescheduleMeetingDto, currentUser?: any) {
     try {
+      // Validate input parameters
+      if (!meetingId || !rescheduleDto || !currentUser) {
+        throw new BadRequestException('Missing required parameters for rescheduling.');
+      }
+
+      // Find the meeting to reschedule
       const meeting = await this.agendaRepository.findOne({ where: { id: meetingId } });
       if (!meeting) {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
 
-      // Validate permissions
+      // Validate that the meeting is active
+      if (!meeting.isActive) {
+        throw new BadRequestException('Cannot reschedule an inactive meeting.');
+      }
+
+      // Validate permissions - only meeting creator or recipient can reschedule
       if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
         throw new BadRequestException('You can only reschedule meetings that you own or created.');
       }
 
-      // Validate that this is a confirmed meeting
-      if (meeting.requestStatus !== RequestStatus.Accepted) {
-        throw new BadRequestException('You can only reschedule confirmed meetings.');
+      // Validate that this is a meeting that can be rescheduled
+      if (!meeting.isMeetingRequest) {
+        // For regular meetings, check if they're confirmed
+        if (meeting.meetingStatus !== MeetingStatus.Confirmed) {
+          throw new BadRequestException('You can only reschedule confirmed meetings.');
+        }
+      } else {
+        // For meeting requests, check if they're accepted
+        if (meeting.requestStatus !== RequestStatus.Accepted) {
+          throw new BadRequestException('You can only reschedule accepted meeting requests.');
+        }
       }
 
-      // Check for time conflicts with new time
-      await this.checkTimeConflicts(
+      // Check if the meeting is already in progress or completed
+      if (meeting.meetingDate && meeting.meetingDate <= new Date()) {
+        throw new BadRequestException('Cannot reschedule a meeting that has already started or completed.');
+      }
+
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to reschedule meetings.');
+      }
+
+      // Validate new date and time using AgendaUtils
+      const dateValidation = AgendaUtils.validateMeetingDate(rescheduleDto.newDate, 1);
+      if (!dateValidation.isValid) {
+        throw new BadRequestException(dateValidation.errorMessage);
+      }
+
+      // Validate that new date/time is not too close to current time (minimum 1 hour notice)
+      const newMeetingDate = new Date(rescheduleDto.newDate);
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+      
+      if (newMeetingDate <= oneHourFromNow) {
+        throw new BadRequestException('New meeting time must be at least 1 hour from now.');
+      }
+
+      // Validate meeting time format
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (!timeRegex.test(rescheduleDto.newTime)) {
+        throw new BadRequestException('Meeting time must be in HH:MM format (24-hour).');
+      }
+
+      // Validate that new date/time is different from current
+      const currentMeetingDate = meeting.meetingDate;
+      
+      if (!currentMeetingDate) {
+        throw new BadRequestException('Original meeting date is missing. Cannot reschedule.');
+      }
+      
+      if (newMeetingDate.getTime() === currentMeetingDate.getTime() && 
+          rescheduleDto.newTime === meeting.time) {
+        throw new BadRequestException('New date and time must be different from current meeting date and time.');
+      }
+
+      // Check for time conflicts on the new date
+      await this.checkTimeConflictsOnDate(
         meeting.eventId,
         rescheduleDto.newTime,
         meeting.duration,
-        meetingId,
+        newMeetingDate,
+        meetingId
       );
 
       // Get user details for notifications
@@ -257,47 +592,50 @@ export class AgendaService {
         this.userRepository.findOne({ where: { id: meeting.userId } })
       ]);
 
-      // Create new meeting entry for rescheduled time
-      const rescheduledMeeting = this.agendaRepository.create({
-        eventId: meeting.eventId,
-        userId: meeting.userId,
-        title: `${meeting.title} (Rescheduled)`,
-        time: rescheduleDto.newTime,
-        duration: meeting.duration,
+      // Store original values for notification purposes
+      const originalMeetingData = {
+        title: meeting.title,
+        time: meeting.time,
+        date: meeting.meetingDate,
         location: meeting.location,
-        details: meeting.details,
-        category: AgendaCategory.Meeting,
-        createdBy: currentUser.id,
-        isMeetingRequest: false,
-        meetingStatus: MeetingStatus.Rescheduled,
-        requestStatus: RequestStatus.Accepted,
-        attendees: meeting.attendees,
-        meetingNotes: rescheduleDto.reason 
-          ? `Rescheduled: ${rescheduleDto.reason}\n\nOriginal meeting: ${meeting.id}`
-          : `Rescheduled from original meeting: ${meeting.id}`,
-        meetingDate: new Date(rescheduleDto.newDate),
-        parentMeetingId: meeting.id,
-      });
+        details: meeting.details
+      };
 
-      // Update original meeting status
-      meeting.meetingStatus = MeetingStatus.Cancelled;
+      // Update the existing meeting with new details
+      meeting.time = rescheduleDto.newTime;
+      meeting.meetingDate = newMeetingDate;
+      meeting.location = rescheduleDto.newLocation || meeting.location;
+      meeting.details = rescheduleDto.newDetails || meeting.details;
+      meeting.meetingStatus = MeetingStatus.Confirmed; // Ensure it's confirmed
+      meeting.requestStatus = RequestStatus.Accepted; // Ensure it's accepted
+      meeting.isMeetingRequest = false; // No longer a request after rescheduling
+      meeting.requestType = undefined; // No request type for rescheduled meetings
+      
+      // Add reschedule information to meeting notes
+      const rescheduleNote = `Rescheduled by ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
+      const reasonNote = rescheduleDto.reason ? `\nReason: ${rescheduleDto.reason}` : '';
+      const originalDetails = `\nOriginal: ${originalMeetingData.time} on ${originalMeetingData.date?.toLocaleDateString()}`;
+      
       meeting.meetingNotes = meeting.meetingNotes 
-        ? `${meeting.meetingNotes}\n\nCancelled due to rescheduling`
-        : 'Cancelled due to rescheduling';
+        ? `${meeting.meetingNotes}\n\n${rescheduleNote}${reasonNote}${originalDetails}`
+        : `${rescheduleNote}${reasonNote}${originalDetails}`;
 
-      await this.agendaRepository.save(meeting);
-      const savedRescheduledMeeting = await this.agendaRepository.save(rescheduledMeeting);
+      // Save the updated meeting
+      const updatedMeeting = await this.agendaRepository.save(meeting);
 
       // Send notifications to the other party
       await this.sendRescheduleNotifications(
-        meeting,
-        savedRescheduledMeeting,
+        originalMeetingData,
+        updatedMeeting,
         currentUserDetails,
         targetUserDetails,
         rescheduleDto
       );
 
-      return await this.getAgendaWithRelations(savedRescheduledMeeting.id);
+      // Meeting rescheduled successfully
+      console.log(`Meeting rescheduled successfully: ${meeting.id} by ${currentUser.id}`);
+
+      return await this.getAgendaWithRelations(updatedMeeting.id);
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -310,6 +648,7 @@ export class AgendaService {
     }
   }
 
+
   // New method for getting meeting by ID
   async getMeetingById(meetingId: string, currentUser?: any) {
     try {
@@ -318,12 +657,44 @@ export class AgendaService {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
 
+      // Admin can view any meeting without restrictions
+      if (currentUser.role === 'admin') {
+        const formattedMeeting = AgendaUtils.formatAgendas([meeting])[0];
+        return {
+          ...formattedMeeting,
+          requestType: 'admin-view',
+          isAdminAccess: true
+        };
+      }
+
       // Validate that current user has access to this meeting
       if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
         throw new BadRequestException('You can only view meetings that you own or created.');
       }
 
-      return this.formatAgendaResponse(meeting);
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to view meetings.');
+      }
+
+      // Format the meeting using AgendaUtils and determine requestType based on user's role
+      const formattedMeeting = AgendaUtils.formatAgendas([meeting])[0];
+      
+      // Determine request type based on user's role
+      let requestType = 'meeting'; // Default for regular meetings
+      if (meeting.isMeetingRequest) {
+        if (meeting.userId === currentUser.id) {
+          requestType = 'incoming'; // User is recipient
+        } else if (meeting.createdBy === currentUser.id) {
+          requestType = 'sent'; // User is creator
+        }
+      }
+      
+      return {
+        ...formattedMeeting,
+        requestType
+      };
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -343,9 +714,27 @@ export class AgendaService {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
 
-      // Validate permissions
-      if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
-        throw new BadRequestException('You can only delete meetings that you own or created.');
+      // Admin can delete any meeting without restrictions
+      if (currentUser.role === 'admin') {
+        meeting.isActive = false;
+        meeting.meetingNotes = meeting.meetingNotes 
+          ? `${meeting.meetingNotes}\n\nDeleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`
+          : `Deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
+
+        await this.agendaRepository.save(meeting);
+        console.log(`Meeting deleted by admin: ${meetingId} by ${currentUser.id}`);
+        return { message: 'Meeting deleted successfully by admin' };
+      }
+
+      // Regular users can only delete meetings they created (not received)
+      if (meeting.createdBy !== currentUser.id) {
+        throw new BadRequestException('You can only delete meetings that you created. You cannot delete meeting requests sent to you.');
+      }
+
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to delete meetings.');
       }
 
       // Soft delete by setting isActive to false
@@ -355,6 +744,9 @@ export class AgendaService {
         : `Deleted by ${currentUser.firstName} ${currentUser.lastName} on ${new Date().toISOString()}`;
 
       await this.agendaRepository.save(meeting);
+
+      // Meeting deleted successfully
+      console.log(`Meeting deleted successfully: ${meetingId} by ${currentUser.id}`);
 
       return { message: 'Meeting deleted successfully' };
     } catch (error) {
@@ -368,12 +760,20 @@ export class AgendaService {
     }
   }
 
-  // New method for deleting all meetings for a user
+  // New method for deleting all meetings for a user (Admin only)
   async deleteAllMeetings(userId: string, eventId?: string, currentUser?: any) {
     try {
-      // Validate that current user is deleting their own meetings
-      if (currentUser.id !== userId) {
-        throw new BadRequestException('You can only delete your own meetings.');
+      // Only admin can delete all meetings
+      if (currentUser.role !== 'admin') {
+        throw new BadRequestException('Only administrators can delete all meetings.');
+      }
+
+      // Check if current user is registered for the event (if eventId is provided)
+      if (eventId) {
+        const userRegistration = await this.checkUserEventRegistration(currentUser.id, eventId);
+        if (!userRegistration) {
+          throw new BadRequestException('You must be registered for this event to delete meetings.');
+        }
       }
 
       const queryBuilder = this.agendaRepository
@@ -395,11 +795,14 @@ export class AgendaService {
       for (const meeting of meetings) {
         meeting.isActive = false;
         meeting.meetingNotes = meeting.meetingNotes 
-          ? `${meeting.meetingNotes}\n\nBulk deleted by ${currentUser.firstName} ${currentUser.lastName} on ${new Date().toISOString()}`
-          : `Bulk deleted by ${currentUser.firstName} ${currentUser.lastName} on ${new Date().toISOString()}`;
+          ? `${meeting.meetingNotes}\n\nBulk deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`
+          : `Bulk deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
       }
 
       await this.agendaRepository.save(meetings);
+
+      // Bulk meeting deletion completed successfully
+      console.log(`Bulk meeting deletion completed successfully: ${meetings.length} meetings deleted by Admin ${currentUser.id}`);
 
       return { 
         message: `Successfully deleted ${meetings.length} meeting(s)`,
@@ -416,16 +819,44 @@ export class AgendaService {
 
   // Helper methods
   private async getAgendaWithRelations(id: string) {
-    return await this.agendaRepository.findOne({
+    const agenda = await this.agendaRepository.findOne({
       where: { id },
       // No need to fetch relations since we only need IDs
     });
+    
+    if (!agenda) {
+      return null;
+    }
+    
+    // Format the response properly
+    return this.formatAgendaResponse(agenda);
   }
 
-  private async checkTimeConflicts(
+  // New helper method to check if user is registered for an event
+  private async checkUserEventRegistration(userId: string, eventId: string): Promise<boolean> {
+    try {
+      const registration = await this.registerEventRepository.findOne({
+        where: { 
+          userId, 
+          eventId, 
+          isRegister: true,
+          status: Status.Sucesss
+        }
+      });
+      
+      return !!registration;
+    } catch (error) {
+      console.error('Error checking user event registration:', error);
+      return false;
+    }
+  }
+
+  // New helper method to check time conflicts on a specific date
+  private async checkTimeConflictsOnDate(
     eventId: string,
     time: string,
     duration: number,
+    meetingDate: Date,
     excludeId?: string,
   ) {
     const startTime = this.parseTimeToMinutes(time);
@@ -434,7 +865,8 @@ export class AgendaService {
     const queryBuilder = this.agendaRepository
       .createQueryBuilder('agenda')
       .where('agenda.eventId = :eventId', { eventId })
-      .andWhere('agenda.isActive = :isActive', { isActive: true });
+      .andWhere('agenda.isActive = :isActive', { isActive: true })
+      .andWhere('DATE(agenda.meetingDate) = DATE(:meetingDate)', { meetingDate });
 
     if (excludeId) {
       queryBuilder.andWhere('agenda.id != :excludeId', { excludeId });
@@ -452,63 +884,21 @@ export class AgendaService {
         (startTime <= agendaStartTime && endTime >= agendaEndTime)
       ) {
         throw new ValidationException(
-          `Time conflict detected. This time slot overlaps with "${agenda.title}" (${agenda.time} - ${this.formatDuration(agenda.duration)})`,
+          `Time conflict detected on ${this.formatDate(meetingDate)}. This time slot overlaps with "${agenda.title}" (${agenda.time} - ${this.formatDuration(agenda.duration)})`,
         );
       }
     }
   }
 
-  // New helper methods for meeting functionality
-  private async validateBothUsersRegistration(eventId: string, currentUserId: string, targetUserId: string) {
-    try {
-      // Check current user registration
-      const currentUserRegistration = await this.registerEventRepository.findOne({
-        where: {
-          userId: currentUserId,
-          eventId: eventId,
-          isRegister: true,
-        },
-      });
-
-      // Check target user registration
-      const targetUserRegistration = await this.registerEventRepository.findOne({
-        where: {
-          userId: targetUserId,
-          eventId: eventId,
-          isRegister: true,
-        },
-      });
-
-      // Provide specific error messages
-      if (!currentUserRegistration && !targetUserRegistration) {
-        throw new ValidationException(
-          `Both you and the target user are not registered for this event. Please register for the event before scheduling meetings.`
-        );
-      }
-
-      if (!currentUserRegistration) {
-        throw new ValidationException(
-          `You are not registered for this event. Please register for the event before scheduling meetings.`
-        );
-      }
-
-      if (!targetUserRegistration) {
-        throw new ValidationException(
-          `The target user is not registered for this event. They must register for the event before you can schedule a meeting with them.`
-        );
-      }
-
-      return true;
-    } catch (error) {
-      if (error instanceof ValidationException) {
-        throw error;
-      }
-      throw error;
-    }
+  // Helper method to format date for display
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   }
-
-
- 
 
   private parseTimeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
@@ -545,25 +935,21 @@ export class AgendaService {
       createdBy: agenda.createdBy,
       createdAt: agenda.createdAt,
       updatedAt: agenda.updatedAt,
-      tableNumber: agenda.tableNumber,
-      luckyDrawTicketNumber: agenda.luckyDrawTicketNumber,
       // New meeting fields
       meetingStatus: agenda.meetingStatus,
       requestStatus: agenda.requestStatus,
-
-
+      requestType: agenda.requestType,
       attendees: agenda.attendees,
       meetingNotes: agenda.meetingNotes,
       isMeetingRequest: agenda.isMeetingRequest,
       meetingDate: agenda.meetingDate,
-      parentMeetingId: agenda.parentMeetingId,
     };
   }
 
     // Helper method to send reschedule notifications
   private async sendRescheduleNotifications(
-    originalMeeting: EventAgenda,
-    rescheduledMeeting: EventAgenda,
+    originalMeetingData: { title: string; time: string; date: Date | undefined; location: string | undefined; details: string | undefined },
+    updatedMeeting: EventAgenda,
     currentUser: any,
     targetUser: any,
     rescheduleDto: RescheduleMeetingDto
@@ -571,12 +957,12 @@ export class AgendaService {
     try {
       // Send email notification to the other party
       if (targetUser?.email) {
-        const emailSubject = `Meeting Rescheduled: ${originalMeeting.title}`;
+        const emailSubject = `Meeting Rescheduled: ${originalMeetingData.title}`;
         const emailHtml = MeetingEmailTemplates.generateRescheduleEmailHTML(
           targetUser,
           currentUser,
-          originalMeeting,
-          rescheduledMeeting,
+          originalMeetingData,
+          updatedMeeting,
           rescheduleDto
         );
 
@@ -585,12 +971,12 @@ export class AgendaService {
 
       // Send email notification to the rescheduler (confirmation)
       if (currentUser?.email) {
-        const emailSubject = `Meeting Rescheduled Successfully: ${originalMeeting.title}`;
+        const emailSubject = `Meeting Rescheduled Successfully: ${originalMeetingData.title}`;
         const emailHtml = MeetingEmailTemplates.generateRescheduleConfirmationEmailHTML(
           currentUser,
           targetUser,
-          originalMeeting,
-          rescheduledMeeting,
+          originalMeetingData,
+          updatedMeeting,
           rescheduleDto
         );
 
