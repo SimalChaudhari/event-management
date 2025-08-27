@@ -44,36 +44,8 @@ export class AgendaService {
 
 
   // New method for getting incoming meeting requests (for recipient)
-  async getIncomingMeetingRequests(userId: string, eventId?: string, currentUser?: any) {
+  async getIncomingMeetingRequests(userId: string, eventId?: string) {
     try {
-      // Admin can view all incoming meeting requests without restrictions
-      if (currentUser.role === 'admin') {
-        const queryBuilder = this.agendaRepository
-          .createQueryBuilder('agenda')
-          .where('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
-          .andWhere('agenda.isActive = :isActive', { isActive: true });
-
-        if (eventId) {
-          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
-        }
-
-        const requests = await queryBuilder.getMany();
-        
-        // Format the requests using AgendaUtils and ensure requestType is 'admin-view'
-        const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
-          ...request,
-          requestType: 'admin-view',
-          isAdminAccess: true
-        }));
-        
-        return formattedRequests;
-      }
-
-      // Regular users can only view their own incoming requests
-      if (currentUser.id !== userId) {
-        throw new BadRequestException('You can only view your own incoming meeting requests.');
-      }
-
       // Check if user is registered for the event (if eventId is provided)
       if (eventId) {
         const userRegistration = await this.checkUserEventRegistration(userId, eventId);
@@ -94,11 +66,27 @@ export class AgendaService {
 
       const requests = await queryBuilder.getMany();
       
+      // Debug: Log the raw requests to see what's in the database
+      console.log('Raw incoming requests:', requests.map(r => ({
+        id: r.id,
+        requestType: r.requestType,
+        isMeetingRequest: r.isMeetingRequest,
+        userId: r.userId,
+        createdBy: r.createdBy
+      })));
+      
       // Format the requests using AgendaUtils and ensure requestType is 'incoming'
       const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
         ...request,
         requestType: 'incoming' // This is always incoming for the recipient
       }));
+      
+      // Debug: Log the formatted requests
+      console.log('Formatted incoming requests:', formattedRequests.map(r => ({
+        id: r.id,
+        requestType: r.requestType,
+        isMeetingRequest: r.isMeetingRequest
+      })));
       
       return formattedRequests;
     } catch (error) {
@@ -110,36 +98,8 @@ export class AgendaService {
   }
 
   // New method for getting sent meeting requests (for sender)
-  async getSentMeetingRequests(userId: string, eventId?: string, currentUser?: any) {
+  async getSentMeetingRequests(userId: string, eventId?: string) {
     try {
-      // Admin can view all sent meeting requests without restrictions
-      if (currentUser.role === 'admin') {
-        const queryBuilder = this.agendaRepository
-          .createQueryBuilder('agenda')
-          .where('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
-          .andWhere('agenda.isActive = :isActive', { isActive: true });
-
-        if (eventId) {
-          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
-        }
-
-        const requests = await queryBuilder.getMany();
-        
-        // Format the requests using AgendaUtils and ensure requestType is 'sent'
-        const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
-          ...request,
-          requestType: 'admin-view',
-          isAdminAccess: true
-        }));
-        
-        return formattedRequests;
-      }
-
-      // Regular users can only view their own sent requests
-      if (currentUser.id !== userId) {
-        throw new BadRequestException('You can only view your own sent meeting requests.');
-      }
-
       // Check if user is registered for the event (if eventId is provided)
       if (eventId) {
         const userRegistration = await this.checkUserEventRegistration(userId, eventId);
@@ -192,45 +152,11 @@ export class AgendaService {
   }
 
   // New method for getting user's meetings (all types)
-  async getMyMeetings(userId: string, eventId?: string, status?: string, currentUser?: any) {
+  async getMyMeetings(userId: string, eventId?: string, status?: string) {
     try {
-      // Admin can view all meetings without restrictions
-      if (currentUser.role === 'admin') {
-        const queryBuilder = this.agendaRepository
-          .createQueryBuilder('agenda')
-          .where('agenda.isActive = :isActive', { isActive: true });
-
-        if (eventId) {
-          queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
-        }
-
-        if (status) {
-          queryBuilder.andWhere('agenda.meetingStatus = :status', { status });
-        }
-
-        // Order by creation date (newest first)
-        queryBuilder.orderBy('agenda.createdAt', 'DESC');
-
-        const meetings = await queryBuilder.getMany();
-        
-        // Format the meetings using AgendaUtils
-        const formattedMeetings = AgendaUtils.formatAgendas(meetings).map(meeting => ({
-          ...meeting,
-          requestType: 'admin-view',
-          isAdminAccess: true
-        }));
-        
-        return formattedMeetings;
-      }
-
-      // Regular users can only view their own meetings
-      if (currentUser.id !== userId) {
-        throw new BadRequestException('You can only view your own meetings.');
-      }
-
       // Check if user is registered for the event (if eventId is provided)
       if (eventId) {
-        const userRegistration = await this.checkUserEventRegistration(currentUser.id, eventId);
+        const userRegistration = await this.checkUserEventRegistration(userId, eventId);
         if (!userRegistration) {
           throw new BadRequestException('You must be registered for this event to view meetings.');
         }
@@ -515,9 +441,9 @@ export class AgendaService {
         throw new BadRequestException('Cannot reschedule an inactive meeting.');
       }
 
-      // Validate permissions - only meeting creator or recipient can reschedule
-      if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
-        throw new BadRequestException('You can only reschedule meetings that you own or created.');
+      // Validate permissions - only meeting creator can reschedule
+      if (meeting.createdBy !== currentUser.id) {
+        throw new BadRequestException('Only the person who created the meeting request can reschedule it.');
       }
 
       // Validate that this is a meeting that can be rescheduled
@@ -657,16 +583,6 @@ export class AgendaService {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
 
-      // Admin can view any meeting without restrictions
-      if (currentUser.role === 'admin') {
-        const formattedMeeting = AgendaUtils.formatAgendas([meeting])[0];
-        return {
-          ...formattedMeeting,
-          requestType: 'admin-view',
-          isAdminAccess: true
-        };
-      }
-
       // Validate that current user has access to this meeting
       if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
         throw new BadRequestException('You can only view meetings that you own or created.');
@@ -714,21 +630,9 @@ export class AgendaService {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
 
-      // Admin can delete any meeting without restrictions
-      if (currentUser.role === 'admin') {
-        meeting.isActive = false;
-        meeting.meetingNotes = meeting.meetingNotes 
-          ? `${meeting.meetingNotes}\n\nDeleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`
-          : `Deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
-
-        await this.agendaRepository.save(meeting);
-        console.log(`Meeting deleted by admin: ${meetingId} by ${currentUser.id}`);
-        return { message: 'Meeting deleted successfully by admin' };
-      }
-
-      // Regular users can only delete meetings they created (not received)
+      // Validate permissions - only meeting creator can delete
       if (meeting.createdBy !== currentUser.id) {
-        throw new BadRequestException('You can only delete meetings that you created. You cannot delete meeting requests sent to you.');
+        throw new BadRequestException('Only the person who created the meeting request can delete it.');
       }
 
       // Check if current user is registered for the event
@@ -760,12 +664,12 @@ export class AgendaService {
     }
   }
 
-  // New method for deleting all meetings for a user (Admin only)
+  // New method for deleting all meetings for a user
   async deleteAllMeetings(userId: string, eventId?: string, currentUser?: any) {
     try {
-      // Only admin can delete all meetings
-      if (currentUser.role !== 'admin') {
-        throw new BadRequestException('Only administrators can delete all meetings.');
+      // Validate that current user is deleting their own meetings
+      if (currentUser.id !== userId) {
+        throw new BadRequestException('You can only delete your own meetings.');
       }
 
       // Check if current user is registered for the event (if eventId is provided)
@@ -795,14 +699,14 @@ export class AgendaService {
       for (const meeting of meetings) {
         meeting.isActive = false;
         meeting.meetingNotes = meeting.meetingNotes 
-          ? `${meeting.meetingNotes}\n\nBulk deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`
-          : `Bulk deleted by Admin ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
+          ? `${meeting.meetingNotes}\n\nBulk deleted by ${currentUser.firstName} ${currentUser.lastName} on ${new Date().toISOString()}`
+          : `Bulk deleted by ${currentUser.firstName} ${currentUser.lastName} on ${new Date().toISOString()}`;
       }
 
       await this.agendaRepository.save(meetings);
 
       // Bulk meeting deletion completed successfully
-      console.log(`Bulk meeting deletion completed successfully: ${meetings.length} meetings deleted by Admin ${currentUser.id}`);
+      console.log(`Bulk meeting deletion completed successfully: ${meetings.length} meetings deleted by ${currentUser.id}`);
 
       return { 
         message: `Successfully deleted ${meetings.length} meeting(s)`,
