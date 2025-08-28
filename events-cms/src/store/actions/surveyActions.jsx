@@ -42,7 +42,7 @@ export const surveyList = () => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
         
-        const response = await axiosInstance.get('/events/surveys/all');
+        const response = await axiosInstance.get('/events/surveys/current');
         
         dispatch({
             type: SURVEY_LIST_SUCCESS,

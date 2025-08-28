@@ -13,7 +13,8 @@ const AddSurveyPage = () => {
     const { id } = useParams();
     const isEditing = Boolean(id);
 
-    const { events } = useSelector((state) => state.event);
+    const events = useSelector((state) => state.event.events);
+
     const { selectedSurvey, createLoading, updateLoading } = useSelector((state) => state.survey);
 
     const [formData, setFormData] = useState({

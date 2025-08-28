@@ -11,7 +11,7 @@ import { speakerList, deleteSpeaker } from '../../store/actions/speakerActions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
-import { API_URL, DUMMY_PATH } from '../../configs/env';
+import { API_URL, DUMMY_PATH, DUMMY_PATH_USER } from '../../configs/env';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -48,12 +48,12 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
                 data: 'name',
                 title: 'Speaker Name',
                 render: function (data, type, row) {
-                    const imageUrl = row.speakerProfile ? `${API_URL}/${row.speakerProfile}` : DUMMY_PATH;
+                    const imageUrl = row.profilePicture ? `${API_URL}/${row.profilePicture}` : DUMMY_PATH_USER;
                     return `
                         <div class="d-inline-block align-middle">
                             <img src="${imageUrl}" alt="speaker" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
                             <div class="d-inline-block">
-                                <h6 class="m-b-0">${row.name}</h6>
+                                <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
                                 <p class="text-muted m-b-0">${row.email || 'No email'}</p>
                             </div>
                         </div>   

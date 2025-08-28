@@ -8,8 +8,10 @@ import {
   IsEmail,
   IsEnum,
   MinLength,
+  IsObject,
 } from 'class-validator';
 import { AuthProvider, UserRole } from './users.entity';
+import { UserEntity } from './users.entity';
 
 
 export class UserDto {
@@ -172,11 +174,50 @@ export class CreateSpeakerDto extends UserDto {
 }
 
 export class RoleSwitchDto {
-  @IsNotEmpty()
   @IsEnum(UserRole)
   newRole!: UserRole;
 
   @IsOptional()
   @IsString()
-  boothCode?: string; // Required only when switching TO exhibitor role
+  boothCode?: string;
+}
+
+// QR Code DTOs
+export class GenerateQRCodeDto {
+  @IsOptional()
+  @IsString()
+  userId?: string; // Optional, for admin generating QR for other users
+}
+
+export class ScanQRCodeDto {
+  @IsString()
+  qrCodeId!: string;
+}
+
+export class QRCodeResponseDto {
+  @IsString()
+  qrCodeId!: string;
+
+  @IsString()
+  qrCodeUrl!: string;
+
+  @IsString()
+  qrCodeImage!: string; // Base64 encoded image
+
+  @IsString()
+  qrCodeSVG!: string; // SVG version
+
+  @IsObject()
+  qrCodePNG!: {
+    filePath: string;
+    fileUrl: string;
+    fileName: string;
+    folderPath: string;
+  }; // PNG file information
+
+  @IsBoolean()
+  isExisting!: boolean; // Indicates if this is an existing QR code
+
+  @IsObject()
+  userInfo!: Partial<UserEntity>;
 }

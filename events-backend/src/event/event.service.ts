@@ -33,7 +33,6 @@ import { EmailUtils } from '../utils/email.utils';
 import { EventValidationUtils } from '../utils/validateEvents';
 import {
   EventQueryBuilderUtils,
-  GlobalSearchUtils,
 } from '../utils/searchEvent';
 import { SpeakerTimeUtils } from '../utils';
 
@@ -298,9 +297,20 @@ export class EventService {
           // Find which fields matched the keyword search
           let matchedFields: string[] = [];
           if (filters.keyword) {
-            matchedFields = GlobalSearchUtils.findMatchedFields(
-              event,
-              filters.keyword,
+            // Simple keyword matching for events
+            const keyword = filters.keyword.toLowerCase();
+            const eventFields = [
+              event.name,
+              event.description,
+              event.location,
+              event.venue,
+              event.country
+            ].filter((field): field is string => 
+              field !== undefined && field !== null
+            );
+            
+            matchedFields = eventFields.filter(field => 
+              field.toLowerCase().includes(keyword)
             );
           }
 
@@ -349,237 +359,7 @@ export class EventService {
     }
   }
 
-  // New global search method that returns organized results by entity type
-  async globalSearch(filters: {
-    keyword?: string;
-    location?: string;
-    startDate?: string;
-    endDate?: string;
-    category?: string;
-    limit?: number;
-    page?: number;
-  }) {
-    try {
-      const { keyword, limit = 20, page = 1 } = filters;
-      const offset = (page - 1) * limit;
 
-      if (!keyword) {
-        throw new ValidationException('Keyword is required for global search');
-      }
-
-      const keywordLower = keyword.toLowerCase();
-      const results: any = {
-        events: [],
-        speakers: [],
-        exhibitors: [],
-        categories: [],
-        surveys: [],
-        totalResults: 0,
-      };
-
-      // Search Events
-      const eventQuery = this.eventRepository.createQueryBuilder('event');
-
-      EventQueryBuilderUtils.buildGlobalEventSearchQuery(eventQuery, keyword, {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        location: filters.location,
-      });
-
-      const events = await eventQuery.limit(limit).offset(offset).getMany();
-
-      // Format events with only essential data
-      results.events = events.map((event) => ({
-        id: event.id,
-        name: event.name,
-        description: event.description,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        endDate: event.endDate,
-        endTime: event.endTime,
-        location: event.location,
-        venue: event.venue,
-        type: event.type,
-        price: event.price,
-        currency: event.currency,
-        images: event.images,
-        color: getEventColor(event.type),
-        matchedFields: GlobalSearchUtils.getMatchedEventFields(
-          event,
-          keywordLower,
-        ),
-      }));
-
-      // Search Speakers
-      const speakerQuery = this.userRepository.createQueryBuilder('user');
-
-      EventQueryBuilderUtils.buildSpeakerSearchQuery(
-        speakerQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const speakers = await speakerQuery.getMany();
-
-      // Format speakers with only essential data
-      results.speakers = speakers.map((speaker) => ({
-        id: speaker.id,
-        firstName: speaker.firstName,
-        lastName: speaker.lastName,
-        email: speaker.email,
-        position: speaker.speakerProfile?.position || '',
-        companyName: speaker.speakerProfile?.companyName || '',
-        profilePicture: speaker.profilePicture,
-        matchedFields: GlobalSearchUtils.getMatchedSpeakerFields(
-          speaker,
-          keywordLower,
-        ),
-        events:
-          speaker.eventSpeakers
-            ?.map((es) =>
-              es.event
-                ? {
-                    id: es.event.id,
-                    name: es.event.name,
-                    startDate: es.event.startDate,
-                    location: es.event.location,
-                    speakingStartTime: es.speakingStartTime,
-                    speakingEndTime: es.speakingEndTime,
-                  }
-                : null,
-            )
-            .filter(Boolean) || [],
-      }));
-
-      // Search Exhibitors
-      const exhibitorQuery =
-        this.exhibitorRepository.createQueryBuilder('exhibitor');
-
-      EventQueryBuilderUtils.buildExhibitorSearchQuery(
-        exhibitorQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const exhibitors = await exhibitorQuery.getMany();
-
-      // Format exhibitors with only essential data
-      results.exhibitors = exhibitors.map((exhibitor) => ({
-        ...ExhibitorUtils.getBasicExhibitorInfo(exhibitor),
-        matchedFields: GlobalSearchUtils.getMatchedExhibitorFields(
-          exhibitor,
-          keywordLower,
-        ),
-        events:
-          exhibitor.eventExhibitors
-            ?.map((ee) =>
-              ee.event
-                ? {
-                    id: ee.event.id,
-                    name: ee.event.name,
-                    startDate: ee.event.startDate,
-                    location: ee.event.location,
-                  }
-                : null,
-            )
-            .filter(Boolean) || [],
-      }));
-
-      // Search Categories - using EventCategory as the base entity
-      const categoryQuery =
-        this.eventCategoryRepository.createQueryBuilder('eventCategory');
-
-      EventQueryBuilderUtils.buildCategorySearchQuery(
-        categoryQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const eventCategories = await categoryQuery.getMany();
-
-      // Format categories with only essential data
-      results.categories = eventCategories
-        .filter(
-          (eventCategory) => eventCategory.category && eventCategory.event,
-        )
-        .map((eventCategory: any) => ({
-          id: eventCategory.category!.id,
-          name: eventCategory.category!.name,
-          description: eventCategory.category!.description,
-          status: eventCategory.category!.status,
-          matchedFields: GlobalSearchUtils.getMatchedCategoryFields(
-            eventCategory.category!,
-            keywordLower,
-          ),
-          events: [
-            {
-              id: eventCategory.event!.id,
-              name: eventCategory.event!.name,
-              startDate: eventCategory.event!.startDate,
-              location: eventCategory.event!.location,
-            },
-          ],
-        }));
-
-      // Search Surveys
-      const surveyQuery = this.surveyRepository.createQueryBuilder('survey');
-
-      EventQueryBuilderUtils.buildSurveySearchQuery(
-        surveyQuery,
-        keyword,
-        {
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-        },
-        limit,
-        offset,
-      );
-
-      const surveys = await surveyQuery.getMany();
-
-      // Format surveys with only essential data
-      results.surveys = surveys.map((survey) => ({
-        id: survey.id,
-        title: survey.title,
-        startDate: survey.startDate,
-        startTime: survey.startTime,
-        endDate: survey.endDate,
-        endTime: survey.endTime,
-        isActive: survey.isActive,
-        matchedFields: GlobalSearchUtils.getMatchedSurveyFields(
-          survey,
-          keywordLower,
-        ),
-        event: survey.event
-          ? {
-              id: survey.event.id,
-              name: survey.event.name,
-              startDate: survey.event.startDate,
-              location: survey.event.location,
-            }
-          : null,
-      }));
-
-      // Calculate total results
-      results.totalResults =
-        results.events.length +
-        results.speakers.length +
-        results.exhibitors.length +
-        results.categories.length +
-        results.surveys.length;
-
-      return results;
-    } catch (error) {
-
-      if (error instanceof ValidationException) {
-        throw error;
-      }
-      throw this.errorHandler.handleDatabaseError(error, 'Global search');
-    }
-  }
 
   // Get event attendance count
   async getEventAttendanceCount(eventId: string): Promise<number> {

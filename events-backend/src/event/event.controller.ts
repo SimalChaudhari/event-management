@@ -152,49 +152,7 @@ export class EventController {
     }
   }
 
-  @Get('search/global')
-  async globalSearch(
-    @Query() filters: {
-      keyword?: string;
-      location?: string;
-      startDate?: string;
-      endDate?: string;
-      category?: string;
-      limit?: number;
-      page?: number;
-    },
-    @Request() req: any,
-    @Res() response: Response,
-  ) {
-    try {
-      // Use the new globalSearch method that returns organized results
-      const searchResults = await this.eventService.globalSearch(filters);
-      
-      const successResponse: any = {
-        success: true,
-        message: 'Global search completed successfully',
-        data: {
-          events: searchResults.events,
-          speakers: searchResults.speakers,
-          exhibitors: searchResults.exhibitors,
-          categories: searchResults.categories,
-          surveys: searchResults.surveys,
-          totalResults: searchResults.totalResults
-        },
-        metadata: {
-          total: searchResults.totalResults,
-          timestamp: new Date().toISOString(),
-          globalSearch: true,
-          searchKeyword: filters.keyword,
-        },
-      };
 
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Global search', req.user?.id);
-      throw error;
-    }
-  }
 
   @Get(':id')
   async getEventById(
