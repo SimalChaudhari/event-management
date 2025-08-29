@@ -33,6 +33,7 @@ import { EmailUtils } from '../utils/email.utils';
 import { EventValidationUtils } from '../utils/validateEvents';
 import {
   EventQueryBuilderUtils,
+  GlobalSearchUtils,
 } from '../utils/searchEvent';
 import { SpeakerTimeUtils } from '../utils';
 
@@ -208,6 +209,7 @@ export class EventService {
   async getAllEvents(
     filters: {
       keyword?: string;
+      globalSearch?: string;
       startDate?: string;
       endDate?: string;
       type?: EventType;
@@ -243,7 +245,13 @@ export class EventService {
         queryBuilder.andWhere('event.startDate >= :today', { today });
       }
 
-      if (filters.keyword) {
+      // If globalSearch is provided, get all events for comprehensive search
+      // If keyword is provided, use basic event field search
+      if (filters.globalSearch) {
+        // For global search, we'll get all events and then filter by comprehensive search
+        // No WHERE clause needed here - we'll filter after getting all events
+      } else if (filters.keyword) {
+        // Use basic event field search for keyword
         const keyword = filters.keyword.toLowerCase();
         queryBuilder.where(
           'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
@@ -306,7 +314,7 @@ export class EventService {
             ...eventData
           } = event;
 
-                    // Check if event is favorited by user
+          // Check if event is favorited by user
           let isFavorite = false;
           if (userId) {
             const favorite = await this.favoriteEventRepository.findOne({
@@ -328,16 +336,10 @@ export class EventService {
             isRegistered = !!registration;
           }
 
-          // Find which fields matched the keyword search
-          let matchedFields: string[] = [];
-          if (filters.keyword) {
-            matchedFields = this.findMatchedFields(event, filters.keyword);
-          }
-
           const { exhibitorDescription, ...eventFiltered } = eventData;
           
-          // Regular response - include all data
-          const result = {
+          // Build the complete event object
+          const completeEvent = {
             ...eventFiltered,
             color: getEventColor(event.type),
             documents: formattedDocuments,
@@ -361,14 +363,54 @@ export class EventService {
                 };
               }),
             },
-            searchFields: matchedFields, // Add matched fields to response
           };
 
-          return result;
+          // If globalSearch is active, perform comprehensive search and return only matched fields
+          if (filters.globalSearch) {
+            const globalSearchResult = GlobalSearchUtils.performGlobalSearch(
+              completeEvent,
+              { keyword: filters.globalSearch, caseSensitive: false }
+            );
+            
+            return {
+              ...globalSearchResult.matchedEvent,
+              searchFields: globalSearchResult.matchedFields,
+              hasGlobalMatch: globalSearchResult.hasMatch
+            };
+          }
+
+          // Regular response - include all data
+          return {
+            ...completeEvent,
+            searchFields: [], // No search fields for regular response
+            hasGlobalMatch: false
+          };
         }),
       );
 
-      return eventsWithAttendance;
+      // If globalSearch is active, filter events that have global matches
+      if (filters.globalSearch) {
+        const eventsWithGlobalMatches = eventsWithAttendance.filter(event => event.hasGlobalMatch);
+        return {
+          events: eventsWithGlobalMatches,
+          metadata: {
+            total: eventsWithGlobalMatches.length,
+            timestamp: new Date().toISOString(),
+            globalSearch: true,
+            searchKeyword: filters.globalSearch,
+            totalMatches: eventsWithGlobalMatches.length
+          }
+        };
+      }
+
+      return {
+        events: eventsWithAttendance,
+        metadata: {
+          total: eventsWithAttendance.length,
+          timestamp: new Date().toISOString(),
+          globalSearch: false
+        }
+      };
     } catch (error) {
       if (error instanceof ValidationException) {
         throw error;

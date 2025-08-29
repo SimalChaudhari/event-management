@@ -125,7 +125,7 @@ export class EventController {
       price?: number;
       location?: string;
       category?: string;
-      globalSearch?: string | boolean; // Add global search flag
+      globalSearch?: string; // Global search term
     },
     @Request() req: any,
     @Res() response: Response,
@@ -137,20 +137,16 @@ export class EventController {
       // Convert string query parameters to appropriate types
       const processedFilters = {
         ...filters,
-        globalSearch: filters.globalSearch === 'true' || Boolean(filters.globalSearch),
+        // globalSearch should be a string for search terms
+        globalSearch: typeof filters.globalSearch === 'string' ? filters.globalSearch : undefined,
       };
 
-      const events = await this.eventService.getAllEvents(processedFilters, userId, userRole);
+      const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);
       
       const successResponse: any = {
         success: true,
         message: 'Events retrieved successfully',
-        events: events,
-        metadata: {
-          total: events.length,
-          timestamp: new Date().toISOString(),
-          globalSearch: processedFilters.globalSearch,
-        },
+        ...result, // This will include events and metadata from the service
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
