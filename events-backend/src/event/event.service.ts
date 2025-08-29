@@ -209,6 +209,7 @@ export class EventService {
   async getAllEvents(
     filters: {
       keyword?: string;
+      globalSearch?: string;
       startDate?: string;
       endDate?: string;
       type?: EventType;
@@ -219,34 +220,74 @@ export class EventService {
     userRole?: string,
   ) {
     try {
-      // Validate EventType enum if provided
       if (filters.type) {
-        EventValidationUtils.validateEventType(
-          filters.type,
-          Object.values(EventType),
+        const validTypes = Object.values(EventType);
+        if (!validTypes.includes(filters.type)) {
+          throw new ValidationException(
+            `Invalid event type. Valid types are: ${validTypes.join(', ')}`,
+          );
+        }
+      }
+
+      const queryBuilder = this.eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
+        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
+        .leftJoinAndSelect('event.category', 'eventCategory')
+        .leftJoinAndSelect('eventCategory.category', 'category')
+        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
+        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+        .leftJoinAndSelect('event.galleries', 'galleries');
+
+      if (filters.category) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today });
+      }
+
+      // If globalSearch is provided, get all events for comprehensive search
+      // If keyword is provided, use basic event field search
+      if (filters.globalSearch) {
+        // For global search, we'll get all events and then filter by comprehensive search
+        // No WHERE clause needed here - we'll filter after getting all events
+      } else if (filters.keyword) {
+        // Use basic event field search for keyword
+        const keyword = filters.keyword.toLowerCase();
+        queryBuilder.where(
+          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
+          { keyword: `%${keyword}%` },
         );
       }
 
-      const queryBuilder = this.eventRepository.createQueryBuilder('event');
+      if (filters.startDate && filters.endDate) {
+        queryBuilder.andWhere(
+          'event.startDate >= :startDate AND event.endDate <= :endDate',
+          { startDate: filters.startDate, endDate: filters.endDate },
+        );
+      }
 
-      // Build complete search query using the utility
-      EventQueryBuilderUtils.buildSearchQuery(queryBuilder, {
-        keyword: filters.keyword,
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        type: filters.type,
-        upcoming: filters.upcoming,
-        category: filters.category,
-      });
+      if (filters.type) {
+        queryBuilder.andWhere('event.type = :type', { type: filters.type });
+      }
+
+      if (filters.category) {
+        const categoryName = filters.category.toLowerCase();
+        queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
+          categoryName: `%${categoryName}%`,
+        });
+      }
+
+      if (filters.upcoming) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today });
+      }
 
       const events = await queryBuilder.getMany();
 
-      // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
-          const surveyDetails =
-            await this.surveyUtils.getSurveyDetailsByEventId(event.id);
+          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (event.documents && event.documentNames) {
@@ -295,289 +336,90 @@ export class EventService {
             isRegistered = !!registration;
           }
 
-          // Find which fields matched the keyword search
-          let matchedFields: string[] = [];
-          if (filters.keyword) {
-            matchedFields = GlobalSearchUtils.findMatchedFields(
-              event,
-              filters.keyword,
-            );
-          }
-
           const { exhibitorDescription, ...eventFiltered } = eventData;
-          // Convert eventStamps array to single object
-          return {
+          
+          // Build the complete event object
+          const completeEvent = {
             ...eventFiltered,
             color: getEventColor(event.type),
-            speakersData: eventSpeakers.map((es) => ({
-              ...UserUtils.getBasicSpeakerInfo(es.speaker),
-              speakingStartTime: es.speakingStartTime,
-              speakingEndTime: es.speakingEndTime,
-            })),
-            categoriesData: category?.map((ec) => ec.category) || [],
             documents: formattedDocuments,
             eventStamps: {
               description: event.eventStampDescription,
               images: event.eventStampImages,
             },
-            exhibitorsData: {
-              exhibitorDescription: exhibitorDescription || '',
-              exhibitors: eventExhibitors.map((ee) => {
-                return {
-                  ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                  promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                };
-              }),
-            },
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
             hasSurvey: !!surveyDetails,
-
             isFavorite: isFavorite,
             isRegistered: isRegistered,
-            searchFields: matchedFields, // Add matched fields to response
+            speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
+            categoriesData: category?.map((ec) => ec.category) || [],
+
+            exhibitorsData: {
+              exhibitorDescription: exhibitorDescription || '',
+              exhibitors:
+                event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive)
+                  ?.map((ee) => {
+                    return {
+                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
+            },
+          };
+
+          // If globalSearch is active, perform comprehensive search and return only matched fields
+          if (filters.globalSearch) {
+            const globalSearchResult = GlobalSearchUtils.performGlobalSearch(
+              completeEvent,
+              { keyword: filters.globalSearch, caseSensitive: false }
+            );
+            
+            return {
+              ...globalSearchResult.matchedEvent,
+              searchFields: globalSearchResult.matchedFields,
+              hasGlobalMatch: globalSearchResult.hasMatch
+            };
+          }
+
+          // Regular response - include all data
+          return {
+            ...completeEvent,
+            searchFields: [], // No search fields for regular response
+            hasGlobalMatch: false
           };
         }),
       );
 
-      return eventsWithAttendance;
-    } catch (error) {
-      if (error instanceof ValidationException) {
-        throw error;
-      }
-      throw this.errorHandler.handleDatabaseError(error, 'Events retrieval');
-    }
-  }
-
-  // New global search method that returns organized results by entity type
-  async globalSearch(filters: {
-    keyword?: string;
-    location?: string;
-    startDate?: string;
-    endDate?: string;
-    category?: string;
-    limit?: number;
-    page?: number;
-  }) {
-    try {
-      const { keyword, limit = 20, page = 1 } = filters;
-      const offset = (page - 1) * limit;
-
-      if (!keyword) {
-        throw new ValidationException('Keyword is required for global search');
+      // If globalSearch is active, filter events that have global matches
+      if (filters.globalSearch) {
+        const eventsWithGlobalMatches = eventsWithAttendance.filter(event => event.hasGlobalMatch);
+        return {
+          events: eventsWithGlobalMatches,
+          metadata: {
+            total: eventsWithGlobalMatches.length,
+            timestamp: new Date().toISOString(),
+            globalSearch: true,
+            searchKeyword: filters.globalSearch,
+            totalMatches: eventsWithGlobalMatches.length
+          }
+        };
       }
 
-      const keywordLower = keyword.toLowerCase();
-      const results: any = {
-        events: [],
-        speakers: [],
-        exhibitors: [],
-        categories: [],
-        surveys: [],
-        totalResults: 0,
+      return {
+        events: eventsWithAttendance,
+        metadata: {
+          total: eventsWithAttendance.length,
+          timestamp: new Date().toISOString(),
+          globalSearch: false
+        }
       };
-
-      // Search Events
-      const eventQuery = this.eventRepository.createQueryBuilder('event');
-
-      EventQueryBuilderUtils.buildGlobalEventSearchQuery(eventQuery, keyword, {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        location: filters.location,
-      });
-
-      const events = await eventQuery.limit(limit).offset(offset).getMany();
-
-      // Format events with only essential data
-      results.events = events.map((event) => ({
-        id: event.id,
-        name: event.name,
-        description: event.description,
-        startDate: event.startDate,
-        startTime: event.startTime,
-        endDate: event.endDate,
-        endTime: event.endTime,
-        location: event.location,
-        venue: event.venue,
-        type: event.type,
-        price: event.price,
-        currency: event.currency,
-        images: event.images,
-        color: getEventColor(event.type),
-        matchedFields: GlobalSearchUtils.getMatchedEventFields(
-          event,
-          keywordLower,
-        ),
-      }));
-
-      // Search Speakers
-      const speakerQuery = this.userRepository.createQueryBuilder('user');
-
-      EventQueryBuilderUtils.buildSpeakerSearchQuery(
-        speakerQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const speakers = await speakerQuery.getMany();
-
-      // Format speakers with only essential data
-      results.speakers = speakers.map((speaker) => ({
-        id: speaker.id,
-        firstName: speaker.firstName,
-        lastName: speaker.lastName,
-        email: speaker.email,
-        position: speaker.speakerProfile?.position || '',
-        companyName: speaker.speakerProfile?.companyName || '',
-        profilePicture: speaker.profilePicture,
-        matchedFields: GlobalSearchUtils.getMatchedSpeakerFields(
-          speaker,
-          keywordLower,
-        ),
-        events:
-          speaker.eventSpeakers
-            ?.map((es) =>
-              es.event
-                ? {
-                    id: es.event.id,
-                    name: es.event.name,
-                    startDate: es.event.startDate,
-                    location: es.event.location,
-                    speakingStartTime: es.speakingStartTime,
-                    speakingEndTime: es.speakingEndTime,
-                  }
-                : null,
-            )
-            .filter(Boolean) || [],
-      }));
-
-      // Search Exhibitors
-      const exhibitorQuery =
-        this.exhibitorRepository.createQueryBuilder('exhibitor');
-
-      EventQueryBuilderUtils.buildExhibitorSearchQuery(
-        exhibitorQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const exhibitors = await exhibitorQuery.getMany();
-
-      // Format exhibitors with only essential data
-      results.exhibitors = exhibitors.map((exhibitor) => ({
-        ...ExhibitorUtils.getBasicExhibitorInfo(exhibitor),
-        matchedFields: GlobalSearchUtils.getMatchedExhibitorFields(
-          exhibitor,
-          keywordLower,
-        ),
-        events:
-          exhibitor.eventExhibitors
-            ?.map((ee) =>
-              ee.event
-                ? {
-                    id: ee.event.id,
-                    name: ee.event.name,
-                    startDate: ee.event.startDate,
-                    location: ee.event.location,
-                  }
-                : null,
-            )
-            .filter(Boolean) || [],
-      }));
-
-      // Search Categories - using EventCategory as the base entity
-      const categoryQuery =
-        this.eventCategoryRepository.createQueryBuilder('eventCategory');
-
-      EventQueryBuilderUtils.buildCategorySearchQuery(
-        categoryQuery,
-        keyword,
-        limit,
-        offset,
-      );
-
-      const eventCategories = await categoryQuery.getMany();
-
-      // Format categories with only essential data
-      results.categories = eventCategories
-        .filter(
-          (eventCategory) => eventCategory.category && eventCategory.event,
-        )
-        .map((eventCategory: any) => ({
-          id: eventCategory.category!.id,
-          name: eventCategory.category!.name,
-          description: eventCategory.category!.description,
-          status: eventCategory.category!.status,
-          matchedFields: GlobalSearchUtils.getMatchedCategoryFields(
-            eventCategory.category!,
-            keywordLower,
-          ),
-          events: [
-            {
-              id: eventCategory.event!.id,
-              name: eventCategory.event!.name,
-              startDate: eventCategory.event!.startDate,
-              location: eventCategory.event!.location,
-            },
-          ],
-        }));
-
-      // Search Surveys
-      const surveyQuery = this.surveyRepository.createQueryBuilder('survey');
-
-      EventQueryBuilderUtils.buildSurveySearchQuery(
-        surveyQuery,
-        keyword,
-        {
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-        },
-        limit,
-        offset,
-      );
-
-      const surveys = await surveyQuery.getMany();
-
-      // Format surveys with only essential data
-      results.surveys = surveys.map((survey) => ({
-        id: survey.id,
-        title: survey.title,
-        startDate: survey.startDate,
-        startTime: survey.startTime,
-        endDate: survey.endDate,
-        endTime: survey.endTime,
-        isActive: survey.isActive,
-        matchedFields: GlobalSearchUtils.getMatchedSurveyFields(
-          survey,
-          keywordLower,
-        ),
-        event: survey.event
-          ? {
-              id: survey.event.id,
-              name: survey.event.name,
-              startDate: survey.event.startDate,
-              location: survey.event.location,
-            }
-          : null,
-      }));
-
-      // Calculate total results
-      results.totalResults =
-        results.events.length +
-        results.speakers.length +
-        results.exhibitors.length +
-        results.categories.length +
-        results.surveys.length;
-
-      return results;
     } catch (error) {
-
       if (error instanceof ValidationException) {
         throw error;
       }
-      throw this.errorHandler.handleDatabaseError(error, 'Global search');
+      this.errorHandler.handleDatabaseError(error, 'Events retrieval');
     }
   }
 
@@ -1333,5 +1175,34 @@ export class EventService {
     }
   }
 
-  //----------------------------------Email Utils----------------------------------
+
+  private findMatchedFields(event: any, keyword: string): string[] {
+    const matchedFields: string[] = [];
+    const keywordLower = keyword.toLowerCase();
+
+    const fieldsToCheck = [
+      'name',
+      'description',
+      'venue',
+      'location',
+      'country',
+      'type',
+      'price',
+      'currency',
+      'latitude',
+      'longitude',
+    ];
+
+    fieldsToCheck.forEach((field) => {
+      if (
+        event[field] &&
+        event[field].toString().toLowerCase().includes(keywordLower)
+      ) {
+        matchedFields.push(field);
+      }
+    });
+
+    return matchedFields;
+  }
+
 }

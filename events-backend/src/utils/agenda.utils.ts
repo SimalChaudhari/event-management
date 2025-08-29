@@ -18,7 +18,8 @@ export interface FormattedAgenda {
   meetingDate?: Date;
   isMeetingRequest?: boolean;
   durationFormatted: string;
-  timeRange: string;
+  startTime: string;
+  endTime: string;
 }
 
 export class AgendaUtils {
@@ -57,6 +58,23 @@ export class AgendaUtils {
     const endTimeStr = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
     
     return `${time} - ${endTimeStr}`;
+  }
+
+  /**
+   * Calculate end time based on start time and duration
+   * @param time Start time in HH:MM format
+   * @param duration Duration in minutes
+   * @returns End time in HH:MM format (e.g., "15:30")
+   */
+  static calculateEndTime(time: string, duration: number): string {
+    const [hours, minutes] = time.split(':').map(Number);
+    const startTime = hours * 60 + minutes;
+    const endTime = startTime + duration;
+    
+    const endHours = Math.floor(endTime / 60);
+    const endMinutes = endTime % 60;
+    
+    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
   }
 
   /**
@@ -146,7 +164,8 @@ export class AgendaUtils {
       meetingDate: agenda.meetingDate,
       isMeetingRequest: agenda.isMeetingRequest,
       durationFormatted: this.formatDuration(agenda.duration),
-      timeRange: this.getTimeRange(agenda.time, agenda.duration)
+      startTime: agenda.time,
+      endTime: this.calculateEndTime(agenda.time, agenda.duration)
     }));
   }
 

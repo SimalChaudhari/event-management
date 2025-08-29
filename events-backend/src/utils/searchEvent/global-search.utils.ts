@@ -139,6 +139,8 @@ export class GlobalSearchUtils {
       position: speaker.speakerProfile?.position || '',
       companyName: speaker.speakerProfile?.companyName || '',
       profilePicture: speaker.profilePicture,
+      speakingStartTime: speaker.speakingStartTime,
+      speakingEndTime: speaker.speakingEndTime,
       matchedFields: this.getMatchedSpeakerFields(speaker, keyword),
       events: speaker.eventSpeakers?.map((es: any) => es.event ? {
         id: es.event.id,
@@ -295,6 +297,327 @@ export class GlobalSearchUtils {
   }
 
   /**
+   * Performs global search across all event fields and returns only matched data sections
+   */
+  static performGlobalSearch(event: any, options: { keyword: string; caseSensitive?: boolean }): {
+    hasMatch: boolean;
+    matchedEvent: any;
+    matchedFields: string[];
+  } {
+    const { keyword, caseSensitive = false } = options;
+    const searchKeyword = caseSensitive ? keyword : keyword.toLowerCase();
+    const matchedFields: string[] = [];
+    let hasMatch = false;
+
+    // Create an object to store only matched data sections
+    const matchedEvent: any = {};
+
+    // Search in basic event fields
+    const basicFields = [
+      'name', 'description', 'startDate', 'endDate', 'startTime', 'endTime',
+      'location', 'venue', 'country', 'type', 'price', 'currency',
+      'latitude', 'longitude', 'floorPlan'
+    ];
+
+    let hasBasicFieldMatch = false;
+    basicFields.forEach(field => {
+      if (event[field] && this.isFieldMatch(event[field], searchKeyword, caseSensitive)) {
+        matchedFields.push(field);
+        hasBasicFieldMatch = true;
+        hasMatch = true;
+      }
+    });
+
+    // If basic fields match, add complete event basic info
+    if (hasBasicFieldMatch) {
+      matchedEvent.id = event.id;
+      matchedEvent.name = event.name;
+      matchedEvent.description = event.description;
+      matchedEvent.startDate = event.startDate;
+      matchedEvent.startTime = event.startTime;
+      matchedEvent.endDate = event.endDate;
+      matchedEvent.endTime = event.endTime;
+      matchedEvent.location = event.location;
+      matchedEvent.venue = event.venue;
+      matchedEvent.latitude = event.latitude;
+      matchedEvent.longitude = event.longitude;
+      matchedEvent.country = event.country;
+      matchedEvent.images = event.images;
+      matchedEvent.type = event.type;
+      matchedEvent.price = event.price;
+      matchedEvent.currency = event.currency;
+      matchedEvent.floorPlan = event.floorPlan;
+      matchedEvent.createdAt = event.createdAt;
+      matchedEvent.updatedAt = event.updatedAt;
+      matchedEvent.enableLuckyDrawFeature = event.enableLuckyDrawFeature;
+      matchedEvent.enableTableSeating = event.enableTableSeating;
+      matchedEvent.color = event.color;
+
+      // Highlight matching fields
+      basicFields.forEach(field => {
+        if (event[field] && this.isFieldMatch(event[field], searchKeyword, caseSensitive)) {
+          matchedEvent[field] = this.highlightMatch(event[field], keyword, caseSensitive);
+        }
+      });
+    }
+
+    // Search in speakers data
+    if (event.speakersData && Array.isArray(event.speakersData)) {
+      const matchedSpeakers: any[] = [];
+      event.speakersData.forEach((speaker: any, index: number) => {
+        const speakerFields = ['name', 'email', 'position', 'companyName', 'description', 'location', 'speakingStartTime', 'speakingEndTime'];
+        let speakerHasMatch = false;
+        
+        speakerFields.forEach(field => {
+          if (speaker[field] && this.isFieldMatch(speaker[field], searchKeyword, caseSensitive)) {
+            matchedFields.push(`speakersData[${index}].${field}`);
+            speakerHasMatch = true;
+          }
+        });
+        
+        if (speakerHasMatch) {
+          // Add complete speaker data with highlighted matching fields
+          const matchedSpeaker = { ...speaker };
+          speakerFields.forEach(field => {
+            if (speaker[field] && this.isFieldMatch(speaker[field], searchKeyword, caseSensitive)) {
+              matchedSpeaker[field] = this.highlightMatch(speaker[field], keyword, caseSensitive);
+            }
+          });
+          matchedSpeakers.push(matchedSpeaker);
+          hasMatch = true;
+        }
+      });
+      
+      if (matchedSpeakers.length > 0) {
+        matchedEvent.speakersData = matchedSpeakers;
+      }
+    }
+
+    // Search in categories data
+    if (event.categoriesData && Array.isArray(event.categoriesData)) {
+      const matchedCategories: any[] = [];
+      event.categoriesData.forEach((category: any, index: number) => {
+        const categoryFields = ['name', 'description'];
+        let categoryHasMatch = false;
+        
+        categoryFields.forEach(field => {
+          if (category[field] && this.isFieldMatch(category[field], searchKeyword, caseSensitive)) {
+            matchedFields.push(`categoriesData[${index}].${field}`);
+            categoryHasMatch = true;
+          }
+        });
+        
+        if (categoryHasMatch) {
+          // Add complete category data with highlighted matching fields
+          const matchedCategory = { ...category };
+          categoryFields.forEach(field => {
+            if (category[field] && this.isFieldMatch(category[field], searchKeyword, caseSensitive)) {
+              matchedCategory[field] = this.highlightMatch(category[field], keyword, caseSensitive);
+            }
+          });
+          matchedCategories.push(matchedCategory);
+          hasMatch = true;
+        }
+      });
+      
+      if (matchedCategories.length > 0) {
+        matchedEvent.categoriesData = matchedCategories;
+      }
+    }
+
+    // Search in exhibitors data
+    if (event.exhibitorsData) {
+      const matchedExhibitors: any = {};
+      
+      if (event.exhibitorsData.exhibitorDescription && this.isFieldMatch(event.exhibitorsData.exhibitorDescription, searchKeyword, caseSensitive)) {
+        matchedExhibitors.exhibitorDescription = this.highlightMatch(event.exhibitorsData.exhibitorDescription, keyword, caseSensitive);
+        matchedFields.push('exhibitorsData.exhibitorDescription');
+        hasMatch = true;
+      }
+
+      if (event.exhibitorsData.exhibitors && Array.isArray(event.exhibitorsData.exhibitors)) {
+        const matchedExhibitorList: any[] = [];
+        event.exhibitorsData.exhibitors.forEach((exhibitor: any, index: number) => {
+          const exhibitorFields = ['companyName', 'companyDescription', 'email', 'mobile', 'uen', 'bothNumber'];
+          let exhibitorHasMatch = false;
+          
+          exhibitorFields.forEach(field => {
+            if (exhibitor[field] && this.isFieldMatch(exhibitor[field], searchKeyword, caseSensitive)) {
+              matchedFields.push(`exhibitorsData.exhibitors[${index}].${field}`);
+              exhibitorHasMatch = true;
+            }
+          });
+          
+          if (exhibitorHasMatch) {
+            // Add complete exhibitor data with highlighted matching fields
+            const matchedExhibitor = { ...exhibitor };
+            exhibitorFields.forEach(field => {
+              if (exhibitor[field] && this.isFieldMatch(exhibitor[field], searchKeyword, caseSensitive)) {
+                matchedExhibitor[field] = this.highlightMatch(exhibitor[field], keyword, caseSensitive);
+              }
+            });
+            matchedExhibitorList.push(matchedExhibitor);
+            hasMatch = true;
+          }
+        });
+        
+        if (matchedExhibitorList.length > 0) {
+          matchedExhibitors.exhibitors = matchedExhibitorList;
+        }
+      }
+      
+      if (Object.keys(matchedExhibitors).length > 0) {
+        matchedEvent.exhibitorsData = matchedExhibitors;
+      }
+    }
+
+    // Search in survey data
+    if (event.surveyDetails) {
+      const matchedSurvey: any = {};
+      
+      if (event.surveyDetails.title && this.isFieldMatch(event.surveyDetails.title, searchKeyword, caseSensitive)) {
+        matchedSurvey.title = this.highlightMatch(event.surveyDetails.title, keyword, caseSensitive);
+        matchedFields.push('surveyDetails.title');
+        hasMatch = true;
+      }
+
+      if (event.surveyDetails.sessions && Array.isArray(event.surveyDetails.sessions)) {
+        const matchedSessions: any[] = [];
+        event.surveyDetails.sessions.forEach((session: any, index: number) => {
+          const sessionFields = ['name', 'description'];
+          let sessionHasMatch = false;
+          
+          sessionFields.forEach(field => {
+            if (session[field] && this.isFieldMatch(session[field], searchKeyword, caseSensitive)) {
+              matchedFields.push(`surveyDetails.sessions[${index}].${field}`);
+              sessionHasMatch = true;
+            }
+          });
+          
+          if (sessionHasMatch) {
+            // Add complete session data with highlighted matching fields
+            const matchedSession = { ...session };
+            sessionFields.forEach(field => {
+              if (session[field] && this.isFieldMatch(session[field], searchKeyword, caseSensitive)) {
+                matchedSession[field] = this.highlightMatch(session[field], keyword, caseSensitive);
+              }
+            });
+            matchedSessions.push(matchedSession);
+            hasMatch = true;
+          }
+        });
+        
+        if (matchedSessions.length > 0) {
+          matchedSurvey.sessions = matchedSessions;
+        }
+      }
+      
+      if (Object.keys(matchedSurvey).length > 0) {
+        // Add complete survey data with highlighted matching fields
+        matchedSurvey.id = event.surveyDetails.id;
+        matchedSurvey.eventId = event.surveyDetails.eventId;
+        matchedSurvey.startDate = event.surveyDetails.startDate;
+        matchedSurvey.startTime = event.surveyDetails.startTime;
+        matchedSurvey.endDate = event.surveyDetails.endDate;
+        matchedSurvey.endTime = event.surveyDetails.endTime;
+        matchedSurvey.isActive = event.surveyDetails.isActive;
+        matchedSurvey.createdAt = event.surveyDetails.createdAt;
+        matchedSurvey.updatedAt = event.surveyDetails.updatedAt;
+        matchedEvent.surveyDetails = matchedSurvey;
+      }
+    }
+
+    // Search in documents
+    if (event.documents && Array.isArray(event.documents)) {
+      const matchedDocuments: any[] = [];
+      event.documents.forEach((doc: any, index: number) => {
+        if (doc.name && this.isFieldMatch(doc.name, searchKeyword, caseSensitive)) {
+          matchedDocuments.push({
+            name: this.highlightMatch(doc.name, keyword, caseSensitive),
+            document: doc.document
+          });
+          matchedFields.push(`documents[${index}].name`);
+          hasMatch = true;
+        }
+      });
+      
+      if (matchedDocuments.length > 0) {
+        matchedEvent.documents = matchedDocuments;
+      }
+    }
+
+    // Search in event stamps
+    if (event.eventStamps) {
+      if (event.eventStamps.description && this.isFieldMatch(event.eventStamps.description, searchKeyword, caseSensitive)) {
+        matchedEvent.eventStamps = {
+          description: this.highlightMatch(event.eventStamps.description, keyword, caseSensitive),
+          images: event.eventStamps.images
+        };
+        matchedFields.push('eventStamps.description');
+        hasMatch = true;
+      }
+    }
+
+    // Search in galleries
+    if (event.galleries && Array.isArray(event.galleries)) {
+      const matchedGalleries: any[] = [];
+      event.galleries.forEach((gallery: any, index: number) => {
+        if (gallery.title && this.isFieldMatch(gallery.title, searchKeyword, caseSensitive)) {
+          // Add complete gallery data with highlighted matching fields
+          const matchedGallery = { ...gallery };
+          matchedGallery.title = this.highlightMatch(gallery.title, keyword, caseSensitive);
+          matchedGalleries.push(matchedGallery);
+          matchedFields.push(`galleries[${index}].title`);
+          hasMatch = true;
+        }
+      });
+      
+      if (matchedGalleries.length > 0) {
+        matchedEvent.galleries = matchedGalleries;
+      }
+    }
+
+    return {
+      hasMatch,
+      matchedEvent,
+      matchedFields
+    };
+  }
+
+  /**
+   * Check if a field value matches the search keyword
+   */
+  private static isFieldMatch(value: any, keyword: string, caseSensitive: boolean): boolean {
+    if (!value) return false;
+    
+    const fieldValue = caseSensitive ? value.toString() : value.toString().toLowerCase();
+    const searchTerm = caseSensitive ? keyword : keyword.toLowerCase();
+    
+    return fieldValue.includes(searchTerm);
+  }
+
+  /**
+   * Highlight the matching text in the field value
+   */
+  private static highlightMatch(value: any, keyword: string, caseSensitive: boolean): string {
+    if (!value) return value;
+    
+    const fieldValue = value.toString();
+    const searchTerm = caseSensitive ? keyword : keyword.toLowerCase();
+    const fieldValueLower = caseSensitive ? fieldValue : fieldValue.toLowerCase();
+    
+    const index = fieldValueLower.indexOf(searchTerm);
+    if (index === -1) return fieldValue;
+    
+    const before = fieldValue.substring(0, index);
+    const match = fieldValue.substring(index, index + keyword.length);
+    const after = fieldValue.substring(index + keyword.length);
+    
+    // Return highlighted text with HTML-like tags for frontend processing
+    return `${before}<mark>${match}</mark>${after}`;
+  }
+
+  /**
    * Validate global search parameters
    */
   static validateGlobalSearchParams(filters: any): { isValid: boolean; errors: string[] } {
@@ -368,6 +691,8 @@ export class GlobalSearchUtils {
         highlights.lastName = entity.lastName && entity.lastName.toLowerCase().includes(keywordLower);
         highlights.companyName = entity.speakerProfile?.companyName && entity.speakerProfile.companyName.toLowerCase().includes(keywordLower);
         highlights.position = entity.speakerProfile?.position && entity.speakerProfile.position.toLowerCase().includes(keywordLower);
+        highlights.speakingStartTime = entity.speakingStartTime && entity.speakingStartTime.toLowerCase().includes(keywordLower);
+        highlights.speakingEndTime = entity.speakingEndTime && entity.speakingEndTime.toLowerCase().includes(keywordLower);
         break;
 
       case 'exhibitor':

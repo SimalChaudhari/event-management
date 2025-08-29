@@ -186,7 +186,7 @@ export class UserController {
   }
 
   // Speaker-specific endpoints
-  @Get('speakers')
+  @Get('speakers/get')
   async getAllSpeakers(@Res() response: Response, @Request() req: any) {
     try {
       const speakers = await this.userService.getAllSpeakers();
@@ -440,6 +440,60 @@ export class UserController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Role switch', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user information by scanning QR code
+   * - Public endpoint that doesn't require authentication
+   * - Returns user information when QR code is scanned
+   */
+  @Get('qr-code/scan/:qrCodeId')
+  async scanQRCode(
+    @Param('qrCodeId') qrCodeId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const userInfo = await this.userService.getUserInfoFromQRCode(qrCodeId);
+      
+      const successResponse = {
+        success: true,
+        message: 'User information retrieved successfully',
+        data: userInfo,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'QR code scanning', undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate QR code for any user (Admin only)
+   * - Admin can generate QR codes for any user
+   */
+  @Get('qr-code/generate/:userId')
+  @UseGuards(JwtAuthGuard)
+  // @Roles(UserRole.Admin)
+  async generateQRCodeForUser(
+    @Param('userId') userId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const qrCodeData = await this.userService.generateUserQRCode(userId);
+      
+      const successResponse = {
+        success: true,
+        message: 'QR code generated successfully',
+        data: qrCodeData,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'QR code generation for user', req.user?.id);
       throw error;
     }
   }

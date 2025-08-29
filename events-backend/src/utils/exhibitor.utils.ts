@@ -17,6 +17,14 @@ export class ExhibitorUtils {
       logo: exhibitor.logo || '',
       uen: exhibitor.uen || '',
       isActive: exhibitor.isActive || false,
+      flyers: exhibitor.flyers || [],
+      flyerNames: exhibitor.flyerNames || [],
+      documents: exhibitor.documents || [],
+      documentNames: exhibitor.documentNames || [],
+      eventImages: exhibitor.eventImages || [],
+      eventImageNames: exhibitor.eventImageNames || [],
+      createdAt: exhibitor.createdAt || '',
+      updatedAt: exhibitor.updatedAt || '',
     };
   }
 

@@ -619,30 +619,6 @@ export class SurveyService {
     return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  // Get user feedback history for sessions
-  private async getUserFeedbackHistory(
-    userId: string,
-    surveyId: string,
-  ): Promise<{ [sessionId: string]: SurveyResponse }> {
-    try {
-      if (!userId) return {};
-
-      const feedbacks = await this.surveyResponseRepository.find({
-        where: { userId, surveyId },
-      });
-
-      const feedbackMap: { [sessionId: string]: SurveyResponse } = {};
-      feedbacks.forEach((feedback) => {
-        feedbackMap[feedback.sessionId] = feedback;
-      });
-
-      return feedbackMap;
-    } catch (error: any) {
-      this.errorHandler.logError(error, 'Get user feedback history');
-      return {};
-    }
-  }
-
   // Enhanced method with clear event status logic
   private getSessionsForUserWithHistory(
     sessions: SurveySession[],

@@ -129,11 +129,8 @@ export class Event {
 
 
   @Column({ type: 'boolean', default: false })
-  enableTableSeating!: boolean;
+  enableLuckyDrawFeature!: boolean;
 
-  @Column({ type: 'boolean', default: false })
-  enableLuckyDraw!: boolean;
-  
 
   @Column('simple-array', { nullable: true })
   eventStampImages?: string[];

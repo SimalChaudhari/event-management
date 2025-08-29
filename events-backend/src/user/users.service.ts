@@ -25,6 +25,7 @@ import {
   ForeignKeyConstraintException,
 } from '../utils/exceptions/custom-exceptions';
 import { UserUtils } from 'utils';
+import { QRCodeUtils } from '../utils/qr-code.utils';
 
 @Injectable()
 export class UserService {
@@ -600,6 +601,84 @@ export class UserService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Role switch');
+    }
+  }
+
+  // QR Code Methods
+  /**
+   * Generate QR code for user
+   * @param userId User ID
+   * @returns QR code data with user information
+   */
+  async generateUserQRCode(userId: string): Promise<{
+    qrCodeId: string;
+    qrCodeImage: string; // Base64 image
+    userInfo: Partial<UserEntity>;
+  }> 
+  {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Generate new QR code each time
+      const qrCodeId = `qr_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const qrCodeUrl = `${process.env.APP_URL}/api/users/qr-code/scan/${qrCodeId}`;
+      
+      // Generate QR code image
+      const qrCodeImage = await QRCodeUtils.generateQRCodeAsDataURL(qrCodeUrl);
+
+      // Return sanitized user data for QR code
+      const sanitizedUser = UserUtils.sanitizeUserData(user);
+
+      return {
+        qrCodeId,
+        qrCodeImage,
+        userInfo: sanitizedUser,
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'QR code generation');
+    }
+  }
+
+  /**
+   * Get user information from scanned QR code
+   * @param qrCodeId QR code identifier
+   * @returns User information
+   */
+  async getUserInfoFromQRCode(qrCodeId: string): Promise<Partial<UserEntity>> {
+    try {
+      // Extract user ID from QR code ID format: qr_${userId}_${timestamp}_${random}
+      const qrCodeParts = qrCodeId.split('_');
+      if (qrCodeParts.length < 2) {
+        throw new ResourceNotFoundException('QR Code', qrCodeId);
+      }
+
+      const userId = qrCodeParts[1];
+      
+      // Get user data directly from database
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Return sanitized user data
+      return UserUtils.sanitizeUserData(user);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'QR code scanning');
     }
   }
 }

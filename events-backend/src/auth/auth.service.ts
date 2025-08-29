@@ -422,6 +422,39 @@ export class AuthService {
         }
       }
 
+      // Auto-change role from exhibitor to user when logging out
+      if (user.role === UserRole.Exhibitor) {
+        // Change role back to user
+        user.role = UserRole.User;
+        
+        // Reactivate the user's booth code if they had one
+        try {
+          const { EventBooth } = await import('../event/event-booth.entity');
+          const eventBoothRepository =
+            this.userRepository.manager.getRepository(EventBooth);
+
+          // Find the booth code used by this user
+          const userBooth = await eventBoothRepository.findOne({
+            where: { usedBy: userId },
+          });
+
+          if (userBooth) {
+            // Reactivate the booth code for future use by the same user
+            await eventBoothRepository.update(
+              { id: userBooth.id },
+              {
+                isActive: true,
+                usedBy: userId, // Keep the same user ID
+                usedAt: new Date(), // Update timestamp
+              },
+            );
+          }
+        } catch (boothError) {
+          // Log error but don't fail the logout process
+          console.error('Error reactivating booth code during logout:', boothError);
+        }
+      }
+
       // Clear refresh token
       user.refreshToken = null as any;
       await this.userRepository.save(user);

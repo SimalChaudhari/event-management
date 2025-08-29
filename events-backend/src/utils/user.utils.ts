@@ -97,6 +97,8 @@ export class UserUtils {
         ? `${user.city}, ${user.state}, ${user.address}`.trim() 
         : user.city || user.state || user.address || '',
       profilePicture: user.profilePicture || '',
+      speakingStartTime: user.speakerProfile?.speakingStartTime || '',
+      speakingEndTime: user.speakerProfile?.speakingEndTime || '',
     };
   }
 

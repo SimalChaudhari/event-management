@@ -16,7 +16,8 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-      .leftJoinAndSelect('event.galleries', 'galleries');
+      .leftJoinAndSelect('event.galleries', 'galleries')
+      .leftJoinAndSelect('event.surveys', 'surveys');
   }
 
   /**
@@ -188,12 +189,76 @@ export class EventQueryBuilderUtils {
   }
 
   /**
+   * Apply comprehensive global search across all event fields and related entities
+   */
+  static applyGlobalSearchFilter(
+    queryBuilder: SelectQueryBuilder<Event>,
+    globalSearch: string
+  ): SelectQueryBuilder<Event> {
+    const searchTerm = globalSearch.toLowerCase();
+    
+    return queryBuilder.where(
+      `(
+        LOWER(event.name) LIKE :searchTerm OR 
+        LOWER(event.description) LIKE :searchTerm OR 
+        LOWER(event.venue) LIKE :searchTerm OR 
+        LOWER(event.location) LIKE :searchTerm OR 
+        LOWER(event.country) LIKE :searchTerm OR 
+        LOWER(CAST(event.price AS TEXT)) LIKE :searchTerm OR 
+        LOWER(event.currency) LIKE :searchTerm OR 
+        LOWER(CAST(event.latitude AS TEXT)) LIKE :searchTerm OR 
+        LOWER(CAST(event.longitude AS TEXT)) LIKE :searchTerm OR
+        LOWER(event.startTime) LIKE :searchTerm OR 
+        LOWER(event.endTime) LIKE :searchTerm OR
+        LOWER(event.type) LIKE :searchTerm OR
+        LOWER(CAST(event.enableTableSeating AS TEXT)) LIKE :searchTerm OR
+        LOWER(CAST(event.enableLuckyDraw AS TEXT)) LIKE :searchTerm OR
+        LOWER(event.eventStampDescription) LIKE :searchTerm OR
+        LOWER(event.exhibitorDescription) LIKE :searchTerm OR
+        
+        -- Speaker fields
+        LOWER(speaker.firstName) LIKE :searchTerm OR 
+        LOWER(speaker.lastName) LIKE :searchTerm OR 
+        LOWER(speakerProfile.companyName) LIKE :searchTerm OR 
+        LOWER(speakerProfile.position) LIKE :searchTerm OR
+        
+        -- Category fields
+        LOWER(category.name) LIKE :searchTerm OR 
+        LOWER(category.description) LIKE :searchTerm OR
+        LOWER(category.status) LIKE :searchTerm OR
+        
+        -- Exhibitor fields
+        LOWER(exhibitor.companyName) LIKE :searchTerm OR 
+        LOWER(exhibitor.companyDescription) LIKE :searchTerm OR
+        LOWER(exhibitor.email) LIKE :searchTerm OR
+        LOWER(exhibitor.mobile) LIKE :searchTerm OR
+        LOWER(exhibitor.uen) LIKE :searchTerm OR
+        LOWER(exhibitor.bothNumber) LIKE :searchTerm OR
+        
+        -- Promotional offer fields
+        LOWER(promotionalOffers.title) LIKE :searchTerm OR 
+        LOWER(promotionalOffers.description) LIKE :searchTerm OR
+        LOWER(promotionalOffers.companyName) LIKE :searchTerm OR
+        LOWER(promotionalOffers.validDate) LIKE :searchTerm OR
+        
+        -- Survey fields
+        LOWER(surveys.title) LIKE :searchTerm OR
+        
+        -- Gallery fields
+        LOWER(galleries.title) LIKE :searchTerm OR
+      )`,
+      { searchTerm: `%${searchTerm}%` }
+    );
+  }
+
+  /**
    * Build complete search query with all filters
    */
   static buildSearchQuery(
     queryBuilder: SelectQueryBuilder<Event>,
     filters: {
       keyword?: string;
+      globalSearch?: string;
       startDate?: string;
       endDate?: string;
       type?: EventType;
@@ -214,7 +279,10 @@ export class EventQueryBuilderUtils {
     this.buildBaseQuery(queryBuilder);
 
     // Apply filters
-    if (filters.keyword) {
+    if (filters.globalSearch) {
+      // Global search takes precedence over keyword search
+      this.applyGlobalSearchFilter(queryBuilder, filters.globalSearch);
+    } else if (filters.keyword) {
       this.applyKeywordFilter(queryBuilder, filters.keyword);
     }
 

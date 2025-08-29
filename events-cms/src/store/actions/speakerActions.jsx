@@ -5,7 +5,7 @@ import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER } from "..
 // Get all speakers
 export const speakerList = () => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/speakers/get');
+        const response = await axiosInstance.get('/users/speakers/get');
         dispatch({
             type: SPEAKER_LIST,
             payload: response.data.data,
@@ -20,7 +20,7 @@ export const speakerList = () => async (dispatch) => {
 
 export const speakerById = (id) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get(`/speakers/${id}`);
+        const response = await axiosInstance.get(`/users/speakers/${id}`);
         return response.data;
     } catch (error) {
         throw error;

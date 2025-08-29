@@ -125,6 +125,7 @@ export class EventController {
       price?: number;
       location?: string;
       category?: string;
+      globalSearch?: string; // Global search term
     },
     @Request() req: any,
     @Res() response: Response,
@@ -133,16 +134,19 @@ export class EventController {
       const userId = req.user?.id; // Get user ID from JWT token
       const userRole = req?.user?.role; // Get actual role from JWT
 
-      const events = await this.eventService.getAllEvents(filters, userId, userRole);
+      // Convert string query parameters to appropriate types
+      const processedFilters = {
+        ...filters,
+        // globalSearch should be a string for search terms
+        globalSearch: typeof filters.globalSearch === 'string' ? filters.globalSearch : undefined,
+      };
+
+      const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);
       
       const successResponse: any = {
         success: true,
         message: 'Events retrieved successfully',
-        events: events,
-        metadata: {
-          total: events.length,
-          timestamp: new Date().toISOString(),
-        },
+        ...result, // This will include events and metadata from the service
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
@@ -152,49 +156,7 @@ export class EventController {
     }
   }
 
-  @Get('search/global')
-  async globalSearch(
-    @Query() filters: {
-      keyword?: string;
-      location?: string;
-      startDate?: string;
-      endDate?: string;
-      category?: string;
-      limit?: number;
-      page?: number;
-    },
-    @Request() req: any,
-    @Res() response: Response,
-  ) {
-    try {
-      // Use the new globalSearch method that returns organized results
-      const searchResults = await this.eventService.globalSearch(filters);
-      
-      const successResponse: any = {
-        success: true,
-        message: 'Global search completed successfully',
-        data: {
-          events: searchResults.events,
-          speakers: searchResults.speakers,
-          exhibitors: searchResults.exhibitors,
-          categories: searchResults.categories,
-          surveys: searchResults.surveys,
-          totalResults: searchResults.totalResults
-        },
-        metadata: {
-          total: searchResults.totalResults,
-          timestamp: new Date().toISOString(),
-          globalSearch: true,
-          searchKeyword: filters.keyword,
-        },
-      };
 
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Global search', req.user?.id);
-      throw error;
-    }
-  }
 
   @Get(':id')
   async getEventById(
@@ -551,7 +513,12 @@ export class EventController {
     }
   
 
-      // Get event booths
+    
+
+
+
+
+  // Get event booths
   @Get(':id/booths')
   async getEventBooths(
     @Param('id') id: string,
