@@ -125,6 +125,7 @@ export class EventController {
       price?: number;
       location?: string;
       category?: string;
+      globalSearch?: string | boolean; // Add global search flag
     },
     @Request() req: any,
     @Res() response: Response,
@@ -133,7 +134,13 @@ export class EventController {
       const userId = req.user?.id; // Get user ID from JWT token
       const userRole = req?.user?.role; // Get actual role from JWT
 
-      const events = await this.eventService.getAllEvents(filters, userId, userRole);
+      // Convert string query parameters to appropriate types
+      const processedFilters = {
+        ...filters,
+        globalSearch: filters.globalSearch === 'true' || Boolean(filters.globalSearch),
+      };
+
+      const events = await this.eventService.getAllEvents(processedFilters, userId, userRole);
       
       const successResponse: any = {
         success: true,
@@ -142,6 +149,7 @@ export class EventController {
         metadata: {
           total: events.length,
           timestamp: new Date().toISOString(),
+          globalSearch: processedFilters.globalSearch,
         },
       };
 
@@ -509,7 +517,12 @@ export class EventController {
     }
   
 
-      // Get event booths
+    
+
+
+
+
+  // Get event booths
   @Get(':id/booths')
   async getEventBooths(
     @Param('id') id: string,

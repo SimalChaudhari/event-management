@@ -199,24 +199,7 @@ export class QRCodeResponseDto {
   qrCodeId!: string;
 
   @IsString()
-  qrCodeUrl!: string;
-
-  @IsString()
   qrCodeImage!: string; // Base64 encoded image
-
-  @IsString()
-  qrCodeSVG!: string; // SVG version
-
-  @IsObject()
-  qrCodePNG!: {
-    filePath: string;
-    fileUrl: string;
-    fileName: string;
-    folderPath: string;
-  }; // PNG file information
-
-  @IsBoolean()
-  isExisting!: boolean; // Indicates if this is an existing QR code
 
   @IsObject()
   userInfo!: Partial<UserEntity>;

@@ -218,34 +218,68 @@ export class EventService {
     userRole?: string,
   ) {
     try {
-      // Validate EventType enum if provided
       if (filters.type) {
-        EventValidationUtils.validateEventType(
-          filters.type,
-          Object.values(EventType),
+        const validTypes = Object.values(EventType);
+        if (!validTypes.includes(filters.type)) {
+          throw new ValidationException(
+            `Invalid event type. Valid types are: ${validTypes.join(', ')}`,
+          );
+        }
+      }
+
+      const queryBuilder = this.eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
+        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
+        .leftJoinAndSelect('event.category', 'eventCategory')
+        .leftJoinAndSelect('eventCategory.category', 'category')
+        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
+        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+        .leftJoinAndSelect('event.galleries', 'galleries');
+
+      if (filters.category) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today });
+      }
+
+      if (filters.keyword) {
+        const keyword = filters.keyword.toLowerCase();
+        queryBuilder.where(
+          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
+          { keyword: `%${keyword}%` },
         );
       }
 
-      const queryBuilder = this.eventRepository.createQueryBuilder('event');
+      if (filters.startDate && filters.endDate) {
+        queryBuilder.andWhere(
+          'event.startDate >= :startDate AND event.endDate <= :endDate',
+          { startDate: filters.startDate, endDate: filters.endDate },
+        );
+      }
 
-      // Build complete search query using the utility
-      EventQueryBuilderUtils.buildSearchQuery(queryBuilder, {
-        keyword: filters.keyword,
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        type: filters.type,
-        upcoming: filters.upcoming,
-        category: filters.category,
-      });
+      if (filters.type) {
+        queryBuilder.andWhere('event.type = :type', { type: filters.type });
+      }
+
+      if (filters.category) {
+        const categoryName = filters.category.toLowerCase();
+        queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
+          categoryName: `%${categoryName}%`,
+        });
+      }
+
+      if (filters.upcoming) {
+        const today = new Date();
+        queryBuilder.andWhere('event.startDate >= :today', { today });
+      }
 
       const events = await queryBuilder.getMany();
 
-      // Add attendance count, favorite status, and matched fields to each event
       const eventsWithAttendance = await Promise.all(
         events.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
-          const surveyDetails =
-            await this.surveyUtils.getSurveyDetailsByEventId(event.id);
+          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
           let formattedDocuments: { name: string; document: string }[] = [];
           if (event.documents && event.documentNames) {
@@ -272,7 +306,7 @@ export class EventService {
             ...eventData
           } = event;
 
-          // Check if event is favorited by user
+                    // Check if event is favorited by user
           let isFavorite = false;
           if (userId) {
             const favorite = await this.favoriteEventRepository.findOne({
@@ -297,56 +331,40 @@ export class EventService {
           // Find which fields matched the keyword search
           let matchedFields: string[] = [];
           if (filters.keyword) {
-            // Simple keyword matching for events
-            const keyword = filters.keyword.toLowerCase();
-            const eventFields = [
-              event.name,
-              event.description,
-              event.location,
-              event.venue,
-              event.country
-            ].filter((field): field is string => 
-              field !== undefined && field !== null
-            );
-            
-            matchedFields = eventFields.filter(field => 
-              field.toLowerCase().includes(keyword)
-            );
+            matchedFields = this.findMatchedFields(event, filters.keyword);
           }
 
           const { exhibitorDescription, ...eventFiltered } = eventData;
-          // Convert eventStamps array to single object
-          return {
+          
+          // Regular response - include all data
+          const result = {
             ...eventFiltered,
             color: getEventColor(event.type),
-            speakersData: eventSpeakers.map((es) => ({
-              ...UserUtils.getBasicSpeakerInfo(es.speaker),
-              speakingStartTime: es.speakingStartTime,
-              speakingEndTime: es.speakingEndTime,
-            })),
-            categoriesData: category?.map((ec) => ec.category) || [],
             documents: formattedDocuments,
             eventStamps: {
               description: event.eventStampDescription,
               images: event.eventStampImages,
             },
+            attendanceCount: attendanceCount,
+            surveyDetails: surveyDetails,
+            hasSurvey: !!surveyDetails,
+            isFavorite: isFavorite,
+            isRegistered: isRegistered,
+            speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
+            categoriesData: category?.map((ec) => ec.category) || [],
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
               exhibitors: eventExhibitors.map((ee) => {
                 return {
-                  ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                  ...ee.exhibitor,
                   promotionalOffers: ee.exhibitor.promotionalOffers || [],
                 };
               }),
             },
-            attendanceCount: attendanceCount,
-            surveyDetails: surveyDetails,
-            hasSurvey: !!surveyDetails,
-
-            isFavorite: isFavorite,
-            isRegistered: isRegistered,
             searchFields: matchedFields, // Add matched fields to response
           };
+
+          return result;
         }),
       );
 
@@ -355,11 +373,9 @@ export class EventService {
       if (error instanceof ValidationException) {
         throw error;
       }
-      throw this.errorHandler.handleDatabaseError(error, 'Events retrieval');
+      this.errorHandler.handleDatabaseError(error, 'Events retrieval');
     }
   }
-
-
 
   // Get event attendance count
   async getEventAttendanceCount(eventId: string): Promise<number> {
@@ -1113,5 +1129,34 @@ export class EventService {
     }
   }
 
-  //----------------------------------Email Utils----------------------------------
+
+  private findMatchedFields(event: any, keyword: string): string[] {
+    const matchedFields: string[] = [];
+    const keywordLower = keyword.toLowerCase();
+
+    const fieldsToCheck = [
+      'name',
+      'description',
+      'venue',
+      'location',
+      'country',
+      'type',
+      'price',
+      'currency',
+      'latitude',
+      'longitude',
+    ];
+
+    fieldsToCheck.forEach((field) => {
+      if (
+        event[field] &&
+        event[field].toString().toLowerCase().includes(keywordLower)
+      ) {
+        matchedFields.push(field);
+      }
+    });
+
+    return matchedFields;
+  }
+
 }

@@ -444,42 +444,6 @@ export class UserController {
     }
   }
 
-  // QR Code Endpoints
-  /**
-   * Generate QR code for current user
-   * - Creates a QR code containing user information
-   * - Can be scanned by mobile devices to view user details
-   */
-  @Get('qr-code/generate')
-  @UseGuards(JwtAuthGuard)
-  async generateQRCode(
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User not authenticated',
-        });
-      }
-
-      const qrCodeData = await this.userService.generateUserQRCode(userId);
-      
-      const successResponse = {
-        success: true,
-        message: 'QR code generated successfully',
-        data: qrCodeData,
-      };
-      
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'QR code generation', req.user?.id);
-      throw error;
-    }
-  }
-
   /**
    * Get user information by scanning QR code
    * - Public endpoint that doesn't require authentication
@@ -512,7 +476,7 @@ export class UserController {
    */
   @Get('qr-code/generate/:userId')
   @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.Admin)
+  // @Roles(UserRole.Admin)
   async generateQRCodeForUser(
     @Param('userId') userId: string,
     @Res() response: Response,
@@ -531,43 +495,6 @@ export class UserController {
     } catch (error) {
       this.errorHandler.logError(error, 'QR code generation for user', req.user?.id);
       throw error;
-    }
-  }
-
-  /**
-   * Download QR code PNG file directly
-   * - Public endpoint (no authentication required)
-   * - Returns the actual PNG file for download
-   */
-  @Get('qr-code/download/:folder/:filename')
-  async downloadQRCodePNG(
-    @Param('folder') folder: string,
-    @Param('filename') filename: string,
-    @Res() response: Response,
-  ) {
-    try {
-      const filePath = path.join(process.cwd(), 'uploads', 'qr-codes', folder, filename);
-      
-      if (!fs.existsSync(filePath)) {
-        return response.status(HttpStatus.NOT_FOUND).json({
-          success: false,
-          message: 'QR code file not found',
-        });
-      }
-
-      // Set headers for file download
-      response.setHeader('Content-Type', 'image/png');
-      response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      
-      // Stream the file
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(response);
-    } catch (error) {
-      this.errorHandler.logError(error, 'QR code download', undefined);
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        success: false,
-        message: 'Error downloading QR code file',
-      });
     }
   }
 
