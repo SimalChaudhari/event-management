@@ -20,8 +20,9 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { UserEntity } from 'user/users.entity';
 import { EmailService } from '../service/email.service';
-import { MeetingEmailTemplates } from '../utils/meeting-email-templates.utils';
+import { MeetingEmailTemplates } from '../utils/email-templates';
 import { AgendaUtils } from '../utils/agenda.utils';
+import { ICSGenerator } from '../utils/calendar-utils/ics-generator.utils';
 
 
 @Injectable()
@@ -386,31 +387,86 @@ export class AgendaService {
         throw new BadRequestException('You must be registered for this event to respond to meeting requests.');
       }
 
-      // Update both statuses consistently based on response
+      // Get meeting creator details for notifications
+      const creator = await this.userRepository.findOne({ where: { id: meeting.createdBy } });
+      if (!creator) {
+        throw new ResourceNotFoundException('Meeting creator', meeting.createdBy);
+      }
+
+      // Store original meeting data for notification purposes
+      const originalMeetingData = {
+        title: meeting.title,
+        time: meeting.time,
+        date: meeting.meetingDate,
+        location: meeting.location,
+        details: meeting.details
+      };
+
+      let responseMessage = '';
+
       if (responseDto.response === RequestStatus.Accepted) {
+        // Accept the meeting request
         meeting.requestStatus = RequestStatus.Accepted;
         meeting.meetingStatus = MeetingStatus.Confirmed;
+        responseMessage = 'Meeting request accepted successfully';
+        
+        // Add response message to meeting notes if provided
+        if (responseDto.message) {
+          meeting.meetingNotes = meeting.meetingNotes 
+            ? `${meeting.meetingNotes}\n\nResponse: ${responseDto.message}`
+            : `Response: ${responseDto.message}`;
+        }
+
+        const updatedMeeting = await this.agendaRepository.save(meeting);
+
+        // Send acceptance notification to the meeting creator
+        await this.sendMeetingResponseNotification(meeting, responseDto, currentUser);
+
+        // Meeting request accepted successfully
+        console.log(`Meeting request accepted: ${meeting.id} by ${currentUser.id}`);
+
+        return await this.getAgendaWithRelations(updatedMeeting.id);
+
       } else if (responseDto.response === RequestStatus.Rejected) {
-        meeting.requestStatus = RequestStatus.Rejected;
+        // Reject the meeting request - remove it from both parties
+        responseMessage = 'Meeting request rejected and removed';
+
+        // Add rejection message to meeting notes if provided
+        if (responseDto.message) {
+          meeting.meetingNotes = meeting.meetingNotes 
+            ? `${meeting.meetingNotes}\n\nRejection: ${responseDto.message}`
+            : `Rejection: ${responseDto.message}`;
+        }
+
+        // Soft delete the meeting request (remove from both parties)
+        meeting.isActive = false;
         meeting.meetingStatus = MeetingStatus.Cancelled;
+        meeting.requestStatus = RequestStatus.Rejected;
+
+        await this.agendaRepository.save(meeting);
+
+        // Send rejection notification to the meeting creator
+        await this.sendMeetingRejectionNotification(
+          originalMeetingData,
+          meeting,
+          currentUser,
+          creator,
+          responseDto.message
+        );
+
+        // Meeting request rejected and removed successfully
+        console.log(`Meeting request rejected and removed: ${meeting.id} by ${currentUser.id}`);
+
+        return {
+          message: 'Meeting request rejected and removed successfully',
+          meetingId: meeting.id,
+          rejectedAt: new Date().toISOString(),
+          rejectedBy: currentUser.id
+        };
       }
 
-      // Add response message to meeting notes if provided
-      if (responseDto.message) {
-        meeting.meetingNotes = meeting.meetingNotes 
-          ? `${meeting.meetingNotes}\n\nResponse: ${responseDto.message}`
-          : `Response: ${responseDto.message}`;
-      }
+      throw new BadRequestException('Invalid response status. Must be either "accepted" or "rejected".');
 
-      const updatedMeeting = await this.agendaRepository.save(meeting);
-
-      // Send notification to the meeting creator
-      await this.sendMeetingResponseNotification(meeting, responseDto, currentUser);
-
-      // Meeting response processed successfully
-      console.log(`Meeting response processed successfully: ${meeting.id} by ${currentUser.id} with response: ${responseDto.response}`);
-
-      return await this.getAgendaWithRelations(updatedMeeting.id);
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -750,7 +806,6 @@ export class AgendaService {
       
       return !!registration;
     } catch (error) {
-      console.error('Error checking user event registration:', error);
       return false;
     }
   }
@@ -922,6 +977,148 @@ export class AgendaService {
     }
   }
 
+  // Helper method to send meeting rejection notifications
+  private async sendMeetingRejectionNotification(
+    originalMeetingData: { title: string; time: string; date: Date | undefined; location: string | undefined; details: string | undefined },
+    rejectedMeeting: EventAgenda,
+    currentUser: any,
+    creator: any,
+    rejectionMessage?: string
+  ) {
+    try {
+      // Send email notification to the meeting creator about rejection
+      if (creator?.email) {
+        const emailSubject = `Meeting Request Rejected: ${originalMeetingData.title}`;
+        const emailHtml = MeetingEmailTemplates.generateMeetingRejectionEmailHTML(
+          creator,
+          currentUser,
+          originalMeetingData,
+          rejectedMeeting,
+          rejectionMessage
+        );
+
+        await this.emailService.sendEmail(creator.email, emailSubject, emailHtml);
+      }
+
+      // Send confirmation email to the rejector
+      if (currentUser?.email) {
+        const emailSubject = `Meeting Request Rejected Successfully: ${originalMeetingData.title}`;
+        const emailHtml = MeetingEmailTemplates.generateMeetingRejectionConfirmationEmailHTML(
+          currentUser,
+          creator,
+          originalMeetingData,
+          rejectedMeeting,
+          rejectionMessage
+        );
+
+        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Failed to send meeting rejection notifications:', errorMessage);
+      // Don't fail the rejection if notifications fail
+    }
+  }
+
+  // Download single meeting as .ics file
+  async downloadMeetingICS(meetingId: string, currentUser: any) {
+    try {
+      // Find the meeting
+      const meeting = await this.agendaRepository.findOne({ where: { id: meetingId } });
+      if (!meeting) {
+        throw new ResourceNotFoundException('Meeting', meetingId);
+      }
+
+      // Validate that current user has access to this meeting
+      if (meeting.userId !== currentUser.id && meeting.createdBy !== currentUser.id) {
+        throw new BadRequestException('You can only download meetings that you own or created.');
+      }
+
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to download meetings.');
+      }
+
+      // Get user details for the meeting
+      const [creator, targetUser] = await Promise.all([
+        this.userRepository.findOne({ where: { id: meeting.createdBy } }),
+        this.userRepository.findOne({ where: { id: meeting.userId } })
+      ]);
+
+      if (!creator || !targetUser) {
+        throw new ResourceNotFoundException('User details not found for meeting');
+      }
+
+      // Generate ICS content
+      const icsContent = ICSGenerator.generateMeetingICS(meeting, creator, targetUser);
+      const filename = ICSGenerator.generateSingleMeetingFilename(meeting);
+
+      return {
+        icsContent,
+        filename,
+        meetingTitle: meeting.title,
+        meetingDate: meeting.meetingDate
+      };
+
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Meeting ICS download');
+    }
+  }
+
+  // Download all meetings as .ics file
+  async downloadAllMeetingsICS(currentUser: any, eventId?: string) {
+    try {
+      // Check if current user is registered for the event (if eventId is provided)
+      if (eventId) {
+        const userRegistration = await this.checkUserEventRegistration(currentUser.id, eventId);
+        if (!userRegistration) {
+          throw new BadRequestException('You must be registered for this event to download meetings.');
+        }
+      }
+
+      // Get all meetings for the user
+      const queryBuilder = this.agendaRepository
+        .createQueryBuilder('agenda')
+        .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId: currentUser.id })
+        .andWhere('agenda.isActive = :isActive', { isActive: true });
+
+      if (eventId) {
+        queryBuilder.andWhere('agenda.eventId = :eventId', { eventId });
+      }
+
+      const meetings = await queryBuilder.getMany();
+
+      if (meetings.length === 0) {
+        throw new BadRequestException('No meetings found to download');
+      }
+
+      // Generate ICS content for all meetings
+      const icsContent = ICSGenerator.generateMultipleMeetingsICS(meetings, currentUser);
+      const filename = ICSGenerator.generateMultipleMeetingsFilename();
+
+      return {
+        icsContent,
+        filename,
+        totalMeetings: meetings.length,
+        eventId: eventId || 'all_events'
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'All meetings ICS download');
+    }
+  }
+
   // Helper method to send meeting request notifications
   private async sendMeetingRequestNotification(
     meeting: EventAgenda,
@@ -958,4 +1155,306 @@ export class AgendaService {
       throw new Error(`Failed to send meeting request notification: ${errorMessage}`);
     }
   }
+
+  // New method for searching users to arrange meetups
+  async searchUsersForMeetup(
+    eventId: string,
+    searchQuery: string,
+    currentUser: any,
+    limit: number = 20
+  ) {
+    try {
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to search for users.');
+      }
+
+      // Validate event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Search for users who are registered for the same event
+      let registrations: any[];
+      
+      try {
+        // First get all registrations for the event
+        const allRegistrations = await this.registerEventRepository.find({
+          where: {
+            eventId: eventId,
+            isRegister: true,
+            status: Status.Sucesss
+          },
+          relations: ['user']
+        });
+
+        // Filter out current user after fetching
+        const filteredByUser = allRegistrations.filter(reg => reg.userId !== currentUser.id);
+
+        // Filter by search query if provided
+        let filteredRegistrations = filteredByUser;
+        if (searchQuery && searchQuery.trim()) {
+          const searchTerm = searchQuery.trim().toLowerCase();
+          filteredRegistrations = filteredByUser.filter((reg: any) => 
+            reg.user && (
+              reg.user.firstName?.toLowerCase().includes(searchTerm) ||
+              reg.user.lastName?.toLowerCase().includes(searchTerm) ||
+              reg.user.email?.toLowerCase().includes(searchTerm)
+            )
+          );
+        }
+
+        // Filter by role and active status
+        registrations = filteredRegistrations
+          .filter((reg: any) => reg.user && ['user', 'exhibitor'].includes(reg.user.role || ''))
+          .slice(0, limit);
+      } catch (error) {
+        console.error('Error in user search:', error);
+        throw new Error('Failed to search for users');
+      }
+
+      // Format the results to show only necessary user information
+      const searchResults = registrations
+        .filter(registration => registration.user) // Filter out registrations without users
+        .map(registration => {
+          const user = registration.user!; // Safe to use ! after filtering
+          return {
+            userId: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            profilePicture: user.profilePicture,
+            // Include registration details
+            registrationDate: registration.createdAt,
+            // Check if there are existing meetings between these users
+            hasExistingMeetings: false, // Will be updated below
+            // Meeting statistics
+            meetingStats: {
+              totalMeetings: 0,
+              confirmedMeetings: 0,
+              pendingMeetings: 0
+            }
+          };
+        });
+
+      // Get meeting statistics for each user
+      for (const result of searchResults) {
+        const meetingStats = await this.getMeetingStatisticsBetweenUsers(
+          currentUser.id,
+          result.userId,
+          eventId
+        );
+        
+        result.hasExistingMeetings = meetingStats.totalMeetings > 0;
+        result.meetingStats = meetingStats;
+      }
+
+      // Sort results: users with existing meetings first, then by name
+      searchResults.sort((a: any, b: any) => {
+        if (a.hasExistingMeetings && !b.hasExistingMeetings) return -1;
+        if (!a.hasExistingMeetings && b.hasExistingMeetings) return 1;
+        return a.firstName.localeCompare(b.firstName);
+      });
+
+      return {
+        users: searchResults,
+        total: searchResults.length,
+        eventId,
+        searchQuery: searchQuery || '',
+        currentUser: {
+          id: currentUser.id,
+          firstName: currentUser.firstName,
+          lastName: currentUser.lastName
+        }
+      };
+
+    } catch (error) {
+      console.error('Error in user search:', error);
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'User search for meetups');
+    }
+  }
+
+  // Helper method to get meeting statistics between two users
+  private async getMeetingStatisticsBetweenUsers(
+    user1Id: string,
+    user2Id: string,
+    eventId: string
+  ) {
+    try {
+      const meetings = await this.agendaRepository.find({
+        where: [
+          {
+            eventId,
+            userId: user1Id,
+            createdBy: user2Id,
+            isActive: true
+          },
+          {
+            eventId,
+            userId: user2Id,
+            createdBy: user1Id,
+            isActive: true
+          }
+        ]
+      });
+
+      const totalMeetings = meetings.length;
+      const confirmedMeetings = meetings.filter(m => m.meetingStatus === MeetingStatus.Confirmed).length;
+      const pendingMeetings = meetings.filter(m => m.meetingStatus === MeetingStatus.Pending).length;
+
+      return {
+        totalMeetings,
+        confirmedMeetings,
+        pendingMeetings
+      };
+    } catch (error) {
+      console.error('Error getting meeting statistics:', error);
+      return {
+        totalMeetings: 0,
+        confirmedMeetings: 0,
+        pendingMeetings: 0
+      };
+    }
+  }
+
+  // New method for canceling meeting requests
+  async cancelMeetingRequest(meetingId: string, currentUser: any) {
+    try {
+      // Find the meeting request
+      const meeting = await this.agendaRepository.findOne({ where: { id: meetingId } });
+      if (!meeting) {
+        throw new ResourceNotFoundException('Meeting request', meetingId);
+      }
+
+      // Validate that this is a meeting request
+      if (!meeting.isMeetingRequest) {
+        throw new BadRequestException('This is not a meeting request.');
+      }
+
+      // Validate permissions - only meeting creator can cancel
+      if (meeting.createdBy !== currentUser.id) {
+        throw new BadRequestException('Only the person who created the meeting request can cancel it.');
+      }
+
+      // Check if the meeting request is already cancelled or completed
+      if (meeting.meetingStatus === MeetingStatus.Cancelled) {
+        throw new BadRequestException('This meeting request is already cancelled.');
+      }
+
+      if (meeting.meetingStatus === MeetingStatus.Confirmed) {
+        throw new BadRequestException('Cannot cancel a confirmed meeting. Use reschedule instead.');
+      }
+
+      // Check if current user is registered for the event
+      const userRegistration = await this.checkUserEventRegistration(currentUser.id, meeting.eventId);
+      if (!userRegistration) {
+        throw new BadRequestException('You must be registered for this event to cancel meeting requests.');
+      }
+
+      // Get target user details for notification
+      const targetUser = await this.userRepository.findOne({ where: { id: meeting.userId } });
+      if (!targetUser) {
+        throw new ResourceNotFoundException('Target user', meeting.userId);
+      }
+
+      // Store original meeting data for notification
+      const originalMeetingData = {
+        title: meeting.title,
+        time: meeting.time,
+        date: meeting.meetingDate,
+        location: meeting.location,
+        details: meeting.details
+      };
+
+      // Cancel the meeting request
+      meeting.meetingStatus = MeetingStatus.Cancelled;
+      meeting.requestStatus = RequestStatus.Rejected;
+      meeting.isActive = false;
+      
+      // Add cancellation information to meeting notes
+      const cancellationNote = `Cancelled by ${currentUser.firstName || currentUser.id} on ${new Date().toISOString()}`;
+      meeting.meetingNotes = meeting.meetingNotes 
+        ? `${meeting.meetingNotes}\n\n${cancellationNote}`
+        : cancellationNote;
+
+      // Save the updated meeting
+      const updatedMeeting = await this.agendaRepository.save(meeting);
+
+      // Send cancellation notifications
+      await this.sendCancellationNotifications(
+        originalMeetingData,
+        updatedMeeting,
+        currentUser,
+        targetUser
+      );
+
+      // Meeting request cancelled successfully
+      console.log(`Meeting request cancelled successfully: ${meeting.id} by ${currentUser.id}`);
+
+      return true
+
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Meeting request cancellation');
+    }
+  }
+
+  // Helper method to send cancellation notifications
+  private async sendCancellationNotifications(
+    originalMeetingData: { title: string; time: string; date: Date | undefined; location: string | undefined; details: string | undefined },
+    cancelledMeeting: EventAgenda,
+    currentUser: any,
+    targetUser: any
+  ) {
+    try {
+      // Send email notification to the target user
+      if (targetUser?.email) {
+        const emailSubject = `Meeting Request Cancelled: ${originalMeetingData.title}`;
+        const emailHtml = MeetingEmailTemplates.generateCancellationEmailHTML(
+          targetUser,
+          currentUser,
+          originalMeetingData,
+          cancelledMeeting
+        );
+
+        await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
+      }
+
+      // Send confirmation email to the canceller
+      if (currentUser?.email) {
+        const emailSubject = `Meeting Request Cancelled Successfully: ${originalMeetingData.title}`;
+        const emailHtml = MeetingEmailTemplates.generateCancellationConfirmationEmailHTML(
+          currentUser,
+          targetUser,
+          originalMeetingData,
+          cancelledMeeting
+        );
+
+        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Failed to send cancellation notifications:', errorMessage);
+      // Don't fail the cancellation if notifications fail
+    }
+  }
+
+
 }

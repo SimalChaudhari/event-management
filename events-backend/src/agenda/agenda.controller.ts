@@ -12,13 +12,14 @@ import {
   Request,
   HttpStatus,
   Header,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AgendaService } from './agenda.service';
-import { 
+import {
   CreateMeetingRequestDto,
   RespondToMeetingRequestDto,
-  RescheduleMeetingDto
+  RescheduleMeetingDto,
 } from './agenda.dto';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
@@ -41,7 +42,10 @@ export class AgendaController {
     @Query('eventId') eventId?: string,
   ) {
     try {
-      const requests = await this.agendaService.getIncomingMeetingRequests(req.user.id, eventId);
+      const requests = await this.agendaService.getIncomingMeetingRequests(
+        req.user.id,
+        eventId,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -55,7 +59,11 @@ export class AgendaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Incoming meeting requests retrieval', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Incoming meeting requests retrieval',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -68,7 +76,10 @@ export class AgendaController {
     @Query('eventId') eventId?: string,
   ) {
     try {
-      const requests = await this.agendaService.getSentMeetingRequests(req.user.id, eventId);
+      const requests = await this.agendaService.getSentMeetingRequests(
+        req.user.id,
+        eventId,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -82,7 +93,11 @@ export class AgendaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Sent meeting requests retrieval', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Sent meeting requests retrieval',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -96,7 +111,11 @@ export class AgendaController {
     @Query('status') status?: string,
   ) {
     try {
-      const meetings = await this.agendaService.getMyMeetings(req.user.id, eventId, status);
+      const meetings = await this.agendaService.getMyMeetings(
+        req.user.id,
+        eventId,
+        status,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -123,7 +142,10 @@ export class AgendaController {
     @Request() req: any,
   ) {
     try {
-      const meeting = await this.agendaService.createMeetingRequest(createMeetingDto, req.user);
+      const meeting = await this.agendaService.createMeetingRequest(
+        createMeetingDto,
+        req.user,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -136,7 +158,11 @@ export class AgendaController {
 
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Meeting request creation', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Meeting request creation',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -150,20 +176,39 @@ export class AgendaController {
     @Request() req: any,
   ) {
     try {
-      const meeting = await this.agendaService.respondToMeetingRequest(id, responseDto, req.user);
+      const result = await this.agendaService.respondToMeetingRequest(
+        id,
+        responseDto,
+        req.user,
+      );
+
+      let message = '';
+      let statusCode = HttpStatus.OK;
+
+      if (responseDto.response === 'accepted') {
+        message = 'Meeting request accepted successfully';
+        statusCode = HttpStatus.OK;
+      } else if (responseDto.response === 'rejected') {
+        message = 'Meeting request rejected and removed successfully';
+        statusCode = HttpStatus.OK;
+      }
 
       const successResponse: SuccessResponse = {
         success: true,
-        message: `Meeting request ${responseDto.response} successfully`,
-        data: meeting,
+        message: message,
+        data: result,
         metadata: {
           timestamp: new Date().toISOString(),
         },
       };
 
-      return response.status(HttpStatus.OK).json(successResponse);
+      return response.status(statusCode).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Meeting request response', req.user?.id);
+      this.errorHandler.logError(
+        error,
+        'Meeting request response',
+        req.user?.id,
+      );
       throw error;
     }
   }
@@ -177,7 +222,11 @@ export class AgendaController {
     @Request() req: any,
   ) {
     try {
-      const meeting = await this.agendaService.rescheduleMeeting(id, rescheduleDto, req.user);
+      const meeting = await this.agendaService.rescheduleMeeting(
+        id,
+        rescheduleDto,
+        req.user,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -255,7 +304,11 @@ export class AgendaController {
     @Request() req: any,
   ) {
     try {
-      const result = await this.agendaService.deleteAllMeetings(body.userId, body.eventId, req.user);
+      const result = await this.agendaService.deleteAllMeetings(
+        body.userId,
+        body.eventId,
+        req.user,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -273,4 +326,142 @@ export class AgendaController {
     }
   }
 
+  // Search for users to arrange meetups
+  @Get('search-users')
+  async searchUsersForMeetup(
+    @Request() req: any,
+    @Res() response: Response,
+    @Query('eventId') eventId: string,
+    @Query('query') searchQuery?: string,
+    @Query('limit') limit?: string,
+  ) {
+    try {
+      if (!eventId) {
+        throw new BadRequestException('Event ID is required');
+      }
+
+      const limitNumber = limit ? parseInt(limit) : 20;
+      if (limitNumber > 50) {
+        throw new BadRequestException('Limit cannot exceed 50');
+      }
+
+      const searchResults = await this.agendaService.searchUsersForMeetup(
+        eventId,
+        searchQuery || '',
+        req.user,
+        limitNumber,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Users found successfully for meetup arrangement',
+        data: searchResults,
+        metadata: {
+          total: searchResults.total,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  // Cancel meeting request
+  @Put('meeting-request/:id/cancel')
+  async cancelMeetingRequest(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      if (!id) {
+        throw new BadRequestException('Meeting ID is required');
+      }
+
+      const result = await this.agendaService.cancelMeetingRequest(
+        id,
+        req.user,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Meeting request cancelled successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'Meeting request cancellation',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  // Download single meeting as .ics file
+  @Get('meeting/:id/download-ics')
+  async downloadMeetingICS(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      if (!id) {
+        throw new BadRequestException('Meeting ID is required');
+      }
+
+      const result = await this.agendaService.downloadMeetingICS(id, req.user);
+
+      // Set response headers for file download
+      response.setHeader('Content-Type', 'text/calendar');
+      response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      response.setHeader('Cache-Control', 'no-cache');
+
+      // Send the ICS content
+      return response.status(HttpStatus.OK).send(result.icsContent);
+
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'Meeting ICS download',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  // Download all meetings as .ics file
+  @Get('meetings/download-ics')
+  async downloadAllMeetingsICS(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query('eventId') eventId?: string,
+  ) {
+    try {
+      const result = await this.agendaService.downloadAllMeetingsICS(req.user, eventId);
+
+      // Set response headers for file download
+      response.setHeader('Content-Type', 'text/calendar');
+      response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      response.setHeader('Cache-Control', 'no-cache');
+
+      // Send the ICS content
+      return response.status(HttpStatus.OK).send(result.icsContent);
+
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'All meetings ICS download',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
 }
