@@ -354,14 +354,18 @@ export class EventService {
             isRegistered: isRegistered,
             speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
             categoriesData: category?.map((ec) => ec.category) || [],
+
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
-              exhibitors: eventExhibitors.map((ee) => {
-                return {
-                  ...ee.exhibitor,
-                  promotionalOffers: ee.exhibitor.promotionalOffers || [],
-                };
-              }),
+              exhibitors:
+                event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive)
+                  ?.map((ee) => {
+                    return {
+                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
             },
           };
 
