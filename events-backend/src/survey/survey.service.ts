@@ -1514,7 +1514,7 @@ export class SurveyService {
       await this.surveyRepository.delete(surveyId);
 
       return {
-        message: 'Survey elated data successfully deleted',
+        message: 'Survey related data deleted',
         deletedSurveyId: surveyId,
         deletedData: {
           survey: survey.title,

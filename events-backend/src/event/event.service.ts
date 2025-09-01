@@ -369,40 +369,92 @@ export class EventService {
             },
           };
 
-          // If globalSearch is active, perform comprehensive search and return only matched fields
+          // For global search, we still return the complete event structure
+          // but mark it as having a global match if search terms are found
           if (filters.globalSearch) {
-            const globalSearchResult = GlobalSearchUtils.performGlobalSearch(
-              completeEvent,
-              { keyword: filters.globalSearch, caseSensitive: false }
-            );
+            // Get detailed search match information
+            const searchResult = this.checkGlobalSearchMatch(completeEvent, filters.globalSearch);
             
             return {
-              ...globalSearchResult.matchedEvent,
-              searchFields: globalSearchResult.matchedFields,
-              hasGlobalMatch: globalSearchResult.hasMatch
+              ...completeEvent,
+              hasGlobalMatch: searchResult.hasMatch,
+              searchResult: searchResult
             };
           }
 
           // Regular response - include all data
           return {
             ...completeEvent,
-            searchFields: [], // No search fields for regular response
             hasGlobalMatch: false
           };
         }),
       );
 
-      // If globalSearch is active, filter events that have global matches
+      // If globalSearch is active, filter events that have global matches and aggregate results
       if (filters.globalSearch) {
         const eventsWithGlobalMatches = eventsWithAttendance.filter(event => event.hasGlobalMatch);
+        
+        // Aggregate all search results into separate arrays
+        const allSpeakers: any[] = [];
+        const allCategories: any[] = [];
+        const allExhibitors: any[] = [];
+        const allPromotionalOffers: any[] = [];
+        const allSurveySessions: any[] = [];
+        
+        eventsWithGlobalMatches.forEach(event => {
+          // Type assertion to handle the searchResult property
+          const eventWithSearch = event as any;
+          if (eventWithSearch.searchResult) {
+            allSpeakers.push(...eventWithSearch.searchResult.matchedSpeakers);
+            allCategories.push(...eventWithSearch.searchResult.matchedCategories);
+            allExhibitors.push(...eventWithSearch.searchResult.matchedExhibitors);
+            allPromotionalOffers.push(...eventWithSearch.searchResult.matchedPromotionalOffers);
+            allSurveySessions.push(...eventWithSearch.searchResult.matchedSurveySessions);
+          }
+        });
+
+        // Only include events in the events array if the search matched the event itself, not just categories/speakers/exhibitors
+        const eventsWithEventMatches = eventsWithGlobalMatches.filter(event => {
+          const eventWithSearch = event as any;
+          return eventWithSearch.searchResult?.matchedEvent === true;
+        });
+
+        const simplifiedEvents = eventsWithEventMatches.map(event => ({
+          id: event.id,
+          name: event.name,
+          description: event.description,
+          startDate: event.startDate,
+          startTime: event.startTime,
+          endDate: event.endDate,
+          endTime: event.endTime,
+          location: event.location,
+          venue: event.venue,
+          country: event.country,
+          images: event.images,
+          type: event.type,
+          price: event.price,
+          currency: event.currency,
+          color: event.color
+        }));
+
         return {
-          events: eventsWithGlobalMatches,
+          events: simplifiedEvents,
+          speakers: allSpeakers,
+          categories: allCategories,
+          exhibitors: allExhibitors,
+          promotionalOffers: allPromotionalOffers,
+          surveySessions: allSurveySessions,
           metadata: {
-            total: eventsWithGlobalMatches.length,
+            total: simplifiedEvents.length,
+            totalSpeakers: allSpeakers.length,
+            totalCategories: allCategories.length,
+            totalExhibitors: allExhibitors.length,
+            totalPromotionalOffers: allPromotionalOffers.length,
+            totalSurveySessions: allSurveySessions.length,
             timestamp: new Date().toISOString(),
             globalSearch: true,
             searchKeyword: filters.globalSearch,
-            totalMatches: eventsWithGlobalMatches.length
+            totalMatches: simplifiedEvents.length
           }
         };
       }
@@ -1176,33 +1228,150 @@ export class EventService {
   }
 
 
-  private findMatchedFields(event: any, keyword: string): string[] {
-    const matchedFields: string[] = [];
+  private checkGlobalSearchMatch(event: any, keyword: string): {
+    hasMatch: boolean;
+    matchedEvent: boolean;
+    matchedSpeakers: any[];
+    matchedCategories: any[];
+    matchedExhibitors: any[];
+    matchedPromotionalOffers: any[];
+    matchedSurveySessions: any[];
+  } {
     const keywordLower = keyword.toLowerCase();
+    const result: {
+      hasMatch: boolean;
+      matchedEvent: boolean;
+      matchedSpeakers: any[];
+      matchedCategories: any[];
+      matchedExhibitors: any[];
+      matchedPromotionalOffers: any[];
+      matchedSurveySessions: any[];
+    } = {
+      hasMatch: false,
+      matchedEvent: false,
+      matchedSpeakers: [],
+      matchedCategories: [],
+      matchedExhibitors: [],
+      matchedPromotionalOffers: [],
+      matchedSurveySessions: []
+    };
 
-    const fieldsToCheck = [
-      'name',
-      'description',
-      'venue',
-      'location',
-      'country',
-      'type',
-      'price',
-      'currency',
-      'latitude',
-      'longitude',
+    // Check basic event fields
+    const basicFields = [
+      'name', 'description', 'venue', 'location', 'country', 'type', 
+      'price', 'currency', 'latitude', 'longitude', 'startTime', 'endTime'
     ];
 
-    fieldsToCheck.forEach((field) => {
-      if (
-        event[field] &&
-        event[field].toString().toLowerCase().includes(keywordLower)
-      ) {
-        matchedFields.push(field);
+    for (const field of basicFields) {
+      if (event[field] && event[field].toString().toLowerCase().includes(keywordLower)) {
+        result.matchedEvent = true;
+        result.hasMatch = true;
+        break;
       }
-    });
+    }
 
-    return matchedFields;
+    // Check speakers
+    if (event.speakersData && Array.isArray(event.speakersData)) {
+      for (const speaker of event.speakersData) {
+        if (speaker.name?.toLowerCase().includes(keywordLower) ||
+            speaker.companyName?.toLowerCase().includes(keywordLower) ||
+            speaker.position?.toLowerCase().includes(keywordLower) ||
+            speaker.email?.toLowerCase().includes(keywordLower) ||
+            speaker.description?.toLowerCase().includes(keywordLower) ||
+            speaker.location?.toLowerCase().includes(keywordLower)) {
+          result.matchedSpeakers.push({
+            ...speaker,
+            eventId: event.id,
+            eventName: event.name
+          });
+          result.hasMatch = true;
+        }
+      }
+    }
+
+    // Check categories
+    if (event.categoriesData && Array.isArray(event.categoriesData)) {
+      for (const category of event.categoriesData) {
+        if (category.name?.toLowerCase().includes(keywordLower) ||
+            category.description?.toLowerCase().includes(keywordLower)) {
+          result.matchedCategories.push({
+            ...category,
+            eventId: event.id,
+            eventName: event.name
+          });
+          result.hasMatch = true;
+        }
+      }
+    }
+
+    // Check exhibitors
+    if (event.exhibitorsData?.exhibitors && Array.isArray(event.exhibitorsData.exhibitors)) {
+      for (const exhibitor of event.exhibitorsData.exhibitors) {
+        if (exhibitor.companyName?.toLowerCase().includes(keywordLower) ||
+            exhibitor.companyDescription?.toLowerCase().includes(keywordLower) ||
+            exhibitor.email?.toLowerCase().includes(keywordLower)) {
+          result.matchedExhibitors.push({
+            ...exhibitor,
+            eventId: event.id,
+            eventName: event.name
+          });
+          result.hasMatch = true;
+        }
+      }
+    }
+
+         // Check promotional offers
+     if (event.exhibitorsData?.exhibitors) {
+       for (const exhibitor of event.exhibitorsData.exhibitors) {
+         if (exhibitor.promotionalOffers && Array.isArray(exhibitor.promotionalOffers)) {
+           for (const offer of exhibitor.promotionalOffers) {
+             if (offer.title?.toLowerCase().includes(keywordLower) ||
+                 offer.description?.toLowerCase().includes(keywordLower)) {
+               result.matchedPromotionalOffers.push({
+                 ...offer,
+                 exhibitorId: exhibitor.id,
+                 exhibitorName: exhibitor.companyName,
+                 eventId: event.id,
+                 eventName: event.name
+               });
+               result.hasMatch = true;
+             }
+           }
+         }
+       }
+     }
+
+           // Check survey sessions
+      if (event.surveyDetails) {
+        if (event.surveyDetails.title?.toLowerCase().includes(keywordLower) ||
+            event.surveyDetails.description?.toLowerCase().includes(keywordLower)) {
+          result.matchedSurveySessions.push({
+            ...event.surveyDetails,
+            eventId: event.id,
+            eventName: event.name
+          });
+          result.hasMatch = true;
+        }
+        
+        // Check individual survey sessions
+        if (event.surveyDetails.sessions && Array.isArray(event.surveyDetails.sessions)) {
+          for (const session of event.surveyDetails.sessions) {
+            if (session.name?.toLowerCase().includes(keywordLower) ||
+                session.description?.toLowerCase().includes(keywordLower)) {
+              result.matchedSurveySessions.push({
+                ...session,
+                surveyId: event.surveyDetails.id,
+                surveyTitle: event.surveyDetails.title,
+                eventId: event.id,
+                eventName: event.name
+              });
+              result.hasMatch = true;
+            }
+          }
+        }
+      }
+
+     return result;
   }
 
 }
