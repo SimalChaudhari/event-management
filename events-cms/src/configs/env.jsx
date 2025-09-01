@@ -10,14 +10,14 @@ export const API_RETRY = {
 // API Configuration
 export const API_CONFIG = {
     // Development
-    development: {  // Changed from DEVELOPMENT to development
-        BASE_URL: 'http://localhost:5000',
-        TIMEOUT: 15000,
-        RETRY_ATTEMPTS: 5,
-        RETRY_DELAY: 2000
-    },
+    // development: {  // Changed from DEVELOPMENT to development
+    //     BASE_URL: 'http://localhost:5000',
+    //     TIMEOUT: 15000,
+    //     RETRY_ATTEMPTS: 5,
+    //     RETRY_DELAY: 2000
+    // },
     // Production
-    production: {   // Changed from PRODUCTION to production
+    development: {   // Changed from PRODUCTION to production
         BASE_URL: 'http://events.isca.org.sg:5000',
         TIMEOUT: 20000,
         RETRY_ATTEMPTS: 3,

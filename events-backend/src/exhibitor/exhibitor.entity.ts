@@ -14,6 +14,121 @@ import { EventExhibitor } from 'event/event.entity';
 import { EventBooth } from '../event/event-booth.entity';
 import { EventAgenda } from 'agenda/agenda.entity';
 
+// Custom transformer to handle both old and new data formats
+const fileArrayTransformer = {
+  to: (value: any): string => {
+    if (!value) return '';
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return JSON.stringify(value);
+  },
+  from: (value: string): any => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        // Check if it's the new format (array of objects) or old format (array of strings)
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].name && parsed[0].flyer) {
+          return parsed; // New format: array of objects
+        } else {
+          // Old format: array of strings, convert to new format
+          return parsed.map((item: string, index: number) => ({
+            name: `Item ${index + 1}`,
+            flyer: item
+          }));
+        }
+      }
+      return parsed;
+    } catch (error) {
+      // If parsing fails, try to split as comma-separated string (fallback)
+      if (typeof value === 'string' && value.includes(',')) {
+        return value.split(',').map((item: string, index: number) => ({
+          name: `Item ${index + 1}`,
+          flyer: item.trim()
+        }));
+      }
+      return [];
+    }
+  }
+};
+
+const documentArrayTransformer = {
+  to: (value: any): string => {
+    if (!value) return '';
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return JSON.stringify(value);
+  },
+  from: (value: string): any => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        // Check if it's the new format (array of objects) or old format (array of strings)
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].name && parsed[0].document) {
+          return parsed; // New format: array of objects
+        } else {
+          // Old format: array of strings, convert to new format
+          return parsed.map((item: string, index: number) => ({
+            name: `Document ${index + 1}`,
+            document: item
+          }));
+        }
+      }
+      return parsed;
+    } catch (error) {
+      // If parsing fails, try to split as comma-separated string (fallback)
+      if (typeof value === 'string' && value.includes(',')) {
+        return value.split(',').map((item: string, index: number) => ({
+          name: `Document ${index + 1}`,
+          document: item.trim()
+        }));
+      }
+      return [];
+    }
+  }
+};
+
+const eventImageArrayTransformer = {
+  to: (value: any): string => {
+    if (!value) return '';
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return JSON.stringify(value);
+  },
+  from: (value: string): any => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        // Check if it's the new format (array of objects) or old format (array of strings)
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].name && parsed[0].eventImage) {
+          return parsed; // New format: array of objects
+        } else {
+          // Old format: array of strings, convert to new format
+          return parsed.map((item: string, index: number) => ({
+            name: `Event Image ${index + 1}`,
+            eventImage: item
+          }));
+        }
+      }
+      return parsed;
+    } catch (error) {
+      // If parsing fails, try to split as comma-separated string (fallback)
+      if (typeof value === 'string' && value.includes(',')) {
+        return value.split(',').map((item: string, index: number) => ({
+          name: `Event Image ${index + 1}`,
+          eventImage: item.trim()
+        }));
+      }
+      return [];
+    }
+  }
+};
+
 @Entity('exhibitors')
 export class Exhibitor {
   @PrimaryGeneratedColumn('uuid')
@@ -45,29 +160,17 @@ export class Exhibitor {
   @Column({ type: 'varchar', nullable: true })
   logo?: string;
 
-  // Multiple flyer images support
-  @Column('simple-array', { nullable: true })
-  flyers?: string[];
+  // Updated flyers structure - array of objects with name and flyer
+  @Column({ type: 'text', nullable: true, transformer: fileArrayTransformer })
+  flyers?: Array<{ name: string; flyer: string }>;
 
-  // Add flyer names field
-  @Column('simple-array', { nullable: true })
-  flyerNames?: string[];
+  // Updated documents structure - array of objects with name and document
+  @Column({ type: 'text', nullable: true, transformer: documentArrayTransformer })
+  documents?: Array<{ name: string; document: string }>;
 
-  // Multiple documents support
-  @Column('simple-array', { nullable: true })
-  documents?: string[];
-
-  // Add this new field for document names 
-  @Column('simple-array', { nullable: true })
-  documentNames?: string[];
-
-  // Multiple event images support
-  @Column('simple-array', { nullable: true })
-  eventImages?: string[];
-
-  // Add event image names field
-  @Column('simple-array', { nullable: true })
-  eventImageNames?: string[];
+  // Updated event images structure - array of objects with name and eventImage
+  @Column({ type: 'text', nullable: true, transformer: eventImageArrayTransformer })
+  eventImages?: Array<{ name: string; eventImage: string }>;
 
   // Add the new relationship
   @OneToMany(
