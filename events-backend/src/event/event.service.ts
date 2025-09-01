@@ -229,16 +229,10 @@ export class EventService {
         }
       }
 
-      const queryBuilder = this.eventRepository
-        .createQueryBuilder('event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
-        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
-        .leftJoinAndSelect('event.category', 'eventCategory')
-        .leftJoinAndSelect('eventCategory.category', 'category')
-        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
-        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-        .leftJoinAndSelect('event.galleries', 'galleries');
+      const queryBuilder = this.eventRepository.createQueryBuilder('event');
+
+      // Use the utility for consistent query building
+      EventQueryBuilderUtils.buildBaseQuery(queryBuilder);
 
       if (filters.category) {
         const today = new Date();
@@ -303,6 +297,14 @@ export class EventService {
             }));
           }
 
+          const speakers =
+          event?.eventSpeakers?.map((es) => ({
+            ...UserUtils.getBasicSpeakerInfo(es.speaker),
+            speakingStartTime: es.speakingStartTime,
+            speakingEndTime: es.speakingEndTime,
+          })) || [];
+          
+
           const {
             eventSpeakers,
             category,
@@ -336,7 +338,7 @@ export class EventService {
             isRegistered = !!registration;
           }
 
-          const { exhibitorDescription, ...eventFiltered } = eventData;
+          const { exhibitorDescription,surveys, ...eventFiltered } = eventData;
           
           // Build the complete event object
           const completeEvent = {
@@ -352,7 +354,7 @@ export class EventService {
             hasSurvey: !!surveyDetails,
             isFavorite: isFavorite,
             isRegistered: isRegistered,
-            speakersData: eventSpeakers.map((es) => UserUtils.getBasicSpeakerInfo(es.speaker)),
+            speakersData: speakers,
             categoriesData: category?.map((ec) => ec.category) || [],
 
             exhibitorsData: {
@@ -556,6 +558,7 @@ export class EventService {
         exhibitorDescription,
         eventStampDescription,
         eventStampImages,
+        surveys,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
         ...eventFiltered
