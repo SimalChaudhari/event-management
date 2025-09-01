@@ -22,6 +22,36 @@ export class PromotionalOfferDto {
   description?: string;
 }
 
+export class FlyerDto {
+  @IsNotEmpty()
+  @IsString()
+  name!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  flyer!: string;
+}
+
+export class DocumentDto {
+  @IsNotEmpty()
+  @IsString()
+  name!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  document!: string;
+}
+
+export class EventImageDto {
+  @IsNotEmpty()
+  @IsString()
+  name!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  eventImage!: string;
+}
+
 export class ExhibitorDto {
   @IsNotEmpty()
   @IsString()
@@ -57,61 +87,49 @@ export class ExhibitorDto {
   @IsString()
   logo?: string;
 
+  // Updated flyers structure - array of objects with name and flyer
   @IsOptional()
   @IsArray()
-  flyers?: string[];
+  flyers?: FlyerDto[];
 
-  // Add flyer names field
+  // Comma-separated names for uploaded flyers (form-data)
   @IsOptional()
-  @IsArray()
-  flyerNames?: string[];
+  @IsString()
+  flyerNames?: string;
 
   @IsOptional()
   promotionalOffers?: PromotionalOfferDto[];
 
+  // Updated documents structure - array of objects with name and document
   @IsOptional()
   @IsArray()
-  documents?: string[];
+  documents?: DocumentDto[];
 
-  // Add document names field
+  // Comma-separated names for uploaded documents (form-data)
   @IsOptional()
-  @IsArray()
-  documentNames?: string[];
+  @IsString()
+  documentNames?: string;
 
+  // Updated event images structure - array of objects with name and eventImage
   @IsOptional()
   @IsArray()
-  eventImages?: string[];
+  eventImages?: EventImageDto[];
 
-  // Add event image names field
+  // Comma-separated names for uploaded event images (form-data)
   @IsOptional()
-  @IsArray()
-  eventImageNames?: string[];
+  @IsString()
+  eventImageNames?: string;
 
   // For handling existing files during update
   @IsOptional()
   @IsArray()
-  originalFlyers?: string[];
-
-  // Add original flyer names field
-  @IsOptional()
-  @IsArray()
-  originalFlyerNames?: string[];
+  originalFlyers?: FlyerDto[];
 
   @IsOptional()
   @IsArray()
-  originalDocuments?: string[];
-
-  // Add this for handling existing document names (Event जैसा ही)
-  @IsOptional()
-  @IsArray()
-  originalDocumentNames?: string[];
+  originalDocuments?: DocumentDto[];
 
   @IsOptional()
   @IsArray()
-  originalEventImages?: string[];
-
-  // Add original event image names field
-  @IsOptional()
-  @IsArray()
-  originalEventImageNames?: string[];
+  originalEventImages?: EventImageDto[];
 }
