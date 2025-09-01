@@ -419,33 +419,22 @@ export class EventService {
           return eventWithSearch.searchResult?.matchedEvent === true;
         });
 
-        const simplifiedEvents = eventsWithEventMatches.map(event => ({
-          id: event.id,
-          name: event.name,
-          description: event.description,
-          startDate: event.startDate,
-          startTime: event.startTime,
-          endDate: event.endDate,
-          endTime: event.endTime,
-          location: event.location,
-          venue: event.venue,
-          country: event.country,
-          images: event.images,
-          type: event.type,
-          price: event.price,
-          currency: event.currency,
-          color: event.color
-        }));
+        // Return complete event data instead of simplified data
+        const completeEvents = eventsWithEventMatches.map(event => {
+          // Remove the searchResult and hasGlobalMatch properties for cleaner response
+          const { searchResult, hasGlobalMatch, ...cleanEvent } = event as any;
+          return cleanEvent;
+        });
 
         return {
-          events: simplifiedEvents,
+          events: completeEvents,
           speakers: allSpeakers,
           categories: allCategories,
           exhibitors: allExhibitors,
           promotionalOffers: allPromotionalOffers,
           surveySessions: allSurveySessions,
           metadata: {
-            total: simplifiedEvents.length,
+            total: completeEvents.length,
             totalSpeakers: allSpeakers.length,
             totalCategories: allCategories.length,
             totalExhibitors: allExhibitors.length,
@@ -454,7 +443,7 @@ export class EventService {
             timestamp: new Date().toISOString(),
             globalSearch: true,
             searchKeyword: filters.globalSearch,
-            totalMatches: simplifiedEvents.length
+            totalMatches: completeEvents.length
           }
         };
       }
