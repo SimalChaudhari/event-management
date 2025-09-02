@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgendaService } from './agenda.service';
 import { AgendaController } from './agenda.controller';
 import { EventAgenda } from './agenda.entity';
+import { AgendaCategory } from './agenda-category.entity';
 import { Event } from '../event/event.entity';
 import { UtilsModule } from '../utils/utils.module';
 import { JwtModule } from '@nestjs/jwt';
@@ -14,6 +15,7 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
   imports: [
     TypeOrmModule.forFeature([
       EventAgenda,
+      AgendaCategory,
       UserEntity,
       Event,
       RegisterEvent,

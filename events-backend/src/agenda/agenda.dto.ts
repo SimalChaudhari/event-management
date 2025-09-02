@@ -13,7 +13,7 @@ import {
   Matches,
   Validate,
 } from 'class-validator';
-import { AgendaCategory, MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
+import { MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
 
 // Custom validator for future dates
 export class FutureDateValidator {
@@ -59,8 +59,8 @@ export class CreateEventAgendaDto {
   details?: string;
 
   @IsNotEmpty()
-  @IsEnum(AgendaCategory)
-  category!: AgendaCategory;
+  @IsUUID()
+  categoryId!: string;
 
   @IsNotEmpty()
   @IsUUID()
@@ -128,8 +128,8 @@ export class UpdateEventAgendaDto {
   details?: string;
 
   @IsOptional()
-  @IsEnum(AgendaCategory)
-  category?: AgendaCategory;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsInt()
@@ -209,6 +209,10 @@ export class CreateMeetingRequestDto {
   @IsOptional()
   @IsString()
   meetingNotes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
 
 export class RespondToMeetingRequestDto {
@@ -255,7 +259,7 @@ export class EventAgendaResponseDto {
   duration!: number;
   location?: string;
   details?: string;
-  category!: AgendaCategory;
+  categoryId!: string;
   isActive!: boolean;
   createdBy!: string;
   createdAt!: Date;
@@ -280,7 +284,7 @@ export class EventAgendaListResponseDto {
   duration!: number;
   location?: string;
   details?: string;
-  category!: AgendaCategory;
+  categoryId!: string;
   createdBy!: string;
   isActive!: boolean;
   createdAt!: Date;

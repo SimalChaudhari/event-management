@@ -10,7 +10,13 @@ export interface FormattedAgenda {
   duration: number;
   location?: string;
   details?: string;
-  category: string;
+  category: {
+    id: string;
+    name: string;
+    color?: string;
+    isActive: boolean;
+  } | null;
+  categoryId: string;
   meetingStatus?: string;
   requestStatus?: string;
   requestType?: string;
@@ -156,7 +162,13 @@ export class AgendaUtils {
       duration: agenda.duration,
       location: agenda.location,
       details: agenda.details,
-      category: agenda.category,
+      category: agenda.category ? {
+        id: agenda.category.id,
+        name: agenda.category.name,
+        color: agenda.category.color,
+        isActive: agenda.category.isActive
+      } : null,
+      categoryId: agenda.categoryId,
       meetingStatus: agenda.meetingStatus,
       requestStatus: agenda.requestStatus,
       requestType: agenda.requestType,
@@ -273,9 +285,9 @@ export class AgendaUtils {
     const confirmed = agendas.filter(a => a.meetingStatus === 'confirmed').length;
     const pending = agendas.filter(a => a.meetingStatus === 'pending').length;
     const cancelled = agendas.filter(a => a.meetingStatus === 'cancelled').length;
-    const meetings = agendas.filter(a => a.category === 'Meeting').length;
-    const workshops = agendas.filter(a => a.category === 'Workshop').length;
-    const presentations = agendas.filter(a => a.category === 'Presentation').length;
+    const meetings = agendas.filter(a => a.category?.name === 'Meeting').length;
+    const workshops = agendas.filter(a => a.category?.name === 'Workshop').length;
+    const presentations = agendas.filter(a => a.category?.name === 'Presentation').length;
 
     return {
       total,
@@ -309,7 +321,7 @@ export class AgendaUtils {
    * @returns Filtered array of agendas
    */
   static filterAgendasByCategory(agendas: FormattedAgenda[], category: string): FormattedAgenda[] {
-    return agendas.filter(agenda => agenda.category === category);
+    return agendas.filter(agenda => agenda.category?.name === category);
   }
 
   /**

@@ -24,7 +24,12 @@ export interface ExhibitorFileUploadOptions {
 
 export class ExhibitorFileUtils {
   private static readonly DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  private static readonly ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+  private static readonly ALLOWED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+  ];
   private static readonly ALLOWED_DOCUMENT_TYPES = ['application/pdf'];
 
   /**
@@ -35,14 +40,14 @@ export class ExhibitorFileUtils {
       maxFlyerCount = 10,
       maxDocumentCount = 5,
       maxEventImageCount = 10,
-      maxLogoCount = 1
+      maxLogoCount = 1,
     } = options;
 
     return [
       { name: 'flyers', maxCount: maxFlyerCount },
       { name: 'documents', maxCount: maxDocumentCount },
       { name: 'eventImages', maxCount: maxEventImageCount },
-      { name: 'logo', maxCount: maxLogoCount }
+      { name: 'logo', maxCount: maxLogoCount },
     ];
   }
 
@@ -53,7 +58,7 @@ export class ExhibitorFileUtils {
     return diskStorage({
       destination: (req, file, cb) => {
         const fieldName = file.fieldname;
-        
+
         switch (fieldName) {
           case 'flyers':
             cb(null, './uploads/exhibitor/flyers');
@@ -92,7 +97,12 @@ export class ExhibitorFileUtils {
           cb(null, true);
           return;
         }
-        cb(new Error(`Invalid image file type. Allowed types: ${this.ALLOWED_IMAGE_TYPES.join(', ')}`), false);
+        cb(
+          new Error(
+            `Invalid image file type. Allowed types: ${this.ALLOWED_IMAGE_TYPES.join(', ')}`,
+          ),
+          false,
+        );
         return;
       }
 
@@ -102,7 +112,12 @@ export class ExhibitorFileUtils {
           cb(null, true);
           return;
         }
-        cb(new Error(`Invalid document file type. Allowed types: ${this.ALLOWED_DOCUMENT_TYPES.join(', ')}`), false);
+        cb(
+          new Error(
+            `Invalid document file type. Allowed types: ${this.ALLOWED_DOCUMENT_TYPES.join(', ')}`,
+          ),
+          false,
+        );
         return;
       }
 
@@ -123,25 +138,27 @@ export class ExhibitorFileUtils {
   /**
    * Create complete FileFieldsInterceptor configuration for exhibitors
    */
-  static createExhibitorFileInterceptor(options: ExhibitorFileUploadOptions = {}) {
-    return FileFieldsInterceptor(
-      this.getExhibitorFileFields(options),
-      {
-        storage: this.getExhibitorStorageConfig(),
-        fileFilter: this.getExhibitorFileFilter(),
-        limits: this.getExhibitorFileSizeLimits(options.maxFileSize),
-      }
-    );
+  static createExhibitorFileInterceptor(
+    options: ExhibitorFileUploadOptions = {},
+  ) {
+    return FileFieldsInterceptor(this.getExhibitorFileFields(options), {
+      storage: this.getExhibitorStorageConfig(),
+      fileFilter: this.getExhibitorFileFilter(),
+      limits: this.getExhibitorFileSizeLimits(options.maxFileSize),
+    });
   }
 
   /**
    * Process uploaded files and return file paths with names
    */
-  static processExhibitorFiles(files: ExhibitorFileUploadConfig, names?: {
-    flyerNames?: string;
-    documentNames?: string;
-    eventImageNames?: string;
-  }): {
+  static processExhibitorFiles(
+    files: ExhibitorFileUploadConfig,
+    names?: {
+      flyerNames?: string;
+      documentNames?: string;
+      eventImageNames?: string;
+    },
+  ): {
     flyers?: Array<{ name: string; flyer: string }>;
     documents?: Array<{ name: string; document: string }>;
     eventImages?: Array<{ name: string; eventImage: string }>;
@@ -156,37 +173,46 @@ export class ExhibitorFileUtils {
 
     // Process flyers
     if (files.flyers && files.flyers.length > 0) {
-      const flyerNames = names?.flyerNames 
-        ? names.flyerNames.split(',').map(n => n.trim()).filter(Boolean)
+      const flyerNames = names?.flyerNames
+        ? names.flyerNames
+            .split(',')
+            .map((n) => n.trim())
+            .filter(Boolean)
         : [];
-      
+
       result.flyers = files.flyers.map((file, index) => ({
-        name: flyerNames[index] ?? file.originalname,
-        flyer: `uploads/exhibitor/flyers/${file.filename}`
+        name: flyerNames[index] ?? `Flyer ${index + 1}`,
+        flyer: `uploads/exhibitor/flyers/${file.filename}`,
       }));
     }
 
     // Process documents
     if (files.documents && files.documents.length > 0) {
-      const documentNames = names?.documentNames 
-        ? names.documentNames.split(',').map(n => n.trim()).filter(Boolean)
+      const documentNames = names?.documentNames
+        ? names.documentNames
+            .split(',')
+            .map((n) => n.trim())
+            .filter(Boolean)
         : [];
-      
+
       result.documents = files.documents.map((file, index) => ({
-        name: documentNames[index] ?? file.originalname,
-        document: `uploads/exhibitor/documents/${file.filename}`
+        name: documentNames[index] ?? `Document ${index + 1}`,
+        document: `uploads/exhibitor/documents/${file.filename}`,
       }));
     }
 
     // Process event images
     if (files.eventImages && files.eventImages.length > 0) {
-      const eventImageNames = names?.eventImageNames 
-        ? names.eventImageNames.split(',').map(n => n.trim()).filter(Boolean)
+      const eventImageNames = names?.eventImageNames
+        ? names.eventImageNames
+            .split(',')
+            .map((n) => n.trim())
+            .filter(Boolean)
         : [];
-      
+
       result.eventImages = files.eventImages.map((file, index) => ({
-        name: eventImageNames[index] ?? file.originalname,
-        eventImage: `uploads/exhibitor/eventImages/${file.filename}`
+        name: eventImageNames[index] ?? `Event Image ${index + 1}`,
+        eventImage: `uploads/exhibitor/eventImages/${file.filename}`,
       }));
     }
 
@@ -196,11 +222,14 @@ export class ExhibitorFileUtils {
   /**
    * Validate file types for a specific field
    */
-  static validateExhibitorFileType(fieldName: string, mimeType: string): boolean {
+  static validateExhibitorFileType(
+    fieldName: string,
+    mimeType: string,
+  ): boolean {
     if (['flyers', 'eventImages', 'logo'].includes(fieldName)) {
       return this.ALLOWED_IMAGE_TYPES.includes(mimeType);
     }
-    
+
     if (fieldName === 'documents') {
       return this.ALLOWED_DOCUMENT_TYPES.includes(mimeType);
     }
@@ -215,7 +244,7 @@ export class ExhibitorFileUtils {
     if (['flyers', 'eventImages', 'logo'].includes(fieldName)) {
       return this.ALLOWED_IMAGE_TYPES;
     }
-    
+
     if (fieldName === 'documents') {
       return this.ALLOWED_DOCUMENT_TYPES;
     }
@@ -248,7 +277,15 @@ export class ExhibitorFileUtils {
     try {
       if (files.flyers) {
         files.flyers.forEach((file: any) => {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'flyers', file.filename);
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'exhibitor',
+            'flyers',
+            file.filename,
+          );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
             console.log(`Cleaned up flyer: ${uploadedPath}`);
@@ -258,7 +295,15 @@ export class ExhibitorFileUtils {
 
       if (files.documents) {
         files.documents.forEach((file: any) => {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'documents', file.filename);
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'exhibitor',
+            'documents',
+            file.filename,
+          );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
             console.log(`Cleaned up document: ${uploadedPath}`);
@@ -268,7 +313,15 @@ export class ExhibitorFileUtils {
 
       if (files.eventImages) {
         files.eventImages.forEach((file: any) => {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'eventImages', file.filename);
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'exhibitor',
+            'eventImages',
+            file.filename,
+          );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
             console.log(`Cleaned up event image: ${uploadedPath}`);
@@ -278,7 +331,15 @@ export class ExhibitorFileUtils {
 
       if (files.logo) {
         files.logo.forEach((file: any) => {
-          const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'exhibitor', 'logos', file.filename);
+          const uploadedPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'exhibitor',
+            'logos',
+            file.filename,
+          );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
             console.log(`Cleaned up logo: ${uploadedPath}`);
@@ -294,7 +355,10 @@ export class ExhibitorFileUtils {
   /**
    * Validate uploaded files before processing to catch errors early
    */
-  static validateUploadedFiles(files: ExhibitorFileUploadConfig): { isValid: boolean; errors: string[] } {
+  static validateUploadedFiles(files: ExhibitorFileUploadConfig): {
+    isValid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     try {
@@ -333,13 +397,13 @@ export class ExhibitorFileUtils {
 
       return {
         isValid: errors.length === 0,
-        errors
+        errors,
       };
     } catch (error: any) {
       errors.push(`File validation error: ${error.message}`);
       return {
         isValid: false,
-        errors
+        errors,
       };
     }
   }
@@ -347,11 +411,14 @@ export class ExhibitorFileUtils {
   /**
    * Process files with validation and error handling
    */
-  static processFilesSafely(files: ExhibitorFileUploadConfig, names?: {
-    flyerNames?: string;
-    documentNames?: string;
-    eventImageNames?: string;
-  }): {
+  static processFilesSafely(
+    files: ExhibitorFileUploadConfig,
+    names?: {
+      flyerNames?: string;
+      documentNames?: string;
+      eventImageNames?: string;
+    },
+  ): {
     success: boolean;
     processedFiles?: any;
     errors?: string[];
@@ -364,23 +431,23 @@ export class ExhibitorFileUtils {
         this.cleanupUploadedFiles(files);
         return {
           success: false,
-          errors: validation.errors
+          errors: validation.errors,
         };
       }
 
       // Process files
       const processedFiles = this.processExhibitorFiles(files, names);
-      
+
       return {
         success: true,
-        processedFiles
+        processedFiles,
       };
     } catch (error: any) {
       // Clean up files on any error
       this.cleanupUploadedFiles(files);
       return {
         success: false,
-        errors: [`File processing error: ${error.message}`]
+        errors: [`File processing error: ${error.message}`],
       };
     }
   }
@@ -389,9 +456,9 @@ export class ExhibitorFileUtils {
    * Clean up removed files during exhibitor update
    */
   static async cleanupRemovedFiles(
-    existingExhibitor: Exhibitor, 
+    existingExhibitor: Exhibitor,
     newData: Partial<ExhibitorDto>,
-    errorHandler: ErrorHandlerService
+    errorHandler: ErrorHandlerService,
   ): Promise<void> {
     try {
       // Clean up flyers
@@ -401,40 +468,59 @@ export class ExhibitorFileUtils {
 
       // Clean up documents
       if (newData.documents && existingExhibitor.documents) {
-        this.cleanupRemovedDocuments(existingExhibitor.documents, newData.documents);
+        this.cleanupRemovedDocuments(
+          existingExhibitor.documents,
+          newData.documents,
+        );
       }
 
       // Clean up event images
       if (newData.eventImages && existingExhibitor.eventImages) {
-        this.cleanupRemovedEventImages(existingExhibitor.eventImages, newData.eventImages);
+        this.cleanupRemovedEventImages(
+          existingExhibitor.eventImages,
+          newData.eventImages,
+        );
       }
 
       // Clean up logo if changed
-      if (newData.logo && existingExhibitor.logo && newData.logo !== existingExhibitor.logo) {
+      if (
+        newData.logo &&
+        existingExhibitor.logo &&
+        newData.logo !== existingExhibitor.logo
+      ) {
         const oldLogoPath = path.resolve(existingExhibitor.logo);
         if (fs.existsSync(oldLogoPath)) {
           fs.unlinkSync(oldLogoPath);
         }
       }
     } catch (error) {
-      errorHandler.logError(error, 'File cleanup during update', existingExhibitor.id);
+      errorHandler.logError(
+        error,
+        'File cleanup during update',
+        existingExhibitor.id,
+      );
     }
   }
 
   /**
    * Clean up removed flyer files
    */
-  private static cleanupRemovedFlyers(oldFlyers: any[], newFlyers: any[]): void {
+  private static cleanupRemovedFlyers(
+    oldFlyers: any[],
+    newFlyers: any[],
+  ): void {
     if (!oldFlyers || !newFlyers) return;
 
-    const oldPaths = oldFlyers.map(f => f.flyer || f);
-    const newPaths = newFlyers.map(f => f.flyer || f);
+    const oldPaths = oldFlyers.map((f) => f.flyer || f);
+    const newPaths = newFlyers.map((f) => f.flyer || f);
 
     // Find files that exist in old but not in new
-    const filesToDelete = oldPaths.filter(oldPath => !newPaths.includes(oldPath));
+    const filesToDelete = oldPaths.filter(
+      (oldPath) => !newPaths.includes(oldPath),
+    );
 
     // Delete the removed files
-    filesToDelete.forEach(filePath => {
+    filesToDelete.forEach((filePath) => {
       try {
         const fullPath = path.resolve(filePath);
         if (fs.existsSync(fullPath)) {
@@ -452,14 +538,16 @@ export class ExhibitorFileUtils {
   private static cleanupRemovedDocuments(oldDocs: any[], newDocs: any[]): void {
     if (!oldDocs || !newDocs) return;
 
-    const oldPaths = oldDocs.map(d => d.document || d);
-    const newPaths = newDocs.map(d => d.document || d);
+    const oldPaths = oldDocs.map((d) => d.document || d);
+    const newPaths = newDocs.map((d) => d.document || d);
 
     // Find files that exist in old but not in new
-    const filesToDelete = oldPaths.filter(oldPath => !newPaths.includes(oldPath));
+    const filesToDelete = oldPaths.filter(
+      (oldPath) => !newPaths.includes(oldPath),
+    );
 
     // Delete the removed files
-    filesToDelete.forEach(filePath => {
+    filesToDelete.forEach((filePath) => {
       try {
         const fullPath = path.resolve(filePath);
         if (fs.existsSync(fullPath)) {
@@ -474,17 +562,22 @@ export class ExhibitorFileUtils {
   /**
    * Clean up removed event image files
    */
-  private static cleanupRemovedEventImages(oldImages: any[], newImages: any[]): void {
+  private static cleanupRemovedEventImages(
+    oldImages: any[],
+    newImages: any[],
+  ): void {
     if (!oldImages || !newImages) return;
 
-    const oldPaths = oldImages.map(img => img.eventImage || img);
-    const newPaths = newImages.map(img => img.eventImage || img);
+    const oldPaths = oldImages.map((img) => img.eventImage || img);
+    const newPaths = newImages.map((img) => img.eventImage || img);
 
     // Find files that exist in old but not in new
-    const filesToDelete = oldPaths.filter(oldPath => !newPaths.includes(oldPath));
+    const filesToDelete = oldPaths.filter(
+      (oldPath) => !newPaths.includes(oldPath),
+    );
 
     // Delete the removed files
-    filesToDelete.forEach(filePath => {
+    filesToDelete.forEach((filePath) => {
       try {
         const fullPath = path.resolve(filePath);
         if (fs.existsSync(fullPath)) {
@@ -499,7 +592,10 @@ export class ExhibitorFileUtils {
   /**
    * Delete all exhibitor files
    */
-  static deleteExhibitorFiles(exhibitor: Exhibitor, errorHandler: ErrorHandlerService): void {
+  static deleteExhibitorFiles(
+    exhibitor: Exhibitor,
+    errorHandler: ErrorHandlerService,
+  ): void {
     try {
       // Delete logo if it exists
       if (exhibitor.logo) {

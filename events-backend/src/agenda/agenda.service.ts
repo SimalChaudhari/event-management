@@ -4,7 +4,8 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EventAgenda, AgendaCategory, MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
+import { EventAgenda, MeetingStatus, RequestStatus, RequestType } from './agenda.entity';
+import { AgendaCategory } from './agenda-category.entity';
 import { 
   CreateMeetingRequestDto,
   RespondToMeetingRequestDto,
@@ -30,6 +31,8 @@ export class AgendaService {
   constructor(
     @InjectRepository(EventAgenda)
     private agendaRepository: Repository<EventAgenda>,
+    @InjectRepository(AgendaCategory)
+    private agendaCategoryRepository: Repository<AgendaCategory>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
   
@@ -57,6 +60,7 @@ export class AgendaService {
 
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
         .where('agenda.userId = :userId', { userId }) // User is the recipient
         .andWhere('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
@@ -111,6 +115,7 @@ export class AgendaService {
 
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
         .where('agenda.createdBy = :userId', { userId }) // User is the creator
         .andWhere('agenda.isMeetingRequest = :isMeetingRequest', { isMeetingRequest: true })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
@@ -165,6 +170,7 @@ export class AgendaService {
 
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
         .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
 
@@ -292,6 +298,25 @@ export class AgendaService {
         throw new BadRequestException('Meeting must have at least 2 attendees (sender and recipient).');
       }
 
+      // Determine category to use
+      let categoryId: string;
+      if (createMeetingDto.categoryId) {
+        // Validate that the provided category exists
+        const category = await this.agendaCategoryRepository.findOne({
+          where: { id: createMeetingDto.categoryId }
+        });
+        if (!category) {
+          throw new BadRequestException(`Category with ID "${createMeetingDto.categoryId}" not found`);
+        }
+        if (!category.isActive) {
+          throw new BadRequestException(`Category "${category.name}" is not active`);
+        }
+        categoryId = createMeetingDto.categoryId;
+      } else {
+        // Use default meeting category if no category provided
+        categoryId = await this.getOrCreateMeetingCategory();
+      }
+
       // All validations passed, proceed with meeting creation
       // Check for time conflicts on the specific date
       await this.checkTimeConflictsOnDate(
@@ -311,7 +336,7 @@ export class AgendaService {
         duration: createMeetingDto.duration,
         location: createMeetingDto.location,
         details: createMeetingDto.details,
-        category: AgendaCategory.Meeting,
+        categoryId: categoryId,
         createdBy: currentUser.id,
         isMeetingRequest: true,
         requestType: RequestType.Incoming, // Set as incoming for the recipient
@@ -634,7 +659,10 @@ export class AgendaService {
   // New method for getting meeting by ID
   async getMeetingById(meetingId: string, currentUser?: any) {
     try {
-      const meeting = await this.agendaRepository.findOne({ where: { id: meetingId } });
+      const meeting = await this.agendaRepository.findOne({ 
+        where: { id: meetingId },
+        relations: ['category']
+      });
       if (!meeting) {
         throw new ResourceNotFoundException('Meeting', meetingId);
       }
@@ -738,6 +766,7 @@ export class AgendaService {
 
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
         .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
 
@@ -777,11 +806,36 @@ export class AgendaService {
   }
 
 
+  // Helper method to get or create meeting category
+  private async getOrCreateMeetingCategory(): Promise<string> {
+    try {
+      // Try to find existing "Meeting" category
+      let meetingCategory = await this.agendaCategoryRepository.findOne({
+        where: { name: 'Meeting' }
+      });
+
+      if (!meetingCategory) {
+        // Create meeting category if it doesn't exist
+        meetingCategory = this.agendaCategoryRepository.create({
+          name: 'Meeting',
+          color: '#3B82F6', // Blue color for meetings
+          isActive: true
+        });
+        meetingCategory = await this.agendaCategoryRepository.save(meetingCategory);
+      }
+
+      return meetingCategory.id;
+    } catch (error) {
+      console.error('Error getting or creating meeting category:', error);
+      throw new Error('Failed to get or create meeting category');
+    }
+  }
+
   // Helper methods
   private async getAgendaWithRelations(id: string) {
     const agenda = await this.agendaRepository.findOne({
       where: { id },
-      // No need to fetch relations since we only need IDs
+      relations: ['category'], // Fetch category details
     });
     
     if (!agenda) {
@@ -878,18 +932,23 @@ export class AgendaService {
   }
 
   private formatAgendaResponse(agenda: any) {
-    // Since we're not fetching relations, just return the agenda data with IDs
     return {
       id: agenda.id,
       eventId: agenda.eventId,
-      userId: agenda.userId,  // Add userId field
+      userId: agenda.userId,
       exhibitorId: agenda.exhibitorId,
       title: agenda.title,
       time: agenda.time,
       duration: agenda.duration,
       location: agenda.location,
       details: agenda.details,
-      category: agenda.category,
+      category: agenda.category ? {
+        id: agenda.category.id,
+        name: agenda.category.name,
+        color: agenda.category.color,
+        isActive: agenda.category.isActive
+      } : null,
+      categoryId: agenda.categoryId, // Keep categoryId for backward compatibility
       isActive: agenda.isActive,
       createdBy: agenda.createdBy,
       createdAt: agenda.createdAt,
@@ -1087,6 +1146,7 @@ export class AgendaService {
       // Get all meetings for the user
       const queryBuilder = this.agendaRepository
         .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
         .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId: currentUser.id })
         .andWhere('agenda.isActive = :isActive', { isActive: true });
 

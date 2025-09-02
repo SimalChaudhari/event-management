@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/users.module';
 import { EventModule } from 'event/event.module';
 import { AgendaModule } from './agenda/agenda.module';
+import { AgendaCategoryModule } from './agenda/agenda-category.module';
 
 import { CartModule } from 'cart/cart.module';
 import { RegisterEventModule } from 'registerEvent/registerEvent.module';
@@ -29,6 +30,7 @@ import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { PollingModule } from 'polling/polling.module';
 import { QnaModule } from 'qna/qna.module';
 import { ChatModule } from './chat/chat.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
@@ -37,7 +39,7 @@ import { ChatModule } from './chat/chat.module';
       type: 'postgres',
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: true, // Temporarily disabled to avoid enum conflicts
       // ssl: true,
       // extra: {
       //   ssl: {
@@ -55,8 +57,8 @@ import { ChatModule } from './chat/chat.module';
     SurveyModule,
     QnaModule,
     PollingModule,
-    EventModule, AgendaModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
-    ChatModule,
+    EventModule, AgendaModule, AgendaCategoryModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
+    ChatModule, AttendanceModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
