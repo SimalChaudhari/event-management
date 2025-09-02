@@ -498,4 +498,37 @@ export class UserController {
     }
   }
 
+  /**
+   * Generate QR code for attendance purposes
+   * - This generates a QR code that can be scanned for attendance check-in
+   * - The QR code contains user information and can be used with external scanners
+   */
+  @Get('qr-code/attendance/:userId')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.Admin)
+  async generateAttendanceQRCode(
+    @Param('userId') userId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const qrCodeData = await this.userService.generateUserQRCode(userId);
+      
+      const successResponse = {
+        success: true,
+        message: 'Attendance QR code generated successfully',
+        data: {
+          ...qrCodeData,
+          purpose: 'attendance',
+          scanInstructions: 'Scan this QR code to check in the user for event attendance',
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Attendance QR code generation', req.user?.id);
+      throw error;
+    }
+  }
+
 }

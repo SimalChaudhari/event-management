@@ -9,20 +9,9 @@ import {
 } from 'typeorm';
 import { Event } from '../event/event.entity';
 import { UserEntity } from '../user/users.entity';
+import { AgendaCategory } from './agenda-category.entity';
 
-export enum AgendaCategory {
-  Brainstorm = 'Brainstorm',
-  Discussion = 'Discussion',
-  Presentation = 'Presentation',
-  Workshop = 'Workshop',
-  Networking = 'Networking',
-  Break = 'Break',
-  QnA = 'QnA',
-  Panel = 'Panel',
-  Demo = 'Demo',
-  Meeting = 'Meeting', // Added meeting category
-  Other = 'Other',
-}
+// AgendaCategory enum removed - now using AgendaCategory entity relationship
 
 export enum MeetingStatus {
   Pending = 'pending',
@@ -68,11 +57,14 @@ export class EventAgenda {
   @Column({ type: 'text', nullable: true })
   details?: string;
 
-  @Column({ 
-    type: 'enum', 
-    enum: AgendaCategory, 
-    default: AgendaCategory.Other 
+  @Column({ type: 'uuid' })
+  categoryId!: string;
+
+  // Relationship to AgendaCategory entity
+  @ManyToOne(() => AgendaCategory, (category) => category.agendas, {
+    onDelete: 'RESTRICT', // Prevent deletion if agendas exist
   })
+  @JoinColumn({ name: 'categoryId' })
   category!: AgendaCategory;
 
   @Column({ type: 'boolean', default: true })
