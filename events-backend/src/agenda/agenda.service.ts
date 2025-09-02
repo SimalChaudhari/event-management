@@ -298,6 +298,25 @@ export class AgendaService {
         throw new BadRequestException('Meeting must have at least 2 attendees (sender and recipient).');
       }
 
+      // Determine category to use
+      let categoryId: string;
+      if (createMeetingDto.categoryId) {
+        // Validate that the provided category exists
+        const category = await this.agendaCategoryRepository.findOne({
+          where: { id: createMeetingDto.categoryId }
+        });
+        if (!category) {
+          throw new BadRequestException(`Category with ID "${createMeetingDto.categoryId}" not found`);
+        }
+        if (!category.isActive) {
+          throw new BadRequestException(`Category "${category.name}" is not active`);
+        }
+        categoryId = createMeetingDto.categoryId;
+      } else {
+        // Use default meeting category if no category provided
+        categoryId = await this.getOrCreateMeetingCategory();
+      }
+
       // All validations passed, proceed with meeting creation
       // Check for time conflicts on the specific date
       await this.checkTimeConflictsOnDate(
@@ -317,7 +336,7 @@ export class AgendaService {
         duration: createMeetingDto.duration,
         location: createMeetingDto.location,
         details: createMeetingDto.details,
-        categoryId: await this.getOrCreateMeetingCategory(),
+        categoryId: categoryId,
         createdBy: currentUser.id,
         isMeetingRequest: true,
         requestType: RequestType.Incoming, // Set as incoming for the recipient

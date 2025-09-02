@@ -209,6 +209,10 @@ export class CreateMeetingRequestDto {
   @IsOptional()
   @IsString()
   meetingNotes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
 
 export class RespondToMeetingRequestDto {
