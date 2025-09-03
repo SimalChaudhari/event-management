@@ -12,11 +12,27 @@ export class CreateAdminInfoDto {
 
   @IsOptional()
   @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
 
   @IsOptional()
   @IsString()
   additionalInformation?: string;
+
+  @IsOptional()
+  @IsString()
+  luckDrawDateandTime?: string;
+
+  @IsOptional()
+  @IsString()
+  dressCode?: string;
+
+  @IsOptional()
+  @IsString()
+  hall?: string;
 }
 
 // DTO for updating admin info
@@ -27,11 +43,27 @@ export class UpdateAdminInfoDto {
 
   @IsOptional()
   @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
 
   @IsOptional()
   @IsString()
   additionalInformation?: string;
+
+  @IsOptional()
+  @IsString()
+  luckDrawDateandTime?: string;
+
+  @IsOptional()
+  @IsString()
+  dressCode?: string;
+
+  @IsOptional()
+  @IsString()
+  hall?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -41,7 +73,7 @@ export class UpdateAdminInfoDto {
 // DTO for CSV row data
 export class CsvRowData {
   @IsString()
-  email!: string;
+  registerEventId!: string;
 
   @IsOptional()
   @IsString()
@@ -53,7 +85,11 @@ export class CsvRowData {
 
   @IsOptional()
   @IsString()
-  additionalInformation?: string;
+  dressCode?: string;
+
+  @IsOptional()
+  @IsString()
+  hall?: string;
 }
 
 // admin-info.dto.ts
@@ -69,11 +105,23 @@ export class BulkAdminInfoItemDto {
 
   @IsOptional()
   @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
 
   @IsOptional()
   @IsString()
   additionalInformation?: string;
+
+  @IsOptional()
+  @IsString()
+  dressCode?: string;
+
+  @IsOptional()
+  @IsString()
+  hall?: string;
 }
 
 // Bulk upload DTO

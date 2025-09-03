@@ -625,8 +625,8 @@ export class UserService {
         throw new ResourceNotFoundException('User', userId);
       }
 
-      // Generate new QR code each time
-      const qrCodeId = `qr_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Use user ID directly as QR code data
+      const qrCodeId = userId;
       const qrCodeUrl = `${process.env.APP_URL}/api/users/qr-code/scan/${qrCodeId}`;
       
       // Generate QR code image
@@ -650,18 +650,13 @@ export class UserService {
 
   /**
    * Get user information from scanned QR code
-   * @param qrCodeId QR code identifier
+   * @param qrCodeId QR code identifier (user ID)
    * @returns User information
    */
   async getUserInfoFromQRCode(qrCodeId: string): Promise<Partial<UserEntity>> {
     try {
-      // Extract user ID from QR code ID format: qr_${userId}_${timestamp}_${random}
-      const qrCodeParts = qrCodeId.split('_');
-      if (qrCodeParts.length < 2) {
-        throw new ResourceNotFoundException('QR Code', qrCodeId);
-      }
-
-      const userId = qrCodeParts[1];
+      // Use qrCodeId directly as user ID
+      const userId = qrCodeId;
       
       // Get user data directly from database
       const user = await this.userRepository.findOne({

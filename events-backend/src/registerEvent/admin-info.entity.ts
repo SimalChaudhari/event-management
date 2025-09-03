@@ -24,11 +24,21 @@ export class AdminInfo {
   @Column({ type: 'varchar', nullable: true })
   luckyDrawNumber?: string;
 
+  @Column({ type: 'timestamp', nullable: true, default: null })
+  luckyDrawDateTime?: Date;
+
   @Column({ type: 'varchar', nullable: true })
   tableNumber?: string;
 
   @Column({ type: 'text', nullable: true })
   additionalInformation?: string;
+  
+
+  @Column({ type: 'varchar', nullable: true })
+  dressCode?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  hall?: string;
 
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;

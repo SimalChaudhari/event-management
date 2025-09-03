@@ -10,6 +10,7 @@ import { ExhibitorStamp } from './exhibitor-stamp.entity';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { AdminInfo } from '../registerEvent/admin-info.entity';
 import { UtilsModule } from '../utils/utils.module';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -24,6 +25,7 @@ import { JwtModule } from '@nestjs/jwt';
       UserEntity,
       Event,
       RegisterEvent,
+      AdminInfo,
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,

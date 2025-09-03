@@ -306,11 +306,11 @@ export class RegisterEventService {
             ...cleanRegisterEvent
           } = registerEvent;
 
-          // Get admin info for this registration only if lucky draw feature is enabled
-          const adminInfo = (registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature) ? {
-            luckyDrawNumber: registerEvent.adminInfo.luckyDrawNumber,
-            tableNumber: registerEvent.adminInfo.tableNumber,
-            additionalInformation: registerEvent.adminInfo.additionalInformation,
+          // Get admin info for this registration - show if lucky draw feature is enabled
+          const hasAdminInfo = registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
+          
+          const adminInfo = hasAdminInfo ? {
+            ...registerEvent.adminInfo,
           } : null;
 
           return {
@@ -505,11 +505,16 @@ export class RegisterEventService {
         ...cleanRegisterEvent
       } = registerEvent;
 
-      // Get admin info for this registration only if lucky draw feature is enabled
-      const adminInfo = (registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature) ? {
-        luckyDrawNumber: registerEvent.adminInfo.luckyDrawNumber,
-        tableNumber: registerEvent.adminInfo.tableNumber,
-        additionalInformation: registerEvent.adminInfo.additionalInformation,
+      // Get admin info for this registration - show if lucky draw feature is enabled
+      const hasAdminInfo = registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
+      
+      const adminInfo = hasAdminInfo ? {
+        luckyDrawNumber: registerEvent.adminInfo?.luckyDrawNumber,
+        luckyDrawDateTime: registerEvent.adminInfo?.luckyDrawDateTime,
+        tableNumber: registerEvent.adminInfo?.tableNumber,
+        additionalInformation: registerEvent.adminInfo?.additionalInformation,
+        dressCode: registerEvent.adminInfo?.dressCode,
+        hall: registerEvent.adminInfo?.hall,
       } : null;
 
       return {

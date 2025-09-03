@@ -15,8 +15,7 @@ import { Event } from '../event/event.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { Status } from '../registerEvent/registerEvent.dto';
 import { 
-  CreateEventQRCodeDto,
-  UpdateEventQRCodeDto,
+
   ContactExchangeDto,
   CollectExhibitorStampDto,
   SelfCheckInDto,
@@ -45,78 +44,7 @@ export class EventQRCodeService {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
-  /**
-   * Create a new event QR code for organizers
-   */
-  async createEventQRCode(
-    createDto: CreateEventQRCodeDto,
-    adminUserId: string,
-  ): Promise<EventQRCode> {
-    try {
-      // Verify event exists
-      const event = await this.eventRepository.findOne({
-        where: { id: createDto.eventId },
-      });
 
-      if (!event) {
-        throw new ResourceNotFoundException('Event', createDto.eventId);
-      }
-
-      // Create the event QR code
-      const eventQRCode = this.eventQRCodeRepository.create({
-        ...createDto,
-        createdBy: adminUserId,
-        validFrom: createDto.validFrom ? new Date(createDto.validFrom) : undefined,
-        validUntil: createDto.validUntil ? new Date(createDto.validUntil) : undefined,
-      });
-
-      return await this.eventQRCodeRepository.save(eventQRCode);
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof DuplicateResourceException
-      ) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Event QR code creation');
-    }
-  }
-
-  /**
-   * Update an existing event QR code
-   */
-  async updateEventQRCode(
-    qrCodeId: string,
-    updateDto: UpdateEventQRCodeDto,
-  ): Promise<EventQRCode> {
-    try {
-      const eventQRCode = await this.eventQRCodeRepository.findOne({
-        where: { id: qrCodeId },
-      });
-
-      if (!eventQRCode) {
-        throw new ResourceNotFoundException('Event QR Code', qrCodeId);
-      }
-
-      // Update fields
-      Object.assign(eventQRCode, updateDto);
-
-      // Convert string dates to Date objects if provided
-      if (updateDto.validFrom) {
-        eventQRCode.validFrom = new Date(updateDto.validFrom);
-      }
-      if (updateDto.validUntil) {
-        eventQRCode.validUntil = new Date(updateDto.validUntil);
-      }
-
-      return await this.eventQRCodeRepository.save(eventQRCode);
-    } catch (error) {
-      if (error instanceof ResourceNotFoundException) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Event QR code update');
-    }
-  }
 
   /**
    * Get all event QR codes for an event
@@ -186,8 +114,8 @@ export class EventQRCodeService {
     userId: string,
   ): Promise<any> {
     try {
-      // Parse QR code data to extract event ID
-      const eventId = this.parseEventIdFromQRCode(selfCheckInDto.qrCodeData);
+      // Use QR code data directly as event ID
+      const eventId = selfCheckInDto.qrCodeData;
       
       // Get event
       const event = await this.eventRepository.findOne({
@@ -320,21 +248,7 @@ export class EventQRCodeService {
     }
   }
 
-  /**
-   * Parse event ID from QR code data
-   * QR code format: "event_${eventId}_${timestamp}_${random}"
-   */
-  private parseEventIdFromQRCode(qrCodeData: string): string {
-    try {
-      const parts = qrCodeData.split('_');
-      if (parts.length < 2 || parts[0] !== 'event') {
-        throw new BadRequestException('Invalid QR code format');
-      }
-      return parts[1];
-    } catch (error) {
-      throw new BadRequestException('Invalid QR code data');
-    }
-  }
+
 
   /**
    * Handle contact exchange between users
@@ -420,46 +334,37 @@ export class EventQRCodeService {
     attendeeId: string,
   ): Promise<any> {
     try {
-      // Get the event QR code (exhibitor booth)
-      const eventQRCode = await this.getEventQRCode(stampDto.eventQRCodeId);
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: stampDto.eventId },
+      });
 
-      // Verify the QR code is for the correct event
-      if (eventQRCode.eventId !== stampDto.eventId) {
-        throw new BadRequestException('QR code is not valid for this event');
+      if (!event) {
+        throw new ResourceNotFoundException('Event', stampDto.eventId);
       }
 
-      // Verify the QR code is for exhibitor stamp collection
-      if (eventQRCode.type !== EventQRCodeType.ExhibitorStamp) {
-        throw new BadRequestException('This QR code is not for exhibitor stamp collection');
-      }
-
-      // Check if stamp already collected from this booth
+      // Check if stamp already collected for this event
       const existingStamp = await this.exhibitorStampRepository.findOne({
         where: {
           attendeeId: attendeeId,
-          eventQRCodeId: stampDto.eventQRCodeId,
+          eventId: stampDto.eventId,
         },
       });
 
       if (existingStamp) {
-        throw new ConflictException('You have already collected a stamp from this booth');
+        throw new ConflictException('You have already collected a stamp for this event');
       }
 
       // Create exhibitor stamp record
       const exhibitorStamp = this.exhibitorStampRepository.create({
         attendeeId: attendeeId,
-        eventQRCodeId: stampDto.eventQRCodeId,
         eventId: stampDto.eventId,
-        boothName: eventQRCode.title,
-        boothLocation: eventQRCode.location,
+        boothName: event.name,
+        boothLocation: event.location,
         notes: stampDto.notes,
       });
 
       const savedStamp = await this.exhibitorStampRepository.save(exhibitorStamp);
-
-      // Update QR code scan count
-      eventQRCode.scanCount += 1;
-      await this.eventQRCodeRepository.save(eventQRCode);
 
       // Get total stamps collected by this attendee for this event
       const totalStamps = await this.exhibitorStampRepository.count({
@@ -474,9 +379,9 @@ export class EventQRCodeService {
         message: 'Exhibitor stamp collected successfully',
         data: {
           booth: {
-            name: eventQRCode.title,
-            location: eventQRCode.location,
-            description: eventQRCode.description,
+            name: event.name,
+            location: event.location,
+            description: event.description,
           },
           stamp: {
             id: savedStamp.id,
@@ -529,7 +434,7 @@ export class EventQRCodeService {
 
       return await this.exhibitorStampRepository.find({
         where,
-        relations: ['eventQRCode', 'event'],
+        relations: ['event'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -575,8 +480,8 @@ export class EventQRCodeService {
         throw new ResourceNotFoundException('Event', eventId);
       }
 
-      // Generate new QR code each time
-      const qrCodeId = `event_${eventId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Use event ID directly as QR code data
+      const qrCodeId = eventId;
       const qrCodeUrl = `${process.env.APP_URL}/api/attendance/event-qr-code/scan/${qrCodeId}`;
       
       // Generate QR code image
@@ -596,9 +501,9 @@ export class EventQRCodeService {
       };
 
       return {
+        eventInfo,
         qrCodeId,
         qrCodeImage,
-        eventInfo,
       };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -610,18 +515,13 @@ export class EventQRCodeService {
 
   /**
    * Get event information from scanned QR code
-   * @param qrCodeId QR code identifier
+   * @param qrCodeId QR code identifier (event ID)
    * @returns Event information
    */
   async getEventInfoFromQRCode(qrCodeId: string): Promise<any> {
     try {
-      // Extract event ID from QR code ID format: event_${eventId}_${timestamp}_${random}
-      const qrCodeParts = qrCodeId.split('_');
-      if (qrCodeParts.length < 2) {
-        throw new ResourceNotFoundException('QR Code', qrCodeId);
-      }
-
-      const eventId = qrCodeParts[1];
+      // Use qrCodeId directly as event ID
+      const eventId = qrCodeId;
       
       // Get event data directly from database
       const event = await this.eventRepository.findOne({
