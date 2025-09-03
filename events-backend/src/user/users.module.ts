@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserService } from './users.service';
 import { UserController } from './users.controller';
+import { QrScanController } from './qr-scan.controller';
 import { UserEntity } from './users.entity';
 import { SpeakerProfile } from './speaker-profile.entity';
 import { SpeakerProfileService } from './speaker-profile.service';
@@ -18,7 +19,7 @@ import { EmailService } from '../service/email.service';
     }),
   ],
     providers: [UserService, SpeakerProfileService, ErrorHandlerService, EmailService],
-    controllers: [UserController],
+    controllers: [UserController, QrScanController],
     exports: [UserService, SpeakerProfileService],
 })
 export class UserModule {}

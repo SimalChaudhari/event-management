@@ -627,7 +627,7 @@ export class UserService {
 
       // Use user ID directly as QR code data
       const qrCodeId = userId;
-      const qrCodeUrl = `${process.env.APP_URL}/api/users/qr-code/scan/${qrCodeId}`;
+      const qrCodeUrl = `${process.env.APP_URL}/${qrCodeId}`;
       
       // Generate QR code image
       const qrCodeImage = await QRCodeUtils.generateQRCodeAsDataURL(qrCodeUrl);
