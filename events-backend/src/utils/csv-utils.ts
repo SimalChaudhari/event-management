@@ -15,10 +15,11 @@ export class CsvUtils {
       if (columns.length < 1) continue;
 
       const csvRow = {
-        email: columns[0],
+        registerEventId: columns[0],
         luckyDrawNumber: columns[1] || undefined,
         tableNumber: columns[2] || undefined,
-        additionalInformation: columns[3] || undefined,
+        dressCode: columns[3] || undefined,
+        hall: columns[4] || undefined,
       };
 
       rows.push(csvRow);
@@ -46,14 +47,14 @@ export class CsvUtils {
 
       const columns = row.split(',').map((col) => col.trim());
       
-      // Check if email is provided
+      // Check if registerEventId is provided
       if (!columns[0] || columns[0].trim() === '') {
-        errors.push(`Row ${i + 1}: Email is required`);
+        errors.push(`Row ${i + 1}: Register Event ID is required`);
       }
 
-      // Check if email format is valid (basic validation)
-      if (columns[0] && !this.isValidEmail(columns[0])) {
-        errors.push(`Row ${i + 1}: Invalid email format`);
+      // Check if registerEventId format is valid (UUID format)
+      if (columns[0] && !this.isValidUUID(columns[0])) {
+        errors.push(`Row ${i + 1}: Invalid Register Event ID format (must be UUID)`);
       }
     }
 
@@ -68,9 +69,9 @@ export class CsvUtils {
    * @returns CSV template string
    */
   static generateCsvTemplate(): string {
-    return `Email,Lucky Draw Number,Table Number,Additional Information
-example@email.com,LD001,T01,Dress Code: Business Casual
-another@email.com,LD002,T02,Directions: Main Hall Entrance`;
+    return `Register Event ID,Lucky Draw Number,Table Number,Dress Code,Hall
+register-event-uuid-1,LD001,T01,Business Casual,Hall A
+register-event-uuid-2,LD002,T02,Business Casual,Hall B`;
   }
 
   /**
@@ -107,6 +108,16 @@ another@email.com,LD002,T02,Directions: Main Hall Entrance`;
   private static isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  /**
+   * Basic UUID validation
+   * @param uuid - UUID string to validate
+   * @returns Boolean indicating if UUID is valid
+   */
+  private static isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   }
 
   /**

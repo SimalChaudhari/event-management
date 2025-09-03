@@ -30,6 +30,12 @@ export class AdminInfo {
   @Column({ type: 'text', nullable: true })
   additionalInformation?: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  dressCode?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  hall?: string;
+
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 

@@ -26,8 +26,7 @@ import {
   ManualCheckInDto,
   CheckOutDto,
   UpdateAttendanceDto,
-  CreateEventQRCodeDto,
-  UpdateEventQRCodeDto,
+
   ContactExchangeDto,
   CollectExhibitorStampDto,
   SelfCheckInDto,
@@ -42,34 +41,13 @@ export class AttendanceController {
   ) {}
 
   /**
-   * Scan QR code for attendance check-in (Public endpoint for external scanners)
-   * This endpoint can be used by external QR code scanning devices
-   */
-  @Post('scan-qr-code')
-  async scanQRCodeForAttendance(
-    @Body() scanData: { qrCodeId: string; eventId: string },
-    @Res() response: Response,
-  ) {
-    try {
-      const result = await this.attendanceService.scanQRCodeForAttendance(
-        scanData.qrCodeId,
-        scanData.eventId,
-      );
-
-      return response.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.errorHandler.logError(error, 'QR code scanning for attendance', undefined);
-      throw error;
-    }
-  }
-
-  /**
    * Check in user by scanning their QR code (Admin only)
    */
-  @Post('check-in-qr-code')
+  @Post('check-in-qr-code/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin)
   async checkInByQRCode(
+    @Param('userId') userId: string,
     @Body() checkInData: CheckInByQRCodeDto,
     @Request() req: any,
     @Res() response: Response,
@@ -86,6 +64,7 @@ export class AttendanceController {
       const attendance = await this.attendanceService.checkInByQRCode(
         checkInData,
         adminUserId,
+        userId,
       );
 
       const successResponse: SuccessResponse = {
@@ -249,7 +228,7 @@ export class AttendanceController {
   }
 
   /**
-   * Get attendance statistics for an event (Admin only)
+   * Get comprehensive attendance statistics for an event (Admin only)
    */
   @Get('event/:eventId/stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -274,6 +253,38 @@ export class AttendanceController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Event attendance statistics', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get live attendance status for real-time updates (Admin only)
+   * - Optimized for frequent polling
+   * - Returns only essential live data
+   */
+  @Get('event/:eventId/live-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async getLiveAttendanceStatus(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const liveStatus = await this.attendanceService.getLiveAttendanceStatus(eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Live attendance status retrieved successfully',
+        data: liveStatus,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Live attendance status', req.user?.id);
       throw error;
     }
   }
@@ -429,142 +440,6 @@ export class AttendanceController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Event QR code scanning', undefined);
-      throw error;
-    }
-  }
-
-  /**
-   * Create a new event QR code for organizers
-   */
-  @Post('event-qr-codes/create')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin)
-  async createEventQRCode(
-    @Body() createDto: CreateEventQRCodeDto,
-    @Request() req: any,
-    @Res() response: Response,
-  ) {
-    try {
-      const adminUserId = req.user?.id;
-      if (!adminUserId) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'Admin not authenticated',
-        });
-      }
-
-      const eventQRCode = await this.eventQRCodeService.createEventQRCode(
-        createDto,
-        adminUserId,
-      );
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Event QR code created successfully',
-        data: eventQRCode,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.CREATED).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Event QR code creation', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Update an existing event QR code
-   */
-  @Put('event-qr-codes/update/:qrCodeId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin)
-  async updateEventQRCode(
-    @Param('qrCodeId') qrCodeId: string,
-    @Body() updateDto: UpdateEventQRCodeDto,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const eventQRCode = await this.eventQRCodeService.updateEventQRCode(
-        qrCodeId,
-        updateDto,
-      );
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Event QR code updated successfully',
-        data: eventQRCode,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Event QR code update', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all event QR codes for an event
-   */
-  @Get('event-qr-codes/event/:eventId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin)
-  async getEventQRCodes(
-    @Param('eventId') eventId: string,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const eventQRCodes = await this.eventQRCodeService.getEventQRCodes(eventId);
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Event QR codes retrieved successfully',
-        data: eventQRCodes,
-        metadata: {
-          total: eventQRCodes.length,
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Event QR codes retrieval', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete an event QR code
-   */
-  @Delete('event-qr-codes/delete/:qrCodeId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin)
-  async deleteEventQRCode(
-    @Param('qrCodeId') qrCodeId: string,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const result = await this.eventQRCodeService.deleteEventQRCode(qrCodeId);
-
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: result.message,
-        data: null,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Event QR code deletion', req.user?.id);
       throw error;
     }
   }
@@ -746,33 +621,5 @@ export class AttendanceController {
     }
   }
 
-  /**
-   * Generate QR code image for an event QR code
-   */
-  @Get('event-qr-codes/:qrCodeId/image')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin)
-  async generateEventQRCodeImage(
-    @Param('qrCodeId') qrCodeId: string,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const qrCodeImage = await this.eventQRCodeService.generateEventQRCodeImage(qrCodeId);
 
-      const successResponse: SuccessResponse = {
-        success: true,
-        message: 'Event QR code image generated successfully',
-        data: { qrCodeImage },
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Event QR code image generation', req.user?.id);
-      throw error;
-    }
-  }
 }

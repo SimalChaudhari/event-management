@@ -10,6 +10,7 @@ import { EventAttendance, AttendanceStatus, CheckInMethod } from './attendance.e
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { AdminInfo } from '../registerEvent/admin-info.entity';
 import { 
   CheckInByQRCodeDto, 
   ManualCheckInDto, 
@@ -21,7 +22,7 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserUtils } from '../utils/user.utils';
 import { QRCodeUtils } from '../utils/qr-code.utils';
 import { ResourceNotFoundException, DuplicateResourceException } from '../utils/exceptions/custom-exceptions';
-
+//test
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -33,6 +34,8 @@ export class AttendanceService {
     private eventRepository: Repository<Event>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(AdminInfo)
+    private adminInfoRepository: Repository<AdminInfo>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -150,36 +153,55 @@ export class AttendanceService {
   async checkInByQRCode(
     checkInData: CheckInByQRCodeDto,
     adminUserId: string,
+    userId: string, // User ID from QR code scan
   ): Promise<EventAttendance> {
     try {
-      // First scan the QR code to get user info
-      const scanResult = await this.scanQRCodeForAttendance(
-        checkInData.qrCodeId,
-        checkInData.eventId,
-      );
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: checkInData.eventId },
+      });
 
-      if (!scanResult.data?.isRegistered) {
+      if (!event) {
+        throw new ResourceNotFoundException('Event', checkInData.eventId);
+      }
+
+      // Verify user exists
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Check if user is registered for the event
+      const registration = await this.registerEventRepository.findOne({
+        where: {
+          userId: userId,
+          eventId: checkInData.eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
         throw new BadRequestException(
           'User is not registered for this event. Cannot check in.',
         );
       }
 
-      if (!scanResult.data?.canCheckIn) {
-        throw new ConflictException(
-          'User is already checked in or cannot be checked in at this time.',
-        );
-      }
-
-      const userId = scanResult.data?.user.id;
-      const eventId = checkInData.eventId;
-
-      // Check if attendance record already exists
+      // Check existing attendance record
       let attendance = await this.attendanceRepository.findOne({
         where: {
           userId: userId,
-          eventId: eventId,
+          eventId: checkInData.eventId,
         },
       });
+
+      if (attendance && attendance.status === AttendanceStatus.CheckedIn) {
+        throw new ConflictException(
+          'User is already checked in for this event.',
+        );
+      }
 
       if (attendance) {
         // Update existing attendance record
@@ -193,8 +215,8 @@ export class AttendanceService {
         // Create new attendance record
         attendance = this.attendanceRepository.create({
           userId: userId,
-          eventId: eventId,
-          registerEventId: scanResult.data?.registration?.id,
+          eventId: checkInData.eventId,
+          registerEventId: registration.id,
           status: AttendanceStatus.CheckedIn,
           checkInTime: new Date(),
           checkInLocation: checkInData.checkInLocation,
@@ -204,7 +226,14 @@ export class AttendanceService {
         });
       }
 
-      return await this.attendanceRepository.save(attendance);
+      const savedAttendance = await this.attendanceRepository.save(attendance);
+
+      // Auto-generate lucky draw number if feature is enabled and this is first check-in
+      if (event.enableLuckyDrawFeature && attendance.status === AttendanceStatus.CheckedIn) {
+        await this.generateLuckyDrawNumber(registration.id, checkInData.eventId);
+      }
+
+      return savedAttendance;
     } catch (error) {
       if (
         error instanceof BadRequestException ||
@@ -293,7 +322,14 @@ export class AttendanceService {
         });
       }
 
-      return await this.attendanceRepository.save(attendance);
+      const savedAttendance = await this.attendanceRepository.save(attendance);
+
+      // Auto-generate lucky draw number if feature is enabled and this is first check-in
+      if (event.enableLuckyDrawFeature && attendance.status === AttendanceStatus.CheckedIn) {
+        await this.generateLuckyDrawNumber(registration.id, checkInData.eventId);
+      }
+
+      return savedAttendance;
     } catch (error) {
       if (
         error instanceof BadRequestException ||
@@ -376,16 +412,50 @@ export class AttendanceService {
   }
 
   /**
-   * Get attendance statistics for an event
+   * Get comprehensive attendance statistics for an event
    */
   async getEventAttendanceStats(eventId: string): Promise<{
     totalRegistered: number;
     totalCheckedIn: number;
     totalCheckedOut: number;
     totalNoShow: number;
+    totalWalkInRegistrations: number;
+    totalAttendees: number; // Total people who attended (checked in + walk-ins)
     checkInRate: number;
+    attendanceRate: number; // Percentage of registered who actually attended
+    walkInRate: number; // Percentage of walk-ins vs total attendees
+    liveStatus: {
+      currentlyCheckedIn: number;
+      currentlyCheckedOut: number;
+      currentlyNoShow: number;
+    };
+    registrationBreakdown: {
+      preEventRegistrations: number;
+      walkInRegistrations: number;
+    };
+    eventInfo: {
+      id: string;
+      name: string;
+      startDate: Date;
+      endDate: Date;
+      isEventActive: boolean;
+      isEventEnded: boolean;
+    };
   }> {
     try {
+      // Get event information
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      const now = new Date();
+      const isEventActive = now >= event.startDate && now <= event.endDate;
+      const isEventEnded = now > event.endDate;
+
       // Get total registrations for the event
       const totalRegistered = await this.registerEventRepository.count({
         where: {
@@ -393,6 +463,18 @@ export class AttendanceService {
           isRegister: true,
         },
       });
+
+      // Get walk-in registrations (registrations made between event start and end time)
+      const totalWalkInRegistrations = await this.registerEventRepository
+        .createQueryBuilder('registerEvent')
+        .where('registerEvent.eventId = :eventId', { eventId })
+        .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true })
+        .andWhere('registerEvent.createdAt >= :startDate', { startDate: event.startDate })
+        .andWhere('registerEvent.createdAt <= :endDate', { endDate: event.endDate })
+        .getCount();
+
+      // Get pre-event registrations
+      const preEventRegistrations = totalRegistered - totalWalkInRegistrations;
 
       // Get attendance counts by status
       const attendanceCounts = await this.attendanceRepository
@@ -408,7 +490,28 @@ export class AttendanceService {
         totalCheckedIn: 0,
         totalCheckedOut: 0,
         totalNoShow: 0,
+        totalWalkInRegistrations,
+        totalAttendees: 0,
         checkInRate: 0,
+        attendanceRate: 0,
+        walkInRate: 0,
+        liveStatus: {
+          currentlyCheckedIn: 0,
+          currentlyCheckedOut: 0,
+          currentlyNoShow: 0,
+        },
+        registrationBreakdown: {
+          preEventRegistrations,
+          walkInRegistrations: totalWalkInRegistrations,
+        },
+        eventInfo: {
+          id: event.id,
+          name: event.name,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          isEventActive,
+          isEventEnded,
+        },
       };
 
       // Calculate counts from attendance records
@@ -417,24 +520,200 @@ export class AttendanceService {
         switch (item.status) {
           case AttendanceStatus.CheckedIn:
             stats.totalCheckedIn = count;
+            stats.liveStatus.currentlyCheckedIn = count;
             break;
           case AttendanceStatus.CheckedOut:
             stats.totalCheckedOut = count;
+            stats.liveStatus.currentlyCheckedOut = count;
             break;
           case AttendanceStatus.NoShow:
             stats.totalNoShow = count;
+            stats.liveStatus.currentlyNoShow = count;
             break;
         }
       });
 
-      // Calculate check-in rate
+      // Calculate total attendees (checked in + walk-ins)
+      stats.totalAttendees = stats.totalCheckedIn + totalWalkInRegistrations;
+
+      // Calculate rates
       if (totalRegistered > 0) {
         stats.checkInRate = (stats.totalCheckedIn / totalRegistered) * 100;
+        stats.attendanceRate = (stats.totalAttendees / totalRegistered) * 100;
+      }
+
+      if (stats.totalAttendees > 0) {
+        stats.walkInRate = (totalWalkInRegistrations / stats.totalAttendees) * 100;
       }
 
       return stats;
     } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
       this.errorHandler.handleDatabaseError(error, 'Event attendance statistics');
+    }
+  }
+
+  /**
+   * Get live attendance status for real-time updates
+   * - Optimized for frequent polling
+   * - Returns only essential live data
+   */
+  async getLiveAttendanceStatus(eventId: string): Promise<{
+    totalRegistered: number;
+    totalCheckedIn: number;
+    totalWalkInRegistrations: number;
+    totalAttendees: number;
+    checkInRate: number;
+    attendanceRate: number;
+    liveStatus: {
+      currentlyCheckedIn: number;
+      currentlyCheckedOut: number;
+      currentlyNoShow: number;
+    };
+    eventInfo: {
+      id: string;
+      name: string;
+      isEventActive: boolean;
+      isEventEnded: boolean;
+    };
+    lastUpdated: string;
+  }> {
+    try {
+      // Get event information
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name', 'startDate', 'endDate'],
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      const now = new Date();
+      const isEventActive = now >= event.startDate && now <= event.endDate;
+      const isEventEnded = now > event.endDate;
+
+      // Get total registrations (optimized query)
+      const totalRegistered = await this.registerEventRepository.count({
+        where: {
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      // Get walk-in registrations (optimized query)
+      const totalWalkInRegistrations = await this.registerEventRepository
+        .createQueryBuilder('registerEvent')
+        .where('registerEvent.eventId = :eventId', { eventId })
+        .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true })
+        .andWhere('registerEvent.createdAt >= :startDate', { startDate: event.startDate })
+        .andWhere('registerEvent.createdAt <= :endDate', { endDate: event.endDate })
+        .getCount();
+
+      // Get attendance counts by status (optimized query)
+      const attendanceCounts = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .select('attendance.status', 'status')
+        .addSelect('COUNT(*)', 'count')
+        .where('attendance.eventId = :eventId', { eventId })
+        .groupBy('attendance.status')
+        .getRawMany();
+
+      let totalCheckedIn = 0;
+      let currentlyCheckedIn = 0;
+      let currentlyCheckedOut = 0;
+      let currentlyNoShow = 0;
+
+      // Calculate counts from attendance records
+      attendanceCounts.forEach((item) => {
+        const count = parseInt(item.count);
+        switch (item.status) {
+          case AttendanceStatus.CheckedIn:
+            totalCheckedIn = count;
+            currentlyCheckedIn = count;
+            break;
+          case AttendanceStatus.CheckedOut:
+            currentlyCheckedOut = count;
+            break;
+          case AttendanceStatus.NoShow:
+            currentlyNoShow = count;
+            break;
+        }
+      });
+
+      // Calculate total attendees and rates
+      const totalAttendees = totalCheckedIn + totalWalkInRegistrations;
+      const checkInRate = totalRegistered > 0 ? (totalCheckedIn / totalRegistered) * 100 : 0;
+      const attendanceRate = totalRegistered > 0 ? (totalAttendees / totalRegistered) * 100 : 0;
+
+      return {
+        totalRegistered,
+        totalCheckedIn,
+        totalWalkInRegistrations,
+        totalAttendees,
+        checkInRate: Math.round(checkInRate * 100) / 100, // Round to 2 decimal places
+        attendanceRate: Math.round(attendanceRate * 100) / 100,
+        liveStatus: {
+          currentlyCheckedIn,
+          currentlyCheckedOut,
+          currentlyNoShow,
+        },
+        eventInfo: {
+          id: event.id,
+          name: event.name,
+          isEventActive,
+          isEventEnded,
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Live attendance status');
+    }
+  }
+
+  /**
+   * Generate lucky draw number based on check-in sequence
+   */
+  async generateLuckyDrawNumber(registerEventId: string, eventId: string): Promise<void> {
+    try {
+      // Check if admin info already exists for this registration
+      const existingAdminInfo = await this.adminInfoRepository.findOne({
+        where: { registerEventId },
+      });
+
+      if (existingAdminInfo && existingAdminInfo.luckyDrawNumber) {
+        // Lucky draw number already exists, don't regenerate
+        return;
+      }
+
+      // Get the count of checked-in attendees for this event to determine sequence
+      const checkedInCount = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .where('attendance.eventId = :eventId', { eventId })
+        .andWhere('attendance.status = :status', { status: AttendanceStatus.CheckedIn })
+        .getCount();
+
+      // Generate lucky draw number based on sequence (001, 002, 003, etc.)
+      const luckyDrawNumber = String(checkedInCount).padStart(3, '0');
+
+      // Create or update admin info with lucky draw number
+      if (existingAdminInfo) {
+        existingAdminInfo.luckyDrawNumber = luckyDrawNumber;
+        await this.adminInfoRepository.save(existingAdminInfo);
+      } else {
+        const newAdminInfo = this.adminInfoRepository.create({
+          registerEventId,
+          luckyDrawNumber,
+        });
+        await this.adminInfoRepository.save(newAdminInfo);
+      }
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Lucky draw number generation');
     }
   }
 

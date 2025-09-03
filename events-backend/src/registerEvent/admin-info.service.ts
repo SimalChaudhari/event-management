@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { AdminInfo } from './admin-info.entity';
 import { RegisterEvent } from './registerEvent.entity';
 import { UserEntity } from '../user/users.entity';
+import { Event } from '../event/event.entity';
 import {
   CreateAdminInfoDto,
   UpdateAdminInfoDto,
@@ -32,6 +33,8 @@ export class AdminInfoService {
     private readonly registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(Event)
+    private readonly eventRepository: Repository<Event>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -57,8 +60,14 @@ export class AdminInfoService {
       });
 
       if (adminInfo) {
-        // Update existing admin info
-        Object.assign(adminInfo, createAdminInfoDto);
+        // Update existing admin info - only update non-lucky draw fields if lucky draw already exists
+        if (adminInfo.luckyDrawNumber && createAdminInfoDto.luckyDrawNumber) {
+          // Skip lucky draw number update if it already exists
+          const { luckyDrawNumber, ...updateData } = createAdminInfoDto;
+          Object.assign(adminInfo, updateData);
+        } else {
+          Object.assign(adminInfo, createAdminInfoDto);
+        }
         return await this.adminInfoRepository.save(adminInfo);
       } else {
         // Create new admin info
@@ -109,6 +118,8 @@ export class AdminInfoService {
         luckyDrawNumber: adminInfo.luckyDrawNumber,
         tableNumber: adminInfo.tableNumber,
         additionalInformation: adminInfo.additionalInformation,
+        dressCode: adminInfo.dressCode,
+        hall: adminInfo.hall,
         createdAt: adminInfo.createdAt,
         updatedAt: adminInfo.updatedAt,
         user: {
@@ -132,8 +143,6 @@ export class AdminInfoService {
     }
   }
 
-
-
   // Delete admin info (soft delete)
   async deleteAdminInfo(id: string): Promise<void> {
     try {
@@ -154,169 +163,192 @@ export class AdminInfoService {
     }
   }
 
-// admin-info.service.ts
+  // admin-info.service.ts
 
-async bulkUploadAdminInfo(
-  bulkUploadDto: BulkUploadAdminInfoDto,
-): Promise<BulkUpdateResponseDto> {
-  try {
-    const { eventId, bulkData } = bulkUploadDto;
-    const response: BulkUpdateResponseDto = {
-      success: true,
-      message: 'Bulk upload completed',
-      totalProcessed: 0,
-      successfulUpdates: 0,
-      failedUpdates: 0,
-      errors: [],
+  async bulkUploadAdminInfo(
+    bulkUploadDto: BulkUploadAdminInfoDto,
+  ): Promise<BulkUpdateResponseDto> {
+    try {
+      const { eventId, bulkData } = bulkUploadDto;
+      const response: BulkUpdateResponseDto = {
+        success: true,
+        message: 'Bulk upload completed',
+        totalProcessed: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0,
+        errors: [],
+      };
+
+      response.totalProcessed = bulkData.length;
+
+      for (const item of bulkData) {
+        try {
+          await this.processBulkItem(item, eventId);
+          response.successfulUpdates++;
+        } catch (error) {
+          response.failedUpdates++;
+          const errorMessage = `User ${item.userId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          response.errors?.push(errorMessage);
+        }
+      }
+
+      // Update response message
+      if (response.failedUpdates === 0) {
+        response.message = `Successfully processed ${response.successfulUpdates} records`;
+      } else {
+        response.message = `Processed ${response.successfulUpdates} records, ${response.failedUpdates} failed`;
+      }
+
+      return response;
+    } catch (error) {
+      throw this.errorHandler.handleDatabaseError(
+        error,
+        'Bulk upload admin info',
+      );
+    }
+  }
+
+  // admin-info.service.ts
+
+  async processCsvFile(
+    file: Express.Multer.File,
+    eventId: string,
+  ): Promise<BulkUpdateResponseDto> {
+    try {
+      // Parse CSV file content
+      const csvContent = file.buffer.toString('utf-8');
+      const csvRows = csvContent.split('\n').filter((row) => row.trim() !== '');
+
+      // Remove header row
+      const dataRows = csvRows.slice(1);
+
+      const response: BulkUpdateResponseDto = {
+        success: true,
+        message: 'CSV file processed',
+        totalProcessed: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0,
+        errors: [],
+      };
+
+      response.totalProcessed = dataRows.length;
+
+      for (let i = 0; i < dataRows.length; i++) {
+        try {
+          const row = dataRows[i];
+          const columns = row
+            .split(',')
+            .map((col) => col.trim().replace(/"/g, ''));
+
+          if (columns.length < 1) continue;
+
+          const csvRow = {
+            registerEventId: columns[0], // First column should be registerEventId
+            luckyDrawNumber: columns[1] || undefined, // Already inserted, so skip
+            tableNumber: columns[2] || undefined,
+            dressCode: columns[3] || undefined,
+            hall: columns[4] || undefined,
+          };
+
+          await this.processBulkItem(csvRow, eventId);
+          response.successfulUpdates++;
+        } catch (error) {
+          response.failedUpdates++;
+          const errorMessage = `Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          response.errors?.push(errorMessage);
+        }
+      }
+
+      // Update response message
+      if (response.failedUpdates === 0) {
+        response.message = `Successfully processed ${response.successfulUpdates} records from CSV`;
+      } else {
+        response.message = `Processed ${response.successfulUpdates} records, ${response.failedUpdates} failed`;
+      }
+
+      return response;
+    } catch (error) {
+      throw this.errorHandler.handleDatabaseError(error, 'CSV file processing');
+    }
+  }
+
+  private async processBulkItem(
+    item: any, // Accept both BulkAdminInfoItemDto and CSV row data
+    eventId: string,
+  ): Promise<void> {
+    let registration;
+
+    // Handle different input types
+    if (item.registerEventId) {
+      // Direct registerEventId provided (from CSV)
+      registration = await this.registerEventRepository.findOne({
+        where: {
+          id: item.registerEventId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+      if (!registration) {
+        throw new Error(
+          `Register Event with ID ${item.registerEventId} not found for this event`,
+        );
+      }
+    } else if (item.userId) {
+      // Direct userId provided (from bulk upload)
+      registration = await this.registerEventRepository.findOne({
+        where: {
+          userId: item.userId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+      if (!registration) {
+        throw new Error(`User ${item.userId} is not registered for this event`);
+      }
+    } else {
+      throw new Error('Either registerEventId or userId must be provided');
+    }
+
+    // Check for duplicate lucky draw numbers
+    if (item.luckyDrawNumber) {
+      const existingLuckyDraw = await this.adminInfoRepository.findOne({
+        where: {
+          luckyDrawNumber: item.luckyDrawNumber,
+          isActive: true,
+        },
+      });
+      if (existingLuckyDraw) {
+        throw new Error(
+          `Lucky draw number ${item.luckyDrawNumber} already exists`,
+        );
+      }
+    }
+
+    // Check for duplicate table numbers
+    if (item.tableNumber) {
+      const existingTable = await this.adminInfoRepository.findOne({
+        where: {
+          tableNumber: item.tableNumber,
+          isActive: true,
+        },
+      });
+      if (existingTable) {
+        throw new Error(`Table number ${item.tableNumber} already exists`);
+      }
+    }
+
+    // Create or update admin info
+    const adminInfoDto: CreateAdminInfoDto = {
+      registerEventId: registration.id,
+      luckyDrawNumber: item.luckyDrawNumber, // Skip if already exists
+      tableNumber: item.tableNumber,
+      additionalInformation: item.additionalInformation,
+      dressCode: item.dressCode,
+      hall: item.hall,
     };
 
-    response.totalProcessed = bulkData.length;
-
-    for (const item of bulkData) {
-      try {
-        await this.processBulkItem(item, eventId);
-        response.successfulUpdates++;
-      } catch (error) {
-        response.failedUpdates++;
-        const errorMessage = `User ${item.userId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        response.errors?.push(errorMessage);
-      }
-    }
-
-    // Update response message
-    if (response.failedUpdates === 0) {
-      response.message = `Successfully processed ${response.successfulUpdates} records`;
-    } else {
-      response.message = `Processed ${response.successfulUpdates} records, ${response.failedUpdates} failed`;
-    }
-
-    return response;
-  } catch (error) {
-    throw this.errorHandler.handleDatabaseError(error, 'Bulk upload admin info');
+    await this.createOrUpdateAdminInfo(adminInfoDto);
   }
-}
-
-// admin-info.service.ts
-
-async processCsvFile(
-  file: Express.Multer.File,
-  eventId: string,
-): Promise<BulkUpdateResponseDto> {
-  try {
-    // Parse CSV file content
-    const csvContent = file.buffer.toString('utf-8');
-    const csvRows = csvContent.split('\n').filter(row => row.trim() !== '');
-    
-    // Remove header row
-    const dataRows = csvRows.slice(1);
-    
-    const response: BulkUpdateResponseDto = {
-      success: true,
-      message: 'CSV file processed',
-      totalProcessed: 0,
-      successfulUpdates: 0,
-      failedUpdates: 0,
-      errors: [],
-    };
-
-    response.totalProcessed = dataRows.length;
-
-    for (let i = 0; i < dataRows.length; i++) {
-      try {
-        const row = dataRows[i];
-        const columns = row.split(',').map(col => col.trim().replace(/"/g, ''));
-        
-        if (columns.length < 1) continue;
-
-        const csvRow = {
-          userId: columns[0],
-          luckyDrawNumber: columns[1] || undefined,
-          tableNumber: columns[2] || undefined,
-          additionalInformation: columns[3] || undefined,
-        };
-
-        await this.processBulkItem(csvRow, eventId);
-        response.successfulUpdates++;
-      } catch (error) {
-        response.failedUpdates++;
-        const errorMessage = `Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        response.errors?.push(errorMessage);
-      }
-    }
-
-    // Update response message
-    if (response.failedUpdates === 0) {
-      response.message = `Successfully processed ${response.successfulUpdates} records from CSV`;
-    } else {
-      response.message = `Processed ${response.successfulUpdates} records, ${response.failedUpdates} failed`;
-    }
-
-    return response;
-  } catch (error) {
-    throw this.errorHandler.handleDatabaseError(error, 'CSV file processing');
-  }
-}
-
-private async processBulkItem(
-  item: BulkAdminInfoItemDto, 
-  eventId: string
-): Promise<void> {
-  // Validate user exists
-  const user = await this.userRepository.findOne({
-    where: { id: item.userId },
-  });
-  if (!user) {
-    throw new Error(`User with ID ${item.userId} not found`);
-  }
-
-  // Validate user is registered for this event
-  const registration = await this.registerEventRepository.findOne({
-    where: { 
-      userId: item.userId, 
-      eventId: eventId,
-      isRegister: true
-    },
-  });
-  if (!registration) {
-    throw new Error(`User ${item.userId} is not registered for this event`);
-  }
-
-  // Check for duplicate lucky draw numbers
-  if (item.luckyDrawNumber) {
-    const existingLuckyDraw = await this.adminInfoRepository.findOne({
-      where: { 
-        luckyDrawNumber: item.luckyDrawNumber,
-        isActive: true 
-      }
-    });
-    if (existingLuckyDraw) {
-      throw new Error(`Lucky draw number ${item.luckyDrawNumber} already exists`);
-    }
-  }
-
-  // Check for duplicate table numbers
-  if (item.tableNumber) {
-    const existingTable = await this.adminInfoRepository.findOne({
-      where: { 
-        tableNumber: item.tableNumber,
-        isActive: true 
-      }
-    });
-    if (existingTable) {
-      throw new Error(`Table number ${item.tableNumber} already exists`);
-    }
-  }
-
-  // Create or update admin info
-  const adminInfoDto: CreateAdminInfoDto = {
-    registerEventId: registration.id,
-    luckyDrawNumber: item.luckyDrawNumber,
-    tableNumber: item.tableNumber,
-    additionalInformation: item.additionalInformation,
-  };
-
-  await this.createOrUpdateAdminInfo(adminInfoDto);
-}
 
   // Get admin info statistics for an event
   async getAdminInfoStats(eventId: string): Promise<any> {
@@ -338,7 +370,9 @@ private async processBulkItem(
         .where('registerEvent.eventId = :eventId', { eventId })
         .andWhere('adminInfo.isActive = :isActive', { isActive: true })
         .andWhere('adminInfo.luckyDrawNumber IS NOT NULL')
-        .andWhere('adminInfo.luckyDrawNumber != ""')
+        .andWhere('adminInfo.luckyDrawNumber != :emptyString', {
+          emptyString: '',
+        })
         .getCount();
 
       const tableNumberCount = await this.adminInfoRepository
@@ -347,7 +381,7 @@ private async processBulkItem(
         .where('registerEvent.eventId = :eventId', { eventId })
         .andWhere('adminInfo.isActive = :isActive', { isActive: true })
         .andWhere('adminInfo.tableNumber IS NOT NULL')
-        .andWhere('adminInfo.tableNumber != ""')
+        .andWhere('adminInfo.tableNumber != :emptyString', { emptyString: '' })
         .getCount();
 
       return {
@@ -364,6 +398,129 @@ private async processBulkItem(
       throw this.errorHandler.handleDatabaseError(
         error,
         'Admin info statistics',
+      );
+    }
+  }
+
+  // Get admin info visibility status for an event
+  async getAdminInfoVisibility(eventId: string): Promise<{
+    showAdminInfoTab: boolean;
+    features: {
+      luckyDrawEnabled: boolean;
+    };
+    eventInfo: {
+      id: string;
+      name: string;
+    };
+  }> {
+    try {
+      // Get event information
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name', 'enableLuckyDrawFeature'],
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      const features = {
+        luckyDrawEnabled: event.enableLuckyDrawFeature || false,
+      };
+
+      // Show admin info tab if lucky draw feature is enabled
+      const showAdminInfoTab = features.luckyDrawEnabled;
+
+      return {
+        showAdminInfoTab,
+        features,
+        eventInfo: {
+          id: event.id,
+          name: event.name,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      throw this.errorHandler.handleDatabaseError(
+        error,
+        'Admin info visibility check',
+      );
+    }
+  }
+
+  // Get lucky draw numbers for an event
+  async getLuckyDrawNumbers(eventId: string): Promise<{
+    luckyDrawNumbers: Array<{
+      luckyDrawNumber: string;
+      user: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+      checkInTime: Date;
+    }>;
+    totalNumbers: number;
+    eventInfo: {
+      id: string;
+      name: string;
+    };
+  }> {
+    try {
+      // Get event information
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name'],
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Get all admin info with lucky draw numbers for this event
+      const adminInfoList = await this.adminInfoRepository
+        .createQueryBuilder('adminInfo')
+        .leftJoinAndSelect('adminInfo.registerEvent', 'registerEvent')
+        .leftJoinAndSelect('registerEvent.user', 'user')
+        .leftJoinAndSelect('registerEvent.event', 'event')
+        .where('event.id = :eventId', { eventId })
+        .andWhere('adminInfo.isActive = :isActive', { isActive: true })
+        .andWhere('adminInfo.luckyDrawNumber IS NOT NULL')
+        .andWhere('adminInfo.luckyDrawNumber != :emptyString', {
+          emptyString: '',
+        })
+        .orderBy('adminInfo.luckyDrawNumber', 'ASC')
+        .getMany();
+
+      const luckyDrawNumbers = adminInfoList.map((adminInfo) => ({
+        luckyDrawNumber: adminInfo.luckyDrawNumber!,
+        user: {
+          id: adminInfo.registerEvent.user?.id || '',
+          firstName: adminInfo.registerEvent.user?.firstName || '',
+          lastName: adminInfo.registerEvent.user?.lastName || '',
+          email: adminInfo.registerEvent.user?.email || '',
+        },
+        checkInTime: adminInfo.createdAt, // This represents when the lucky draw number was assigned
+      }));
+
+      return {
+        luckyDrawNumbers,
+        totalNumbers: luckyDrawNumbers.length,
+        eventInfo: {
+          id: event.id,
+          name: event.name,
+        },
+      };
+    } catch (error) {
+      console.log(error, '%%%%%%%%');
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      throw this.errorHandler.handleDatabaseError(
+        error,
+        'Lucky draw numbers retrieval',
       );
     }
   }

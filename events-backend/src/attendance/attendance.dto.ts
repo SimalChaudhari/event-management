@@ -3,9 +3,6 @@ import { AttendanceStatus, CheckInMethod } from './attendance.entity';
 import { EventQRCodeType, EventQRCodeStatus } from './event-qr-code.entity';
 
 export class CheckInByQRCodeDto {
-  @IsString()
-  qrCodeId!: string;
-
   @IsUUID()
   eventId!: string;
 
@@ -119,96 +116,7 @@ export class QRCodeScanResponseDto {
   };
 }
 
-// New DTOs for Event QR Codes
-export class CreateEventQRCodeDto {
-  @IsUUID()
-  eventId!: string;
 
-  @IsEnum(EventQRCodeType)
-  type!: EventQRCodeType;
-
-  @IsOptional()
-  @IsString()
-  title?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  location?: string;
-
-  @IsOptional()
-  @IsDateString()
-  validFrom?: string;
-
-  @IsOptional()
-  @IsDateString()
-  validUntil?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  allowSelfCheckIn?: boolean = true;
-
-  @IsOptional()
-  @IsBoolean()
-  autoRegister?: boolean = false;
-
-  @IsOptional()
-  @IsBoolean()
-  redirectToPayment?: boolean = false;
-
-  @IsOptional()
-  @IsInt()
-  maxScans?: number = -1;
-}
-
-export class UpdateEventQRCodeDto {
-  @IsOptional()
-  @IsEnum(EventQRCodeType)
-  type?: EventQRCodeType;
-
-  @IsOptional()
-  @IsEnum(EventQRCodeStatus)
-  status?: EventQRCodeStatus;
-
-  @IsOptional()
-  @IsString()
-  title?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  location?: string;
-
-  @IsOptional()
-  @IsDateString()
-  validFrom?: string;
-
-  @IsOptional()
-  @IsDateString()
-  validUntil?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  allowSelfCheckIn?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  autoRegister?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  redirectToPayment?: boolean;
-
-  @IsOptional()
-  @IsInt()
-  maxScans?: number;
-}
 
 // DTOs for Contact Exchange
 export class ContactExchangeDto {
@@ -255,9 +163,6 @@ export class ContactExchangeResponseDto {
 // DTOs for Exhibitor Stamp Collection
 export class CollectExhibitorStampDto {
   @IsUUID()
-  eventQRCodeId!: string; // QR code of the exhibition booth
-
-  @IsUUID()
   eventId!: string;
 
   @IsOptional()
@@ -288,7 +193,7 @@ export class ExhibitorStampResponseDto {
 // DTOs for Self Check-in via Event QR Code
 export class SelfCheckInDto {
   @IsString()
-  qrCodeData!: string; // The scanned QR code data (e.g., "event_event-123_1700000000000_abc123")
+  qrCodeData!: string; // The event ID (e.g., "6e1fc1d9-ba7d-4fe2-85d9-4075bd316ba3")
 
   @IsOptional()
   @IsString()

@@ -9,10 +9,9 @@ import {
 } from 'typeorm';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
-import { EventQRCode } from './event-qr-code.entity';
 
 @Entity('exhibitor_stamps')
-@Index(['attendeeId', 'eventQRCodeId'], { unique: true }) // Prevent duplicate stamps from same booth
+@Index(['attendeeId', 'eventId'], { unique: true }) // Prevent duplicate stamps for same event
 export class ExhibitorStamp {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -23,13 +22,6 @@ export class ExhibitorStamp {
   @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'attendeeId' })
   attendee!: UserEntity;
-
-  @Column()
-  eventQRCodeId!: string; // QR code of the exhibition booth
-
-  @ManyToOne(() => EventQRCode, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'eventQRCodeId' })
-  eventQRCode!: EventQRCode;
 
   @Column()
   eventId!: string;

@@ -10,22 +10,22 @@ export class Coupon {
   code!: string; // Like: "WELCOME10"
 
   @Column({ default: true })
-  isActive!: boolean; // coupon active है या नहीं
+  isActive!: boolean; // coupon active 
 
   @Column('decimal', { precision: 10, scale: 2 })
-  actualValue!: number; // minimum order value जिस पर coupon apply होगा
+  actualValue!: number; // minimum order
 
   @Column('decimal', { precision: 10, scale: 2 })
-  discountValue!: number; // discount की value
+  discountValue!: number; // discount
 
   @Column({ type: 'enum', enum: ['percentage', 'fixed'] })
-  discountType!: 'percentage' | 'fixed'; // percentage या fixed amount
+  discountType!: 'percentage' | 'fixed'; // percentage  fixed amount
 
   @Column({ default: 1 })
-  usageLimit!: number; // एक user कितनी बार use कर सकता है
+  usageLimit!: number; //
 
   @Column({ type: 'date', nullable: true })
-  expiryDate?: Date; // coupon का expiry date
+  expiryDate?: Date; // coupon expiry date
 
   @CreateDateColumn()
   createdAt!: Date;

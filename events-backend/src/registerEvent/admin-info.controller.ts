@@ -210,6 +210,60 @@ export class AdminInfoController {
     }
   }
 
+  // Get admin info visibility status for an event
+  @Get('visibility/:eventId')
+  @Roles(UserRole.Admin)
+  async getAdminInfoVisibility(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const visibility = await this.adminInfoService.getAdminInfoVisibility(eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Admin info visibility status retrieved successfully',
+        data: visibility,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Admin info visibility', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get lucky draw numbers for an event
+  @Get('lucky-draw/:eventId')
+  @Roles(UserRole.Admin)
+  async getLuckyDrawNumbers(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const luckyDrawNumbers = await this.adminInfoService.getLuckyDrawNumbers(eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Lucky draw numbers retrieved successfully',
+        data: luckyDrawNumbers,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Lucky draw numbers retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
   // Download CSV template for bulk upload
   @Get('csv-template')
   @Roles(UserRole.Admin)
