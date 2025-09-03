@@ -12,11 +12,19 @@ export class CreateAdminInfoDto {
 
   @IsOptional()
   @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
 
   @IsOptional()
   @IsString()
   additionalInformation?: string;
+
+  @IsOptional()
+  @IsString()
+  luckDrawDateandTime?: string;
 
   @IsOptional()
   @IsString()
@@ -35,11 +43,19 @@ export class UpdateAdminInfoDto {
 
   @IsOptional()
   @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
   tableNumber?: string;
 
   @IsOptional()
   @IsString()
   additionalInformation?: string;
+
+  @IsOptional()
+  @IsString()
+  luckDrawDateandTime?: string;
 
   @IsOptional()
   @IsString()
@@ -86,6 +102,10 @@ export class BulkAdminInfoItemDto {
   @IsOptional()
   @IsString()
   luckyDrawNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  luckyDrawDateTime?: string;
 
   @IsOptional()
   @IsString()

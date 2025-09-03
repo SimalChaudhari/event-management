@@ -510,6 +510,7 @@ export class RegisterEventService {
       
       const adminInfo = hasAdminInfo ? {
         luckyDrawNumber: registerEvent.adminInfo?.luckyDrawNumber,
+        luckyDrawDateTime: registerEvent.adminInfo?.luckyDrawDateTime,
         tableNumber: registerEvent.adminInfo?.tableNumber,
         additionalInformation: registerEvent.adminInfo?.additionalInformation,
         dressCode: registerEvent.adminInfo?.dressCode,

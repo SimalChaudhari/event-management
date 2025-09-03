@@ -116,6 +116,7 @@ export class AdminInfoService {
       return adminInfoList.map((adminInfo) => ({
         id: adminInfo.id,
         luckyDrawNumber: adminInfo.luckyDrawNumber,
+        luckyDrawDateTime: adminInfo.luckyDrawDateTime,
         tableNumber: adminInfo.tableNumber,
         additionalInformation: adminInfo.additionalInformation,
         dressCode: adminInfo.dressCode,
