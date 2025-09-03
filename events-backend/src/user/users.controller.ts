@@ -475,7 +475,7 @@ export class UserController {
    * - Admin can generate QR codes for any user
    */
   @Get('qr-code/generate/:userId')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   // @Roles(UserRole.Admin)
   async generateQRCodeForUser(
     @Param('userId') userId: string,
