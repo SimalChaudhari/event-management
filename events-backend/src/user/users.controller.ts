@@ -444,31 +444,7 @@ export class UserController {
     }
   }
 
-  /**
-   * Get user information by scanning QR code
-   * - Public endpoint that doesn't require authentication
-   * - Returns user information when QR code is scanned
-   */
-  @Get('qr-code/scan/:qrCodeId')
-  async scanQRCode(
-    @Param('qrCodeId') qrCodeId: string,
-    @Res() response: Response,
-  ) {
-    try {
-      const userInfo = await this.userService.getUserInfoFromQRCode(qrCodeId);
-      
-      const successResponse = {
-        success: true,
-        message: 'User information retrieved successfully',
-        data: userInfo,
-      };
-      
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'QR code scanning', undefined);
-      throw error;
-    }
-  }
+
 
   /**
    * Generate QR code for any user (Admin only)
