@@ -178,8 +178,9 @@ export class FavoriteEventService {
         // Since these are favorite events, isFavorite will always be true
         const isFavorite = true;
 
-        // Check if user has registered for this event
+        // Check if user has registered for this event and get registration ID
         let isRegistered = false;
+        let registerEventId = null;
         if (favorite.eventId) {
           const registration = await this.registerEventRepository.findOne({
             where: {
@@ -189,6 +190,7 @@ export class FavoriteEventService {
             },
           });
           isRegistered = !!registration;
+          registerEventId = registration?.id || null;
         }
 
         const {
@@ -243,6 +245,7 @@ export class FavoriteEventService {
             hasSurvey: !!surveyDetails,
             isFavorite: isFavorite, // Always true for favorite events
             isRegistered: isRegistered,
+            registerEventId: registerEventId,
           },
           // Add user's personal agenda data
         };

@@ -184,7 +184,6 @@ export class RegisterEventService {
         });
       }
 
-   
       // Add attendance count and favorite status to each registered event
       const registerEventsWithAttendance = await Promise.all(
         registerEvents.map(async (registerEvent) => {
@@ -199,11 +198,11 @@ export class RegisterEventService {
               )
             : null;
 
-                   // Get user's personal agenda items for this specific event
+          // Get user's personal agenda items for this specific event
           const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
             this.agendaRepository,
             registerEvent.eventId || '',
-            registerEvent.userId || ''
+            registerEvent.userId || '',
           );
 
           let formattedDocuments: { name: string; document: string }[] = [];
@@ -307,11 +306,15 @@ export class RegisterEventService {
           } = registerEvent;
 
           // Get admin info for this registration - show if lucky draw feature is enabled
-          const hasAdminInfo = registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
-          
-          const adminInfo = hasAdminInfo ? {
-            ...registerEvent.adminInfo,
-          } : null;
+          const hasAdminInfo =
+            registerEvent.adminInfo &&
+            registerEvent.event?.enableLuckyDrawFeature;
+
+          const adminInfo = hasAdminInfo
+            ? {
+                ...registerEvent.adminInfo,
+              }
+            : null;
 
           return {
             ...cleanRegisterEvent,
@@ -350,8 +353,6 @@ export class RegisterEventService {
     }
   }
 
-
-
   async findOne(registrationId: string, userId: string, role: string) {
     try {
       // Query to find the specific register event
@@ -384,7 +385,7 @@ export class RegisterEventService {
       const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
         this.agendaRepository,
         registerEvent.eventId || '',
-        registerEvent.userId || ''
+        registerEvent.userId || '',
       );
 
       // Get attendance count for this event
@@ -506,16 +507,14 @@ export class RegisterEventService {
       } = registerEvent;
 
       // Get admin info for this registration - show if lucky draw feature is enabled
-      const hasAdminInfo = registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
-      
-      const adminInfo = hasAdminInfo ? {
-        luckyDrawNumber: registerEvent.adminInfo?.luckyDrawNumber,
-        luckyDrawDateTime: registerEvent.adminInfo?.luckyDrawDateTime,
-        tableNumber: registerEvent.adminInfo?.tableNumber,
-        additionalInformation: registerEvent.adminInfo?.additionalInformation,
-        dressCode: registerEvent.adminInfo?.dressCode,
-        hall: registerEvent.adminInfo?.hall,
-      } : null;
+      const hasAdminInfo =
+        registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
+
+      const adminInfo = hasAdminInfo
+        ? {
+            ...registerEvent.adminInfo,
+          }
+        : null;
 
       return {
         success: true,

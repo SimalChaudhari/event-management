@@ -31,6 +31,7 @@ import { PollingModule } from 'polling/polling.module';
 import { QnaModule } from 'qna/qna.module';
 import { ChatModule } from './chat/chat.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { ContactInfoModule } from './contact-info/contact-info.module';
 
 @Module({
   imports: [
@@ -58,7 +59,7 @@ import { AttendanceModule } from './attendance/attendance.module';
     QnaModule,
     PollingModule,
     EventModule, AgendaModule, AgendaCategoryModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
-    ChatModule, AttendanceModule,
+    ChatModule, AttendanceModule, ContactInfoModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

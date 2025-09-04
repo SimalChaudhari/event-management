@@ -614,8 +614,7 @@ export class UserService {
     qrCodeId: string;
     qrCodeImage: string; // Base64 image
     userInfo: Partial<UserEntity>;
-  }> 
-  {
+  }> {
     try {
       const user = await this.userRepository.findOne({
         where: { id: userId },
@@ -625,12 +624,11 @@ export class UserService {
         throw new ResourceNotFoundException('User', userId);
       }
 
-      // Use user ID directly as QR code data
+      // Use user ID directly as QR code data (no URL, just the ID)
       const qrCodeId = userId;
-      const qrCodeUrl = `${process.env.APP_URL}/${qrCodeId}`;
-      
-      // Generate QR code image
-      const qrCodeImage = await QRCodeUtils.generateQRCodeAsDataURL(qrCodeUrl);
+
+      // Generate QR code image with just the user ID
+      const qrCodeImage = await QRCodeUtils.generateQRCodeAsDataURL(qrCodeId);
 
       // Return sanitized user data for QR code
       const sanitizedUser = UserUtils.sanitizeUserData(user);
@@ -657,7 +655,7 @@ export class UserService {
     try {
       // Use qrCodeId directly as user ID
       const userId = qrCodeId;
-      
+
       // Get user data directly from database
       const user = await this.userRepository.findOne({
         where: { id: userId },
@@ -674,6 +672,35 @@ export class UserService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'QR code scanning');
+    }
+  }
+
+  async getQRCodeImageFromQRCode(
+    qrCodeId: string,
+  ): Promise<{ qrCodeId: string; qrCodeImage: string }> {
+    try {
+      // Get user data directly from database using qrCodeId as userId
+      const userId = qrCodeId;
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Generate QR code with just the user ID (no URL)
+      // Generate and return QR code image as base64
+      const qrCodeImage = await QRCodeUtils.generateQRCodeAsDataURL(qrCodeId);
+      return {
+        qrCodeId,
+        qrCodeImage,
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'QR code image generation');
     }
   }
 }
