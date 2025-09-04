@@ -529,5 +529,26 @@ export class UserController {
     }
   }
 
-  
+  @Get('qr-code/generate-image/:qrCodeData')
+  async scanQRCodeImage(
+    @Param('qrCodeData') qrCodeData: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const qrCodeImage = await this.userService.getQRCodeImageFromQRCode(qrCodeData);
+      
+      const successResponse = {
+        success: true,
+        message: 'QR code image retrieved successfully',
+        data: qrCodeImage,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'QR code image scanning', undefined);
+      throw error;
+    }
+  }
+
+
 }

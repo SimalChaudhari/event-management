@@ -325,8 +325,9 @@ export class EventService {
             isFavorite = !!favorite;
           }
 
-          // Check if user has registered for this event
+          // Check if user has registered for this event and get registration ID
           let isRegistered = false;
+          let registerEventId = null;
           if (userId) {
             const registration = await this.registerEventRepository.findOne({
               where: {
@@ -336,6 +337,7 @@ export class EventService {
               },
             });
             isRegistered = !!registration;
+            registerEventId = registration?.id || null;
           }
 
           const { exhibitorDescription,surveys, ...eventFiltered } = eventData;
@@ -354,6 +356,7 @@ export class EventService {
             hasSurvey: !!surveyDetails,
             isFavorite: isFavorite,
             isRegistered: isRegistered,
+            registerEventId: registerEventId,
             speakersData: speakers,
             categoriesData: category?.map((ec) => ec.category) || [],
 
@@ -526,8 +529,9 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
-      // Check if user has registered for this event
+      // Check if user has registered for this event and get registration ID
       let isRegistered = false;
+      let registerEventId = null;
       if (userId) {
         const registration = await this.registerEventRepository.findOne({
           where: {
@@ -537,6 +541,7 @@ export class EventService {
           },
         });
         isRegistered = !!registration;
+        registerEventId = registration?.id || null;
       }
 
       // Format documents with names
@@ -592,6 +597,7 @@ export class EventService {
         hasSurvey: !!surveyDetails,
         isFavorite: isFavorite,
         isRegistered: isRegistered,
+        registerEventId: registerEventId,
       };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
