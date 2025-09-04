@@ -1,5 +1,6 @@
 // src/utils/user.utils.ts
 import { UserEntity } from '../user/users.entity';
+import { AddressEntity } from '../user/address.entity';
 
 export class UserUtils {
   /**
@@ -13,10 +14,12 @@ export class UserUtils {
 
   /**
    * Get public speaker information (only safe fields)
-   * @param user User entity (speaker) with optional speakerProfile
+   * @param user User entity (speaker) with optional speakerProfile and addresses
    * @returns Public speaker data with only allowed fields
    */
-  static getPublicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
+  static getPublicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any; addresses?: AddressEntity[] }) {
+    const defaultAddress = user.addresses?.find(addr => addr.isDefault) || user.addresses?.[0];
+    
     return {
       id: user.id,
       name: user.firstName && user.lastName 
@@ -26,19 +29,22 @@ export class UserUtils {
       position: user.speakerProfile?.position || '',
       companyName: user.speakerProfile?.companyName || '',
       description: user.speakerProfile?.description || '',
-      location: user.city && user.state 
-        ? `${user.city}, ${user.state}`.trim() 
-        : user.city || user.state || '',
+      location: defaultAddress 
+        ? `${defaultAddress.city}, ${defaultAddress.state}`.trim() 
+        : '',
       profilePicture: user.profilePicture || '',
       linkedinProfile: user.linkedinProfile || '',
       // Add more user fields for complete information
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       mobile: user.mobile || '',
-      address: user.address || '',
-      city: user.city || '',
-      state: user.state || '',
-      postalCode: user.postalCode || '',
+      defaultAddress: defaultAddress ? {
+        street: defaultAddress.street,
+        city: defaultAddress.city,
+        state: defaultAddress.state,
+        postalCode: defaultAddress.postalCode,
+        country: defaultAddress.country
+      } : null,
       countryCurrency: user.countryCurrency || '',
       isVerify: user.isVerify || false,
       role: user.role || '',
@@ -49,10 +55,12 @@ export class UserUtils {
 
   /**
    * Get admin speaker information (more detailed)
-   * @param user User entity (speaker) with optional speakerProfile
+   * @param user User entity (speaker) with optional speakerProfile and addresses
    * @returns Speaker data for admin view
    */
-  static getAdminSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
+  static getAdminSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any; addresses?: AddressEntity[] }) {
+    const defaultAddress = user.addresses?.find(addr => addr.isDefault) || user.addresses?.[0];
+    
     return {
       id: user.id,
       name: user.firstName && user.lastName 
@@ -67,10 +75,14 @@ export class UserUtils {
       description: user.speakerProfile?.description || '',
       profilePicture: user.profilePicture || '',
       linkedinProfile: user.linkedinProfile || '',
-      address: user.address || '',
-      city: user.city || '',
-      state: user.state || '',
-      postalCode: user.postalCode || '',
+      // addresses: user.addresses || [],
+      addresses: defaultAddress ? {
+        street: defaultAddress.street,
+        city: defaultAddress.city,
+        state: defaultAddress.state,
+        postalCode: defaultAddress.postalCode,
+        country: defaultAddress.country
+      } : null,
       countryCurrency: user.countryCurrency || '',
       isVerify: user.isVerify || false,
       createdAt: user.createdAt,
@@ -80,10 +92,12 @@ export class UserUtils {
 
   /**
    * Get basic speaker info for events (minimal fields)
-   * @param user User entity (speaker) with optional speakerProfile
+   * @param user User entity (speaker) with optional speakerProfile and addresses
    * @returns Basic speaker info for event displays
    */
-  static getBasicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any }) {
+  static getBasicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any; addresses?: AddressEntity[] }) {
+    const defaultAddress = user.addresses?.find(addr => addr.isDefault) || user.addresses?.[0];
+  
     return {
       id: user.id,
       name: user.firstName && user.lastName 
@@ -93,9 +107,9 @@ export class UserUtils {
       position: user.speakerProfile?.position || '',
       companyName: user.speakerProfile?.companyName || '',
       description: user.speakerProfile?.description || '',
-      location: user.city && user.state && user.address
-        ? `${user.city}, ${user.state}, ${user.address}`.trim() 
-        : user.city || user.state || user.address || '',
+      location: defaultAddress
+        ? `${defaultAddress.city}, ${defaultAddress.state}, ${defaultAddress.street}`.trim() 
+        : '',
       profilePicture: user.profilePicture || '',
       speakingStartTime: user.speakerProfile?.speakingStartTime || '',
       speakingEndTime: user.speakerProfile?.speakingEndTime || '',
@@ -118,11 +132,11 @@ export class UserUtils {
   }
 
   /**
-   * Sanitize user data by removing sensitive fields
-   * @param user User entity
-   * @returns User data without sensitive fields
+   * Sanitize user data by removing sensitive fields and adding address information
+   * @param user User entity with addresses
+   * @returns User data without sensitive fields but with address information
    */
-  static sanitizeUserData(user: UserEntity): Partial<UserEntity> {
+  static sanitizeUserData(user: UserEntity): any {
     const { 
       password, 
       resetToken, 
@@ -135,7 +149,11 @@ export class UserUtils {
       refreshToken,
       ...sanitizedUser 
     } = user;
-    return sanitizedUser;
+    
+    return {
+      ...sanitizedUser,
+      formattedAddress: this.formatUserAddress(user)
+    };
   }
 
   /**
@@ -180,28 +198,51 @@ export class UserUtils {
   }
 
   /**
-   * Format user address
-   * @param user User entity
+   * Format user address from addresses relationship
+   * @param user User entity with addresses
+   * @param addressType Optional address type to find, defaults to default address
    * @returns Formatted address string
    */
-  static formatUserAddress(user: Partial<UserEntity>): string {
+  static formatUserAddress(user: Partial<UserEntity> & { addresses?: AddressEntity[] }, addressType?: string): string {
+    let address: AddressEntity | undefined;
+    
+    if (addressType) {
+      address = user.addresses?.find(addr => addr.type === addressType);
+    } else {
+      address = user.addresses?.find(addr => addr.isDefault) || user.addresses?.[0];
+    }
+    
+    if (!address) return '';
+    
     const parts = [
-      user.address,
-      user.city,
-      user.state,
-      user.postalCode
+      address.street,
+      address.apartment,
+      address.city,
+      address.state,
+      address.postalCode,
+      address.country
     ].filter(Boolean);
     
     return parts.join(', ');
   }
 
   /**
+   * Get default address for user
+   * @param user User entity with addresses
+   * @returns Default address or first address if no default set
+   */
+  static getDefaultAddress(user: Partial<UserEntity> & { addresses?: AddressEntity[] }): AddressEntity | null {
+    if (!user.addresses || user.addresses.length === 0) return null;
+    return user.addresses.find(addr => addr.isDefault) || user.addresses[0] || null;
+  }
+
+  /**
    * Get speaker info based on user role/permission level
-   * @param user User entity (speaker) with optional speakerProfile
+   * @param user User entity (speaker) with optional speakerProfile and addresses
    * @param viewerRole Role of the person viewing (admin, user, etc.)
    * @returns Appropriate speaker data based on viewer permissions
    */
-  static getSpeakerInfoByPermission(user: Partial<UserEntity> & { speakerProfile?: any }, viewerRole?: string) {
+  static getSpeakerInfoByPermission(user: Partial<UserEntity> & { speakerProfile?: any; addresses?: AddressEntity[] }, viewerRole?: string) {
     switch (viewerRole) {
       case 'admin':
         return this.getAdminSpeakerInfo(user);

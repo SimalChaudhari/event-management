@@ -189,13 +189,13 @@ function AddExhibitorPage() {
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
-        name: '',
-        userName: '',
         email: '',
         mobile: '',
-        address: '',
         companyName: '',
         companyDescription: '',
+        logo: null,
+        uen: '',
+        bothNumber: '',
         isActive: true,
         flyers: [],
         flyerNames: [],
@@ -319,13 +319,13 @@ function AddExhibitorPage() {
                         }
 
                         const formDataToSet = {
-                            name: editData.name || '',
-                            userName: editData.userName || '',
                             email: editData.email || '',
                             mobile: editData.mobile || '',
-                            address: editData.address || '',
                             companyName: editData.companyName || '',
                             companyDescription: editData.companyDescription || '',
+                            logo: editData.logo || null,
+                            uen: editData.uen || '',
+                            bothNumber: editData.bothNumber || '',
                             isActive: editData.isActive !== undefined ? editData.isActive : true,
                             flyers: flyersData,
                             flyerNames: flyerNamesData,
@@ -360,7 +360,14 @@ function AddExhibitorPage() {
         if (type === 'file') {
             const newFiles = Array.from(files);
 
-            if (name === 'flyers') {
+            if (name === 'logo') {
+                if (newFiles.length > 0) {
+                    setFormData((prev) => ({
+                        ...prev,
+                        logo: newFiles[0]
+                    }));
+                }
+            } else if (name === 'flyers') {
                 const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
@@ -371,7 +378,7 @@ function AddExhibitorPage() {
                 setFlyerPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
                 // Add default names for new flyers
-                const newFlyerNames = newFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+                const newFlyerNames = newFiles.map((file, index) => `Flyer ${formData.flyers.length + index + 1}`);
                 setFlyerNames((prev) => [...prev, ...newFlyerNames]);
 
                 setFormData((prev) => ({
@@ -389,7 +396,7 @@ function AddExhibitorPage() {
                 setEventImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
                 // Add default names for new event images
-                const newEventImageNames = newFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+                const newEventImageNames = newFiles.map((file, index) => `Event Image ${formData.eventImages.length + index + 1}`);
                 setEventImageNames((prev) => [...prev, ...newEventImageNames]);
 
                 setFormData((prev) => ({
@@ -407,7 +414,7 @@ function AddExhibitorPage() {
                 setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
                 // Add default names for new documents
-                const newDocumentNames = newFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+                const newDocumentNames = newFiles.map((file, index) => `Document ${formData.documents.length + index + 1}`);
                 setDocumentNames((prev) => [...prev, ...newDocumentNames]);
 
                 setFormData((prev) => ({
@@ -451,7 +458,7 @@ function AddExhibitorPage() {
 
             setFlyerPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
-            const newFlyerNames = validFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+            const newFlyerNames = validFiles.map((file, index) => `Flyer ${formData.flyers.length + index + 1}`);
             setFlyerNames((prev) => [...prev, ...newFlyerNames]);
 
             setFormData((prev) => ({
@@ -483,7 +490,7 @@ function AddExhibitorPage() {
 
             setEventImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
-            const newEventImageNames = validFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+            const newEventImageNames = validFiles.map((file, index) => `Event Image ${formData.eventImages.length + index + 1}`);
             setEventImageNames((prev) => [...prev, ...newEventImageNames]);
 
             setFormData((prev) => ({
@@ -512,7 +519,7 @@ function AddExhibitorPage() {
 
             setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
-            const newDocumentNames = validFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
+            const newDocumentNames = validFiles.map((file, index) => `Document ${formData.documents.length + index + 1}`);
             setDocumentNames((prev) => [...prev, ...newDocumentNames]);
 
             setFormData((prev) => ({
@@ -607,8 +614,8 @@ function AddExhibitorPage() {
 
     // Validate form
     const validateForm = () => {
-        if (!formData.name.trim()) {
-            setError('Name is required');
+        if (!formData.companyName.trim()) {
+            setError('Company name is required');
             return false;
         }
         if (!formData.email.trim()) {
@@ -619,8 +626,12 @@ function AddExhibitorPage() {
             setError('Mobile number is required');
             return false;
         }
-        if (!formData.companyName.trim()) {
-            setError('Company name is required');
+        if (!formData.uen.trim()) {
+            setError('UEN is required');
+            return false;
+        }
+        if (!formData.bothNumber.trim()) {
+            setError('Booth number is required');
             return false;
         }
         return true;
@@ -640,25 +651,29 @@ function AddExhibitorPage() {
 
             const formDataToSend = new FormData();
 
+            // Add logo file
+            if (formData.logo && formData.logo instanceof File) {
+                formDataToSend.append('logo', formData.logo);
+            }
+
             // Add text fields
             Object.keys(formData).forEach((key) => {
-                if (key === 'flyerNames') {
+                if (key === 'logo') {
+                    // Skip logo as it's handled above
+                } else if (key === 'flyerNames') {
                     if (formData[key] && Array.isArray(formData[key])) {
-                        formData[key].forEach((name) => {
-                            formDataToSend.append('flyerNames', name);
-                        });
+                        // Join array with comma to send as string
+                        formDataToSend.append('flyerNames', formData[key].join(','));
                     }
                 } else if (key === 'eventImageNames') {
                     if (formData[key] && Array.isArray(formData[key])) {
-                        formData[key].forEach((name) => {
-                            formDataToSend.append('eventImageNames', name);
-                        });
+                        // Join array with comma to send as string
+                        formDataToSend.append('eventImageNames', formData[key].join(','));
                     }
                 } else if (key === 'documentNames') {
                     if (formData[key] && Array.isArray(formData[key])) {
-                        formData[key].forEach((name) => {
-                            formDataToSend.append('documentNames', name);
-                        });
+                        // Join array with comma to send as string
+                        formDataToSend.append('documentNames', formData[key].join(','));
                     }
                 } else if (key === 'flyers') {
                     if (formData[key] && Array.isArray(formData[key])) {
@@ -691,6 +706,11 @@ function AddExhibitorPage() {
 
             // Handle existing files for edit mode
             if (id) {
+                // Handle existing logo
+                if (formData.logo && typeof formData.logo === 'string') {
+                    formDataToSend.append('originalLogo', formData.logo);
+                }
+
                 if (formData.flyers && formData.flyers.length > 0) {
                     formData.flyers.forEach((flyer) => {
                         if (typeof flyer === 'string') {
@@ -790,41 +810,25 @@ function AddExhibitorPage() {
 
                             <form onSubmit={handleSubmit}>
                                 <Row>
-                                    {/* Basic Information */}
-                                    <Col sm={6}>
+                                    {/* Company Name - First field */}
+                                    <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="name">
-                                                Name
+                                            <label className="floating-label" htmlFor="companyName">
+                                                Company Name
                                             </label>
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                name="name"
-                                                value={formData.name}
+                                                name="companyName"
+                                                value={formData.companyName}
                                                 onChange={handleChange}
-                                                placeholder="Exhibitor Name"
+                                                placeholder="Company Name"
                                                 required
                                             />
                                         </div>
                                     </Col>
 
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="userName">
-                                                Username
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                name="userName"
-                                                value={formData.userName}
-                                                onChange={handleChange}
-                                                placeholder="Username"
-                                                required
-                                            />
-                                        </div>
-                                    </Col>
-
+                                    {/* Email */}
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="email">
@@ -842,6 +846,7 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
+                                    {/* Mobile */}
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="mobile">
@@ -859,24 +864,61 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    <Col sm={6}>
+                                    {/* Company Description */}
+                                    <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="companyName">
-                                                Company Name
+                                            <label className="floating-label" htmlFor="companyDescription">
+                                                Company Description (Optional)
+                                            </label>
+                                            <textarea
+                                                className="form-control"
+                                                name="companyDescription"
+                                                value={formData.companyDescription}
+                                                onChange={handleChange}
+                                                placeholder="Enter company description..."
+                                                rows={4}
+                                            />
+                                        </div>
+                                    </Col>
+
+                               
+
+                                    {/* UEN, Booth Number, Status - 3 columns in one line */}
+                                    <Col sm={4}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="uen">
+                                                UEN Number
                                             </label>
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                name="companyName"
-                                                value={formData.companyName}
+                                                name="uen"
+                                                value={formData.uen}
                                                 onChange={handleChange}
-                                                placeholder="Company Name"
+                                                placeholder="UEN Number"
                                                 required
                                             />
                                         </div>
                                     </Col>
 
-                                    <Col sm={6}>
+                                    <Col sm={4}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="bothNumber">
+                                                Booth Number
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="bothNumber"
+                                                value={formData.bothNumber}
+                                                onChange={handleChange}
+                                                placeholder="Booth Number"
+                                                required
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={4}>
                                         <div className="form-group fill">
                                             <label className="floating-label">Status</label>
                                             <div>
@@ -892,35 +934,34 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    <Col sm={12}>
+                                         {/* Logo Upload - Below Company Description */}
+                                         <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="address">
-                                                Address (Optional)
+                                            <label className="floating-label" htmlFor="logo">
+                                                Company Logo
                                             </label>
-                                            <textarea
+                                            <input
+                                                type="file"
                                                 className="form-control"
-                                                name="address"
-                                                value={formData.address}
+                                                name="logo"
                                                 onChange={handleChange}
-                                                placeholder="Enter complete address..."
-                                                rows={3}
+                                                accept="image/*"
                                             />
-                                        </div>
-                                    </Col>
-
-                                    <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="companyDescription">
-                                                Company Description (Optional)
-                                            </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="companyDescription"
-                                                value={formData.companyDescription}
-                                                onChange={handleChange}
-                                                placeholder="Enter company description..."
-                                                rows={4}
-                                            />
+                                            {formData.logo && (
+                                                <div className="mt-2">
+                                                    <img
+                                                        src={formData.logo instanceof File ? URL.createObjectURL(formData.logo) : `${API_URL}/${formData.logo.replace(/\\/g, '/')}`}
+                                                        alt="Logo Preview"
+                                                        style={{
+                                                            width: '100px',
+                                                            height: '100px',
+                                                            objectFit: 'cover',
+                                                            borderRadius: '8px',
+                                                            border: '2px solid #ddd'
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </Col>
 

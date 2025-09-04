@@ -16,14 +16,24 @@ const AddUserPage = () => {
         firstName: '',
         lastName: '',
         email: '',
-        password: '',
         mobile: '',
-        address: '',
+        role: 'user',
+        street: '',
         city: '',
         state: '',
         postalCode: '',
-        isMember: false,
-        biometricEnabled: false,
+        country: '',
+        addressType: 'home',
+        isDefaultAddress: true,
+        apartment: '',
+        landmark: '',
+        addressLabel: '',
+        deliveryInstructions: '',
+        acceptTerms: false,
+        companyName: '',
+        position: '',
+        description: '',
+        linkedinProfile: '',
         profilePicture: null
     });
     const [imagePreview, setImagePreview] = useState(null);
@@ -46,18 +56,35 @@ const AddUserPage = () => {
     useEffect(() => {
         if (id && userByID) {
             const editData = userByID;
+            
+            // Get default/first address from addresses array
+            const defaultAddress = editData.addresses && editData.addresses.length > 0 
+                ? editData.addresses.find(addr => addr.isDefault) || editData.addresses[0]
+                : {};
+            
             setFormData({
                 firstName: editData.firstName || '',
                 lastName: editData.lastName || '',
                 email: editData.email || '',
-                password: '',
+              
                 mobile: editData.mobile || '',
-                address: editData.address || '',
-                city: editData.city || '',
-                state: editData.state || '',
-                postalCode: editData.postalCode || '',
-                isMember: editData.isMember || false,
-                biometricEnabled: editData.biometricEnabled || false,
+                role: editData.role || 'user',
+                street: defaultAddress.street || '',
+                city: defaultAddress.city || '',
+                state: defaultAddress.state || '',
+                postalCode: defaultAddress.postalCode || '',
+                country: defaultAddress.country || '',
+                addressType: defaultAddress.type || 'home',
+                isDefaultAddress: defaultAddress.isDefault || true,
+                apartment: defaultAddress.apartment || '',
+                landmark: defaultAddress.landmark || '',
+                addressLabel: defaultAddress.label || '',
+                deliveryInstructions: defaultAddress.instructions || '',
+                acceptTerms: editData.acceptTerms || false,
+                companyName: editData.companyName || '',
+                position: editData.position || '',
+                description: editData.description || '',
+                linkedinProfile: editData.linkedinProfile || '',
                 profilePicture: null
             });
             
@@ -123,14 +150,26 @@ const AddUserPage = () => {
                         firstName: '',
                         lastName: '',
                         email: '',
-                        password: '',
+                     
                         mobile: '',
-                        address: '',
+                        role: 'user',
+                        street: '',
                         city: '',
                         state: '',
                         postalCode: '',
-                        isMember: false,
-                        biometricEnabled: false,
+                        country: '',
+                        addressType: 'home',
+                        isDefaultAddress: true,
+                        apartment: '',
+                        landmark: '',
+                        addressLabel: '',
+                        deliveryInstructions: '',
+                    
+                        acceptTerms: false,
+                        companyName: '',
+                        position: '',
+                        description: '',
+                        linkedinProfile: '',
                         profilePicture: null
                     });
                     setImagePreview(null);
@@ -223,25 +262,7 @@ const AddUserPage = () => {
                                             />
                                         </div>
                                     </Col>
-                                    {!id && (
-                                        <Col sm={6}>
-                                            <div className="form-group fill">
-                                                <label className="floating-label" htmlFor="password">
-                                                    Password<span className="text-danger">*</span>
-                                                </label>
-                                                <input
-                                                    type="password"
-                                                    className="form-control"
-                                                    name="password"
-                                                    value={formData.password}
-                                                    onChange={handleChange}
-                                                    placeholder="Password"
-                                                    required={!id}
-                                                    minLength="6"
-                                                />
-                                            </div>
-                                        </Col>
-                                    )}
+                                    
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="mobile">
@@ -257,17 +278,55 @@ const AddUserPage = () => {
                                             />
                                         </div>
                                     </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="role">
+                                                Role<span className="text-danger">*</span>
+                                            </label>
+                                            <select
+                                                className="form-control"
+                                                name="role"
+                                                value={formData.role}
+                                                onChange={handleChange}
+                                                required
+                                            >
+                                                <option value="user">User</option>
+                                                <option value="admin">Admin</option>
+                                                <option value="speaker">Speaker</option>
+                                                <option value="exhibitor">Exhibitor</option>
+                                            </select>
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="addressType">
+                                                Address Type
+                                            </label>
+                                            <select
+                                                className="form-control"
+                                                name="addressType"
+                                                value={formData.addressType}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="home">Home</option>
+                                                <option value="work">Work</option>
+                                                <option value="billing">Billing</option>
+                                                <option value="shipping">Shipping</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                    </Col>
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="address">
-                                                Address
+                                            <label className="floating-label" htmlFor="street">
+                                                Street Address
                                             </label>
                                             <textarea
                                                 className="form-control"
-                                                name="address"
-                                                value={formData.address}
+                                                name="street"
+                                                value={formData.street}
                                                 onChange={handleChange}
-                                                placeholder="Address"
+                                                placeholder="street"
                                                 rows={3}
                                             />
                                         </div>
@@ -317,6 +376,81 @@ const AddUserPage = () => {
                                             />
                                         </div>
                                     </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="country">
+                                                Country
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="country"
+                                                value={formData.country}
+                                                onChange={handleChange}
+                                                placeholder="Country"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="apartment">
+                                                Apartment/Suite
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="apartment"
+                                                value={formData.apartment}
+                                                onChange={handleChange}
+                                                placeholder="Apartment, Suite, Unit"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="landmark">
+                                                Landmark
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="landmark"
+                                                value={formData.landmark}
+                                                onChange={handleChange}
+                                                placeholder="Nearby Landmark"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="addressLabel">
+                                                Address Label
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="addressLabel"
+                                                value={formData.addressLabel}
+                                                onChange={handleChange}
+                                                placeholder="Home, Office, etc."
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="deliveryInstructions">
+                                                Delivery Instructions
+                                            </label>
+                                            <textarea
+                                                className="form-control"
+                                                name="deliveryInstructions"
+                                                value={formData.deliveryInstructions}
+                                                onChange={handleChange}
+                                                placeholder="Special delivery instructions"
+                                                rows={2}
+                                            />
+                                        </div>
+                                    </Col>
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
@@ -353,36 +487,102 @@ const AddUserPage = () => {
                                             )}
                                         </div>
                                     </Col>
+                                    {/* Speaker Profile Fields - Show only when role is speaker */}
+                                    {formData.role === 'speaker' && (
+                                        <>
+                                            <Col sm={6}>
+                                                <div className="form-group fill">
+                                                    <label className="floating-label" htmlFor="companyName">
+                                                        Company Name
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        name="companyName"
+                                                        value={formData.companyName}
+                                                        onChange={handleChange}
+                                                        placeholder="Company/Organization"
+                                                    />
+                                                </div>
+                                            </Col>
+                                            <Col sm={6}>
+                                                <div className="form-group fill">
+                                                    <label className="floating-label" htmlFor="position">
+                                                        Position/Title
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        name="position"
+                                                        value={formData.position}
+                                                        onChange={handleChange}
+                                                        placeholder="Job Title/Position"
+                                                    />
+                                                </div>
+                                            </Col>
+                                            <Col sm={6}>
+                                                <div className="form-group fill">
+                                                    <label className="floating-label" htmlFor="linkedinProfile">
+                                                        LinkedIn Profile
+                                                    </label>
+                                                    <input
+                                                        type="url"
+                                                        className="form-control"
+                                                        name="linkedinProfile"
+                                                        value={formData.linkedinProfile}
+                                                        onChange={handleChange}
+                                                        placeholder="https://linkedin.com/in/username"
+                                                    />
+                                                </div>
+                                            </Col>
+                                            <Col sm={12}>
+                                                <div className="form-group fill">
+                                                    <label className="floating-label" htmlFor="description">
+                                                        Bio/Description
+                                                    </label>
+                                                    <textarea
+                                                        className="form-control"
+                                                        name="description"
+                                                        value={formData.description}
+                                                        onChange={handleChange}
+                                                        placeholder="Speaker biography and description"
+                                                        rows={4}
+                                                    />
+                                                </div>
+                                            </Col>
+                                        </>
+                                    )}
+                                    
                                     <Col sm={6}>
                                         <div className="form-group">
                                             <div className="custom-control custom-switch">
                                                 <input
                                                     type="checkbox"
                                                     className="custom-control-input"
-                                                    id="isMember"
-                                                    name="isMember"
-                                                    checked={formData.isMember}
+                                                    id="isDefaultAddress"
+                                                    name="isDefaultAddress"
+                                                    checked={formData.isDefaultAddress}
                                                     onChange={handleChange}
                                                 />
-                                                <label className="custom-control-label" htmlFor="isMember">
-                                                    Is Member
+                                                <label className="custom-control-label" htmlFor="isDefaultAddress">
+                                                    Default Address
                                                 </label>
                                             </div>
                                         </div>
                                     </Col>
-                                    <Col sm={6}>
+                                      <Col sm={6}>
                                         <div className="form-group">
                                             <div className="custom-control custom-switch">
                                                 <input
                                                     type="checkbox"
                                                     className="custom-control-input"
-                                                    id="biometricEnabled"
-                                                    name="biometricEnabled"
-                                                    checked={formData.biometricEnabled}
+                                                    id="acceptTerms"
+                                                    name="acceptTerms"
+                                                    checked={formData.acceptTerms}
                                                     onChange={handleChange}
                                                 />
-                                                <label className="custom-control-label" htmlFor="biometricEnabled">
-                                                    Biometric Enabled
+                                                <label className="custom-control-label" htmlFor="acceptTerms">
+                                                    Accept Terms & Conditions
                                                 </label>
                                             </div>
                                         </div>
@@ -403,7 +603,7 @@ const AddUserPage = () => {
                                             <Button 
                                                 variant="primary" 
                                                 type="submit"
-                                                disabled={loading || !formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || (!id && !formData.password.trim())}
+                                                disabled={loading || !formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() }
                                             >
                                                 {loading ? (
                                                     <>

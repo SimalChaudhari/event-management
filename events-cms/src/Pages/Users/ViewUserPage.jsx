@@ -45,9 +45,12 @@ const ViewUserPage = () => {
 
     const InfoCard = ({ title, icon, children, className = "" }) => (
         <Card className={`mb-4 ${className}`} style={{ 
-            border: 'none', 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            borderRadius: '12px'
+            backgroundColor: '#fff', 
+            borderRadius: '8px', 
+            padding: '20px', 
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            border: '1px solid #e9ecef',
+            borderLeft: '4px solid #4680ff'
         }}>
             <Card.Body style={{ padding: '24px' }}>
                 <Card.Title style={{ 
@@ -62,7 +65,7 @@ const ViewUserPage = () => {
                     <i className={icon} style={{ color: '#4680ff' }}></i>
                     {title}
                 </Card.Title>
-                <hr style={{ margin: '0 0 20px 0', opacity: '0.3' }} />
+                <hr style={{ margin: '0 0 20px 0', borderTop: '2px solid #4680ff', opacity: '0.8' }} />
                 {children}
             </Card.Body>
         </Card>
@@ -103,10 +106,11 @@ const ViewUserPage = () => {
                 {/* Header */}
                 <div style={{ 
                     backgroundColor: '#fff', 
-                    borderRadius: '12px', 
-                    padding: '24px', 
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    marginBottom: '24px'
+                    borderRadius: '8px', 
+                    padding: '20px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    marginBottom: '24px',
+                    borderTop: '4px solid #4680ff'
                 }}>
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
@@ -215,6 +219,8 @@ const ViewUserPage = () => {
                                 value={`${userData.firstName} ${userData.lastName}`}
                                 icon="feather icon-user"
                             />
+
+                            
                             <InfoField 
                                 label="Email Address" 
                                 value={userData.email}
@@ -230,143 +236,200 @@ const ViewUserPage = () => {
 
                     {/* Right Column - Detailed Information */}
                     <Col lg={8} md={12}>
-                        {/* Personal Details */}
-                        <InfoCard title="Personal Details" icon="feather icon-user">
+                        {/* Account Details */}
+                        <InfoCard title="Account Details" icon="feather icon-settings">
                             <Row>
                                 <Col xs={12} md={6}>
                                     <InfoField 
-                                        label="First Name" 
-                                        value={userData.firstName}
-                                        icon="feather icon-user"
+                                        label="User Role" 
+                                        value={userData.role}
+                                        icon="feather icon-shield"
                                     />
                                 </Col>
                                 <Col xs={12} md={6}>
                                     <InfoField 
-                                        label="Last Name" 
-                                        value={userData.lastName}
-                                        icon="feather icon-user"
+                                        label="Account Verified" 
+                                        value={userData.isVerify ? 'Yes' : 'No'}
+                                        icon="feather icon-check-circle"
                                     />
                                 </Col>
                                 <Col xs={12} md={6}>
                                     <InfoField 
-                                        label="Email Address" 
-                                        value={userData.email}
-                                        icon="feather icon-mail"
+                                        label="Terms Accepted" 
+                                        value={userData.acceptTerms ? 'Yes' : 'No'}
+                                        icon="feather icon-file-text"
                                     />
                                 </Col>
                                 <Col xs={12} md={6}>
                                     <InfoField 
-                                        label="Mobile Number" 
-                                        value={userData.mobile}
-                                        icon="feather icon-phone"
+                                        label="Authentication Provider" 
+                                        value={userData.authProvider}
+                                        icon="feather icon-lock"
                                     />
                                 </Col>
+                                {userData.socialId && (
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="Social ID" 
+                                            value={userData.socialId}
+                                            icon="feather icon-link"
+                                        />
+                                    </Col>
+                                )}
+                                {userData.linkedinProfile && (
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="LinkedIn Profile" 
+                                            value={userData.linkedinProfile}
+                                            icon="fab fa-linkedin"
+                                        />
+                                    </Col>
+                                )}
+                                {userData.countryCurrency && (
+                                    <Col xs={12} md={6}>
+                                        <InfoField 
+                                            label="Country Currency" 
+                                            value={userData.countryCurrency}
+                                            icon="feather icon-dollar-sign"
+                                        />
+                                    </Col>
+                                )}
                             </Row>
                         </InfoCard>
 
-                        {/* Address Details - Only show if address data exists */}
-                        {(userData.address || userData.city || userData.state || userData.postalCode) && (
-                            <InfoCard title="Address Details" icon="feather icon-map-pin">
-                                <Row>
-                                    <Col xs={12}>
-                                        <InfoField 
-                                            label="Address" 
-                                            value={userData.address}
-                                            icon="feather icon-map-pin"
-                                        />
-                                    </Col>
-                                    <Col xs={12} md={6}>
-                                        <InfoField 
-                                            label="City" 
-                                            value={userData.city}
-                                            icon="feather icon-map-pin"
-                                        />
-                                    </Col>
-                                    <Col xs={12} md={6}>
-                                        <InfoField 
-                                            label="State" 
-                                            value={userData.state}
-                                            icon="feather icon-map-pin"
-                                        />
-                                    </Col>
-                                    <Col xs={12} md={6}>
-                                        <InfoField 
-                                            label="Postal Code" 
-                                            value={userData.postalCode}
-                                            icon="feather icon-map-pin"
-                                        />
-                                    </Col>
-                                </Row>
-                            </InfoCard>
-                        )}
+                        {/* Account History Card */}
+                        <InfoCard title="Account History" icon="feather icon-clock">
+                            <Row>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="Account Created" 
+                                        value={new Date(userData.createdAt).toLocaleString()}
+                                        icon="feather icon-user-plus"
+                                    />
+                                </Col>
+                                <Col xs={12} md={6}>
+                                    <InfoField 
+                                        label="Last Updated" 
+                                        value={new Date(userData.updatedAt).toLocaleString()}
+                                        icon="feather icon-edit"
+                                    />
+                                </Col>
+                              
+                            </Row>
+                        </InfoCard>
+                    </Col>
 
-                        {/* Membership Details - Only show if membership data exists */}
-                        {(userData.isMember !== undefined || userData.biometricEnabled !== undefined) && (
-                            <InfoCard title="Membership Details" icon="feather icon-shield">
-                                <Row>
-                                    <Col xs={12} md={6}>
-                                        <div className="mb-3" style={{ 
-                                            padding: '12px 16px',
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <div style={{ 
-                                                fontSize: '13px', 
-                                                fontWeight: '600', 
-                                                color: '#6c757d',
-                                                marginBottom: '4px',
+                    <Col xs={12}>
+                        {/* Address Details - Show all addresses */}
+                        {userData.addresses && Array.isArray(userData.addresses) && userData.addresses.length > 0 && (
+                            <InfoCard title="Address Information" icon="feather icon-map-pin">
+                                {userData.addresses.map((address, index) => (
+                                    <div key={address.id} className="mb-4">
+                                        {userData.addresses.length > 1 && (
+                                            <div style={{
+                                                backgroundColor: '#e9ecef',
+                                                padding: '8px 12px',
+                                                borderRadius: '6px',
+                                                marginBottom: '12px',
+                                                fontSize: '14px',
+                                                fontWeight: '600',
+                                                color: '#495057',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '6px'
+                                                justifyContent: 'space-between',
+                                                borderLeft: '3px solid #4680ff'
                                             }}>
-                                                <i className="feather icon-shield" style={{ fontSize: '12px' }}></i>
-                                                Member Status
+                                                <span>Address {index + 1}</span>
+                                                <div>
+                                                    {address.isDefault && (
+                                                        <Badge bg="primary" style={{ fontSize: '10px', marginRight: '6px' }}>
+                                                            Default
+                                                        </Badge>
+                                                    )}
+                                                    <Badge bg="secondary" style={{ fontSize: '10px' }}>
+                                                        {address.type}
+                                                    </Badge>
+                                                </div>
                                             </div>
-                                            <Badge 
-                                                bg={userData.isMember ? 'success' : 'secondary'}
-                                                style={{ 
-                                                    fontSize: '12px',
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px'
-                                                }}
-                                            >
-                                                {userData.isMember ? 'Active Member' : 'Not a Member'}
-                                            </Badge>
-                                        </div>
-                                    </Col>
-                                    <Col xs={12} md={6}>
-                                        <div className="mb-3" style={{ 
-                                            padding: '12px 16px',
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            border: '1px solid #e9ecef'
-                                        }}>
-                                            <div style={{ 
-                                                fontSize: '13px', 
-                                                fontWeight: '600', 
-                                                color: '#6c757d',
-                                                marginBottom: '4px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px'
-                                            }}>
-                                                <i className="feather icon-shield" style={{ fontSize: '12px' }}></i>
-                                                Biometric Access
-                                            </div>
-                                            <Badge 
-                                                bg={userData.biometricEnabled ? 'success' : 'warning'}
-                                                style={{ 
-                                                    fontSize: '12px',
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px'
-                                                }}
-                                            >
-                                                {userData.biometricEnabled ? 'Enabled' : 'Disabled'}
-                                            </Badge>
-                                        </div>
-                                    </Col>
-                                </Row>
+                                        )}
+                                        <Row>
+                                            <Col xs={12} md={4}>
+                                                <InfoField 
+                                                    label="Street Address" 
+                                                    value={address.street}
+                                                    icon="feather icon-map-pin"
+                                                />
+                                            </Col>
+                                            {address.apartment && (
+                                                <Col xs={12} md={4}>
+                                                    <InfoField 
+                                                        label="Apartment/Unit" 
+                                                        value={address.apartment}
+                                                        icon="feather icon-home"
+                                                    />
+                                                </Col>
+                                            )}
+                                            {address.landmark && (
+                                                <Col xs={12} md={4}>
+                                                    <InfoField 
+                                                        label="Landmark" 
+                                                        value={address.landmark}
+                                                        icon="feather icon-navigation"
+                                                    />
+                                                </Col>
+                                            )}
+                                            <Col xs={12} md={4}>
+                                                <InfoField 
+                                                    label="City" 
+                                                    value={address.city}
+                                                    icon="feather icon-map-pin"
+                                                />
+                                            </Col>
+                                            <Col xs={12} md={4}>
+                                                <InfoField 
+                                                    label="State" 
+                                                    value={address.state}
+                                                    icon="feather icon-map-pin"
+                                                />
+                                            </Col>
+                                            <Col xs={12} md={4}>
+                                                <InfoField 
+                                                    label="Postal Code" 
+                                                    value={address.postalCode}
+                                                    icon="feather icon-map-pin"
+                                                />
+                                            </Col>
+                                            <Col xs={12} md={4}>
+                                                <InfoField 
+                                                    label="Country" 
+                                                    value={address.country}
+                                                    icon="feather icon-globe"
+                                                />
+                                            </Col>
+                                            {address.label && (
+                                                <Col xs={12} md={4}>
+                                                    <InfoField 
+                                                        label="Address Label" 
+                                                        value={address.label}
+                                                        icon="feather icon-tag"
+                                                    />
+                                                </Col>
+                                            )}
+                                            {address.instructions && (
+                                                <Col xs={12}>
+                                                    <InfoField 
+                                                        label="Delivery Instructions" 
+                                                        value={address.instructions}
+                                                        icon="feather icon-message-square"
+                                                    />
+                                                </Col>
+                                            )}
+                                        </Row>
+                                        {index < userData.addresses.length - 1 && (
+                                            <hr style={{ margin: '20px 0', opacity: '0.3' }} />
+                                        )}
+                                    </div>
+                                ))}
                             </InfoCard>
                         )}
                     </Col>

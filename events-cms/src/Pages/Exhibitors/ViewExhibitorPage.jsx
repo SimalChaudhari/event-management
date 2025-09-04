@@ -40,6 +40,65 @@ const ViewExhibitorPage = () => {
         navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
     };
 
+    // InfoCard component for consistent styling similar to EventBasicComponent
+    const InfoCard = ({ title, icon, children, borderColor = "#4680ff", className = "" }) => (
+        <div className={`mb-4 ${className}`} style={{ 
+            backgroundColor: '#fff', 
+            borderRadius: '8px', 
+            padding: '20px', 
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            border: '1px solid #e9ecef',
+            borderLeft: `4px solid ${borderColor}`
+        }}>
+            <div style={{ padding: '24px' }}>
+                <h5 style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600', 
+                    color: '#2c3e50',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    borderBottom: `2px solid ${borderColor}`,
+                    paddingBottom: '8px',
+                    position: 'relative'
+                }}>
+                    <span style={{ fontSize: '20px' }}>{icon}</span>
+                    {title}
+                </h5>
+                {children}
+            </div>
+        </div>
+    );
+
+    const InfoField = ({ label, value, icon = null }) => (
+        <div className="mb-3">
+            <div style={{ 
+                fontSize: '1rem', 
+                fontWeight: '600', 
+                color: '#495057',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+            }}>
+                {icon && <span style={{ fontSize: '16px' }}>{icon}</span>}
+                {label}:
+            </div>
+            <div style={{ 
+                fontSize: '15px', 
+                color: '#2c3e50',
+                fontWeight: '500',
+                backgroundColor: '#f8f9fa',
+                padding: '10px 15px',
+                borderRadius: '8px',
+                border: '1px solid #e9ecef'
+            }}>
+                {value || 'N/A'}
+            </div>
+        </div>
+    );
+
     // Image modal functions for zoomable functionality
     const getImageSrc = (image) => {
         if (typeof image === 'string') {
@@ -169,7 +228,14 @@ const ViewExhibitorPage = () => {
                                 }}
                             />
                             <Card.Body className="p-2">
-                                <small className="text-muted">{flyer.name || `Flyer ${index + 1}`}</small>
+                                <div style={{ 
+                                    fontSize: '14px', 
+                                    fontWeight: 'bold', 
+                                    color: '#495057',
+                                    textAlign: 'center'
+                                }}>
+                                    {flyer.name || `Flyer ${index + 1}`}
+                                </div>
                             </Card.Body>
                         </Card>
                     </Col>
@@ -198,7 +264,14 @@ const ViewExhibitorPage = () => {
                                 }}
                             />
                             <Card.Body className="p-2">
-                                <small className="text-muted">{eventImage.name || `Event Image ${index + 1}`}</small>
+                                <div style={{ 
+                                    fontSize: '14px', 
+                                    fontWeight: 'bold', 
+                                    color: '#495057',
+                                    textAlign: 'center'
+                                }}>
+                                    {eventImage.name || `Event Image ${index + 1}`}
+                                </div>
                             </Card.Body>
                         </Card>
                     </Col>
@@ -216,28 +289,71 @@ const ViewExhibitorPage = () => {
         return (
             <div className="documents-list">
                 {exhibitor.documents.map((doc, index) => (
-                    <Card key={index} className="mb-2">
-                        <Card.Body className="py-2">
-                            <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 className="mb-0">{doc.name || `Document ${index + 1}`}</h6>
-                                    <small className="text-muted">Document {index + 1}</small>
+                    <div 
+                        key={index} 
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            border: '1px solid #e9ecef',
+                            borderRadius: '8px',
+                            padding: '12px 16px',
+                            marginBottom: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {/* PDF Icon */}
+                            <div style={{
+                                backgroundColor: '#dc3545',
+                                borderRadius: '4px',
+                                padding: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: '32px',
+                                height: '32px'
+                            }}>
+                                <i className="fas fa-file-pdf" style={{ color: 'white', fontSize: '14px' }}></i>
+                            </div>
+                            
+                            {/* Document Name */}
+                            <div>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    color: '#212529',
+                                    marginBottom: '2px'
+                                }}>
+                                    {doc.name || `Document ${index + 1}`}
                                 </div>
-                                <div>
-                                    <Button 
-                                        variant="outline-primary" 
-                                        size="sm"
-                                        href={`${API_URL}/${doc.document || doc}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        <i style={{ marginRight: '10px' }} className="feather icon-download me-1"></i>
-                                        Download
-                                    </Button>
+                                <div style={{
+                                    fontSize: '12px',
+                                    color: '#6c757d'
+                                }}>
+                                    PDF Document
                                 </div>
                             </div>
-                        </Card.Body>
-                    </Card>
+                        </div>
+                        
+                        {/* View Button */}
+                        <Button 
+                            variant="outline-primary" 
+                            size="sm"
+                            href={`${API_URL}/${doc.document || doc}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                fontSize: '12px',
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                fontWeight: '500'
+                            }}
+                        >
+                            <i className="fas fa-eye" style={{ marginRight: '6px' }}></i>
+                            View
+                        </Button>
+                    </div>
                 ))}
             </div>
         );
@@ -286,6 +402,9 @@ const ViewExhibitorPage = () => {
         } else if (currentImageType === 'offers') {
             imageSrc = getImageSrc(currentImage);
             imageTitle = currentImage.title || `Promotional Offer ${currentImageIndex + 1}`;
+        } else if (currentImageType === 'logo') {
+            imageSrc = getImageSrc(currentImage);
+            imageTitle = 'Company Logo';
         }
 
         return (
@@ -441,130 +560,490 @@ const ViewExhibitorPage = () => {
     };
 
     return (
-        <Container fluid>
-            <div className="row">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header">
-                            <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h4 className="card-title">Exhibitor Details</h4>
-                                    <p className="text-muted mb-0">View exhibitor information and related data</p>
-                                </div>
-                                <div>
-                                    <Button variant="secondary" onClick={handleBack} className="me-2">
-                                        <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                                        Back
-                                    </Button>
-                                 
-                                </div>
-                            </div>
+        <div className="p-2 bg-light">
+            {/* Header Section */}
+            <div className="mb-4">
+                <div style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    padding: '20px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    marginBottom: '24px',
+                    borderTop: '4px solid #3498db'
+                }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 style={{ 
+                                margin: 0, 
+                                color: '#2c3e50',
+                                fontWeight: '600'
+                            }}>
+                                🏢 Exhibitor Profile
+                            </h4>
+                            <p style={{ 
+                                margin: '8px 0 0 0', 
+                                color: '#6c757d',
+                                fontSize: '14px'
+                            }}>
+                                View detailed exhibitor information and related data
+                            </p>
                         </div>
-                        <div className="card-body">
-                            {/* Basic Information */}
-                            <Row className="mb-4">
-                                <Col md={8}>
-                                    <div className="exhibitor-basic-info">
-                                        <div className="d-flex align-items-center mb-3">
-                                            {exhibitor.eventImages && exhibitor.eventImages.length > 0 && (
-                                                <img 
-                                                    src={`${API_URL}/${exhibitor.eventImages[0].eventImage || exhibitor.eventImages[0]}`}
-                                                    alt="Exhibitor"
-                                                    className="img-thumbnail me-3"
-                                                    style={{ 
-                                                        width: '80px', 
-                                                        height: '80px', 
-                                                        objectFit: 'cover',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                    onClick={() => handleEventImageClick(0)}
-                                                    onError={(e) => {
-                                                        e.target.src = '/assets/images/user/avatar-1.jpg';
-                                                    }}
-                                                />
-                                                
-                                            )}
-                                            <div className='m-1'>
-                                                <h4 className="mb-1">{exhibitor.name}</h4>
-                                                <p className="text-muted mb-1">{exhibitor.companyName}</p>
-                                                <Badge variant={exhibitor.isActive ? 'success' : 'danger'}>
-                                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Col>
-                                <Col md={4}>{renderExhibitorStats()}</Col>
-                            </Row>
-
-                            {/* Contact Information */}
-                            <Row className="mb-4">
-                                <Col md={6}>
-                                    <Card className="bg-light">
-                                        <Card.Body>
-                                            <h6 className="card-title">Contact Information</h6>
-                                            <hr />
-                                            <div className="contact-details">
-                                                <p><strong>Email:</strong> {exhibitor.email}</p>
-                                                <p><strong>Mobile:</strong> {exhibitor.mobile}</p>
-                                                <p><strong>Username:</strong> {exhibitor.userName}</p>
-                                                <p><strong>Address:</strong> {exhibitor.address || 'Not provided'}</p>
-                                            </div>
-                                        </Card.Body>
-                                    </Card>
-                                </Col>
-                                <Col md={6}>
-                                    <Card className="bg-light">
-                                        <Card.Body>
-                                            <h6 className="card-title">Additional Information</h6>
-                                            <hr />
-                                            <div className="additional-details">
-                                                <p><strong>Company Description:</strong></p>
-                                                <p className="text-muted small">
-                                                    {exhibitor.companyDescription || 'No description provided'}
-                                                </p>
-                                                <p><strong>Created:</strong> {exhibitor.createdAt ? exhibitor.createdAt : 'N/A'}</p>
-                                                <p><strong>Last Updated:</strong> {exhibitor.updatedAt ? exhibitor.updatedAt : 'N/A'}</p>
-                                            </div>
-                                        </Card.Body>
-                                    </Card>
-                                </Col>
-                            </Row>
-
-                            {/* Tabs for additional content */}
-                            <Tab.Container defaultActiveKey="offers">
-                                <Nav variant="tabs" className="mb-3">
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="offers">
-                                            Promotional Offers ({exhibitor.promotionalOffers?.length || 0})
-                                        </Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="flyers">Flyers ({exhibitor.flyers?.length || 0})</Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="images">Event Images ({exhibitor.eventImages?.length || 0})</Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="documents">Documents ({exhibitor.documents?.length || 0})</Nav.Link>
-                                    </Nav.Item>
-                                </Nav>
-
-                                <Tab.Content>
-                                    <Tab.Pane eventKey="offers">{renderPromotionalOffers()}</Tab.Pane>
-                                    <Tab.Pane eventKey="flyers">{renderFlyers()}</Tab.Pane>
-                                    <Tab.Pane eventKey="images">{renderEventImages()}</Tab.Pane>
-                                    <Tab.Pane eventKey="documents">{renderDocuments()}</Tab.Pane>
-                                </Tab.Content>
-                            </Tab.Container>
-                        </div>
+                        <Button 
+                            variant="outline-secondary" 
+                            onClick={handleBack}
+                            style={{ 
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                border: '1px solid #dee2e6',
+                                fontWeight: '500'
+                            }}
+                        >
+                            <i className="fas fa-arrow-left me-2" style={{marginRight: '10px'}}></i>
+                            Back
+                        </Button>
                     </div>
                 </div>
             </div>
 
+            {/* Statistics Section - First */}
+            <InfoCard title="Statistics" icon="📊" borderColor="#9b59b6">
+                <Row className="text-center">
+                    <Col lg={3} md={6} className="mb-3">
+                        <div style={{
+                            backgroundColor: '#fff',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                            <h4 style={{ color: '#3498db', marginBottom: '10px' }}>
+                                {exhibitor.flyers?.length || 0}
+                            </h4>
+                            <small className="text-muted">🖼️ Flyers</small>
+                        </div>
+                    </Col>
+                    <Col lg={3} md={6} className="mb-3">
+                        <div style={{
+                            backgroundColor: '#fff',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                            <h4 style={{ color: '#27ae60', marginBottom: '10px' }}>
+                                {exhibitor.eventImages?.length || 0}
+                            </h4>
+                            <small className="text-muted">📸 Images</small>
+                        </div>
+                    </Col>
+                    <Col lg={3} md={6} className="mb-3">
+                        <div style={{
+                            backgroundColor: '#fff',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                            <h4 style={{ color: '#f39c12', marginBottom: '10px' }}>
+                                {exhibitor.documents?.length || 0}
+                            </h4>
+                            <small className="text-muted">📁 Documents</small>
+                        </div>
+                    </Col>
+                    <Col lg={3} md={6} className="mb-3">
+                        <div style={{
+                            backgroundColor: '#fff',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            border: '1px solid #e9ecef',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                            <h4 style={{ color: '#e74c3c', marginBottom: '10px' }}>
+                                {exhibitor.promotionalOffers?.length || 0}
+                            </h4>
+                            <small className="text-muted">🎁 Offers</small>
+                        </div>
+                    </Col>
+                </Row>
+            </InfoCard>
+
+            {/* Exhibitor Overview - Clean Style */}
+            <div className="mb-3">
+                <div style={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e9ecef', 
+                    borderLeft: '4px solid #3498db',
+                    borderRadius: '8px',
+                    padding: '20px'
+                }}>
+                    <h6 style={{
+                        color: '#495057',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        marginBottom: '15px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        borderBottom: '2px solid #3498db',
+                        paddingBottom: '8px'
+                    }}>
+                        Exhibitor Overview
+                    </h6>
+                    
+                    <Row>
+                        {/* Company Logo - First */}
+                        <Col lg={4} md={12} className="mb-3">
+                            <div className="text-center">
+                                <div style={{ 
+                                    fontSize: '12px', 
+                                    fontWeight: '500', 
+                                    color: '#6c757d',
+                                    marginBottom: '10px'
+                                }}>
+                                    Company Logo
+                                </div>
+                                {exhibitor.logo ? (
+                                    <img 
+                                        src={`${API_URL}/${exhibitor.logo.replace(/\\/g, '/')}`}
+                                        alt="Company Logo"
+                                        style={{
+                                            maxWidth: '140px',
+                                            maxHeight: '100px',
+                                            objectFit: 'contain',
+                                            borderRadius: '6px',
+                                            border: '1px solid #dee2e6',
+                                            backgroundColor: '#f8f9fa',
+                                            padding: '8px',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={() => {
+                                            setCurrentImages([exhibitor.logo]);
+                                            setCurrentImageIndex(0);
+                                            setCurrentImageType('logo');
+                                            setShowImageModal(true);
+                                        }}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: '140px',
+                                        height: '100px',
+                                        backgroundColor: '#f8f9fa',
+                                        borderRadius: '6px',
+                                        border: '1px dashed #ced4da',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        margin: '0 auto',
+                                        color: '#adb5bd',
+                                        fontSize: '11px'
+                                    }}>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <i className="fas fa-image mb-1" style={{ fontSize: '20px' }}></i>
+                                            <br />
+                                            No Logo
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Col>
+
+                        {/* Company Information */}
+                        <Col lg={8} md={12}>
+                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Company Name:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.companyName}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Booth Number:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>UEN Number:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center py-2">
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Status:</span>
+                                <Badge 
+                                    bg={exhibitor.isActive ? 'success' : 'danger'} 
+                                    style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
+                                >
+                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                            </div>
+                        </div>
+                        </Col>
+                    </Row>
+                </div>
+            </div>
+
+            {/* Contact Information & Company Details - 2 Grid Layout */}
+            <Row className="mb-3">
+                {/* Left Column - Contact Information */}
+                <Col lg={6} md={12} className="mb-3">
+                    <div style={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef', 
+                        borderLeft: '4px solid #27ae60',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        height: '100%'
+                    }}>
+                        <h6 style={{
+                            color: '#495057',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            marginBottom: '15px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            borderBottom: '2px solid #27ae60',
+                            paddingBottom: '8px'
+                        }}>
+                            Contact Information
+                        </h6>
+                        
+                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Email:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.email}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Mobile:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.mobile}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>UEN Number:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center py-2">
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Created:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
+                                    {new Date(exhibitor.createdAt).toLocaleDateString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </Col>
+
+                {/* Right Column - Company Details */}
+                <Col lg={6} md={12} className="mb-3">
+                    <div style={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef', 
+                        borderLeft: '4px solid #f39c12',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        height: '100%'
+                    }}>
+                        <h6 style={{
+                            color: '#495057',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            marginBottom: '15px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            borderBottom: '2px solid #f39c12',
+                            paddingBottom: '8px'
+                        }}>
+                            Company Details
+                        </h6>
+                        
+                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Booth Number:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber}</span>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Status:</span>
+                                <Badge 
+                                    bg={exhibitor.isActive ? 'success' : 'danger'} 
+                                    style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
+                                >
+                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                            </div>
+                            
+                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                borderBottom: '1px solid #f1f1f1'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Last Updated:</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
+                                    {new Date(exhibitor.updatedAt).toLocaleDateString()}
+                                </span>
+                            </div>
+                            
+                            <hr style={{ margin: '12px 0', borderColor: '#f1f1f1' }} />
+                            
+                            <div className="mb-2">
+                                <div style={{ 
+                                    fontWeight: 'bold', 
+                                    color: '#495057', 
+                                    marginBottom: '8px',
+                                    fontSize: '14px'
+                                }}>
+                                    Company Description:
+                                </div>
+                                <div style={{
+                                    color: exhibitor.companyDescription ? '#212529' : '#6c757d',
+                                    fontStyle: exhibitor.companyDescription ? 'normal' : 'italic',
+                                    fontSize: '14px',
+                                    lineHeight: '1.5',
+                                    maxHeight: '70px',
+                                    overflowY: 'auto',
+                                    fontWeight: exhibitor.companyDescription ? '500' : 'normal'
+                                }}>
+                                    {exhibitor.companyDescription || 'No description provided'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+
+
+            {/* Additional Resources Section */}
+            <InfoCard title="Additional Resources" icon="📁" borderColor="#e74c3c">
+                <Tab.Container defaultActiveKey="offers">
+                    <Nav variant="pills" className="mb-4" style={{ 
+                        borderBottom: '2px solid #e74c3c',
+                        paddingBottom: '12px',
+                        gap: '15px'
+                    }}>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="offers"
+                                style={{
+                                    borderRadius: '8px',
+                                    fontWeight: '500',
+                                    border: '1px solid #dee2e6',
+                                    fontSize: '14px',
+                                    padding: '8px 16px'
+                                }}
+                            >
+                                🎁 Promotional Offers ({exhibitor.promotionalOffers?.length || 0})
+                            </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="flyers"
+                                style={{
+                                    borderRadius: '8px',
+                                    fontWeight: '500',
+                                    border: '1px solid #dee2e6',
+                                    fontSize: '14px',
+                                    padding: '8px 16px'
+                                }}
+                            >
+                                🖼️ Flyers ({exhibitor.flyers?.length || 0})
+                            </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="images"
+                                style={{
+                                    borderRadius: '8px',
+                                    fontWeight: '500',
+                                    border: '1px solid #dee2e6',
+                                    fontSize: '14px',
+                                    padding: '8px 16px'
+                                }}
+                            >
+                                📸 Event Images ({exhibitor.eventImages?.length || 0})
+                            </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="documents"
+                                style={{
+                                    borderRadius: '8px',
+                                    fontWeight: '500',
+                                    border: '1px solid #dee2e6',
+                                    fontSize: '14px',
+                                    padding: '8px 16px'
+                                }}
+                            >
+                                📁 Documents ({exhibitor.documents?.length || 0})
+                            </Nav.Link>
+                        </Nav.Item>
+                    </Nav>
+
+                    <Tab.Content style={{ marginTop: '20px' }}>
+                        <Tab.Pane eventKey="offers">
+                            <div style={{
+                                backgroundColor: '#fff',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                border: '1px solid #e9ecef',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}>
+                                {renderPromotionalOffers()}
+                            </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="flyers">
+                            <div style={{
+                                backgroundColor: '#fff',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                border: '1px solid #e9ecef',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}>
+                                {renderFlyers()}
+                            </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="images">
+                            <div style={{
+                                backgroundColor: '#fff',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                border: '1px solid #e9ecef',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}>
+                                {renderEventImages()}
+                            </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="documents">
+                            <div style={{
+                                backgroundColor: '#fff',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                border: '1px solid #e9ecef',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}>
+                                {renderDocuments()}
+                            </div>
+                        </Tab.Pane>
+                    </Tab.Content>
+                </Tab.Container>
+            </InfoCard>
+
             {/* Image Zoom Modal */}
             {renderImageModal()}
-        </Container>
+        </div>
     );
 };
 

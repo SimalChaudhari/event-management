@@ -14,6 +14,13 @@ export interface ExhibitorCredentialsData {
   password: string;
 }
 
+export interface UserCredentialsData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+}
+
 export interface RoleSwitchCodeData {
   email: string;
   firstName: string;
@@ -129,6 +136,95 @@ export class EmailTemplateUtils {
       to: data.email,
       subject: 'Welcome to Our Event Platform - Speaker Account Created',
       html: this.generateSpeakerCredentialsTemplate(data),
+    };
+  }
+
+  /**
+   * Generate HTML template for user credentials email
+   * @param data User credentials data
+   * @returns HTML email template
+   */
+  static generateUserCredentialsTemplate(data: UserCredentialsData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
+          <h2 style="color: #333; text-align: center;">🎉 Welcome to Our Event Platform!</h2>
+          <p style="color: #555; font-size: 16px;">
+              Dear <strong>${data.firstName} ${data.lastName}</strong>,
+          </p>
+          <p style="color: #555; font-size: 16px;">
+              Welcome to our event platform! Your account has been created successfully by our admin team. Here are your login credentials:
+          </p>
+          
+          <div style="
+              background-color: #e7f3ff;
+              border: 1px solid #b3d9ff;
+              color: #004085;
+              padding: 20px;
+              margin: 20px 0;
+              border-radius: 8px;
+              text-align: center;
+          ">
+              <h3 style="margin: 0 0 15px 0; color: #004085;">🔐 Your Login Credentials</h3>
+              <p style="margin: 8px 0; font-size: 16px;">
+                  <strong>Email:</strong> ${data.email}
+              </p>
+              <p style="margin: 8px 0; font-size: 16px;">
+                  <strong>Password:</strong> <span style="background-color: #004085; color: white; padding: 5px 10px; border-radius: 4px; font-family: monospace;">${data.password}</span>
+              </p>
+          </div>
+
+          <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; margin: 20px 0; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #856404;">🔒 Important Security Notice</h4>
+              <ul style="margin: 0; padding-left: 20px;">
+                  <li>Please change your password after your first login</li>
+                  <li>Keep your credentials secure and do not share them</li>
+                  <li>Use a strong, unique password for better security</li>
+              </ul>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" 
+                 style="
+                     background-color: #007bff;
+                     color: white;
+                     padding: 12px 30px;
+                     text-decoration: none;
+                     border-radius: 5px;
+                     font-weight: bold;
+                     display: inline-block;
+                 ">
+                  Login to Your Account
+              </a>
+          </div>
+
+          <p style="color: #555; font-size: 14px; margin-top: 30px;">
+              If you have any questions or need assistance, please don't hesitate to contact our support team.
+          </p>
+          
+          <p style="color: #555; font-size: 14px;">
+              Best regards,<br>
+              <strong>Event Platform Team</strong>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="color: #888; font-size: 12px; text-align: center;">
+              This is an automated email. Please do not reply to this message.
+          </p>
+      </div>
+    `;
+  }
+
+  /**
+   * Get email options for user credentials email
+   * @param data User credentials data
+   * @returns Email options object
+   */
+  static getUserCredentialsEmailOptions(data: UserCredentialsData) {
+    return {
+      from: process.env.SMTP_USER,
+      to: data.email,
+      subject: 'Welcome to Our Event Platform - Account Created',
+      html: this.generateUserCredentialsTemplate(data),
     };
   }
 

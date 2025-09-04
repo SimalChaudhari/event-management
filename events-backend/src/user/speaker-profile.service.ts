@@ -6,6 +6,7 @@ import { UserEntity, UserRole } from './users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
 import { CreateSpeakerProfileDto, UpdateSpeakerProfileDto } from './speaker-profile.dto';
+import { UserUtils } from '../utils/user.utils';
 
 @Injectable()
 export class SpeakerProfileService {
@@ -111,20 +112,17 @@ export class SpeakerProfileService {
     try {
       const speakers = await this.userRepository.find({
         where: { role: UserRole.Speaker },
-        relations: ['speakerProfile'],
+        relations: ['speakerProfile', 'addresses'],
         order: { updatedAt: 'DESC' },
         select: [
-          'id', 'firstName', 'lastName', 'email', 'mobile', 'address', 'city', 
-          'state', 'postalCode', 'countryCurrency', 'profilePicture', 
+          'id', 'firstName', 'lastName', 'email', 'mobile', 'countryCurrency', 'profilePicture', 
           'linkedinProfile', 'isVerify', 'role', 'createdAt', 'updatedAt'
         ]
       });
 
-      return speakers.map(({ password, ...speaker }) => ({
-        ...speaker,
-        speakerProfile: speaker.speakerProfile || null,
-      
-      }));
+      return speakers.map((speaker) => 
+        UserUtils.getAdminSpeakerInfo(speaker)
+      );
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Speakers with profiles retrieval');
     }
@@ -134,10 +132,9 @@ export class SpeakerProfileService {
     try {
       const speaker = await this.userRepository.findOne({
         where: { id, role: UserRole.Speaker },
-        relations: ['speakerProfile'],
+        relations: ['speakerProfile', 'addresses'],
         select: [
-          'id', 'firstName', 'lastName', 'email', 'mobile', 'address', 'city', 
-          'state', 'postalCode', 'countryCurrency', 'profilePicture', 
+          'id', 'firstName', 'lastName', 'email', 'mobile', 'countryCurrency', 'profilePicture', 
           'linkedinProfile', 'isVerify', 'role', 'createdAt', 'updatedAt'
         ]
       });
@@ -146,12 +143,7 @@ export class SpeakerProfileService {
         throw new ResourceNotFoundException('Speaker', id);
       }
 
-      const { password, ...speakerWithoutPassword } = speaker;
-      return {
-        ...speakerWithoutPassword,
-        speakerProfile: speaker.speakerProfile || null,
-      
-      };
+      return UserUtils.getAdminSpeakerInfo(speaker);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;

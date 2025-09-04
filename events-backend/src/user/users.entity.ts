@@ -1,6 +1,7 @@
 import { EventAgenda } from 'agenda/agenda.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Order } from 'order/order.entity';
+import { AddressEntity } from './address.entity';
 import {
   Entity,
   Column,
@@ -44,18 +45,6 @@ export class UserEntity {
 
   @Column()
   mobile!: string; // Updated field
-
-  @Column({ nullable: true })
-  address?: string; // Updated field
-
-  @Column({ nullable: true })
-  city?: string; // Updated field
-
-  @Column({ nullable: true })
-  state?: string; // Updated field
-
-  @Column({ nullable: true })
-  postalCode?: string; // Updated field
 
   @Column({
     type: 'enum',
@@ -148,5 +137,9 @@ export class UserEntity {
 
   @OneToMany(() => EventAgenda, (agenda) => agenda.user)
   agendas?: EventAgenda[];
+
+  // Address relationship - one user can have multiple addresses
+  @OneToMany(() => AddressEntity, (address) => address.user)
+  addresses?: AddressEntity[];
   
 }

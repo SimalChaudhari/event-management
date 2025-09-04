@@ -20,6 +20,9 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
+    // Ensure data is valid and has proper structure
+    const validData = Array.isArray(data) ? data.filter(item => item && item.id) : [];
+
     // Preserve the current page
     let currentPage = 0;
     if ($.fn.DataTable.isDataTable(tableZero)) {
@@ -28,7 +31,8 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
     }
 
     $(tableZero).DataTable({
-        data: data || [],
+        data: validData,
+        rowId: 'id', // Explicitly set the row ID field
         order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
@@ -78,18 +82,16 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
             },
             {
                 data: 'mobile',
-                title: 'Contact & Location',
+                title: 'Mobile',
                 render: function (data, type, row) {
                     return `
                         <div class="d-inline-block align-middle">
-                            <h6 class="m-b-5">${row.mobile || 'N/A'}</h6>
-                            <p class="m-b-0">
+                              <p class="m-b-0">
                                 <span class="badge badge-success">
                                     <i class="feather icon-phone mr-1"></i>
                                     ${row.mobile || 'N/A'}
                                 </span>
                             </p>
-                            <p class="m-b-0 text-muted small">${row.city || 'N/A'}, ${row.state || 'N/A'}</p>
                         </div>
                     `;
                 }
@@ -103,10 +105,9 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
                             <p class="m-b-0">
                                 <span class="badge badge-light-primary">
                                     <i class="feather icon-map-pin mr-1"></i>
-                                    ${row.address || 'Not specified'}
+                                    ${row.formattedAddress || 'Not specified'}
                                 </span>
                             </p>
-                            <p class="m-b-0 text-muted small">${row.postalCode || 'N/A'}</p>
                         </div>
                     `;
                 }
@@ -161,23 +162,31 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const id = $(this).data('id');
-                const userData = data.find((user) => user.id === id);
+                const userData = validData.find((user) => user && user.id === id);
                 if (userData) {
                     handleViewUser(userData);
+                } else {
+                    console.error('User data not found for ID:', id);
                 }
             });
 
             $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
                 const id = $(this).data('id');
-                const userData = data.find((user) => user.id === id);
+                const userData = validData.find((user) => user && user.id === id);
                 if (userData) {
                     handleEditUser(userData);
+                } else {
+                    console.error('User data not found for ID:', id);
                 }
             });
 
             $(tableZero + ' tbody').off('click', '.delete-btn').on('click', '.delete-btn', function () {
                 const id = $(this).data('id');
-                handleDeleteUser(id);
+                if (id) {
+                    handleDeleteUser(id);
+                } else {
+                    console.error('No user ID found for delete action');
+                }
             });
         },
         responsive: true,
@@ -245,15 +254,23 @@ const UserList = () => {
 
     const initializeTable = () => {
         destroyTable();
-        if (Array.isArray(user) && user.length >= 0) {
-            const table = userTable(
-                user,
-                handleAddUser,
-                handleEditUser,
-                handleDeleteUser,
-                handleViewUser
-            );
-            setCurrentTable(table);
+        // Check if user data exists and is an array
+        if (Array.isArray(user)) {
+            try {
+                const table = userTable(
+                    user,
+                    handleAddUser,
+                    handleEditUser,
+                    handleDeleteUser,
+                    handleViewUser
+                );
+                setCurrentTable(table);
+            } catch (error) {
+                console.error('Error initializing user table:', error);
+                console.log('User data:', user);
+            }
+        } else {
+            console.log('User data is not an array or is undefined:', user);
         }
     };
 

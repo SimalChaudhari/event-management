@@ -41,22 +41,6 @@ export class UserDto {
   mobile?: string; // Updated field
 
   @IsOptional()
-  @IsString()
-  address?: string; // Updated field
-
-  @IsOptional()
-  @IsString()
-  city?: string; // Updated field
-
-  @IsOptional()
-  @IsString()
-  state?: string; // Updated field
-
-  @IsOptional()
-  @IsString()
-  postalCode?: string; // Updated field
-
-  @IsOptional()
   @IsBoolean()
   isMember?: boolean; // Updated field
 
@@ -117,6 +101,51 @@ export class UserDto {
 
   @IsOptional()
   updatedAt?: Date;
+
+  // Optional address fields for admin registration
+  @IsOptional()
+  @IsString()
+  street?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  addressType?: string; // home, work, billing, shipping, other
+
+  @IsOptional()
+  @IsBoolean()
+  isDefaultAddress?: boolean;
+
+  @IsOptional()
+  @IsString()
+  apartment?: string;
+
+  @IsOptional()
+  @IsString()
+  landmark?: string;
+
+  @IsOptional()
+  @IsString()
+  addressLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryInstructions?: string;
 }
 
 

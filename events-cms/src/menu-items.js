@@ -32,7 +32,7 @@ const chartData = {
                 },
                 {
                     id: 'exhibitors',
-                    title: 'Exhibitors',
+                    title: 'Exhibitor Booths',
                     type: 'item',
                     icon: 'feather icon-users',         // Group of people icon
                     url: '/exhibitors'

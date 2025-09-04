@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/users.module';
+import { AddressModule } from './user/address.module';
 import { EventModule } from 'event/event.module';
 import { AgendaModule } from './agenda/agenda.module';
 import { AgendaCategoryModule } from './agenda/agenda-category.module';
@@ -51,6 +52,7 @@ import { ContactInfoModule } from './contact-info/contact-info.module';
     AuthModule,
     SettingModule,
     UserModule,
+    AddressModule,
     GalleryModule,
   
     ExhibitorModule,

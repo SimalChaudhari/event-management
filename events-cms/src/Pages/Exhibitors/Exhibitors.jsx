@@ -46,15 +46,17 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
             {
-                data: 'name',
-                title: 'Name/Company Name/Status',
+                data: 'companyName',
+                title: 'Company & Status',
                 render: function (data, type, row) {
                  
-                    const imageUrl = row.eventImages && row.eventImages.length > 0 
-                        ? (row.eventImages[0].eventImage 
-                            ? `${API_URL}/${row.eventImages[0].eventImage}` 
-                            : `${API_URL}/${row.eventImages[0]}`)
-                        : DUMMY_PATH;
+                    const logoUrl = row.logo 
+                        ? `${API_URL}/${row.logo}` 
+                        : (row.eventImages && row.eventImages.length > 0 
+                            ? (row.eventImages[0].eventImage 
+                                ? `${API_URL}/${row.eventImages[0].eventImage}` 
+                                : `${API_URL}/${row.eventImages[0]}`)
+                            : DUMMY_PATH);
                     
                  
                     let badgeClass = 'badge-light-success';
@@ -67,12 +69,12 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
 
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${imageUrl}" alt="exhibitor" class="img-radius align-top m-r-15" 
+                            <img src="${logoUrl}" alt="company logo" class="img-radius align-top m-r-15" 
                                  style="width:50px; height:50px; object-fit:cover;" 
                                  onerror="this.src='${DUMMY_PATH}';">
                             <div class="d-inline-block">
-                                <h6 class="m-b-0">${row.name || 'N/A'}</h6>
-                                <p class="m-b-5 text-muted">${row.companyName || 'N/A'}</p>
+                                <h6 class="m-b-0">${row.companyName || 'N/A'}</h6>
+                                <p class="m-b-5 text-muted">Booth: ${row.bothNumber || 'N/A'}</p>
                                 <span class="badge ${badgeClass}">
                                     ${statusText}
                                 </span>
@@ -83,7 +85,7 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
             },
             {
                 data: 'email',
-                title: 'Contact & Company',
+                title: 'Contact Information',
                 render: function (data, type, row) {
          
                     return `
@@ -95,29 +97,11 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
                                     ${row.mobile || 'N/A'}
                                 </span>
                             </p>
-                            <p class="m-b-0 text-muted small">@${row.userName || 'N/A'}</p>
+                            <p class="m-b-0 text-muted small">UEN: ${row.uen || 'N/A'}</p>
                         </div>
                     `;
                 }
             },
-            {
-                data: 'address',
-                title: 'Location',
-                render: function (data, type, row) {
-                
-                    return `
-                        <div class="d-inline-block align-middle">
-                            <p class="m-b-0">
-                                <span class="badge badge-light-primary">
-                                    <i class="feather icon-map-pin mr-1"></i>
-                                    ${row.address || 'Not specified'}
-                                </span>
-                            </p>
-                        </div>
-                    `;
-                }
-            },
-        
             {
                 data: null,
                 title: 'Created Date',
@@ -322,9 +306,8 @@ const Exhibitors = () => {
                             <Table striped hover responsive id="exhibitor-data-table">
                                 <thead>
                                     <tr>
-                                        <th>Name/Company Name/Status</th>
-                                        <th>Contact & Company</th>
-                                        <th>Location</th>  
+                                        <th>Company & Status</th>
+                                        <th>Contact Information</th>
                                         <th>Created Date</th>
                                         <th>Actions</th>
                                     </tr>

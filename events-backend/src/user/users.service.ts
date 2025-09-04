@@ -26,6 +26,8 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { UserUtils } from 'utils';
 import { QRCodeUtils } from '../utils/qr-code.utils';
+import { AddressService } from './address.service';
+import { AddressUtils } from '../utils/address.utils';
 
 @Injectable()
 export class UserService {
@@ -35,6 +37,7 @@ export class UserService {
     private readonly errorHandler: ErrorHandlerService,
     private readonly emailService: EmailService,
     private readonly speakerProfileService: SpeakerProfileService,
+    private readonly addressService: AddressService,
   ) {}
 
   // Helper function to send speaker credentials via email
@@ -61,6 +64,7 @@ export class UserService {
     );
   }
 
+
   async getAll(roles?: UserRole[]): Promise<Partial<UserEntity>[]> {
     try {
       let where = {};
@@ -69,6 +73,7 @@ export class UserService {
       }
       const users = await this.userRepository.find({
         where,
+        relations: ['addresses'],
         order: { updatedAt: 'DESC' },
       });
       return users.map((user) => UserUtils.sanitizeUserData(user));
@@ -80,6 +85,7 @@ export class UserService {
     try {
       const user = await this.userRepository.findOne({
         where: { id },
+        relations: ['addresses'],
       });
       if (!user) {
         throw new ResourceNotFoundException('User', id);
@@ -165,11 +171,24 @@ export class UserService {
 
   async update(
     id: string,
-    updateData: Partial<UserEntity>,
+    updateData: Partial<UserEntity> & {
+      street?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+      addressType?: string;
+      isDefaultAddress?: boolean;
+      apartment?: string;
+      landmark?: string;
+      addressLabel?: string;
+      deliveryInstructions?: string;
+    },
   ): Promise<Partial<UserEntity>> {
     try {
       const user = await this.userRepository.findOne({
         where: { id },
+        relations: ['addresses'],
       });
       if (!user) {
         throw new ResourceNotFoundException('User', id);
@@ -185,17 +204,64 @@ export class UserService {
         }
       }
 
-      // Remove sensitive fields from updateData
-      const { password, id: userId, ...safeUpdateData } = updateData;
+      // Extract address data
+      const {
+        street,
+        city,
+        state,
+        postalCode,
+        country,
+        addressType,
+        isDefaultAddress,
+        apartment,
+        landmark,
+        addressLabel,
+        deliveryInstructions,
+        password,
+        id: userId,
+        ...safeUpdateData
+      } = updateData;
 
       // Update the user
       Object.assign(user, safeUpdateData);
       const updatedUser = await this.userRepository.save(user);
 
-      // Remove sensitive fields from response
-      const { password: _, ...result } = updatedUser;
+      // Handle address update if address data is provided
+      const addressData = AddressUtils.extractAddressData({
+        street,
+        city,
+        state,
+        postalCode,
+        country,
+        addressType,
+        isDefaultAddress,
+        apartment,
+        landmark,
+        addressLabel,
+        deliveryInstructions,
+      });
 
-      return result;
+      if (AddressUtils.hasAnyAddressFields(addressData)) {
+        await AddressUtils.updateUserAddress(
+          this.addressService,
+          id,
+          addressData,
+          this.errorHandler
+        );
+      }
+
+      // Get updated user with addresses for response
+      const userWithAddresses = await this.userRepository.findOne({
+        where: { id },
+        relations: ['addresses'],
+      });
+
+      if (!userWithAddresses) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      // Return sanitized user data with address information
+      return UserUtils.sanitizeUserData(userWithAddresses);
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||

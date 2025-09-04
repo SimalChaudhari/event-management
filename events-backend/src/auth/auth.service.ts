@@ -16,6 +16,13 @@ import { JwtService } from '@nestjs/jwt';
 import { EmailService } from 'service/email.service';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { AddressService } from '../user/address.service';
+import { AddressUtils } from '../utils/address.utils';
+import { PasswordUtils } from '../utils/password.utils';
+import { 
+  EmailTemplateUtils, 
+  UserCredentialsData 
+} from '../utils/email-templates.utils';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +32,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly addressService: AddressService,
   ) {}
 
   private handleError(error: any): never {
@@ -81,6 +89,7 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
   }
 
+
   // Register a new user
   async register(userDto: UserDto): Promise<{ message: string }> {
     try {
@@ -94,44 +103,123 @@ export class AuthService {
         );
       }
 
-      if (!userDto.password) {
-        throw new BadRequestException('Password is required');
-      }
-
       if (!userDto.mobile) {
         throw new BadRequestException('Mobile is required');
       }
+
+      // Check if this is admin creating a user vs user self-registration
+      const isAdminCreatedUser =  userDto.role === UserRole.User;
+      let plainPassword: string;
+      
+      if (isAdminCreatedUser && !userDto.password) {
+        // Admin is creating user without password - auto-generate
+        plainPassword = PasswordUtils.generateRandomPassword(12);
+      } else if (!isAdminCreatedUser && !userDto.password) {
+        // User self-registration requires password
+        throw new BadRequestException('Password is required for user registration');
+      } else {
+        // Use provided password
+        plainPassword = userDto.password!;
+      }
+
       // Hash the password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(userDto.password, saltRounds);
+      const hashedPassword = await PasswordUtils.hashPassword(plainPassword);
 
       // Generate OTP for email verification
       const otp = this.generateOTP();
       // const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       // Create the new user with hashed password
+      // Extract address data before creating user
+      const {
+        street,
+        city,
+        state,
+        postalCode,
+        country,
+        addressType,
+        isDefaultAddress,
+        apartment,
+        landmark,
+        addressLabel,
+        deliveryInstructions,
+        ...userData
+      } = userDto;
+
       const newUser = this.userRepository.create({
-        ...userDto,
+        ...userData,
         password: hashedPassword,
         role: userDto.role || UserRole.User,
         acceptTerms: Boolean(userDto.acceptTerms),
         otp: otp,
         // otpExpiry: otpExpiry,
-        isVerify: false, // Ensure user is not verified initially
+        isVerify: isAdminCreatedUser ? true : false, // Admin-created users are verified by default
       });
 
-      await this.userRepository.save(newUser);
+      const savedUser = await this.userRepository.save(newUser);
 
-      // Send OTP via email
+      // Create address if address data is provided
+      const addressData = AddressUtils.extractAddressData({
+        street,
+        city,
+        state,
+        postalCode,
+        country,
+        addressType,
+        isDefaultAddress,
+        apartment,
+        landmark,
+        addressLabel,
+        deliveryInstructions,
+      });
+
+      await AddressUtils.createUserAddress(
+        this.addressService,
+        savedUser.id,
+        addressData
+      );
+
+      // Send appropriate email based on registration type
       if (!userDto.email || !userDto.firstName || !userDto.lastName) {
         throw new BadRequestException('Email, firstName and lastName are required');
       }
-      await this.emailService.sendWelcomeEmail(userDto.email, userDto.firstName, userDto.lastName, otp);
 
-      return {
-        message:
-          "We've sent a One-Time Password (OTP) to your registered email address. Please check your inbox and enter the OTP to verify your account. Once your account is verified, you can proceed to the login page.",
-      };
+      if (isAdminCreatedUser && !userDto.password) {
+        // Send credentials email for admin-created users (when password was auto-generated)
+        try {
+          const credentialsData: UserCredentialsData = {
+            email: userDto.email,
+            firstName: userDto.firstName,
+            lastName: userDto.lastName,
+            password: plainPassword,
+          };
+
+          const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(credentialsData);
+          await this.emailService['transporter'].sendMail(mailOptions);
+          
+          console.log(`User credentials sent to ${userDto.email}: ${userDto.firstName} ${userDto.lastName}`);
+        } catch (emailError) {
+          console.error('Error sending credentials email:', emailError);
+          // Continue without throwing error - user was created successfully
+        }
+
+        return {
+          message: "User account created successfully. Login credentials have been sent to the user's email address.",
+        };
+      } else if (isAdminCreatedUser && userDto.password) {
+        // Admin created user with provided password - just confirm creation
+        return {
+          message: "User account created successfully with the provided password.",
+        };
+      } else {
+        // Send OTP email for user self-registration
+        await this.emailService.sendWelcomeEmail(userDto.email, userDto.firstName, userDto.lastName, otp);
+
+        return {
+          message:
+            "We've sent a One-Time Password (OTP) to your registered email address. Please check your inbox and enter the OTP to verify your account. Once your account is verified, you can proceed to the login page.",
+        };
+      }
     } catch (error) {
       this.handleError(error);
     }
@@ -671,3 +759,4 @@ export class AuthService {
     }
   }
 }
+
