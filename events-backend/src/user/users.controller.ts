@@ -507,4 +507,27 @@ export class UserController {
     }
   }
 
+
+  @Get('qr-code/scan/:qrCodeData')
+  async scanQRCode(
+    @Param('qrCodeData') qrCodeData: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const userInfo = await this.userService.getUserInfoFromQRCode(qrCodeData);
+      
+      const successResponse = {
+        success: true,
+        message: 'User information retrieved successfully',
+        data: userInfo,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'QR code scanning', undefined);
+      throw error;
+    }
+  }
+
+  
 }
