@@ -12,8 +12,8 @@ const EventDocumentsComponent = ({ documents }) => {
     if (!documents || documents.length === 0) {
         return (
             <StandardComponentTemplate 
-                title="Event Documents" 
-                icon="📁"
+                title={`Event Documents(${documents.length})`} 
+                // icon="📁"
                 borderColor="green"
             >
                 <div className="text-center py-4">
@@ -101,8 +101,8 @@ const EventDocumentsComponent = ({ documents }) => {
 
     return (
         <StandardComponentTemplate 
-            title="Event Documents" 
-            icon="📁"
+            title={`Event Documents(${documents.length})`} 
+            // icon="📁"
             borderColor="green"
         >
             <div

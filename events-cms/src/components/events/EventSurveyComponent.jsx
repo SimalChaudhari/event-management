@@ -13,7 +13,7 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
         return (
             <StandardComponentTemplate 
                 title="Event Survey" 
-                icon="📊"
+                icon="fas fa-poll"
                 borderColor="blue"
             >
                 <div className="text-center py-4">
@@ -33,58 +33,62 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
 
             <div className="card border-0 shadow-sm">
                 <div className="card-body p-4">
-                    {/* Survey Title and Status */}
+                    {/* Survey Title and Status - Using label style */}
                     <div className="row">
                         <div className="col-lg-6 mb-3">
-                            <div className="d-flex align-items-center mb-2">
-                                <i className="fas fa-heading text-primary me-2" style={{ marginRight: 8 }}></i>
-                                <strong>Survey Title:</strong>
+                            <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                    <i className="fas fa-file-alt" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                    Survey Title:
+                                </span>
+                                <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                                    {surveyDetails.title}
+                                </span>
                             </div>
-                            <p className="mb-0 text-dark">{surveyDetails.title}</p>
                         </div>
 
                         <div className="col-lg-6 mb-3">
-                            <div className="d-flex align-items-center mb-2">
-                                <i className="fas fa-toggle-on text-primary me-2" style={{ marginRight: 8 }}></i>
-                                <strong>Status:</strong>
+                            <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                    <i className="fas fa-toggle-on" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                                    Status:
+                                </span>
+                                <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                                    <Badge bg={surveyDetails.isActive ? 'success' : 'secondary'} className="px-3 py-1">
+                                        <i className={`fas fa-${surveyDetails.isActive ? 'check-circle' : 'pause-circle'} me-1`}></i>
+                                        {surveyDetails.isActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </span>
                             </div>
-                            <Badge bg={surveyDetails.isActive ? 'success' : 'secondary'} className="px-3 py-2">
-                                <i
-                                    className={`fas fa-${surveyDetails.isActive ? 'check-circle' : 'pause-circle'} me-1`}
-                                ></i>
-                                {surveyDetails.isActive ? 'Active' : 'Inactive'}
-                            </Badge>
                         </div>
                     </div>
 
-                    <hr className="my-3" />
-
-                    {/* Survey Dates */}
+                    {/* Survey Dates - Using label style */}
                     <div className="row">
                         <div className="col-lg-6 mb-3">
-                            <div className="d-flex align-items-center mb-2">
-                                <i className="fas fa-calendar-alt text-primary" style={{ marginRight: 8 }}></i>
-                                <strong>Start Date & Time:</strong>
+                            <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                    <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                    Start Date & Time:
+                                </span>
+                                <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                                    {surveyDetails.startDate} <i className="fas fa-clock" style={{ marginLeft: '8px', marginRight: '4px', color: '#6c757d' }}></i>
+                                    {formatTime(surveyDetails.startTime)}
+                                </span>
                             </div>
-                            <p className="mb-0 text-dark">
-                                {surveyDetails.startDate}
-                                <span style={{ margin: '0 6px' }}></span>
-                                <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
-                                {formatTime(surveyDetails.startTime)}
-                            </p>
                         </div>
 
                         <div className="col-lg-6 mb-3">
-                            <div className="d-flex align-items-center mb-2">
-                                <i className="fas fa-calendar-check text-primary" style={{ marginRight: 8 }}></i>
-                                <strong>End Date & Time:</strong>
+                            <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                    <i className="fas fa-calendar-check" style={{ marginRight: '8px', color: '#dc3545' }}></i>
+                                    End Date & Time:
+                                </span>
+                                <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                                    {surveyDetails.endDate} <i className="fas fa-clock" style={{ marginLeft: '8px', marginRight: '4px', color: '#6c757d' }}></i>
+                                    {formatTime(surveyDetails.endTime)}
+                                </span>
                             </div>
-                            <p className="mb-0 text-dark">
-                                {surveyDetails.endDate}
-                                <span style={{ margin: '0 6px' }}></span>
-                                <i className="fas fa-clock text-secondary" style={{ marginRight: 4 }}></i>
-                                {formatTime(surveyDetails.endTime)}
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -98,41 +102,62 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
             <div className="card border-0 shadow-sm h-100">
                 <div className="card-body">
                     {/* Session Header */}
-                    <div className="d-flex align-items-center mb-2">
-                        <span className="badge bg-primary me-2" style={{ minWidth: 60 }}>
-                            Session {index + 1}
+                    <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                            <i className="fas fa-hashtag" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                            Session {index + 1}:
                         </span>
-                        <h6 className="mb-0 fw-bold">{session.name}</h6>
+                        <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                            {session.name}
+                        </span>
                     </div>
 
                     {/* Session Description */}
-                    <p className="mb-2 small text-muted">{session.description}</p>
+                    <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                            <i className="fas fa-sticky-note" style={{ marginRight: '8px', color: '#6c757d' }}></i>
+                            Description:
+                        </span>
+                        <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                            {session.description}
+                        </span>
+                    </div>
 
-                    {/* Session Date and Time */}
-                    <div className="row mb-2">
-                        <div className="col-6">
-                            <small>
-                                <i className="fas fa-calendar-day" style={{ marginRight: 4 }}></i>
-                                <strong>Date:</strong> {session.date}
-                            </small>
-                        </div>
-                        <div className="col-6">
-                            <small>
-                                <i className="fas fa-clock" style={{ marginRight: 4 }}></i>
-                                <strong>Time:</strong> {formatTime(session.startTime)} -{' '}
-                                {formatTime(session.endTime)}
-                            </small>
-                        </div>
+                    {/* Session Date */}
+                    <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                            <i className="fas fa-calendar-day" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                            Date:
+                        </span>
+                        <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                            {session.date}
+                        </span>
+                    </div>
+
+                    {/* Session Time */}
+                    <div className="info-field-container mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                            <i className="fas fa-clock" style={{ marginRight: '8px', color: '#dc3545' }}></i>
+                            Time:
+                        </span>
+                        <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                            {formatTime(session.startTime)} - {formatTime(session.endTime)}
+                        </span>
                     </div>
 
                     {/* Session Status */}
-                    <Badge bg={session.isActive ? 'success' : 'secondary'} className="mt-2">
-                        <i
-                            className={`fas fa-${session.isActive ? 'check-circle' : 'pause-circle'}`}
-                            style={{ marginRight: 4 }}
-                        ></i>
-                        {session.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <div className="info-field-container mb-2 py-2">
+                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                            <i className="fas fa-toggle-on" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                            Status:
+                        </span>
+                        <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                            <Badge bg={session.isActive ? 'success' : 'secondary'} className="px-3 py-1">
+                                <i className={`fas fa-${session.isActive ? 'check-circle' : 'pause-circle'} me-1`}></i>
+                                {session.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -161,7 +186,7 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
     return (
         <StandardComponentTemplate 
             title="Event Survey" 
-            icon="📊"
+            // icon="📊"
             borderColor="blue"
         >
             <div className="survey-section">

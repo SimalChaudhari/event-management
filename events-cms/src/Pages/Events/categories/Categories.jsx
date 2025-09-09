@@ -16,6 +16,7 @@ import { EVENT_PATHS } from '../../../utils/constants';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
+
 function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -48,11 +49,20 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
                 data: 'name',
                 title: 'Category Name',
                 render: function (data, type, row) {
+                    // Truncate description if it's too long
+                    const maxLength = 100;
+                    let description = row.description || 'No description';
+                    
+                    // Simply truncate without any buttons
+                    if (description.length > maxLength) {
+                        description = description.substring(0, maxLength) + '...';
+                    }
+                    
                     return `
                         <div class="d-inline-block align-middle">
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.name}</h6>
-                                <p class="text-muted m-b-0">${row.description || 'No description'}</p>
+                                <p class="text-muted m-b-0">${description}</p>
                             </div>
                         </div>   
                     `;

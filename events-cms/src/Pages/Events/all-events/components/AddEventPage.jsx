@@ -14,11 +14,10 @@ import {
 } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import axiosInstance from '../../../../configs/axiosInstance';
-import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import LocationMarker from '../components/LocationMarker';
 import SpeakerFormModal from '../components/SpeakerFormSidebar';
 import CategoryFormModal from '../components/CategoryFormModal';
+import MapLocationModal from './MapLocationModal';
 import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
@@ -109,7 +108,6 @@ function AddEventPage() {
     const dispatch = useDispatch();
     const { id } = useParams(); // Edit mode
     const { fetchEvent } = FetchEventData();
-    const [tempLatLng, setTempLatLng] = useState(null);
     const [display, setDisplay] = useState(null);
 
     const [speakerList, setSpeakerList] = useState([]);
@@ -137,10 +135,16 @@ function AddEventPage() {
         longitude: '',
         floorPlan: null,
         exhibitorIds: [],
+        exhibitorDescription: '',
         eventStampDescription: '',
         eventStampImages: []
     });
     const [showMapModal, setShowMapModal] = useState(false);
+
+    // Track dropdown open states
+    const [speakerDropdownOpen, setSpeakerDropdownOpen] = useState(false);
+    const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+    const [exhibitorDropdownOpen, setExhibitorDropdownOpen] = useState(false);
 
     // Image and document management states
     const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
@@ -176,6 +180,9 @@ function AddEventPage() {
 
     // Add new state for document names input
     const [documentNames, setDocumentNames] = useState([]);
+
+    // Add loading state for form submission
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Fetch current location
     const getCurrentLocation = () => {
@@ -229,10 +236,13 @@ function AddEventPage() {
                         }
 
                         // Handle exhibitors
+                        let exhibitorDescription = '';
                         let exhibitorIds = [];
                         if (editData.exhibitors) {
                             console.log(editData, 'editData.exhibitors');
+                            // console.log(editData, 'editData.exhibitors');
                             exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
+                            exhibitorDescription = editData?.exhibitors?.exhibitorDescription || '';
                         }
 
                         // Handle images
@@ -344,6 +354,7 @@ function AddEventPage() {
                             categoryIds: categoryIds,
                             floorPlan: floorPlanData,
                             exhibitorIds: exhibitorIds,
+                            exhibitorDescription: exhibitorDescription,
                             eventStampDescription: eventStampDescription,
                             eventStampImages: eventStampImagesData
                         };
@@ -514,7 +525,7 @@ function AddEventPage() {
         const validFiles = files.filter((file) => file.type === 'application/pdf');
 
         if (validFiles.length !== files.length) {
-            alert('केवल PDF files allowed हैं documents के लिए');
+            alert(' PDF files allowed');
         }
 
         if (validFiles.length > 0) {
@@ -527,7 +538,6 @@ function AddEventPage() {
 
             setDocumentPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
-            // नई files के लिए default names
             const newDocumentNames = validFiles.map((file) => file.name.replace(/\.[^/.]+$/, ''));
 
             setFormData((prev) => ({
@@ -563,6 +573,7 @@ function AddEventPage() {
             longitude: '',
             floorPlan: null,
             exhibitorIds: [],
+            exhibitorDescription: '',
             eventStampDescription: '',
             eventStampImages: []
         });
@@ -589,7 +600,7 @@ function AddEventPage() {
 
     const fetchSpeakers = async () => {
         try {
-            const response = await axiosInstance.get('speakers/get');
+            const response = await axiosInstance.get('users/speakers/get');
             if (response.data.success) {
                 setSpeakerList(response.data.data);
             }
@@ -635,6 +646,7 @@ function AddEventPage() {
     // Handle form submission - Updated to handle event stamps correctly
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true);
 
         // Validate document names before submission
         let hasValidationErrors = false;
@@ -680,6 +692,8 @@ function AddEventPage() {
             } else if (key === 'exhibitorIds') {
                 const exhibitorsArray = Array.isArray(dataToSend.exhibitorIds) ? dataToSend.exhibitorIds : [];
                 formDataToSend.append('exhibitorIds', exhibitorsArray.join(','));
+            } else if (key === 'exhibitorDescription') {
+                formDataToSend.append('exhibitorDescription', dataToSend[key]);
             } else if (key === 'eventStampDescription') {
                 // Handle event stamp description
                 formDataToSend.append('eventStampDescription', dataToSend[key]);
@@ -770,6 +784,8 @@ function AddEventPage() {
             }
         } catch (error) {
             console.error('Error submitting form:', error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -853,43 +869,12 @@ function AddEventPage() {
         }
     };
 
-    // Location map component
-    const LocationMap = () => {
-        const fetchAddressFromCoordinates = async (lat, lng) => {
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                const data = await response.json();
-                setDisplay(data.display_name);
-                return data.address;
-            } catch (error) {
-                console.error('Reverse geocoding error:', error);
-                return '';
-            }
-        };
-
-        useMapEvents({
-            click: async (event) => {
-                const { lat, lng } = event.latlng;
-                const address = await fetchAddressFromCoordinates(lat, lng);
-                setFormData((prev) => ({
-                    ...prev,
-                    latitude: lat,
-                    longitude: lng,
-                    location: address?.city || address?.town || address?.village || ''
-                }));
-                setTempLatLng({ latitude: lat, longitude: lng, address });
-            }
-        });
-
-        return (
-            <>
-                <LocationMarker
-                    latitude={formData.latitude}
-                    longitude={formData.longitude}
-                    location={display ? display : formData?.venue}
-                />
-            </>
-        );
+    // Handle location save from modal
+    const handleLocationSave = (locationData) => {
+        setFormData((prev) => ({
+            ...prev,
+            ...locationData
+        }));
     };
 
     // Floor plan handling
@@ -930,6 +915,14 @@ function AddEventPage() {
         setFormData((prev) => ({
             ...prev,
             eventStampDescription: value
+        }));
+    };
+
+    const handleExhibitorDescriptionChange = (e) => {
+        const { value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            exhibitorDescription: value
         }));
     };
 
@@ -1031,86 +1024,6 @@ function AddEventPage() {
         }
 
         return { isValid: true, error: '' };
-    };
-
-    // Document name input field with validation
-    const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
-        const [localError, setLocalError] = useState('');
-
-        // Validation function
-        const validateDocumentName = (name, allNames, currentIndex) => {
-            if (!name || name.trim() === '') {
-                return { isValid: true, error: '' };
-            }
-
-            if (name.trim().length < 2) {
-                return {
-                    isValid: false,
-                    error: 'Document name should be at least 2 characters'
-                };
-            }
-
-            const duplicateIndex = allNames.findIndex(
-                (docName, idx) => idx !== currentIndex && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
-            );
-
-            if (duplicateIndex !== -1) {
-                return {
-                    isValid: false,
-                    error: 'Document name already exists'
-                };
-            }
-
-            return { isValid: true, error: '' };
-        };
-
-        const handleNameChange = (e) => {
-            const newName = e.target.value;
-
-            // Update parent component
-            onNameChange(index, newName);
-
-            // Validate only if there's content
-            if (newName.trim()) {
-                // We'll handle validation in parent to avoid state issues
-                setLocalError('');
-            } else {
-                setLocalError('');
-            }
-        };
-
-        return (
-            <div style={{ width: '100%' }}>
-                <input
-                    type="text"
-                    value={documentName || ''}
-                    onChange={handleNameChange}
-                    placeholder="Enter document name (optional)"
-                    style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        border: `1px solid ${localError ? '#dc3545' : '#ddd'}`,
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        marginBottom: localError ? '2px' : '4px',
-                        backgroundColor: localError ? '#fff5f5' : '#fff'
-                    }}
-                />
-                {localError && (
-                    <div
-                        style={{
-                            fontSize: '11px',
-                            color: '#dc3545',
-                            marginBottom: '4px',
-                            fontStyle: 'italic'
-                        }}
-                    >
-                        {localError}
-                    </div>
-                )}
-            </div>
-        );
     };
 
     return (
@@ -1229,15 +1142,39 @@ function AddEventPage() {
                                             <label className="floating-label" htmlFor="latitude">
                                                 Latitude
                                             </label>
-                                            <input
-                                                type="number"
-                                                className="form-control"
-                                                name="latitude"
-                                                value={formData.latitude}
-                                                onClick={() => setShowMapModal(true)}
-                                                onChange={handleChange}
-                                                placeholder="Latitude"
-                                            />
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    name="latitude"
+                                                    value={formData.latitude}
+                                                    onChange={handleChange}
+                                                    placeholder="Latitude"
+                                                    style={{ paddingRight: '45px' }}
+                                                />
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    onClick={() => setShowMapModal(true)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '8px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        height: '32px',
+                                                        width: '32px',
+                                                        padding: '0',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '14px',
+                                                        borderRadius: '4px'
+                                                    }}
+                                                    title="Select on Map"
+                                                >
+                                                    <i className="fas fa-map-marker-alt"></i>
+                                                </Button>
+                                            </div>
                                         </div>
                                     </Col>
                                     <Col sm={6}>
@@ -1245,15 +1182,39 @@ function AddEventPage() {
                                             <label className="floating-label" htmlFor="longitude">
                                                 Longitude
                                             </label>
-                                            <input
-                                                type="number"
-                                                className="form-control"
-                                                name="longitude"
-                                                value={formData.longitude}
-                                                onClick={() => setShowMapModal(true)}
-                                                onChange={handleChange}
-                                                placeholder="Longitude"
-                                            />
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    name="longitude"
+                                                    value={formData.longitude}
+                                                    onChange={handleChange}
+                                                    placeholder="Longitude"
+                                                    style={{ paddingRight: '45px' }}
+                                                />
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    onClick={() => setShowMapModal(true)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '8px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        height: '32px',
+                                                        width: '32px',
+                                                        padding: '0',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '14px',
+                                                        borderRadius: '4px'
+                                                    }}
+                                                    title="Select on Map"
+                                                >
+                                                    <i className="fas fa-map-marker-alt"></i>
+                                                </Button>
+                                            </div>
                                         </div>
                                     </Col>
 
@@ -1367,18 +1328,26 @@ function AddEventPage() {
                                                     value={selectedSpeakerOptions}
                                                     onChange={handleSpeakerSelect}
                                                     placeholder={id ? 'Update speakers...' : 'Choose speakers...'}
+                                                    onMenuOpen={() => setSpeakerDropdownOpen(true)}
+                                                    onMenuClose={() => setSpeakerDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(speakerDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menu: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(speakerDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menuPortal: (base) => ({
                                                             ...base,
-                                                            zIndex: 10000 // Ensures dropdown renders above other elements
+                                                            ...(speakerDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 10000
+                                                            })
                                                         })
                                                     }}
                                                     menuPortalTarget={document.body} // Renders dropdown in body
@@ -1430,18 +1399,26 @@ function AddEventPage() {
                                                     value={selectedCategoryOptions}
                                                     onChange={handleCategorySelect}
                                                     placeholder={id ? 'Update categories...' : 'Choose categories...'}
+                                                    onMenuOpen={() => setCategoryDropdownOpen(true)}
+                                                    onMenuClose={() => setCategoryDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(categoryDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menu: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(categoryDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menuPortal: (base) => ({
                                                             ...base,
-                                                            zIndex: 10000 // Ensures dropdown renders above other elements
+                                                            ...(categoryDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 10000
+                                                            })
                                                         })
                                                     }}
                                                     menuPortalTarget={document.body} // Renders dropdown in body
@@ -1467,35 +1444,59 @@ function AddEventPage() {
                                                 <Select
                                                     isMulti
                                                     options={exhibitorList.map((exhibitor) => ({
-                                                        label: exhibitor.name,
+                                                        label: exhibitor.companyName,
                                                         value: exhibitor.id
                                                     }))}
                                                     value={exhibitorList
                                                         .filter((exhibitor) => formData.exhibitorIds.includes(String(exhibitor.id))) // Convert to string for comparison
                                                         .map((exhibitor) => ({
-                                                            label: exhibitor.name,
+                                                            label: exhibitor.companyName,
                                                             value: exhibitor.id
                                                         }))}
                                                     onChange={handleExhibitorSelect}
                                                     placeholder="Choose exhibitors..."
+                                                    onMenuOpen={() => setExhibitorDropdownOpen(true)}
+                                                    onMenuClose={() => setExhibitorDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(exhibitorDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menu: (base) => ({
                                                             ...base,
-                                                            zIndex: 9999
+                                                            ...(exhibitorDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 9999
+                                                            })
                                                         }),
                                                         menuPortal: (base) => ({
                                                             ...base,
-                                                            zIndex: 10000
+                                                            ...(exhibitorDropdownOpen && {
+                                                                zIndex: showMapModal ? 1 : 10000
+                                                            })
                                                         })
                                                     }}
                                                     menuPortalTarget={document.body}
                                                     menuPosition="fixed"
                                                 />
                                             </div>
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="exhibitorDescription">
+                                                Exhibitor Description (Optional)
+                                            </label>
+                                            <textarea
+                                                className="form-control"
+                                                name="exhibitorDescription"
+                                                value={formData.exhibitorDescription}
+                                                onChange={handleExhibitorDescriptionChange}
+                                                placeholder="Enter exhibitor description..."
+                                                rows={3}
+                                            />
                                         </div>
                                     </Col>
 
@@ -2307,11 +2308,11 @@ function AddEventPage() {
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button variant="danger" onClick={handleNavigate}>
+                                            <Button variant="danger" onClick={handleNavigate} disabled={isSubmitting}>
                                                 Cancel
                                             </Button>
-                                            <Button variant="primary" type="submit">
-                                                {id ? 'Update' : 'Create'}
+                                            <Button variant="primary" type="submit" disabled={isSubmitting}>
+                                                {isSubmitting ? <>{id ? 'Updating...' : 'Creating...'}</> : id ? 'Update' : 'Create'}
                                             </Button>
                                         </div>
                                     </div>
@@ -2323,111 +2324,13 @@ function AddEventPage() {
             </div>
 
             {/* Map Modal */}
-            <Modal show={showMapModal} onHide={() => setShowMapModal(false)} size="xl">
-                <Modal.Header>
-                    <Modal.Title>Select Location on the Map</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <MapContainer
-                        center={[formData.latitude || 51.505, formData.longitude || -0.09]}
-                        zoom={13}
-                        style={{ width: '100%', height: '400px' }}
-                    >
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <LocationMap />
-                    </MapContainer>
-                </Modal.Body>
-
-                {tempLatLng && (
-                    <div className="p-4">
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Coordinates Information</Card.Title>
-                                <hr />
-                                <Row>
-                                    <Col xs={6} md={3}>
-                                        <Card.Text className="mb-2">
-                                            <strong>Latitude:</strong>
-                                            <br />
-                                            {tempLatLng.latitude || 'Not Available'}
-                                        </Card.Text>
-                                    </Col>
-                                    <Col xs={6} md={3}>
-                                        <Card.Text className="mb-2">
-                                            <strong>Longitude:</strong>
-                                            <br />
-                                            {tempLatLng.longitude || 'Not Available'}
-                                        </Card.Text>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
-
-                        <Card className="mb-3">
-                            <Card.Body>
-                                <Card.Title>Address Information</Card.Title>
-                                <hr />
-                                {tempLatLng.address ? (
-                                    <div>
-                                        <p className="mb-2">
-                                            <strong>City/Town/Village:</strong>{' '}
-                                            {tempLatLng.address.town || tempLatLng.address.village || null}
-                                        </p>
-
-                                        <p className="mb-2">
-                                            <strong>State:</strong> {tempLatLng.address.state || null}
-                                        </p>
-
-                                        <p className="mb-2">
-                                            <strong>District:</strong>{' '}
-                                            {tempLatLng.address.state_district || tempLatLng.address.district || null}
-                                        </p>
-
-                                        <p className="mb-2">
-                                            <strong>Country:</strong> {tempLatLng.address.country || null}
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <p>Fetching address...</p>
-                                )}
-                            </Card.Body>
-                        </Card>
-
-                        <div className="mt-8 text-center">
-                            <Button
-                                variant="primary"
-                                onClick={() => {
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        latitude: tempLatLng.latitude,
-                                        longitude: tempLatLng.longitude,
-                                        location: [
-                                            tempLatLng.address.state,
-                                            tempLatLng.address.state_district || tempLatLng.address.district
-                                        ]
-                                            .filter(Boolean)
-                                            .join(', '),
-                                        venue: tempLatLng.address.town || tempLatLng.address.village,
-                                        country: tempLatLng.address.country
-                                    }));
-
-                                    setShowMapModal(false);
-                                    setTempLatLng(null);
-                                }}
-                                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
-                            >
-                                Save Location
-                            </Button>
-                        </div>
-                    </div>
-                )}
-
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowMapModal(false)}>
-                        Close
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            <MapLocationModal
+                show={showMapModal}
+                onHide={() => setShowMapModal(false)}
+                formData={formData}
+                onLocationSave={handleLocationSave}
+                display={display}
+            />
         </Container>
     );
 }

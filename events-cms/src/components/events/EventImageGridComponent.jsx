@@ -12,8 +12,8 @@ const EventImageGridComponent = ({ images, getImageSrc, handleEventImageClick })
     if (!images || images.length === 0) {
         return (
             <StandardComponentTemplate 
-                title="Event Images" 
-                icon="🖼️"
+                title={`Event Images ${images?.length || 0}`}  
+                // icon="🖼️"
                 borderColor="purple"
             >
                 <div className="text-center py-4">
@@ -94,8 +94,8 @@ const EventImageGridComponent = ({ images, getImageSrc, handleEventImageClick })
 
     return (
         <StandardComponentTemplate 
-            title="Event Images" 
-            icon="🖼️"
+            title={`Event Images(${images?.length || 0})`} 
+            // icon="🖼️"
             borderColor="purple"
         >
             <div
@@ -106,7 +106,7 @@ const EventImageGridComponent = ({ images, getImageSrc, handleEventImageClick })
                     marginTop: '10px'
                 }}
             >
-                {images.map(renderImageItem)}
+                {images.map(renderImageItem)} 
             </div>
         </StandardComponentTemplate>
     );

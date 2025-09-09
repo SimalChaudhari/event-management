@@ -13,6 +13,7 @@ import {
   UploadedFile,
   Request,
   Post,
+  Query,
 } from '@nestjs/common';
 
 import { Response } from 'express';
@@ -40,14 +41,24 @@ export class UserController {
 
   @Get('')
   @Roles(UserRole.Admin)
-  async getAllUsers(@Res() response: Response, @Request() req: any) {
+  async getAllUsers(@Res() response: Response, @Request() req: any, @Query('role') roleFilter?: string) {
     try {
-      // const users = await this.userService.getAll(UserRole.User);
-      const users = await this.userService.getAll([UserRole.User, UserRole.Exhibitor]);
+      // Pass roleFilter to service method
+      // If no roleFilter, default behavior shows both users and exhibitors
+      const users = await this.userService.getAll([UserRole.User, UserRole.Exhibitor], roleFilter);
+      
+      let message = 'User details retrieved successfully';
+      if (roleFilter === 'exhibitor') {
+        message = 'Exhibitor details retrieved successfully';
+      } else if (roleFilter === 'user') {
+        message = 'User details retrieved successfully';
+      } else {
+        message = 'Users and Exhibitors retrieved successfully';
+      }
       
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'User details retrieved successfully',
+        message: message,
         data: users,
         metadata: {
           total: users.length,

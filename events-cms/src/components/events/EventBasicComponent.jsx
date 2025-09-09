@@ -1,11 +1,11 @@
-import React from 'react';
-import { Row, Col, Badge, Card } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Row, Col, Badge } from 'react-bootstrap';
 import DateTimeFormatter from '../dateTime/DateTimeFormatter';
+import { ExpandableDescription } from '../ExpandableDescription';
 
 /**
- * EventBasicComponent - Component to display basic event details with clean card-based UI
+ * EventBasicComponent - Component to display basic event details with exhibitor-style UI
  * @param {Object} eventData - Event data object
- * @param {Function} renderCategories - Function to render categories
  */
 const EventBasicComponent = ({ eventData }) => {
     // Format timestamp to readable date
@@ -22,6 +22,82 @@ const EventBasicComponent = ({ eventData }) => {
         });
     };
 
+    // Get colorful icons based on icon class
+    const getIconColor = (iconClass) => {
+        const colorMap = {
+            'fas fa-calendar-alt': '#007bff', // Blue for calendar
+            'fas fa-tag': '#28a745', // Green for tag
+            'fas fa-tags': '#ffc107', // Yellow for tags
+            'fas fa-clock': '#dc3545', // Red for clock
+            'fas fa-map-marker-alt': '#e74c3c', // Red for location
+            'fas fa-building': '#6f42c1', // Purple for building
+            'fas fa-globe': '#17a2b8', // Teal for globe
+            'fas fa-dollar-sign': '#28a745', // Green for money
+            'fas fa-calendar-plus': '#20c997', // Teal for created
+            'fas fa-edit': '#fd7e14', // Orange for edit
+            'fas fa-gift': '#e91e63', // Pink for lucky draw
+            'fa fa-sticky-note': '#6c757d', // Gray for text
+            'fas fa-info-circle': '#17a2b8', // Teal for info
+            'fa fa-sticky-note': '#007bff'
+        };
+        return colorMap[iconClass] || '#495057';
+    };
+
+    // InfoCard component for consistent styling similar to exhibitor view
+    const InfoCard = ({ title, iconClass, children, borderColor = '#4680ff', className = '' }) => (
+        <div
+            className={`mb-4 ${className}`}
+            style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                border: '1px solid #e9ecef',
+                borderLeft: `4px solid ${borderColor}`
+            }}
+        >
+            <div style={{ padding: '24px' }}>
+                <h5
+                    style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#2c3e50',
+                        marginBottom: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderBottom: `2px solid ${borderColor}`,
+                        paddingBottom: '8px',
+                        position: 'relative'
+                    }}
+                >
+                    <i className={iconClass} style={{ fontSize: '20px', color: getIconColor(iconClass) }}></i>
+                    {title}
+                </h5>
+                {children}
+            </div>
+        </div>
+    );
+
+    const InfoField = ({ label, value, iconClass = null }) => (
+        <div
+            className="info-field-container mb-2 py-2"
+            style={{
+                borderBottom: '1px solid #f1f1f1'
+            }}
+        >
+            <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
+                {label}:
+            </span>
+            <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
+                {value}
+            </span>
+        </div>
+    );
+
+
+
     const renderCategories = () => {
         if (!eventData?.categories?.length) {
             return <p className="text-muted">No categories listed.</p>;
@@ -29,20 +105,24 @@ const EventBasicComponent = ({ eventData }) => {
         return (
             <Row>
                 {eventData?.categories?.map((category, index) => (
-                    <Col lg={6} key={category.id} className="mb-4">
-                        <div className="category-item">
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    🏷️ Category Name:
+                    <Col lg={6} md={12} key={category.id} className="mb-3">
+                        <div className="mb-3">
+                            {/* Category Name - Same line like other fields */}
+                            <InfoField label="Category Name" value={category.name} iconClass="fas fa-tag" />
+
+                            {/* Description - Always stacked */}
+                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
+                                    <i
+                                        className="fa fa-sticky-note"
+                                        style={{ marginRight: '8px', color: getIconColor('fa fa-sticky-note') }}
+                                    ></i>
+                                    Description:
                                 </div>
-                                <div className="fw-bold">{category.name}</div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📝 Description:
-                                </div>
-                                <div className="fw-bold">{category.description}</div>
+                                <ExpandableDescription 
+                                    text={category.description}
+                                    maxLines={2}
+                                />
                             </div>
                         </div>
                     </Col>
@@ -54,309 +134,149 @@ const EventBasicComponent = ({ eventData }) => {
     return (
         <div className="p-2 bg-light">
             {/* Event Overview Section */}
-            <div className="mb-4">
-                <h5 className="fw-bold text-dark mb-3 section-title">Event Overview</h5>
-                
-                <div className="overview-container">
-                    {/* Event Title & Status Row */}
-                    <Row className="mb-3">
-                        <Col lg={6} className="mb-3">
-                            <div className="mb-2">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📋 Event Name:
-                                </div>
-                                <div className="fw-bold">{eventData.name}</div>
-                            </div>
-                        </Col>
-                        
-                        <Col lg={6} className="mb-3">
-                            <div className="mb-2">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    🏷️ Event Type:
-                                </div>
-                                <div>
-                                    <Badge bg="secondary" className="px-3 py-2">
-                                        {eventData.type || 'N/A'}
-                                    </Badge>
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
-
-                    <hr className="my-3" />
-
-                    {/* Start & End Date/Time Row */}
-                    <Row className="mb-3">
-                        <Col lg={6} className="mb-3">
-                            <div className="mb-2">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📅 Start Date & Time:
-                                </div>
-                                <div className="fw-bold">
-                                    <DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />
-                                </div>
-                            </div>
-                        </Col>
-                        
-                        <Col lg={6} className="mb-3">
-                            <div className="mb-2">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    ✅ End Date & Time:
-                                </div>
-                                <div className="fw-bold">
-                                    <DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
-
-                    <hr className="my-3" />
-
-                    {/* Event Description Row - Full Width */}
-                    <Row>
-                        <Col md={12}>
-                            <div className="mb-2">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📝 Event Description:
-                                </div>
-                                <div className="description-content">
-                                    {eventData.description || 'No description available'}
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-            </div>
-
-            {/* Event Details Section */}
-            <div className="mb-4">
-                <h5 className="fw-bold text-dark mb-3 section-title">Event Details</h5>
-                
+            <InfoCard title="Event Overview" iconClass="fas fa-info-circle" borderColor="#3498db">
                 <Row>
-                    <Col lg={6} className="mb-4">
-                        <div className="details-container">
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📍 Location:
-                                </div>
-                                <div className="fw-bold">{eventData.location || 'N/A'}</div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    🏢 Venue:
-                                </div>
-                                <div className="fw-bold">{eventData.venue || 'N/A'}</div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    🌍 Country:
-                                </div>
-                                <div className="fw-bold">{eventData.country || 'N/A'}</div>
-                            </div>
+                    <Col lg={6} md={12}>
+                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <InfoField label="Event Name" value={eventData.name} iconClass="fas fa-calendar-alt" />
+                            <InfoField
+                                label="Ticket Price"
+                                value={
+                                    <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '16px' }}>
+                                        {eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free'}
+                                    </span>
+                                }
+                                iconClass="fas fa-dollar-sign"
+                            />
+                            <InfoField
+                                label="Start Date & Time"
+                                value={<DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />}
+                                iconClass="fas fa-clock"
+                            />
+                            <InfoField
+                                label="End Date & Time"
+                                value={<DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />}
+                                iconClass="fas fa-clock"
+                            />
+
+                            <InfoField
+                                label="Lucky Draw Feature"
+                                value={
+                                    <Badge bg={eventData.enableLuckyDrawFeature ? 'success' : 'danger'} className="px-3 py-1">
+                                        {eventData.enableLuckyDrawFeature ? 'Enabled' : 'Disabled'}
+                                        <i
+                                            style={{ marginLeft: '4px' }}
+                                            className={`fas fa-${eventData.enableLuckyDrawFeature ? 'check-circle' : 'times-circle'} me-1`}
+                                        ></i>
+                                    </Badge>
+                                }
+                                iconClass="fas fa-gift"
+                            />
+                            <InfoField
+                                label="Created At"
+                                value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.createdAt)}</span>}
+                                iconClass="fas fa-calendar-plus"
+                            />
                         </div>
                     </Col>
-                    
-                    <Col lg={6} className="mb-4">
-                        <div className="details-container">
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    💰 Ticket Price:
-                                </div>
-                                <div className="fw-bold text-success fs-5">
-                                    {eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free'}
-                                </div>
+
+                    <Col lg={6} md={12}>
+                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <InfoField
+                                label="Event Type"
+                                value={
+                                    <Badge bg="secondary" className="px-3 py-1">
+                                        {eventData.type || 'N/A'}
+                                    </Badge>
+                                }
+                                iconClass="fas fa-tag"
+                            />
+                            <InfoField label="Location" value={eventData.location || 'N/A'} iconClass="fas fa-map-marker-alt" />
+                            <InfoField label="Venue" value={eventData.venue || 'N/A'} iconClass="fas fa-building" />
+                            <InfoField label="Country" value={eventData.country || 'N/A'} iconClass="fas fa-globe" />
+
+                            <InfoField label="Attendance Count" value={eventData.attendanceCount || '0'} iconClass="fas fa-users" />
+                            <InfoField
+                                label="Last Updated"
+                                value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.updatedAt)}</span>}
+                                iconClass="fas fa-edit"
+                            />
+                        </div>
+                    </Col>
+                    <Col lg={12} md={12}>
+                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                            <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
+                                <i
+                                    className="fa fa-sticky-note"
+                                    style={{ marginRight: '8px', color: getIconColor('fa fa-sticky-note') }}
+                                ></i>
+                                Event Description:
                             </div>
-                            
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    📊 Created At:
-                                </div>
-                                <div className="text-muted">{formatTimestamp(eventData.createdAt)}</div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <div className="fw-semibold text-muted mb-1 label-text">
-                                    🔄 Last Updated:
-                                </div>
-                                <div className="text-muted">{formatTimestamp(eventData.updatedAt)}</div>
-                            </div>
+                            <ExpandableDescription 
+                                text={eventData.description}
+                                maxLines={2}
+                            />
                         </div>
                     </Col>
                 </Row>
-            </div>
+            </InfoCard>
 
             {/* Categories Section */}
-            <div className="mb-4">
-                <h5 className="fw-bold text-dark mb-3 section-title">Event Categories</h5>
+            <InfoCard title="Event Categories" iconClass="fas fa-tags" borderColor="#f39c12">
                 {renderCategories()}
-            </div>
+            </InfoCard>
 
-            {/* Custom CSS Styles */}
+            {/* Custom CSS for Responsive Behavior */}
             <style jsx>{`
-                .label-text {
-                    font-size: 1rem !important;
-                    font-weight: 600 !important;
-                    color: #495057 !important;
-                    text-transform: none !important;
-                    letter-spacing: 0.3px !important;
-                    margin-bottom: 8px !important;
+                /* Desktop: side-by-side layout */
+                .info-field-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                 }
 
-                .description-content {
-                    background: #f8f9fa;
-                    padding: 15px;
-                    border-radius: 8px;
-                    font-size: 0.95rem;
-                    color: #495057;
-                    line-height: 1.6;
-                    border: 1px solid #e9ecef;
-                    font-style: eventData.description ? 'normal' : 'italic';
+                .field-label {
+                    min-width: 140px;
                 }
 
-                .section-title {
-                    color: #2c3e50 !important;
-                    border-bottom: 2px solid #3498db;
-                    padding-bottom: 8px;
-                    position: relative;
+                .field-value {
+                    text-align: right;
+                    flex: 1;
                 }
 
-                .section-title::after {
-                    content: '';
-                    position: absolute;
-                    bottom: -2px;
-                    left: 0;
-                    width: 50px;
-                    height: 2px;
-                    background: #e74c3c;
-                }
-
-                .overview-container {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 20px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    border-left: 4px solid #3498db;
-                }
-
-                .details-container {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 20px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    height: 100%;
-                    border-left: 4px solid #27ae60;
-                }
-
-                .category-item {
-                    background: white;
-                    border-radius: 8px;
-                    padding: 20px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    height: 100%;
-                    border-left: 4px solid #f39c12;
-                }
-
-                /* Mobile Responsive Styles */
+                /* Mobile: stacked layout */
                 @media (max-width: 768px) {
-                    .label-text {
-                        font-size: 0.9rem !important;
-                        color: #2c3e50 !important;
+                    .info-field-container {
+                        display: block !important;
+                        text-align: left !important;
                     }
-                    
-                    .section-title {
-                        font-size: 1.2rem !important;
-                        color: #2c3e50 !important;
-                        border-bottom: 2px solid #3498db;
-                        margin-bottom: 15px;
+
+                    .field-label {
+                        display: block !important;
+                        min-width: auto !important;
+                        margin-bottom: 4px !important;
+                        font-size: 13px !important;
+                        color: #495057 !important;
                     }
-                    
-                    .overview-container,
-                    .details-container,
-                    .category-item {
-                        background: #ffffff !important;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
-                        padding: 15px !important;
-                        border-radius: 6px !important;
-                        margin-bottom: 10px;
-                        border: 1px solid #e9ecef;
-                    }
-                    
-                    .overview-container {
-                        border-left: 4px solid #3498db;
-                    }
-                    
-                    .details-container {
-                        border-left: 4px solid #27ae60;
-                    }
-                    
-                    .category-item {
-                        border-left: 4px solid #f39c12;
-                    }
-                    
-                    .description-content {
-                        font-size: 0.9rem;
-                        padding: 12px;
-                        background: #f8f9fa;
-                    }
-                    
-                    .fw-bold {
-                        font-size: 0.95rem !important;
-                        color: #2c3e50 !important;
-                    }
-                    
-                    .text-muted {
-                        font-size: 0.85rem !important;
-                        color: #6c757d !important;
-                    }
-                    
-                    .fs-5 {
-                        font-size: 1rem !important;
-                    }
-                    
-                    .px-3.py-2 {
-                        padding: 0.5rem 1rem !important;
-                        font-size: 0.8rem !important;
-                    }
-                    
-                    hr {
-                        border-color: #dee2e6;
-                        margin: 15px 0;
+
+                    .field-value {
+                        display: block !important;
+                        text-align: left !important;
+                        font-size: 14px !important;
+                        font-weight: 600 !important;
+                        color: #212529 !important;
+                        padding-left: 0 !important;
+                        margin-left: 0 !important;
                     }
                 }
 
                 @media (max-width: 576px) {
-                    .label-text {
-                        font-size: 0.85rem !important;
-                        color: #2c3e50 !important;
+                    .field-label {
+                        font-size: 12px !important;
                     }
-                    
-                    .section-title {
-                        font-size: 1.1rem !important;
-                        color: #2c3e50 !important;
-                    }
-                    
-                    .fw-bold {
-                        font-size: 0.9rem !important;
-                        color: #2c3e50 !important;
-                    }
-                    
-                    .text-muted {
-                        font-size: 0.8rem !important;
-                        color: #6c757d !important;
-                    }
-                    
-                    .description-content {
-                        font-size: 0.85rem;
-                        padding: 10px;
-                    }
-                    
-                    .overview-container,
-                    .details-container,
-                    .category-item {
-                        padding: 12px !important;
-                        margin-bottom: 8px;
+
+                    .field-value {
+                        font-size: 13px !important;
                     }
                 }
             `}</style>

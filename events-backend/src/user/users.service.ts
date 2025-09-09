@@ -65,12 +65,22 @@ export class UserService {
   }
 
 
-  async getAll(roles?: UserRole[]): Promise<Partial<UserEntity>[]> {
+  async getAll(roles?: UserRole[], roleFilter?: string): Promise<Partial<UserEntity>[]> {
     try {
       let where = {};
-      if (roles && roles.length > 0) {
+      
+      // If roleFilter is provided, override the roles parameter
+      if (roleFilter) {
+        if (roleFilter === 'exhibitor') {
+          where = { role: UserRole.Exhibitor };
+        } else if (roleFilter === 'user') {
+          where = { role: UserRole.User };
+        }
+        // If roleFilter is provided but not 'exhibitor' or 'user', show both (no where clause)
+      } else if (roles && roles.length > 0) {
         where = { role: In(roles) };
       }
+      
       const users = await this.userRepository.find({
         where,
         relations: ['addresses'],

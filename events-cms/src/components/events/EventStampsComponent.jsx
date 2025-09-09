@@ -1,5 +1,6 @@
 import React from 'react';
 import StandardComponentTemplate from '../StandardComponentTemplate';
+import { ExpandableDescription } from '../ExpandableDescription';
 
 /**
  * EventStampsComponent - Component to display event stamps
@@ -13,7 +14,7 @@ const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick 
         return (
             <StandardComponentTemplate 
                 title="Event Stamps" 
-                icon="🏷️"
+                // icon="🏷️"
                 borderColor="red"
             >
                 <div className="text-center py-4">
@@ -112,7 +113,13 @@ const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick 
         return (
             <div className="mb-3 mt-3">
                 <h6>Description</h6>
-                <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventStamps.description}</p>
+                <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>
+
+                    <ExpandableDescription 
+                        text={eventStamps.description}
+                        maxLines={2}
+                    />
+                </p>
             </div>
         );
     };
@@ -120,7 +127,7 @@ const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick 
     return (
         <StandardComponentTemplate 
             title="Event Stamps" 
-            icon="🏷️"
+            // icon="🏷️"
             borderColor="red"
         >
             {/* Stamp Images */}

@@ -5,6 +5,7 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
+import Form from 'react-bootstrap/Form';
 import { useSelector } from 'react-redux';
 import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
@@ -212,6 +213,7 @@ const UserList = () => {
     const [userIdToDelete, setUserIdToDelete] = React.useState(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
+    const [roleFilter, setRoleFilter] = useState('all');
 
     const handleViewUser = (userData) => {
         navigate(`${USER_PATHS.VIEW_USER}/${userData.id}`);
@@ -237,11 +239,20 @@ const UserList = () => {
                 await deleteUserData(userIdToDelete);
                 setShowConfirmModal(false);
                 setIsLoading(false);
+                // Refresh data with current filter after deletion
+                await fetchData(roleFilter === 'all' ? null : roleFilter);
             } catch (error) {
                 console.error('Error deleting user:', error);
             }
         }
         setIsLoading(false);
+    };
+
+    const handleRoleFilterChange = async (event) => {
+        const newFilter = event.target.value;
+        setRoleFilter(newFilter);
+        // Fetch data with new filter
+        await fetchData(newFilter === 'all' ? null : newFilter);
     };
 
     const destroyTable = () => {
@@ -275,7 +286,7 @@ const UserList = () => {
     };
 
     useEffect(() => {
-        fetchData();
+        fetchData(roleFilter === 'all' ? null : roleFilter);
         return () => destroyTable();
     }, []);
 
@@ -299,6 +310,33 @@ const UserList = () => {
                 <Col sm={12} className="btn-page">
                     <Card className="user-list"> 
                         <Card.Body>
+                            {/* Filter Section */}
+                            <Row className="mb-3">
+                                <Col md={4}>
+                                    <Form.Group>
+                                        <Form.Label><strong>Filter by Role:</strong></Form.Label>
+                                        <Form.Select
+                                            value={roleFilter}
+                                            onChange={handleRoleFilterChange}
+                                            className="form-control"
+                                        >
+                                            <option value="all">All Users & Exhibitors</option>
+                                            <option value="user">Users Only</option>
+                                            <option value="exhibitor">Exhibitors Only</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                </Col>
+                                <Col md={8}>
+                                    <div className="d-flex align-items-end h-100">
+                                        <p className="text-muted mb-0">
+                                            {roleFilter === 'all' && 'Showing all users and exhibitors'}
+                                            {roleFilter === 'user' && 'Showing users only'}
+                                            {roleFilter === 'exhibitor' && 'Showing exhibitors only'}
+                                        </p>
+                                    </div>
+                                </Col>
+                            </Row>
+                            
                             <Table striped hover responsive id="user-data-table">
                                 <thead>
                                     <tr>

@@ -53,7 +53,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                 }}>
                     <div 
                         className="profile-image mb-3" 
-                        onClick={() => handleSpeakerImageClick(speaker.speakerProfile)}
+                        onClick={() => handleSpeakerImageClick(speaker.profilePicture)}
                         style={{ cursor: 'pointer' }}
                     >
                         <div style={{
@@ -67,9 +67,9 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                             margin: '0 auto',
                             border: '3px solid rgba(255,255,255,0.3)'
                         }}>
-                            {speaker.speakerProfile ? (
+                            {speaker.profilePicture ? (
                                 <img
-                                    src={`${API_URL}/${speaker.speakerProfile}`}
+                                    src={`${API_URL}/${speaker.profilePicture}`}
                                     alt={speaker.name}
                                     style={{
                                         width: '100%',

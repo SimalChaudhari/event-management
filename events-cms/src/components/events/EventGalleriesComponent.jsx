@@ -14,7 +14,7 @@ const EventGalleriesComponent = ({ galleries, getImageSrc, handleGalleryImageCli
         return (
             <StandardComponentTemplate 
                 title="Event Galleries" 
-                icon="🖼️"
+                // icon="🖼️"
                 borderColor="purple"
             >
                 <div className="text-center py-4">    
@@ -108,7 +108,7 @@ const EventGalleriesComponent = ({ galleries, getImageSrc, handleGalleryImageCli
     return (
         <StandardComponentTemplate 
             title="Event Galleries" 
-            icon="🖼️"
+            // icon="🖼️"
             borderColor="purple"
         >
             {galleries.map((gallery, index) => renderGallery(gallery, index))}

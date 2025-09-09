@@ -1,10 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Table from 'react-bootstrap/Table';
+import { Row, Col, Card, Table } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { participatedEvents, adminDeleteRegisterEvent } from '../../../store/actions/eventActions';
@@ -346,12 +343,6 @@ const RegisteredEvents = () => {
     const location = useLocation();
     const navigate = useNavigate();
     
-    // Add state for view modal
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [viewData, setViewData] = useState(null);
-
-    // Add state for Add Register Event modal
-    const [showAddRegisterModal, setShowAddRegisterModal] = useState(false);
 
     // Delete modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -475,18 +466,5 @@ const RegisteredEvents = () => {
     );
 };
 
-// Add this helper function to calculate duration
-function calculateDuration(startDate, endDate) {
-    const diffTime = Math.abs(endDate - startDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 1) {
-        return '<span class="badge badge-light-info">1 day</span>';
-    } else if (diffDays === 0) {
-        return '<span class="badge badge-light-info">Same day</span>';
-    } else {
-        return `<span class="badge badge-light-info">${diffDays} days</span>`;
-    }
-}
 
 export default RegisteredEvents;

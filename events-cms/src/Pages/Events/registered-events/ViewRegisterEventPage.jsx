@@ -18,83 +18,6 @@ import EventStampsComponent from '../../../components/events/EventStampsComponen
 import EventSurveyComponent from '../../../components/events/EventSurveyComponent';
 import EventExhibitorsComponent from '../../../components/events/EventExhibitorsComponent';
 
-// Google Maps API Key
-const GOOGLE_API_KEY = 'AIzaSyAh43XIafkwl_7xaqeES90e8FQWqhN4DEc';
-
-// Google Maps Component
-const GoogleMap = ({ latitude, longitude, eventName, location }) => {
-    const [mapLoaded, setMapLoaded] = useState(false);
-
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => setMapLoaded(true);
-        document.head.appendChild(script);
-
-        return () => {
-            if (document.head.contains(script)) {
-                document.head.removeChild(script);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        if (mapLoaded && latitude && longitude) {
-            const map = new window.google.maps.Map(document.getElementById('map'), {
-                center: { lat: parseFloat(latitude), lng: parseFloat(longitude) },
-                zoom: 15,
-                mapTypeId: window.google.maps.MapTypeId.ROADMAP
-            });
-
-            new window.google.maps.Marker({
-                position: { lat: parseFloat(latitude), lng: parseFloat(longitude) },
-                map: map,
-                title: eventName || 'Event Location',
-                animation: window.google.maps.Animation.DROP
-            });
-        }
-    }, [mapLoaded, latitude, longitude, eventName, location]);
-
-    if (!latitude || !longitude) {
-        return (
-            <div
-                style={{
-                    height: '300px',
-                    backgroundColor: '#f8f9fa',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef'
-                }}
-            >
-                <div className="text-center">
-                    <i className="fas fa-map-marker-alt text-muted" style={{ fontSize: '3rem', marginBottom: '10px' }}></i>
-                    <p className="text-muted mb-0">No coordinates available</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div id="map" style={{ height: '300px', width: '100%', borderRadius: '8px', border: '1px solid #e9ecef', overflow: 'hidden' }}>
-            {!mapLoaded && (
-                <div
-                    style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}
-                >
-                    <div className="text-center">
-                        <div className="spinner-border text-primary" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-2 mb-0 text-muted">Loading map...</p>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
 
 const ViewRegisterEventPage = () => {
     const { id } = useParams();
@@ -163,38 +86,6 @@ const ViewRegisterEventPage = () => {
         }
     };
 
-    // Event main image zoom function
-    const handleEventMainImageClick = (imagePath) => {
-        setCurrentEventMainImage(imagePath);
-        setShowEventMainImageModal(true);
-    };
-
-    // Render categories
-    const renderCategories = () => {
-        if (!eventData?.event?.categories?.length) {
-            return <p>No categories listed.</p>;
-        }
-
-        return (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {eventData.event.categories.map((category, index) => (
-                    <Badge
-                        key={category.id}
-                        bg="success"
-                        style={{
-                            fontSize: '14px',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            backgroundColor: '#FFF'
-                        }}
-                    >
-                        <i className="fas fa-tag me-2" style={{ color: '#000', marginRight: 6 }}></i>
-                        {category.name}
-                    </Badge>
-                ))}
-            </div>
-        );
-    };
 
     // Render event statistics
     const renderEventStats = () => {
@@ -306,267 +197,6 @@ const ViewRegisterEventPage = () => {
         setShowImageModal(true);
     };
 
-    // Render galleries
-    const renderGalleries = () => {
-        if (!eventData?.event?.galleries?.length) {
-            return <p>No galleries available.</p>;
-        }
-
-        return (
-            <div>
-                {eventData.event.galleries.map((gallery, galleryIndex) => (
-                    <div key={gallery.id} className="mb-4">
-                        <h5>
-                            {gallery.title} <Badge bg="info">{gallery.galleryImages?.length || 0}</Badge>
-                        </h5>
-                        <hr />
-                        <div
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                                gap: '10px',
-                                marginTop: '10px'
-                            }}
-                        >
-                            {gallery.galleryImages?.map((image, index) => {
-                                const imageSrc = getImageSrc(image);
-
-                                return (
-                                    <div
-                                        key={index}
-                                        style={{
-                                            position: 'relative',
-                                            cursor: 'pointer',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            border: '2px solid #ddd',
-                                            transition: 'transform 0.2s ease, border-color 0.2s ease'
-                                        }}
-                                        onClick={() => handleGalleryImageClick(gallery.galleryImages, gallery.title, index)}
-                                    >
-                                        <img
-                                            src={imageSrc}
-                                            alt={`Gallery ${galleryIndex + 1} - Image ${index + 1}`}
-                                            style={{ width: '100%', height: '150px', objectFit: 'cover' }}
-                                            onError={(e) => {
-                                                console.error('Gallery image failed to load:', imageSrc);
-                                                e.target.style.display = 'none';
-                                            }}
-                                        />
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                                color: 'white',
-                                                padding: '2px 6px',
-                                                borderRadius: '50%',
-                                                fontSize: '10px'
-                                            }}
-                                        >
-                                            <i className="fas fa-search-plus"></i>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    };
-
-    // Render exhibitors
-    const renderExhibitors = () => {
-        if (!eventData?.event?.exhibitorsData?.exhibitors?.length) {
-            return <p>No exhibitors available.</p>;
-        }
-
-        return (
-            <div>
-                {eventData.event.exhibitorsData.exhibitorDescription && (
-                    <div className="mb-4">
-                        <h6>Exhibitor Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}>{eventData.event.exhibitorsData.exhibitorDescription}</p>
-                        <hr />
-                    </div>
-                )}
-
-                <div className="exhibitors-grid">
-                    {eventData.event.exhibitorsData.exhibitors.map((exhibitor) => (
-                        <div key={exhibitor.id} className="exhibitor-card mb-4">
-                            <div className="exhibitor-header">
-                                <h6 className="exhibitor-name">{exhibitor.name}</h6>
-                                <p className="exhibitor-company">{exhibitor.companyName}</p>
-                            </div>
-
-                            <div className="exhibitor-info">
-                                {exhibitor.companyDescription && <p className="exhibitor-description">{exhibitor.companyDescription}</p>}
-
-                                <div className="exhibitor-contact">
-                                    {exhibitor.email && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-envelope"></i>
-                                            <span>{exhibitor.email}</span>
-                                        </div>
-                                    )}
-
-                                    {exhibitor.mobile && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-mobile"></i>
-                                            <span>{exhibitor.mobile}</span>
-                                        </div>
-                                    )}
-
-                                    {exhibitor.address && (
-                                        <div className="contact-item">
-                                            <i className="fas fa-map-marker-alt"></i>
-                                            <span>{exhibitor.address}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Exhibitor Images */}
-                                {exhibitor.eventImages?.length > 0 && (
-                                    <div className="mt-3">
-                                        <h6>Event Images</h6>
-                                        <div
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                                                gap: '8px'
-                                            }}
-                                        >
-                                            {exhibitor.eventImages.map((image, index) => (
-                                                <img
-                                                    key={index}
-                                                    src={getImageSrc(image)}
-                                                    alt={`Exhibitor ${index + 1}`}
-                                                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Promotional Offers */}
-                                {exhibitor.promotionalOffers?.length > 0 && (
-                                    <div className="mt-3">
-                                        <h6>Promotional Offers</h6>
-                                        {exhibitor.promotionalOffers.map((offer) => (
-                                            <div key={offer.id} className="offer-card mb-2">
-                                                <div className="d-flex align-items-center">
-                                                    {offer.image && (
-                                                        <img
-                                                            src={getImageSrc(offer.image)}
-                                                            alt={offer.title}
-                                                            style={{
-                                                                width: '50px',
-                                                                height: '50px',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '4px',
-                                                                marginRight: '10px'
-                                                            }}
-                                                        />
-                                                    )}
-                                                    <div>
-                                                        <h6 className="mb-1">{offer.title}</h6>
-                                                        <p className="mb-1 small">{offer.description}</p>
-                                                        <small className="text-muted">
-                                                            Valid until: {new Date(offer.validDate).toLocaleDateString()}
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
-    // Render event stamps
-    const renderEventStamps = () => {
-        if (!eventData?.event?.eventStamps) {
-            return <p>No event stamps available.</p>;
-        }
-
-        return (
-            <div>
-                <h5>Event Stamps</h5>
-                <hr />
-
-                {eventData.event.eventStamps.images?.length > 0 && (
-                    <div>
-                        <h6>Stamp Images</h6>
-                        <div
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                                gap: '10px',
-                                marginTop: '10px'
-                            }}
-                        >
-                            {eventData.event.eventStamps.images.map((image, index) => {
-                                const imageSrc = getImageSrc(image);
-
-                                return (
-                                    <div
-                                        key={index}
-                                        style={{
-                                            position: 'relative',
-                                            cursor: 'pointer',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            border: '2px solid #ddd',
-                                            transition: 'transform 0.2s ease, border-color 0.2s ease'
-                                        }}
-                                        onClick={() => handleStampImageClick(index)}
-                                    >
-                                        <img
-                                            src={imageSrc}
-                                            alt={`Event Stamp ${index + 1}`}
-                                            style={{ width: '100%', height: '150px', objectFit: 'cover' }}
-                                            onError={(e) => {
-                                                console.error('Stamp image failed to load:', imageSrc);
-                                                e.target.style.display = 'none';
-                                            }}
-                                        />
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: '5px',
-                                                right: '5px',
-                                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                                color: 'white',
-                                                padding: '2px 6px',
-                                                borderRadius: '50%',
-                                                fontSize: '10px'
-                                            }}
-                                        >
-                                            <i className="fas fa-search-plus"></i>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {eventData.event.eventStamps.description && (
-                    <div className="mb-3 mt-3">
-                        <h6>Description</h6>
-                        <p style={{ textAlign: 'justify', lineHeight: '1.6' }}> {eventData.event.eventStamps.description}</p>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     // Gallery navigation functions
     const goToPreviousGalleryImage = () => {
@@ -629,79 +259,17 @@ const ViewRegisterEventPage = () => {
                 </div>
 
                 <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                    {/* Registration Info */}
-                    <div
-                        className="mb-3"
-                        style={{
-                            backgroundColor: '#f8f9fa',
-                            borderRadius: '8px',
-                            padding: '20px',
-                            border: '1px solid #e9ecef'
-                        }}
-                    >
-                        <h5>Registration Information</h5>
-                        <hr />
-                        <Row>
-                            <Col md={6}>
-                                <p className="mb-2">
-                                    <strong>Registered By:</strong> {eventData.user?.firstName} {eventData.user?.lastName}
-                                </p>
-                                <p className="mb-2">
-                                    <strong>Email:</strong> {eventData.user?.email}
-                                </p>
-                                <p className="mb-2">
-                                    <strong>Mobile:</strong> {eventData.user?.mobile || 'N/A'}
-                                </p>
-                                <p className="mb-2">
-                                    <strong>Registration Date:</strong> {regDate}
-                                </p>
-                            </Col>
-                            <Col md={6}>
-                                <p className="mb-2">
-                                    <strong>User Type:</strong>
-                                    <span
-                                        className="badge ml-2"
-                                        style={{
-                                            backgroundColor: eventData.type === 'exhibitor' ? 'rgb(162, 209, 231)' : 'rgb(223, 228, 165)',
-                                            color: 'rgb(14, 13, 13)',
-                                            fontWeight: '500'
-                                        }}
-                                    >
-                                        {eventData.type || 'N/A'}
-                                    </span>
-                                </p>
-                                <p className="mb-2">
-                                    <strong>Registration Status:</strong>
-                                    <Badge
-                                        bg={
-                                            eventData.status === 'Success'
-                                                ? 'success'
-                                                : eventData.status === 'Withdraw'
-                                                ? 'danger'
-                                                : 'warning'
-                                        }
-                                        className="ml-2"
-                                    >
-                                        {eventData.status}
-                                    </Badge>
-                                </p>
-                                {eventData.isCreatedByAdmin && (
-                                    <p className="mb-2">
-                                        <strong>Created By:</strong>
-                                        <Badge bg="danger" className="ml-2">
-                                            <i className="fas fa-shield mr-1"></i>Admin
-                                        </Badge>
-                                    </p>
-                                )}
-                            </Col>
-                        </Row>
-                    </div>
-
                     {/* Tabbed Content */}
-                    <Tab.Container id="event-tabs" defaultActiveKey="details">
+                    <Tab.Container id="event-tabs" defaultActiveKey="registration">
                         <Row>
                             <Col sm={12}>
                                 <Nav variant="tabs" className="mb-3">
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="registration">
+                                            <i className="fas fa-user-check me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Registration Information
+                                        </Nav.Link>
+                                    </Nav.Item>
                                     <Nav.Item>
                                         <Nav.Link eventKey="details">
                                             <i className="fas fa-info-circle me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
@@ -766,6 +334,233 @@ const ViewRegisterEventPage = () => {
                         </Row>
 
                         <Tab.Content>
+                            {/* Registration Information Tab */}
+                            <Tab.Pane eventKey="registration">
+                                <div className="p-2 bg-light">
+                                    {/* User Information Section */}
+                                    <div
+                                        className="mb-4"
+                                        style={{
+                                            backgroundColor: '#fff',
+                                            borderRadius: '8px',
+                                            padding: '20px',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                            border: '1px solid #e9ecef',
+                                            borderLeft: '4px solid #3498db'
+                                        }}
+                                    >
+                                        <div style={{ padding: '24px' }}>
+                                            <h5
+                                                style={{
+                                                    fontSize: '18px',
+                                                    fontWeight: '600',
+                                                    color: '#2c3e50',
+                                                    marginBottom: '20px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    borderBottom: '2px solid #3498db',
+                                                    paddingBottom: '8px'
+                                                }}
+                                            >
+                                                <i className="fas fa-user-circle" style={{ fontSize: '20px', color: '#3498db' }}></i>
+                                                User Information
+                                            </h5>
+                                            <Row>
+                                                <Col lg={6} md={12}>
+                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i className="fas fa-user" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                                                    Registered By:
+                                                                </div>
+                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                    {eventData.user?.firstName} {eventData.user?.lastName}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i className="fas fa-envelope" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
+                                                                    Email:
+                                                                </div>
+                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                    {eventData.user?.email}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i className="fas fa-phone" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                                                                    Mobile:
+                                                                </div>
+                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                    {eventData.user?.mobile || 'N/A'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                                
+                                                <Col lg={6} md={12}>
+                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
+                                                                    Registration Date:
+                                                                </div>
+                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                    {regDate}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i className="fas fa-tag" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
+                                                                    User Type:
+                                                                </div>
+                                                                <div className="field-value">
+                                                                    <Badge bg="secondary" className="px-3 py-1">
+                                                                        {eventData.type || 'N/A'}
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {eventData.isCreatedByAdmin && (
+                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                <div className="info-field-container">
+                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                        <i className="fas fa-shield-alt" style={{ marginRight: '8px', color: '#dc3545' }}></i>
+                                                                        Created By:
+                                                                    </div>
+                                                                    <div className="field-value">
+                                                                        <Badge bg="danger" className="px-3 py-1">
+                                                                            Admin
+                                                                        </Badge>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    </div>
+
+                                    {/* Registration Status Section */}
+                                    <div
+                                        className="mb-4"
+                                        style={{
+                                            backgroundColor: '#fff',
+                                            borderRadius: '8px',
+                                            padding: '20px',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                            border: '1px solid #e9ecef',
+                                            borderLeft: '4px solid #28a745'
+                                        }}
+                                    >
+                                        <div style={{ padding: '24px' }}>
+                                            <h5
+                                                style={{
+                                                    fontSize: '18px',
+                                                    fontWeight: '600',
+                                                    color: '#2c3e50',
+                                                    marginBottom: '20px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    borderBottom: '2px solid #28a745',
+                                                    paddingBottom: '8px'
+                                                }}
+                                            >
+                                                <i className="fas fa-clipboard-check" style={{ fontSize: '20px', color: '#28a745' }}></i>
+                                                Registration Status
+                                            </h5>
+                                            <Row>
+                                                <Col lg={12} md={12}>
+                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                            <div className="info-field-container">
+                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                    <i 
+                                                                        className={`fas ${eventData.status === 'Success' ? 'fa-check-circle' : eventData.status === 'Withdraw' ? 'fa-times-circle' : 'fa-clock'}`} 
+                                                                        style={{ 
+                                                                            marginRight: '8px', 
+                                                                            color: eventData.status === 'Success' ? '#28a745' : eventData.status === 'Withdraw' ? '#dc3545' : '#ffc107'
+                                                                        }}
+                                                                    ></i>
+                                                                    Registration Status:
+                                                                </div>
+                                                                <div className="field-value">
+                                                                    <Badge
+                                                                        bg={
+                                                                            eventData.status === 'Success'
+                                                                                ? 'success'
+                                                                                : eventData.status === 'Withdraw'
+                                                                                ? 'danger'
+                                                                                : 'warning'
+                                                                        }
+                                                                        className="px-3 py-2"
+                                                                        style={{ fontSize: '14px' }}
+                                                                    >
+                                                                        {eventData.status}
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    </div>
+
+                                    {/* Custom CSS for Responsive Behavior */}
+                                    <style jsx>{`
+                                        /* Desktop: side-by-side layout */
+                                        .info-field-container {
+                                            display: flex;
+                                            justify-content: space-between;
+                                            align-items: center;
+                                        }
+
+                                        .field-label {
+                                            min-width: 140px;
+                                        }
+
+                                        .field-value {
+                                            text-align: right;
+                                            flex: 1;
+                                        }
+
+                                        /* Mobile: stacked layout */
+                                        @media (max-width: 768px) {
+                                            .info-field-container {
+                                                display: block !important;
+                                                text-align: left !important;
+                                            }
+
+                                            .field-label {
+                                                margin-bottom: 5px;
+                                            }
+
+                                            .field-value {
+                                                text-align: left !important;
+                                                margin-left: 20px;
+                                            }
+                                        }
+                                    `}</style>
+                                </div>
+                            </Tab.Pane>
+
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
                                 <EventBasicComponent eventData={eventData?.event} />

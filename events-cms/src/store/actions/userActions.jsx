@@ -10,11 +10,17 @@ const setLoading = (dispatch, loading) => {
     });
 };
 
-export const userList = () => async (dispatch) => {
+export const userList = (roleFilter = null) => async (dispatch) => {
     try {
         setLoading(dispatch, true);
 
-        const response = await axiosInstance.get('/users');
+        // Build the URL with role filter if provided
+        let url = '/users';
+        if (roleFilter && (roleFilter === 'user' || roleFilter === 'exhibitor')) {
+            url += `?role=${roleFilter}`;
+        }
+
+        const response = await axiosInstance.get(url);
         dispatch({
             type: USER_LIST,
             payload: response.data?.data

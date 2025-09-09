@@ -43,7 +43,7 @@ const EventLocationComponent = ({ eventData }) => {
         return (
             <StandardComponentTemplate 
                 title="Event Location" 
-                icon="📍"
+                // icon="📍"
                 borderColor="green"
             >
                 <div className="text-center py-4">
@@ -57,7 +57,7 @@ const EventLocationComponent = ({ eventData }) => {
     return (
         <StandardComponentTemplate 
             title="Event Location" 
-            icon="📍"
+            // icon="📍"
             borderColor="green"
         >
             <div className="p-3" style={{ padding: '20px' }}>

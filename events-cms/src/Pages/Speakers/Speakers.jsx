@@ -49,11 +49,12 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
                 title: 'Speaker Name',
                 render: function (data, type, row) {
                     const imageUrl = row.profilePicture ? `${API_URL}/${row.profilePicture}` : DUMMY_PATH_USER;
+                    const fullName = row.name || `${row.firstName || ''} ${row.lastName || ''}`.trim();
                     return `
                         <div class="d-inline-block align-middle">
                             <img src="${imageUrl}" alt="speaker" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
                             <div class="d-inline-block">
-                                <h6 class="m-b-0">${row.firstName} ${row.lastName}</h6>
+                                <h6 class="m-b-0">${fullName}</h6>
                                 <p class="text-muted m-b-0">${row.email || 'No email'}</p>
                             </div>
                         </div>   
@@ -75,12 +76,22 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
                 }
             },
             {
-                data: 'location',
-                title: 'Location',
+                data: 'mobile',
+                title: 'Mobile',
                 render: function (data, type, row) {
-                    return `<div class="text-wrap">${row.location || 'N/A'}</div>`;
+                    return `
+                        <div class="d-inline-block align-middle">
+                              <p class="m-b-0">
+                                <span class="badge badge-success">
+                                    <i class="feather icon-phone mr-1"></i>
+                                    ${row.mobile || 'N/A'}
+                                </span>
+                            </p>
+                        </div>
+                    `;
                 }
             },
+        
             {
                 data: 'createdAt',
                 title: 'Created Date',
@@ -260,7 +271,7 @@ const Speakers = () => {
                                         <th>Speaker Name</th>
                                         <th>Position</th>
                                         <th>Company</th>
-                                        <th>Location</th>
+                                        <th>Mobile</th>
                                         <th>Created Date</th>
                                         <th>Actions</th>
                                     </tr>

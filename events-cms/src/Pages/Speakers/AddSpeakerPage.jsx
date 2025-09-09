@@ -9,21 +9,20 @@ const AddSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { id } = useParams(); // Edit mode के लिए
-    
+
     const [formData, setFormData] = useState({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         mobile: '',
         position: '',
         companyName: '',
-        location: '',
+
         description: '',
-        speakerProfile: null
+        profilePicture: null
     });
     const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
     // Load edit data if id exists
     useEffect(() => {
@@ -34,19 +33,20 @@ const AddSpeakerPage = () => {
                     if (response?.data) {
                         const editData = response.data;
                         setFormData({
-                            name: editData.name || '',
+                            firstName: editData.firstName || '',
+                            lastName: editData.lastName || '',
                             email: editData.email || '',
                             mobile: editData.mobile || '',
                             position: editData.position || '',
                             companyName: editData.companyName || '',
-                            location: editData.location || '',
+
                             description: editData.description || '',
-                            speakerProfile: null
+                            profilePicture: null
                         });
-                        
+
                         // Edit mode में पुरानी image का URL set करें
-                        if (editData.speakerProfile) {
-                            setImagePreview(`${API_URL}/${editData.speakerProfile}`);
+                        if (editData.profilePicture) {
+                            setImagePreview(`${API_URL}/${editData.profilePicture}`);
                         } else {
                             setImagePreview(DUMMY_PATH);
                         }
@@ -71,10 +71,9 @@ const AddSpeakerPage = () => {
         const file = e.target.files[0];
         setFormData((prev) => ({
             ...prev,
-            speakerProfile: file
+            profilePicture: file
         }));
 
-        // नई image का preview दिखाने के लिए
         if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -82,9 +81,8 @@ const AddSpeakerPage = () => {
             };
             reader.readAsDataURL(file);
         } else {
-            // Edit mode में पुरानी image वापस दिखाएं
-            if (id && formData.speakerProfile) {
-                setImagePreview(`${API_URL}/${formData.speakerProfile}`);
+            if (id && formData.profilePicture) {
+                setImagePreview(`${API_URL}/${formData.profilePicture}`);
             } else {
                 setImagePreview(DUMMY_PATH);
             }
@@ -94,8 +92,6 @@ const AddSpeakerPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
-        setSuccess('');
 
         try {
             const submitData = new FormData();
@@ -108,33 +104,29 @@ const AddSpeakerPage = () => {
             if (id) {
                 const response = await dispatch(updateSpeaker(id, submitData));
                 if (response) {
-                    setSuccess('Speaker updated successfully!');
-                    setTimeout(() => {
-                        navigate('/speakers');
-                    }, 2000);
+                    navigate('/speakers');
                 }
             } else {
                 const response = await dispatch(createSpeaker(submitData));
                 if (response) {
-                    setSuccess('Speaker created successfully!');
                     setFormData({
-                        name: '',
+                        firstName: '',
+                        lastName: '',
                         email: '',
                         mobile: '',
                         position: '',
                         companyName: '',
-                        location: '',
+
                         description: '',
-                        speakerProfile: null
+                        profilePicture: null
                     });
                     setImagePreview(null);
-                    setTimeout(() => {
-                        navigate('/speakers');
-                    }, 2000);
+
+                    navigate('/speakers');
                 }
             }
         } catch (error) {
-            setError('An error occurred while saving speaker');
+            setLoading(false);
         } finally {
             setLoading(false);
         }
@@ -152,33 +144,44 @@ const AddSpeakerPage = () => {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Speaker' : 'Add Speaker'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={handleCancel}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
+                                <Button variant="secondary" onClick={handleCancel}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>
                             </div>
                         </div>
                         <div className="card-body">
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            {success && <Alert variant="success">{success}</Alert>}
-
                             <form onSubmit={handleSubmit}>
                                 <Row>
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="name">
-                                                Speaker Name *
+                                            <label className="floating-label" htmlFor="firstName">
+                                                First Name *
                                             </label>
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                name="name"
-                                                value={formData.name}
+                                                name="firstName"
+                                                value={formData.firstName}
                                                 onChange={handleInputChange}
-                                                placeholder="Enter speaker name"
+                                                placeholder="Enter first name"
+                                                required
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="lastName">
+                                                Last Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="lastName"
+                                                value={formData.lastName}
+                                                onChange={handleInputChange}
+                                                placeholder="Enter last name"
                                                 required
                                             />
                                         </div>
@@ -251,22 +254,6 @@ const AddSpeakerPage = () => {
                                         </div>
                                     </Col>
 
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="location">
-                                                Location
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                name="location"
-                                                value={formData.location}
-                                                onChange={handleInputChange}
-                                                placeholder="Enter location"
-                                            />
-                                        </div>
-                                    </Col>
-
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="description">
@@ -285,23 +272,23 @@ const AddSpeakerPage = () => {
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="speakerProfile">
+                                            <label className="floating-label" htmlFor="profilePicture">
                                                 Profile Image
                                             </label>
                                             <input
                                                 type="file"
                                                 className="form-control"
-                                                name="speakerProfile"
+                                                name="profilePicture"
                                                 onChange={handleFileChange}
                                                 accept="image/*"
                                             />
-                                            
+
                                             {/* Image Preview */}
                                             {imagePreview && (
                                                 <div className="mt-3 text-start">
-                                                    <img 
-                                                        src={imagePreview} 
-                                                        alt="Profile Preview" 
+                                                    <img
+                                                        src={imagePreview}
+                                                        alt="Profile Preview"
                                                         style={{
                                                             width: '120px',
                                                             height: '120px',
@@ -319,15 +306,12 @@ const AddSpeakerPage = () => {
                                         </div>
                                     </Col>
                                 </Row>
-                                
+
                                 {/* Form Actions */}
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button 
-                                                variant="danger" 
-                                                onClick={handleCancel}
-                                            >
+                                            <Button variant="danger" onClick={handleCancel}>
                                                 Cancel
                                             </Button>
                                             <Button
@@ -335,7 +319,8 @@ const AddSpeakerPage = () => {
                                                 type="submit"
                                                 disabled={
                                                     loading ||
-                                                    !formData.name.trim() ||
+                                                    !formData.firstName.trim() ||
+                                                    !formData.lastName.trim() ||
                                                     !formData.email.trim() ||
                                                     !formData.mobile.trim() ||
                                                     !formData.position.trim()
@@ -355,4 +340,4 @@ const AddSpeakerPage = () => {
     );
 };
 
-export default AddSpeakerPage; 
+export default AddSpeakerPage;

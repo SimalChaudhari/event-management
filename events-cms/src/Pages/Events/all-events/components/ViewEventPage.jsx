@@ -86,12 +86,9 @@ const ViewEventPage = () => {
                         {category.name}
                         {category.description}
                     </Badge>
-                    
                 ))}
 
-                <div>
-                  
-                </div>
+                <div></div>
             </div>
         );
     };
@@ -250,7 +247,6 @@ const ViewEventPage = () => {
         setShowStampImageModal(true);
     };
 
-
     // 12-hour AM/PM format helper
     const formatTime = (timeStr) => {
         if (!timeStr) return '';
@@ -367,10 +363,6 @@ const ViewEventPage = () => {
                                 <div className="p-3" style={{ padding: '20px' }}>
                                     <Row>
                                         <Col md={6}>
-                                            <h5>
-                                                Event Images <Badge bg="info">{eventData?.images?.length || 0}</Badge>
-                                            </h5>
-                                            <hr />
                                             <EventImageGridComponent
                                                 images={eventData?.images}
                                                 getImageSrc={getImageSrc}
@@ -378,10 +370,6 @@ const ViewEventPage = () => {
                                             />
                                         </Col>
                                         <Col md={6} className="section-speakers">
-                                            <h5>
-                                                Event Documents <Badge bg="info">{eventData?.documents?.length || 0}</Badge>
-                                            </h5>
-                                            <hr />
                                             <EventDocumentsComponent documents={eventData?.documents} />
                                         </Col>
                                     </Row>

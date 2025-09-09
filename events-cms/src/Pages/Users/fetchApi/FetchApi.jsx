@@ -4,9 +4,9 @@ import { deleteUser, userList } from '../../../store/actions/userActions';
 export const FetchUsers = () => {
   const dispatch = useDispatch();
 
-  const fetchData = async () => {
+  const fetchData = async (roleFilter = null) => {
     try {
-      await dispatch(userList());
+      await dispatch(userList(roleFilter));
     } catch (error) {
       console.error('Error fetching users:', error);
     }

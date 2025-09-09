@@ -19,7 +19,7 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
                 <Modal.Title>Add New Speaker</Modal.Title>
             </Modal.Header>
             <Modal.Body>
-                <Row cla>
+                 <Row>
                     <Col sm={6}>
                         <div className="form-group fill">
                             <label className="floating-label" htmlFor="name">

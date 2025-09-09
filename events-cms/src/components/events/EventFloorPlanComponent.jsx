@@ -13,7 +13,7 @@ const EventFloorPlanComponent = ({ floorPlan, getImageSrc }) => {
         return (
             <StandardComponentTemplate 
                 title="Event Floor Plan" 
-                icon="🏗️"
+                // icon="🏗️"
                 borderColor="blue"
             >
                 <div className="text-center py-4">
@@ -41,7 +41,7 @@ const EventFloorPlanComponent = ({ floorPlan, getImageSrc }) => {
     return (
         <StandardComponentTemplate 
             title="Event Floor Plan" 
-            icon="🏗️"
+            // icon="🏗️"
             borderColor="blue"
         >
             <div style={{ textAlign: 'center' }}>

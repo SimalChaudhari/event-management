@@ -30,7 +30,7 @@ export const speakerById = (id) => async (dispatch) => {
 // Create new speaker
 export const createSpeaker = (data) => async (dispatch) => {
     try {
-        const response = await axiosInstance.post('/speakers/create', data);
+        const response = await axiosInstance.post('/users/speakers/create', data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Speaker created successfully!');
             // Refresh the speaker list
@@ -48,7 +48,7 @@ export const createSpeaker = (data) => async (dispatch) => {
 // Update speaker
 export const updateSpeaker = (id, data) => async (dispatch) => {
     try {
-        const response = await axiosInstance.put(`/speakers/update/${id}`, data);
+        const response = await axiosInstance.put(`/users/speakers/update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Speaker updated successfully!');
             // Refresh the speaker list
@@ -65,7 +65,7 @@ export const updateSpeaker = (id, data) => async (dispatch) => {
 // Delete speaker
 export const deleteSpeaker = (id) => async (dispatch) => {
     try {
-        await axiosInstance.delete(`/speakers/delete/${id}`);
+        await axiosInstance.delete(`/users/speakers/delete/${id}`);
         toast.success('Speaker deleted successfully!');
         // Refresh the speaker list
         await dispatch(speakerList());

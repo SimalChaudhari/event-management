@@ -11,6 +11,7 @@ const ViewSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [speakerData, setSpeakerData] = useState(null);
+    console.log(speakerData);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('professional');
 
@@ -40,12 +41,12 @@ const ViewSpeakerPage = () => {
     if (loading) return <div>Loading...</div>;
     if (!speakerData) return <div>No speaker found.</div>;
 
-    const imageUrl = speakerData.speakerProfile ? `${API_URL}/${speakerData.speakerProfile}` : DUMMY_PATH;
+    const imageUrl = speakerData.profilePicture ? `${API_URL}/${speakerData.profilePicture}` : DUMMY_PATH;
 
     // Speaker image zoom function
-    const handleSpeakerImageClick = (speakerProfile) => {
-        if (speakerProfile) {
-            setCurrentSpeakerImage(speakerProfile);
+    const handleSpeakerImageClick = (profilePicture) => {
+        if (profilePicture) {
+            setCurrentSpeakerImage(profilePicture);
             setShowSpeakerImageModal(true);
         } else {
             setShowSpeakerImageModal(false);
@@ -75,7 +76,7 @@ const ViewSpeakerPage = () => {
                         {/* Left Side - Image */}
                         <Col lg={5} md={6} className="mb-4">
                             <div className="text-center">
-                                {speakerData.speakerProfile && (
+                                {speakerData.profilePicture && (
                                     <div style={{ position: 'relative', display: 'inline-block' }}>
                                         <img 
                                             src={imageUrl} 
@@ -90,7 +91,7 @@ const ViewSpeakerPage = () => {
                                                 cursor: 'pointer',
                                                 transition: 'transform 0.2s, box-shadow 0.2s'
                                             }}
-                                            onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                            onClick={() => handleSpeakerImageClick(speakerData.profilePicture)}
                                             onMouseEnter={(e) => {
                                                 e.target.style.transform = 'scale(1.02)';
                                                 e.target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
@@ -113,7 +114,7 @@ const ViewSpeakerPage = () => {
                                                 cursor: 'pointer',
                                                 transition: 'background-color 0.2s'
                                             }}
-                                            onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                            onClick={() => handleSpeakerImageClick(speakerData.profilePicture)}
                                             onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.9)'}
                                             onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0,0,0,0.7)'}
                                         >
@@ -121,7 +122,7 @@ const ViewSpeakerPage = () => {
                                         </div>
                                     </div>
                                 )}
-                                {!speakerData.speakerProfile && (
+                                {!speakerData.profilePicture && (
                                     <img 
                                         src={imageUrl} 
                                         alt="speaker" 
@@ -176,7 +177,7 @@ const ViewSpeakerPage = () => {
                                         <span style={{ color: '#666' }}>{speakerData.email || 'N/A'}</span>
                                     </div>
                                     <div className="mb-2">
-                                        <i className="fas fa-phone mr-2" style={{ color: '#4680ff' }}></i>
+                                        <i className="fa fa-address-card mr-2" style={{ color: '#4680ff' }}></i>
                                         <span style={{ color: '#666' }}>{speakerData.mobile || 'N/A'}</span>
                                     </div>
                                     {speakerData.location && (
@@ -226,7 +227,7 @@ const ViewSpeakerPage = () => {
                                 {speakerData.description && (
                                     <div className="mb-4">
                                         <h5 style={{ color: '#333', borderBottom: '2px solid #e9ecef', paddingBottom: '8px', marginBottom: '15px' }}>
-                                            <i className="fas fa-file-text mr-2" style={{ color: '#4680ff' }}></i>
+                                            <i className="fas fa-sticky-note mr-2" style={{ color: '#4680ff' }}></i>
                                             About Speaker
                                         </h5>
                                         <p style={{ color: '#666', lineHeight: '1.6', marginBottom: '0' }}>
@@ -244,12 +245,9 @@ const ViewSpeakerPage = () => {
                                     <Row>
                                         <Col xs={12} md={6} className="mb-3">
                                             <strong style={{ color: '#333' }}>Status:</strong><br />
-                                            <span style={{ color: '#28a745' }}>Active</span>
+                                            <span style={{ color: '#28a745' }}>{speakerData.isVerify ? 'Active' : 'Inactive'}</span>
                                         </Col>
-                                        <Col xs={12} md={6} className="mb-3">
-                                            <strong style={{ color: '#333' }}>Member Since:</strong><br />
-                                            <span style={{ color: '#666' }}>2023</span>
-                                        </Col>
+                                       
                                     </Row>
                                 </div>
                             </div>
