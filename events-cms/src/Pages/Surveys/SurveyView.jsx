@@ -121,20 +121,7 @@ function atable(data, handleAddSurvey, handleEdit, handleDelete, handleView) {
                 }
             },
          
-            {
-                data: null,
-                title: 'Survey Period',
-                render: function (data, type, row) {
-                    const startDate = formatDateTimeForTable(row.startDate, row.startTime);
-                    const endDate = formatDateTimeForTable(row.endDate, row.endTime);
-                    return `
-                        <div>
-                            <small><strong>From:</strong> ${startDate}</small><br>
-                            <small><strong>To:</strong> ${endDate}</small>
-                        </div>
-                    `;
-                }
-            },
+           
             {
                 data: 'isActive',
                 title: 'Status',
@@ -336,7 +323,7 @@ const SurveyView = () => {
                                     <tr>
                                         <th>Survey Details</th>
                                         <th>Event Details</th>
-                                        <th>Survey Period</th>
+                                     
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>

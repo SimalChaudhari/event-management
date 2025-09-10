@@ -125,6 +125,7 @@ export class EventController {
       price?: number;
       location?: string;
       category?: string;
+      eventName?: string; // Event name filter
       globalSearch?: string; // Global search term
     },
     @Request() req: any,
@@ -139,6 +140,8 @@ export class EventController {
         ...filters,
         // globalSearch should be a string for search terms
         globalSearch: typeof filters.globalSearch === 'string' ? filters.globalSearch : undefined,
+        // eventName should be a string for event name filtering
+        eventName: typeof filters.eventName === 'string' ? filters.eventName : undefined,
       };
 
       const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);

@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Row, Col, Card, Table } from 'react-bootstrap';
+import { Row, Col, Card, Table, Form, Button, InputGroup } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { participatedEvents, adminDeleteRegisterEvent } from '../../../store/actions/eventActions';
+import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter } from '../../../store/actions/eventActions';
+import FilterComponent from '../../../components/common/FilterComponent';
 import { useLocation, useNavigate } from 'react-router-dom';
+import useFilterLogic from '../../../hooks/useFilterLogic';
 import '../../../assets/css/register.css';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
@@ -343,6 +345,24 @@ const RegisteredEvents = () => {
     const location = useLocation();
     const navigate = useNavigate();
     
+    // Filter logic using custom hook
+    const {
+        selectedUserId,
+        selectedEventId,
+        users,
+        events,
+        loadingDropdowns,
+        activeFilters,
+        applyFilters,
+        clearFilters,
+        setSelectedUserId,
+        setSelectedEventId
+    } = useFilterLogic({
+        filterAction: participatedEvents,
+        loadUsersAction: getAllUsersForFilter,
+        loadEventsAction: getAllEventsForFilter,
+        dispatch
+    });
 
     // Delete modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -412,11 +432,6 @@ const RegisteredEvents = () => {
     };
 
     useEffect(() => {
-        dispatch(participatedEvents());
-        return () => destroyTable();
-    }, [dispatch]);
-
-    useEffect(() => {
         initializeTable();
         return () => destroyTable();
     }, [registrations]);
@@ -431,6 +446,22 @@ const RegisteredEvents = () => {
 
     return (
         <>
+            {/* Filter Component */}
+            <FilterComponent
+                users={users}
+                events={events}
+                loadingDropdowns={loadingDropdowns}
+                selectedUserId={selectedUserId}
+                selectedEventId={selectedEventId}
+                onUserChange={setSelectedUserId}
+                onEventChange={setSelectedEventId}
+                onApplyFilters={applyFilters}
+                onClearFilters={clearFilters}
+                activeFilters={activeFilters}
+                showUserFilter={true}
+                showEventFilter={true}
+            />
+            
             <Row>
               
                 <Col sm={12} className="btn-page">

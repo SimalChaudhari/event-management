@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus, Query } from '@nestjs/common';
 import { RegisterEventService } from './registerEvent.service';
 import { CreateRegisterEventDto, UpdateRegisterEventDto, AdminCreateRegisterEventDto } from './registerEvent.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -145,11 +145,21 @@ export class RegisterEventController {
   }
 
   @Get('all')
-  async getAll(@Req() req: Request, @Res() response: Response) {
+  async getAll(
+    @Req() req: Request, 
+    @Res() response: Response,
+    @Query('filter') filter?: string,
+    @Query('user') userFilter?: string,
+    @Query('event') eventFilter?: string
+  ) {
     try {
       const userId = req.user.id;
       const role = req.user.role;
-      const result = await this.registerEventService.findAll(userId, role);
+      const result = await this.registerEventService.findAll(userId, role, {
+        filter,
+        userFilter,
+        eventFilter
+      });
       
       return response.status(HttpStatus.OK).json(result);
     } catch (error) {

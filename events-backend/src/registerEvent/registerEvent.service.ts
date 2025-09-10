@@ -139,49 +139,71 @@ export class RegisterEventService {
     }
   }
 
-  async findAll(userId: string, role: string) {
+  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string }) {
     try {
       let registerEvents;
-
       if (role === 'admin') {
         // Admin can see all register events
-        registerEvents = await this.registerEventRepository.find({
-          relations: [
-            'user',
-            'event',
-            'event.eventSpeakers',
-            'event.eventSpeakers.speaker',
-            'event.eventSpeakers.speaker.speakerProfile',
-            'event.category',
-            'event.category.category',
-            'event.galleries',
-            'event.eventExhibitors',
-            'event.eventExhibitors.exhibitor',
-            'event.eventExhibitors.exhibitor.promotionalOffers',
-            'order',
-            'adminInfo',
-          ],
-        });
+        const queryBuilder = this.registerEventRepository
+          .createQueryBuilder('registerEvent')
+          .leftJoinAndSelect('registerEvent.user', 'user')
+          .leftJoinAndSelect('registerEvent.event', 'event')
+          .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
+          .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+          .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+          .leftJoinAndSelect('event.category', 'category')
+          .leftJoinAndSelect('category.category', 'categoryDetails')
+          .leftJoinAndSelect('event.galleries', 'galleries')
+          .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
+          .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
+          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('registerEvent.order', 'order')
+          .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo');
+
+        // Apply filters if provided
+        if (filters?.userFilter) {
+          queryBuilder.andWhere(
+            '(LOWER(user.firstName) LIKE LOWER(:userFilter) OR LOWER(user.lastName) LIKE LOWER(:userFilter) OR LOWER(user.email) LIKE LOWER(:userFilter))',
+            { userFilter: `%${filters.userFilter}%` }
+          );
+        }
+
+        if (filters?.eventFilter) {
+          queryBuilder.andWhere(
+            '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
+            { eventFilter: `%${filters.eventFilter}%` }
+          );
+        }
+
+        registerEvents = await queryBuilder.getMany();
       } else {
         // Normal user can only see their own registered events
-        registerEvents = await this.registerEventRepository.find({
-          where: { user: { id: userId } },
-          relations: [
-            'user',
-            'event',
-            'event.eventSpeakers',
-            'event.eventSpeakers.speaker',
-            'event.eventSpeakers.speaker.speakerProfile',
-            'event.category',
-            'event.category.category',
-            'event.galleries',
-            'event.eventExhibitors',
-            'event.eventExhibitors.exhibitor',
-            'event.eventExhibitors.exhibitor.promotionalOffers',
-            'order',
-            'adminInfo',
-          ],
-        });
+        const queryBuilder = this.registerEventRepository
+          .createQueryBuilder('registerEvent')
+          .leftJoinAndSelect('registerEvent.user', 'user')
+          .leftJoinAndSelect('registerEvent.event', 'event')
+          .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
+          .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+          .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+          .leftJoinAndSelect('event.category', 'category')
+          .leftJoinAndSelect('category.category', 'categoryDetails')
+          .leftJoinAndSelect('event.galleries', 'galleries')
+          .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
+          .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
+          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('registerEvent.order', 'order')
+          .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
+          .where('user.id = :userId', { userId });
+
+        // Apply event filter for regular users
+        if (filters?.eventFilter) {
+          queryBuilder.andWhere(
+            '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
+            { eventFilter: `%${filters.eventFilter}%` }
+          );
+        }
+
+        registerEvents = await queryBuilder.getMany();
       }
 
       // Add attendance count and favorite status to each registered event

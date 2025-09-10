@@ -215,6 +215,7 @@ export class EventService {
       type?: EventType;
       upcoming?: boolean;
       category?: string;
+      eventName?: string;
     },
     userId?: string,
     userRole?: string,
@@ -274,6 +275,13 @@ export class EventService {
       if (filters.upcoming) {
         const today = new Date();
         queryBuilder.andWhere('event.startDate >= :today', { today });
+      }
+
+      if (filters.eventName) {
+        // Exact name match for dropdown filter
+        queryBuilder.andWhere('event.name = :eventName', {
+          eventName: filters.eventName,
+        });
       }
 
       const events = await queryBuilder.getMany();

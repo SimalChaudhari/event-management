@@ -24,6 +24,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserEntity } from 'user/users.entity';
+import { SurveyUtils } from '../utils/survey-utils';
 
 @Injectable()
 export class SurveyService {
@@ -39,6 +40,7 @@ export class SurveyService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
+    private surveyUtils: SurveyUtils,
   ) {}
 
   // Helper function to validate time format
@@ -927,9 +929,13 @@ export class SurveyService {
           order: { date: 'ASC', startTime: 'ASC' },
         });
 
+        // Get event information using utility function
+        const eventInfo = await this.surveyUtils.getEventInfoByEventId(survey.eventId);
+
         surveysWithSessions.push({
           ...survey,
           sessions,
+          eventInfo,
         });
       }
 
@@ -955,6 +961,9 @@ export class SurveyService {
         order: { date: 'ASC', startTime: 'ASC' },
       });
 
+      // Get event information using utility function
+      const eventInfo = await this.surveyUtils.getEventInfoByEventId(survey.eventId);
+
       const totalDays = this.calculateEventDays(
         new Date(survey.startDate),
         new Date(survey.endDate),
@@ -969,6 +978,7 @@ export class SurveyService {
       return {
         ...survey,
         sessions,
+        eventInfo,
         eventStats: {
           totalDays,
           totalHours,
@@ -1294,11 +1304,15 @@ export class SurveyService {
         order: { date: 'ASC', startTime: 'ASC' },
       });
 
+      // Get event information using utility function
+      const eventInfo = await this.surveyUtils.getEventInfoByEventId(survey.eventId);
+
       // For Admin: Show all sessions (always array)
       if (userRole === 'admin') {
         return {
           ...survey,
           sessions: allSessions,
+          eventInfo,
         };
       }
 
@@ -1317,6 +1331,7 @@ export class SurveyService {
       return {
         ...survey,
         sessions: sessionsFormat,
+        eventInfo,
       };
     } catch (error: any) {
       if (error instanceof ResourceNotFoundException) {

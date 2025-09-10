@@ -8,6 +8,7 @@ import { Event } from '../event/event.entity';
 import { UserEntity } from 'user/users.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
+import { SurveyUtils } from '../utils/survey-utils';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { ErrorHandlerService } from 'utils/services/error-handler.service';
       signOptions: { }, // Set your token expiration
     }),
   ],
-  providers: [SurveyService, ErrorHandlerService],
+  providers: [SurveyService, ErrorHandlerService, SurveyUtils],
   controllers: [SurveyController],
   exports: [SurveyService], // Export for use in other modules
 })

@@ -9,10 +9,11 @@ import { EventQueryBuilderUtils, GlobalSearchUtils } from './searchEvent';
 import { FileUploadUtils } from './filesUploadFormat/file-upload.utils';
 import { AgendaUtils } from './agenda.utils';
 import { Survey, SurveySession, SurveyResponse } from '../survey/survey.entity';
+import { Event } from '../event/event.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Survey, SurveySession, SurveyResponse]),
+    TypeOrmModule.forFeature([Survey, SurveySession, SurveyResponse, Event]),
   ],
   providers: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils],
   exports: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils],

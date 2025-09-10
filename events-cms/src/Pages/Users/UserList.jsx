@@ -13,6 +13,7 @@ import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { useNavigate } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
+import UserFilterComponent from '../../components/common/UserFilterComponent';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -248,12 +249,22 @@ const UserList = () => {
         setIsLoading(false);
     };
 
-    const handleRoleFilterChange = async (event) => {
-        const newFilter = event.target.value;
+    const handleRoleFilterChange = async (newFilter) => {
         setRoleFilter(newFilter);
         // Fetch data with new filter
         await fetchData(newFilter === 'all' ? null : newFilter);
     };
+
+    const handleClearFilters = async () => {
+        setRoleFilter('all');
+        await fetchData(null);
+    };
+
+    // Define filter options for the reusable component
+    const roleFilterOptions = [
+        { value: 'user', label: 'Users Only' },
+        { value: 'exhibitor', label: 'Exhibitors Only' }
+    ];
 
     const destroyTable = () => {
         if (currentTable) {
@@ -310,32 +321,20 @@ const UserList = () => {
                 <Col sm={12} className="btn-page">
                     <Card className="user-list"> 
                         <Card.Body>
-                            {/* Filter Section */}
-                            <Row className="mb-3">
-                                <Col md={4}>
-                                    <Form.Group>
-                                        <Form.Label><strong>Filter by Role:</strong></Form.Label>
-                                        <Form.Select
-                                            value={roleFilter}
-                                            onChange={handleRoleFilterChange}
-                                            className="form-control"
-                                        >
-                                            <option value="all">All Users & Exhibitors</option>
-                                            <option value="user">Users Only</option>
-                                            <option value="exhibitor">Exhibitors Only</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-                                <Col md={8}>
-                                    <div className="d-flex align-items-end h-100">
-                                        <p className="text-muted mb-0">
-                                            {roleFilter === 'all' && 'Showing all users and exhibitors'}
-                                            {roleFilter === 'user' && 'Showing users only'}
-                                            {roleFilter === 'exhibitor' && 'Showing exhibitors only'}
-                                        </p>
-                                    </div>
-                                </Col>
-                            </Row>
+                            {/* Reusable User Filter Component */}
+                            <UserFilterComponent
+                                filterOptions={roleFilterOptions}
+                                selectedFilter={roleFilter}
+                                onFilterChange={handleRoleFilterChange}
+                                filterLabel="Filter by Role"
+                                filterIcon="users"
+                                title="Filter Options"
+                                loading={false}
+                                activeFilters={{}}
+                                onClearFilters={handleClearFilters}
+                                allOptionLabel="All Users & Exhibitors"
+                                allOptionValue="all"
+                            />
                             
                             <Table striped hover responsive id="user-data-table">
                                 <thead>

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -14,6 +14,8 @@ import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
+import FilterComponent from '../../../components/common/FilterComponent';
+import useEventFilter from '../../../hooks/useEventFilter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -256,36 +258,63 @@ const UpcomingEvents = () => {
     const [viewData, setViewData] = React.useState(null); // State for user data to view
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
 
-    const handleView = (data) => {
+    // Use reusable event filter hook for upcoming events with initial filter
+    const {
+        selectedEventId,
+        allEvents,
+        loadingDropdowns,
+        activeFilters,
+        applyFilters,
+        clearFilters,
+        handleEventChange
+    } = useEventFilter(upcomingEventList, { upcoming: true });
+
+    const handleView = useCallback((data) => {
         setViewData(data);
         setShowViewModal(true);
-    };
+    }, []);
 
-    const destroyTable = () => {
+    const destroyTable = useCallback(() => {
         if (currentTable) {
             $('#data-table-zero').off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
         }
-    };
+    }, [currentTable]);
 
-    const initializeTable = () => {
+    const handleAddEvent = useCallback(() => {
+        setEditData(null);
+        setShowModal(true);
+    }, []);
+
+    const handleEdit = useCallback((data) => {
+        setEditData(data);
+        setShowModal(true);
+    }, []);
+    
+    const handleDelete = useCallback((eventId) => {
+        setItemToDelete({ id: eventId });
+        setShowDeleteModal(true);
+    }, []);
+
+
+    const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
             const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView);
             setCurrentTable(table);
         }
-    };
+    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView]);
 
     useEffect(() => {
-        dispatch(upcomingEventList({}));
-        return () => destroyTable();
-    }, [dispatch]);
+        dispatch(upcomingEventList());
+        return destroyTable;
+    }, [dispatch, destroyTable]);
 
     useEffect(() => {
         initializeTable();
-        return () => destroyTable();
-    }, [events]);
+        return destroyTable;
+    }, [initializeTable, destroyTable]);
 
     useEffect(() => {
         return () => {
@@ -293,24 +322,12 @@ const UpcomingEvents = () => {
                 resetFilters(currentTable);
             }
         };
-    }, [location.pathname]);
+    }, [location.pathname, currentTable]);
 
-    const handleAddEvent = () => {
-        setEditData(null);
-        setShowModal(true);
-    };
+ 
 
-    const handleEdit = (data) => {
-        setEditData(data);
-        setShowModal(true);
-    };
-
-    const handleDelete = (eventId) => {
-        setItemToDelete({ id: eventId });
-        setShowDeleteModal(true);
-    };
-
-    const handleConfirmDelete = async () => {
+ 
+    const handleConfirmDelete = useCallback(async () => {
         if (!itemToDelete) return;
 
         setIsDeleting(true);
@@ -319,27 +336,39 @@ const UpcomingEvents = () => {
             setShowDeleteModal(false);
             setItemToDelete(null);
             destroyTable();
-            await dispatch(upcomingEventList({}));
+            await dispatch(upcomingEventList());
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {
             setIsDeleting(false);
         }
-    };
+    }, [itemToDelete, dispatch, destroyTable]);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         if (!isDeleting) {
             setShowDeleteModal(false);
             setItemToDelete(null);
         }
-    };
+    }, [isDeleting]);
 
-    const handleCloseModal = () => {
+    const handleCloseModal = useCallback(() => {
         setShowModal(false);
-    };
+    }, []);
     
     return (
         <>
+            {/* Filter Component */}
+            <FilterComponent
+                events={allEvents}
+                loadingDropdowns={loadingDropdowns}
+                selectedEventId={selectedEventId}
+                onEventChange={handleEventChange}
+                onApplyFilters={applyFilters}
+                onClearFilters={clearFilters}
+                activeFilters={activeFilters}
+                showUserFilter={false}
+                showEventFilter={true}
+            />
         
             <DeleteConfirmationModal
                 show={showDeleteModal}

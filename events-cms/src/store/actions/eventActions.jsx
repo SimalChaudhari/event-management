@@ -2,9 +2,47 @@ import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
 import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from '../constants/actionTypes';
 
-export const eventList = () => async (dispatch) => {
+export const eventList = (filters = {}) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/events');
+        // Build query parameters
+        const queryParams = new URLSearchParams();
+        
+        if (filters.eventName) {
+            queryParams.append('eventName', filters.eventName);
+        }
+        
+        if (filters.keyword) {
+            queryParams.append('keyword', filters.keyword);
+        }
+        
+        if (filters.startDate) {
+            queryParams.append('startDate', filters.startDate);
+        }
+        
+        if (filters.endDate) {
+            queryParams.append('endDate', filters.endDate);
+        }
+        
+        if (filters.type) {
+            queryParams.append('type', filters.type);
+        }
+        
+        if (filters.location) {
+            queryParams.append('location', filters.location);
+        }
+        
+        if (filters.category) {
+            queryParams.append('category', filters.category);
+        }
+        
+        if (filters.globalSearch) {
+            queryParams.append('globalSearch', filters.globalSearch);
+        }
+        
+        const queryString = queryParams.toString();
+        const url = queryString ? `/events?${queryString}` : '/events';
+        
+        const response = await axiosInstance.get(url);
         dispatch({
             type: EVENT_LIST,
             payload: response.data // Assuming response contains the customers data
@@ -32,9 +70,48 @@ export const eventById = (id) => async (dispatch) => {
     }
 };
 
-export const upcomingEventList = () => async (dispatch) => {
+export const upcomingEventList = (filters = {}) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/events?upcoming=true');
+        // Build query parameters, always include upcoming=true
+        const queryParams = new URLSearchParams();
+        queryParams.append('upcoming', 'true');
+        
+        if (filters.eventName) {
+            queryParams.append('eventName', filters.eventName);
+        }
+        
+        if (filters.keyword) {
+            queryParams.append('keyword', filters.keyword);
+        }
+        
+        if (filters.startDate) {
+            queryParams.append('startDate', filters.startDate);
+        }
+        
+        if (filters.endDate) {
+            queryParams.append('endDate', filters.endDate);
+        }
+        
+        if (filters.type) {
+            queryParams.append('type', filters.type);
+        }
+        
+        if (filters.location) {
+            queryParams.append('location', filters.location);
+        }
+        
+        if (filters.category) {
+            queryParams.append('category', filters.category);
+        }
+        
+        if (filters.globalSearch) {
+            queryParams.append('globalSearch', filters.globalSearch);
+        }
+        
+        const queryString = queryParams.toString();
+        const url = `/events?${queryString}`;
+        
+        const response = await axiosInstance.get(url);
         dispatch({
             type: UPCOMING_EVENT_LIST,
             payload: response.data // Assuming response contains the customers data
@@ -82,9 +159,27 @@ export const editEvent = (id, data) => async (dispatch) => {
     return false; // Return false for any errors or unsuccessful attempts
 };
 
-export const participatedEvents = () => async (dispatch) => {
+export const participatedEvents = (filters = {}) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/register-events/all');
+        // Build query parameters
+        const queryParams = new URLSearchParams();
+        
+        if (filters.userFilter) {
+            queryParams.append('user', filters.userFilter);
+        }
+        
+        if (filters.eventFilter) {
+            queryParams.append('event', filters.eventFilter);
+        }
+        
+        if (filters.filter) {
+            queryParams.append('filter', filters.filter);
+        }
+        
+        const queryString = queryParams.toString();
+        const url = queryString ? `/register-events/all?${queryString}` : '/register-events/all';
+        
+        const response = await axiosInstance.get(url);
         dispatch({
             type: PARTICIPATED_EVENTS,
             payload: response.data
@@ -292,5 +387,27 @@ export const adminDeleteRegisterEvent = (id) => async (dispatch) => {
         toast.error(errorMessage);
     }
     return false;
+};
+
+// Get all users for dropdown filter
+export const getAllUsersForFilter = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/users');
+        return response.data?.data || [];
+    } catch (error) {
+        console.error('Error fetching users for filter:', error);
+        return [];
+    }
+};
+
+// Get all events for dropdown filter
+export const getAllEventsForFilter = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/events');
+        return response.data?.events || [];
+    } catch (error) {
+        console.error('Error fetching events for filter:', error);
+        return [];
+    }
 };
 

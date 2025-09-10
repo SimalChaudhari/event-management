@@ -17,7 +17,7 @@ import EventGalleriesComponent from '../../../components/events/EventGalleriesCo
 import EventStampsComponent from '../../../components/events/EventStampsComponent';
 import EventSurveyComponent from '../../../components/events/EventSurveyComponent';
 import EventExhibitorsComponent from '../../../components/events/EventExhibitorsComponent';
-
+import { ExpandableDescription } from '../../../components/ExpandableDescription';
 
 const ViewRegisterEventPage = () => {
     const { id } = useParams();
@@ -85,7 +85,6 @@ const ViewRegisterEventPage = () => {
             setShowSpeakerImageModal(false);
         }
     };
-
 
     // Render event statistics
     const renderEventStats = () => {
@@ -197,7 +196,6 @@ const ViewRegisterEventPage = () => {
         setShowImageModal(true);
     };
 
-
     // Gallery navigation functions
     const goToPreviousGalleryImage = () => {
         setCurrentGalleryImageIndex((prevIndex) => (prevIndex === 0 ? galleryImages.length - 1 : prevIndex - 1));
@@ -238,6 +236,37 @@ const ViewRegisterEventPage = () => {
         const date = new Date();
         date.setHours(hour, minute);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    // Format timestamp to readable date for agenda
+    const formatAgendaTimestamp = (timestamp) => {
+        if (!timestamp) return 'N/A';
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    // Get colorful icons based on icon class for agenda
+    const getAgendaIconColor = (iconClass) => {
+        const colorMap = {
+            'fas fa-calendar-alt': '#007bff',
+            'fas fa-clock': '#dc3545',
+            'fas fa-hourglass-half': '#28a745',
+            'fas fa-map-marker-alt': '#e74c3c',
+            'fas fa-info-circle': '#17a2b8',
+            'fas fa-sticky-note': '#6c757d',
+            'fas fa-tag': '#ffc107',
+            'fas fa-user': '#6f42c1',
+            'fas fa-check-circle': '#28a745',
+            'fas fa-times-circle': '#dc3545',
+            'fas fa-exclamation-circle': '#ffc107',
+            'fas fa-exchange-alt': '#fd7e14',
+            'fas fa-question-circle': '#6c757d'
+        };
+        return colorMap[iconClass] || '#495057';
     };
 
     return (
@@ -329,6 +358,13 @@ const ViewRegisterEventPage = () => {
                                             Exhibitors
                                         </Nav.Link>
                                     </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="agenda">
+                                            <i className="fas fa-calendar-check me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Agenda
+                                        </Nav.Link>
+                                    </Nav.Item>
                                 </Nav>
                             </Col>
                         </Row>
@@ -371,60 +407,102 @@ const ViewRegisterEventPage = () => {
                                                     <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i className="fas fa-user" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className="fas fa-user"
+                                                                        style={{ marginRight: '8px', color: '#007bff' }}
+                                                                    ></i>
                                                                     Registered By:
                                                                 </div>
-                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                <div
+                                                                    className="field-value"
+                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
+                                                                >
                                                                     {eventData.user?.firstName} {eventData.user?.lastName}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i className="fas fa-envelope" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className="fas fa-envelope"
+                                                                        style={{ marginRight: '8px', color: '#17a2b8' }}
+                                                                    ></i>
                                                                     Email:
                                                                 </div>
-                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                <div
+                                                                    className="field-value"
+                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
+                                                                >
                                                                     {eventData.user?.email}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i className="fas fa-phone" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className="fas fa-phone"
+                                                                        style={{ marginRight: '8px', color: '#28a745' }}
+                                                                    ></i>
                                                                     Mobile:
                                                                 </div>
-                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                <div
+                                                                    className="field-value"
+                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
+                                                                >
                                                                     {eventData.user?.mobile || 'N/A'}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </Col>
-                                                
+
                                                 <Col lg={6} md={12}>
                                                     <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className="fas fa-calendar-alt"
+                                                                        style={{ marginRight: '8px', color: '#fd7e14' }}
+                                                                    ></i>
                                                                     Registration Date:
                                                                 </div>
-                                                                <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                <div
+                                                                    className="field-value"
+                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
+                                                                >
                                                                     {regDate}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i className="fas fa-tag" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className="fas fa-tag"
+                                                                        style={{ marginRight: '8px', color: '#6f42c1' }}
+                                                                    ></i>
                                                                     User Type:
                                                                 </div>
                                                                 <div className="field-value">
@@ -434,12 +512,18 @@ const ViewRegisterEventPage = () => {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {eventData.isCreatedByAdmin && (
                                                             <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                                 <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-shield-alt" style={{ marginRight: '8px', color: '#dc3545' }}></i>
+                                                                    <div
+                                                                        className="field-label"
+                                                                        style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                    >
+                                                                        <i
+                                                                            className="fas fa-shield-alt"
+                                                                            style={{ marginRight: '8px', color: '#dc3545' }}
+                                                                        ></i>
                                                                         Created By:
                                                                     </div>
                                                                     <div className="field-value">
@@ -490,12 +574,26 @@ const ViewRegisterEventPage = () => {
                                                     <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
                                                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                                                             <div className="info-field-container">
-                                                                <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                    <i 
-                                                                        className={`fas ${eventData.status === 'Success' ? 'fa-check-circle' : eventData.status === 'Withdraw' ? 'fa-times-circle' : 'fa-clock'}`} 
-                                                                        style={{ 
-                                                                            marginRight: '8px', 
-                                                                            color: eventData.status === 'Success' ? '#28a745' : eventData.status === 'Withdraw' ? '#dc3545' : '#ffc107'
+                                                                <div
+                                                                    className="field-label"
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                                >
+                                                                    <i
+                                                                        className={`fas ${
+                                                                            eventData.status === 'Success'
+                                                                                ? 'fa-check-circle'
+                                                                                : eventData.status === 'Withdraw'
+                                                                                ? 'fa-times-circle'
+                                                                                : 'fa-clock'
+                                                                        }`}
+                                                                        style={{
+                                                                            marginRight: '8px',
+                                                                            color:
+                                                                                eventData.status === 'Success'
+                                                                                    ? '#28a745'
+                                                                                    : eventData.status === 'Withdraw'
+                                                                                    ? '#dc3545'
+                                                                                    : '#ffc107'
                                                                         }}
                                                                     ></i>
                                                                     Registration Status:
@@ -647,6 +745,378 @@ const ViewRegisterEventPage = () => {
                             {/* Survey Tab */}
                             <Tab.Pane eventKey="survey">
                                 <EventSurveyComponent surveyDetails={eventData?.event?.surveyDetails} formatTime={formatTime} />
+                            </Tab.Pane>
+
+                            {/* Agenda Tab */}
+                            <Tab.Pane eventKey="agenda">
+                                <div className="p-2 bg-light">
+                                    {eventData?.event?.myAgendas && eventData.event.myAgendas.length > 0 ? (
+                                        eventData.event.myAgendas.map((agenda, index) => {
+                                            // InfoCard component for consistent styling
+                                            const InfoCard = ({ title, iconClass, borderColor, children }) => (
+                                                <div
+                                                    className="mb-4"
+                                                    style={{
+                                                        backgroundColor: '#fff',
+                                                        borderRadius: '8px',
+                                                        padding: '20px',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                                        border: '1px solid #e9ecef',
+                                                        borderLeft: `4px solid ${borderColor}`
+                                                    }}
+                                                >
+                                                    <div style={{ padding: '24px' }}>
+                                                        <h5
+                                                            style={{
+                                                                fontSize: '18px',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                marginBottom: '20px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '10px',
+                                                                borderBottom: `2px solid ${borderColor}`,
+                                                                paddingBottom: '8px'
+                                                            }}
+                                                        >
+                                                            <i className={iconClass} style={{ fontSize: '20px', color: borderColor }}></i>
+                                                            {title}
+                                                        </h5>
+                                                        {children}
+                                                    </div>
+                                                </div>
+                                            );
+
+                                            const InfoField = ({ label, value, iconClass = null }) => (
+                                                <div
+                                                    className="info-field-container mb-2 py-2"
+                                                    style={{
+                                                        borderBottom: '1px solid #f1f1f1'
+                                                    }}
+                                                >
+                                                    <span
+                                                        className="field-label"
+                                                        style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
+                                                    >
+                                                        {iconClass && (
+                                                            <i
+                                                                className={iconClass}
+                                                                style={{ marginRight: '8px', color: getAgendaIconColor(iconClass) }}
+                                                            ></i>
+                                                        )}
+                                                        {label}:
+                                                    </span>
+                                                    <span
+                                                        className="field-value"
+                                                        style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}
+                                                    >
+                                                        {value}
+                                                    </span>
+                                                </div>
+                                            );
+
+                                            return (
+                                                <InfoCard
+                                                    key={agenda.id}
+                                                    title={agenda.title || `Agenda Item ${index + 1}`}
+                                                    iconClass="fas fa-calendar-check"
+                                                    borderColor={
+                                                        agenda.meetingStatus === 'confirmed'
+                                                            ? '#28a745'
+                                                            : agenda.meetingStatus === 'pending'
+                                                            ? '#ffc107'
+                                                            : agenda.meetingStatus === 'cancelled'
+                                                            ? '#dc3545'
+                                                            : '#6c757d'
+                                                    }
+                                                >
+                                                    <Row>
+                                                        <Col lg={6} md={12}>
+                                                            <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                                <InfoField
+                                                                    label="Meeting Date"
+                                                                    value={formatAgendaTimestamp(agenda.meetingDate)}
+                                                                    iconClass="fas fa-calendar-alt"
+                                                                />
+                                                                <InfoField
+                                                                    label="Start Time"
+                                                                    value={formatTime(agenda.startTime) || agenda.time}
+                                                                    iconClass="fas fa-clock"
+                                                                />
+                                                                <InfoField
+                                                                    label="End Time"
+                                                                    value={agenda.endTime || 'N/A'}
+                                                                    iconClass="fas fa-clock"
+                                                                />
+                                                                <InfoField
+                                                                    label="Duration"
+                                                                    value={agenda.durationFormatted || `${agenda.duration} minutes`}
+                                                                    iconClass="fas fa-hourglass-half"
+                                                                />
+                                                            </div>
+                                                        </Col>
+
+                                                        <Col lg={6} md={12}>
+                                                            <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                                <InfoField
+                                                                    label="Location"
+                                                                    value={agenda.location || 'N/A'}
+                                                                    iconClass="fas fa-map-marker-alt"
+                                                                />
+                                                                <InfoField
+                                                                    label="Meeting Status"
+                                                                    value={
+                                                                        <Badge
+                                                                            bg={
+                                                                                agenda.meetingStatus === 'confirmed'
+                                                                                    ? 'success'
+                                                                                    : agenda.meetingStatus === 'pending'
+                                                                                    ? 'warning'
+                                                                                    : agenda.meetingStatus === 'cancelled'
+                                                                                    ? 'danger'
+                                                                                    : 'secondary'
+                                                                            }
+                                                                            className="px-3 py-1"
+                                                                        >
+                                                                            {agenda.meetingStatus || 'N/A'}
+                                                                        </Badge>
+                                                                    }
+                                                                    iconClass={
+                                                                        agenda.meetingStatus === 'confirmed'
+                                                                            ? 'fas fa-check-circle'
+                                                                            : agenda.meetingStatus === 'pending'
+                                                                            ? 'fas fa-exclamation-circle'
+                                                                            : agenda.meetingStatus === 'cancelled'
+                                                                            ? 'fas fa-times-circle'
+                                                                            : 'fas fa-question-circle'
+                                                                    }
+                                                                />
+                                                                {agenda.isMeetingRequest && (
+                                                                    <>
+                                                                        <InfoField
+                                                                            label="Request Type"
+                                                                            value={
+                                                                                <Badge bg="info" className="px-3 py-1">
+                                                                                    {agenda.requestType || 'N/A'}
+                                                                                </Badge>
+                                                                            }
+                                                                            iconClass="fas fa-exchange-alt"
+                                                                        />
+                                                                        <InfoField
+                                                                            label="Request Status"
+                                                                            value={
+                                                                                <Badge
+                                                                                    bg={
+                                                                                        agenda.requestStatus === 'accepted'
+                                                                                            ? 'success'
+                                                                                            : agenda.requestStatus === 'pending'
+                                                                                            ? 'warning'
+                                                                                            : agenda.requestStatus === 'rejected'
+                                                                                            ? 'danger'
+                                                                                            : 'secondary'
+                                                                                    }
+                                                                                    className="px-3 py-1"
+                                                                                >
+                                                                                    {agenda.requestStatus || 'N/A'}
+                                                                                </Badge>
+                                                                            }
+                                                                            iconClass={
+                                                                                agenda.requestStatus === 'accepted'
+                                                                                    ? 'fas fa-check-circle'
+                                                                                    : agenda.requestStatus === 'pending'
+                                                                                    ? 'fas fa-clock'
+                                                                                    : agenda.requestStatus === 'rejected'
+                                                                                    ? 'fas fa-times-circle'
+                                                                                    : 'fas fa-question-circle'
+                                                                            }
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </Col>
+
+                                                        <Col lg={6} md={12}>
+                                                            {agenda.category && (
+                                                                <InfoField
+                                                                    label="Category"
+                                                                    value={
+                                                                        <Badge
+                                                                            className="px-3 py-1"
+                                                                            style={{
+                                                                                backgroundColor: agenda.category.color || '#6c757d',
+                                                                                color: '#fff',
+                                                                                border: 'none'
+                                                                            }}
+                                                                        >
+                                                                            {agenda.category.name}
+                                                                        </Badge>
+                                                                    }
+                                                                    iconClass="fas fa-tag"
+                                                                />
+                                                            )}
+                                                        </Col>
+
+                                                        <Col lg={6} md={12}>
+                                                            {agenda.meetingWith && (
+                                                                <InfoField
+                                                                    label="Meeting With"
+                                                                    value={
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <div
+                                                                                style={{
+                                                                                    width: '24px',
+                                                                                    height: '24px',
+                                                                                    borderRadius: '50%',
+                                                                                    backgroundColor: '#007bff',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    color: 'white',
+                                                                                    fontSize: '12px',
+                                                                                    fontWeight: 'bold'
+                                                                                }}
+                                                                            >
+                                                                                {agenda.meetingWith.firstName?.charAt(0)?.toUpperCase() ||
+                                                                                    agenda.meetingWith.lastName?.charAt(0)?.toUpperCase() ||
+                                                                                    agenda.meetingWith.email?.charAt(0)?.toUpperCase() ||
+                                                                                    '?'}
+                                                                            </div>
+                                                                            <div
+                                                                                style={{
+                                                                                    display: 'flex',
+                                                                                    flexDirection: 'column',
+                                                                                    lineHeight: '1.2'
+                                                                                }}
+                                                                            >
+                                                                                <span style={{ fontWeight: '500', fontSize: '13px' }}>
+                                                                                    {agenda.meetingWith.firstName &&
+                                                                                    agenda.meetingWith.lastName
+                                                                                        ? `${agenda.meetingWith.firstName} ${agenda.meetingWith.lastName}`.trim()
+                                                                                        : agenda.meetingWith.firstName ||
+                                                                                          agenda.meetingWith.lastName ||
+                                                                                          'Unknown User'}
+                                                                                </span>
+                                                                                <span style={{ fontSize: '11px', color: '#6c757d' }}>
+                                                                                    {agenda.meetingWith.email}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                    iconClass="fas fa-user"
+                                                                />
+                                                            )}
+                                                        </Col>
+                                                        {agenda.details && (
+                                                            <Col lg={12} md={12}>
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div
+                                                                        style={{
+                                                                            fontWeight: 'bold',
+                                                                            color: '#495057',
+                                                                            fontSize: '14px',
+                                                                            marginBottom: '8px'
+                                                                        }}
+                                                                    >
+                                                                        <i
+                                                                            className="fas fa-info-circle"
+                                                                            style={{
+                                                                                marginRight: '8px',
+                                                                                color: getAgendaIconColor('fas fa-info-circle')
+                                                                            }}
+                                                                        ></i>
+                                                                        Meeting Details:
+                                                                    </div>
+                                                                    <ExpandableDescription text={agenda.details} maxLines={2} />
+                                                                </div>
+                                                            </Col>
+                                                        )}
+
+                                                        {agenda.meetingNotes && (
+                                                            <Col lg={12} md={12}>
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div
+                                                                        style={{
+                                                                            fontWeight: 'bold',
+                                                                            color: '#495057',
+                                                                            fontSize: '14px',
+                                                                            marginBottom: '8px'
+                                                                        }}
+                                                                    >
+                                                                        <i
+                                                                            className="fas fa-sticky-note"
+                                                                            style={{
+                                                                                marginRight: '8px',
+                                                                                color: getAgendaIconColor('fas fa-sticky-note')
+                                                                            }}
+                                                                        ></i>
+                                                                        Meeting Notes:
+                                                                    </div>
+                                                                    <ExpandableDescription text={agenda.meetingNotes} maxLines={2} />
+                                                                </div>
+                                                            </Col>
+                                                        )}
+                                                    </Row>
+                                                </InfoCard>
+                                            );
+                                        })
+                                    ) : (
+                                        <div
+                                            className="mb-4"
+                                            style={{
+                                                backgroundColor: '#fff',
+                                                borderRadius: '8px',
+                                                padding: '20px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                                border: '1px solid #e9ecef',
+                                                borderLeft: '4px solid #6c757d'
+                                            }}
+                                        >
+                                            <div className="text-center py-5">
+                                                <div className="mb-3">
+                                                    <i className="fas fa-calendar-times" style={{ fontSize: '3rem', color: '#dee2e6' }}></i>
+                                                </div>
+                                                <h5 className="text-muted mb-2">No Agenda Items</h5>
+                                                <p className="text-muted mb-0">No agenda items or meetings scheduled for this event yet.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Custom CSS for Responsive Behavior */}
+                                    <style jsx>{`
+                                        /* Desktop: side-by-side layout */
+                                        .info-field-container {
+                                            display: flex;
+                                            justify-content: space-between;
+                                            align-items: center;
+                                        }
+
+                                        .field-label {
+                                            min-width: 140px;
+                                        }
+
+                                        .field-value {
+                                            text-align: right;
+                                            flex: 1;
+                                        }
+
+                                        /* Mobile: stacked layout */
+                                        @media (max-width: 768px) {
+                                            .info-field-container {
+                                                display: block !important;
+                                                text-align: left !important;
+                                            }
+
+                                            .field-label {
+                                                margin-bottom: 5px;
+                                            }
+
+                                            .field-value {
+                                                text-align: left !important;
+                                                margin-left: 20px;
+                                            }
+                                        }
+                                    `}</style>
+                                </div>
                             </Tab.Pane>
                         </Tab.Content>
                     </Tab.Container>

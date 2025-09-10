@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -16,6 +16,8 @@ import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
 import { getAllGalleries } from '../../../store/actions/galleryActions';
+import FilterComponent from '../../../components/common/FilterComponent';
+import useEventFilter from '../../../hooks/useEventFilter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -287,21 +289,44 @@ const EventView = () => {
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const navigate = useNavigate();
 
-    const handleView = (data) => {
-        navigate(`/events/view-event/${data.id}`);
-    };
+    // Use reusable event filter hook
+    const {
+        selectedEventId,
+        allEvents,
+        loadingDropdowns,
+        activeFilters,
+        applyFilters,
+        clearFilters,
+        handleEventChange
+    } = useEventFilter(eventList);
 
-    const destroyTable = () => {
+    const handleView = useCallback((data) => {
+        navigate(`/events/view-event/${data.id}`);
+    }, [navigate]);
+
+    const destroyTable = useCallback(() => {
         if (currentTable) {
             $('#data-table-zero').off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
         }
-    };
+    }, [currentTable]);
 
-// ... existing code ...
 
-const handleGallery = async (data) => {
+    const handleAddEvent = useCallback(() => {
+        navigate('/events/add-event');
+      }, [navigate]);
+  
+      const handleEdit = useCallback((data) => {
+          navigate(`/events/edit-event/${data.id}`);
+      }, [navigate]);
+  
+      const handleDelete = useCallback((eventId) => {
+          setItemToDelete({ id: eventId });
+          setShowDeleteModal(true);
+      }, []);
+
+const handleGallery = useCallback(async (data) => {
     try {
         const response = await dispatch(getAllGalleries());
         const allGalleries = response?.data || [];
@@ -316,25 +341,26 @@ const handleGallery = async (data) => {
         console.error('Error checking gallery:', error);
         navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
     }
-};
+}, [dispatch, navigate]);
 
-    const initializeTable = () => {
+    const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
             const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery);
             setCurrentTable(table);
         }
-    };
+    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery]);
+
 
     useEffect(() => {
-        dispatch(eventList({}));
-        return () => destroyTable();
-    }, [dispatch]);
+        dispatch(eventList());
+        return destroyTable;
+    }, [dispatch, destroyTable]);
 
     useEffect(() => {
         initializeTable();
-        return () => destroyTable();
-    }, [events]);
+        return destroyTable;
+    }, [initializeTable, destroyTable]);
 
     useEffect(() => {
         return () => {
@@ -342,22 +368,10 @@ const handleGallery = async (data) => {
                 resetFilters(currentTable);
             }
         };
-    }, [location.pathname]);
+    }, [location.pathname, currentTable]);
 
-    const handleAddEvent = () => {
-      navigate('/events/add-event');
-    };
 
-    const handleEdit = (data) => {
-        navigate(`/events/edit-event/${data.id}`);
-    };
-
-    const handleDelete = (eventId) => {
-        setItemToDelete({ id: eventId });
-        setShowDeleteModal(true);
-    };
-
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = useCallback(async () => {
         if (!itemToDelete) return;
 
         setIsDeleting(true);
@@ -366,27 +380,39 @@ const handleGallery = async (data) => {
             setShowDeleteModal(false);
             setItemToDelete(null);
             destroyTable();
-            await dispatch(eventList({}));
+            await dispatch(eventList());
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {
             setIsDeleting(false);
         }
-    };
+    }, [itemToDelete, dispatch, destroyTable]);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         if (!isDeleting) {
             setShowDeleteModal(false);
             setItemToDelete(null);
         }
-    };
+    }, [isDeleting]);
 
-    const handleCloseModal = () => {
+    const handleCloseModal = useCallback(() => {
         setShowModal(false);
-    };
+    }, []);
 
     return (
         <>
+            {/* Filter Component */}
+            <FilterComponent
+                events={allEvents}
+                loadingDropdowns={loadingDropdowns}
+                selectedEventId={selectedEventId}
+                onEventChange={handleEventChange}
+                onApplyFilters={applyFilters}
+                onClearFilters={clearFilters}
+                activeFilters={activeFilters}
+                showUserFilter={false}
+                showEventFilter={true}
+            />
           
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
             <Row>

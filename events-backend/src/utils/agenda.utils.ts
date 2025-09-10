@@ -26,6 +26,12 @@ export interface FormattedAgenda {
   durationFormatted: string;
   startTime: string;
   endTime: string;
+  meetingWith?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
 }
 
 export class AgendaUtils {
@@ -177,8 +183,82 @@ export class AgendaUtils {
       isMeetingRequest: agenda.isMeetingRequest,
       durationFormatted: this.formatDuration(agenda.duration),
       startTime: agenda.time,
-      endTime: this.calculateEndTime(agenda.time, agenda.duration)
+      endTime: this.calculateEndTime(agenda.time, agenda.duration),
+      meetingWith: null
     }));
+  }
+
+  /**
+   * Format agenda data with user information to show meeting participants
+   * @param agendas Array of EventAgenda entities
+   * @param creators Map of creator user information
+   * @param currentUserId Current user ID to determine who the meeting is with
+   * @returns Array of formatted agenda objects with meeting participant info
+   */
+  static formatAgendasWithUsers(
+    agendas: EventAgenda[],
+    creators: Map<string, any>,
+    currentUserId: string
+  ): FormattedAgenda[] {
+    return agendas.map(agenda => {
+      let meetingWith = null;
+
+      // Determine who the meeting is with based on user roles
+      if (agenda.isMeetingRequest && currentUserId) {
+        if (agenda.userId === currentUserId && agenda.createdBy !== currentUserId) {
+          // Current user is recipient, meeting is with creator
+          const creator = creators.get(agenda.createdBy);
+          if (creator) {
+            meetingWith = {
+              id: creator.id,
+              firstName: creator.firstName || '',
+              lastName: creator.lastName || '',
+              email: creator.email || ''
+            };
+          }
+        } else if (agenda.createdBy === currentUserId && agenda.userId !== currentUserId) {
+          // Current user is creator, meeting is with recipient (from agenda.user relation)
+          if (agenda.user) {
+            meetingWith = {
+              id: agenda.user.id,
+              firstName: agenda.user.firstName || '',
+              lastName: agenda.user.lastName || '',
+              email: agenda.user.email || ''
+            };
+          }
+        }
+        // If both userId and createdBy are the same (self-meeting), meetingWith remains null
+      }
+
+      return {
+        id: agenda.id,
+        eventId: agenda.eventId,
+        userId: agenda.userId,
+        createdBy: agenda.createdBy,
+        title: agenda.title,
+        time: agenda.time,
+        duration: agenda.duration,
+        location: agenda.location,
+        details: agenda.details,
+        category: agenda.category ? {
+          id: agenda.category.id,
+          name: agenda.category.name,
+          color: agenda.category.color,
+          isActive: agenda.category.isActive
+        } : null,
+        categoryId: agenda.categoryId,
+        meetingStatus: agenda.meetingStatus,
+        requestStatus: agenda.requestStatus,
+        requestType: agenda.requestType,
+        meetingNotes: agenda.meetingNotes,
+        meetingDate: agenda.meetingDate,
+        isMeetingRequest: agenda.isMeetingRequest,
+        durationFormatted: this.formatDuration(agenda.duration),
+        startTime: agenda.time,
+        endTime: this.calculateEndTime(agenda.time, agenda.duration),
+        meetingWith
+      };
+    });
   }
 
   /**
@@ -201,8 +281,26 @@ export class AgendaUtils {
         { eventId: eventId, userId: userId, isActive: true },
         { eventId: eventId, createdBy: userId, isActive: true }
       ],
+      relations: ['category', 'user'],
       order: { time: 'ASC' }
     });
+
+    // Get all unique user IDs that are creators of agendas (to fetch creator info)
+    const creatorIds = [...new Set(allAgendas.map((agenda: any) => agenda.createdBy))];
+    
+    // Fetch creator user information
+    let creators = new Map();
+    if (creatorIds.length > 0 && agendaRepository.manager) {
+      try {
+        const creatorUsers = await agendaRepository.manager.find('UserEntity', {
+          where: creatorIds.map(id => ({ id })),
+          select: ['id', 'firstName', 'lastName', 'email']
+        });
+        creators = new Map(creatorUsers.map((user: any) => [user.id, user]));
+      } catch (error) {
+        console.warn('Could not fetch creator user information:', error);
+      }
+    }
 
     // Filter and deduplicate agendas based on meeting request logic
     const filteredAgendas = this.filterRelevantAgendas(allAgendas, userId);
@@ -222,8 +320,8 @@ export class AgendaUtils {
       }
     }
 
-    // Format agendas and include user's table/lucky draw info
-    const formattedAgendas = this.formatAgendas(filteredAgendas);
+    // Format agendas with creator information
+    const formattedAgendas = this.formatAgendasWithUsers(filteredAgendas, creators, userId);
     
     // Add user's table and lucky draw info to each agenda item
     return formattedAgendas.map(agenda => ({
