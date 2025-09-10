@@ -13,7 +13,7 @@ const AddSurveyPage = () => {
     const { id } = useParams();
     const isEditing = Boolean(id);
 
-    const events = useSelector((state) => state.event.events);
+    const events = useSelector((state) => state.event?.event?.events);
 
     const { selectedSurvey, createLoading, updateLoading } = useSelector((state) => state.survey);
 
@@ -31,7 +31,16 @@ const AddSurveyPage = () => {
     const [errors, setErrors] = useState({});
     const [suggestions, setSuggestions] = useState(null);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [sessionsList, setSessionsList] = useState([]);
+    const [sessionsList, setSessionsList] = useState([
+        {
+            name: '',
+            date: '',
+            startTime: '',
+            endTime: '',
+            description: '',
+            isActive: true
+        }
+    ]);
 
     useEffect(() => {
         dispatch(eventList());
@@ -150,26 +159,41 @@ const AddSurveyPage = () => {
         }
 
         try {
+            // Helper function to convert HH:MM to HH:MM:SS format
+            const formatTime = (time) => {
+                if (!time) return time;
+                return time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time;
+            };
+
             const surveyDataToSubmit = {
                 ...formData,
+                startTime: formatTime(formData.startTime),
+                endTime: formatTime(formData.endTime),
                 sessions: sessionsList.map(session => ({
                     name: session.name,
                     date: session.date,
-                    startTime: session.startTime,
-                    endTime: session.endTime,
+                    startTime: formatTime(session.startTime),
+                    endTime: formatTime(session.endTime),
                     description: session.description,
                     isActive: session.isActive
                 })).filter(session => session.name && session.date) // Only include sessions with name and date
             };
 
+            let response;
             if (isEditing) {
-                await dispatch(surveyUpdate(id, surveyDataToSubmit));
+                response = await dispatch(surveyUpdate(id, surveyDataToSubmit));
             } else {
-                await dispatch(surveyCreate(surveyDataToSubmit));
+                response = await dispatch(surveyCreate(surveyDataToSubmit));
             }
-            navigate('/surveys');
+
+            // Only navigate if the action was successful
+            if (response && !response.error) {
+                navigate('/surveys');
+            }
+            // If error occurs, stay on page (backend will handle error display)
         } catch (error) {
             console.error('Error saving survey:', error);
+            // Stay on page if error occurs (backend will handle error display)
         }
     };
 
@@ -203,7 +227,26 @@ const AddSurveyPage = () => {
     const isLoading = createLoading || updateLoading;
 
     return (
-        <Container fluid>
+        <>
+            <style jsx>{`
+                .react-select__menu {
+                    z-index: 9999 !important;
+                }
+                .react-select__menu-portal {
+                    z-index: 9999 !important;
+                }
+                .react-select__control {
+                    font-size: 14px;
+                }
+                .react-select__option {
+                    font-size: 14px;
+                    padding: 8px 12px;
+                }
+                .react-select__single-value {
+                    font-size: 14px;
+                }
+            `}</style>
+            <Container fluid>
             <div className="row">
                 <div className="col-12">
                     <div className="card">
@@ -219,9 +262,9 @@ const AddSurveyPage = () => {
                         <div className="card-body">
                             <form onSubmit={handleSubmit}>
                                 <Row>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="eventId">
+                                    <Col sm={12}>
+                                        <div className="form-group fill" >
+                                            <label className="floating-label" style={{ marginTop: '-8px' }} htmlFor="eventId">
                                                 Event *
                                             </label>
                                             <Select
@@ -235,11 +278,39 @@ const AddSurveyPage = () => {
                                                 placeholder="Select an event"
                                                 isClearable
                                                 isSearchable
+                                                menuPortalTarget={document.body}
+                                                menuPosition="fixed"
                                                 styles={{
                                                     control: (base) => ({
                                                         ...base,
                                                         minHeight: '45px',
-                                                        border: errors.eventId ? '1px solid #dc3545' : '1px solid #ced4da'
+                                                        border: errors.eventId ? '1px solid #dc3545' : '1px solid #ced4da',
+                                                        fontSize: '14px'
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        zIndex: 9999,
+                                                        fontSize: '14px'
+                                                    }),
+                                                    menuPortal: (base) => ({
+                                                        ...base,
+                                                        zIndex: 9999
+                                                    }),
+                                                    option: (base) => ({
+                                                        ...base,
+                                                        fontSize: '14px',
+                                                        padding: '8px 12px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }),
+                                                    singleValue: (base) => ({
+                                                        ...base,
+                                                        fontSize: '14px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        maxWidth: '100%'
                                                     })
                                                 }}
                                             />
@@ -250,8 +321,10 @@ const AddSurveyPage = () => {
                                             )}
                                         </div>
                                     </Col>
+                                </Row>
 
-                                    <Col sm={6}>
+                                <Row>
+                                    <Col sm={12}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="title">
                                                 Survey Title *
@@ -408,7 +481,22 @@ const AddSurveyPage = () => {
                                             <Badge bg="info" className="mb-2">
                                                 <span>Sessions </span> {sessionsList.length}/20
                                             </Badge>
-                                            <div className="d-flex align-items-center">
+                                            <small className="text-muted">
+                                                Add survey sessions (optional)
+                                            </small>
+                                        </div>
+                                    </Col>
+                                </Row>
+
+                                {/* Sessions Management */}
+                                <Row>
+                                    <Col sm={12}>
+                                        <Card className="mb-3">
+                                            <Card.Header className="d-flex justify-content-between align-items-center">
+                                                <h6 className="mb-0">
+                                                    <i className="feather icon-list mr-2"></i>
+                                                    Survey Sessions ({sessionsList.length})
+                                                </h6>
                                                 <Button
                                                     variant="outline-primary"
                                                     size="sm"
@@ -418,26 +506,8 @@ const AddSurveyPage = () => {
                                                     <i className="feather icon-plus mr-1"></i>
                                                     Add Session
                                                 </Button>
-                                                <small className="text-muted ml-2">
-                                                    Add survey sessions (optional)
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                </Row>
-
-                                {/* Sessions Management */}
-                                {sessionsList.length > 0 && (
-                                    <Row>
-                                        <Col sm={12}>
-                                            <Card className="mb-3">
-                                                <Card.Header>
-                                                    <h6 className="mb-0">
-                                                        <i className="feather icon-list mr-2"></i>
-                                                        Survey Sessions ({sessionsList.length})
-                                                    </h6>
-                                                </Card.Header>
-                                                <Card.Body>
+                                            </Card.Header>
+                                            <Card.Body>
                                                     {sessionsList.map((session, index) => (
                                                         <div key={session.id} className="border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
                                                             <div className="d-flex justify-content-between align-items-center mb-2">
@@ -525,11 +595,10 @@ const AddSurveyPage = () => {
                                                             </Row>
                                                         </div>
                                                     ))}
-                                                </Card.Body>
-                                            </Card>
-                                        </Col>
-                                    </Row>
-                                )}
+                                            </Card.Body>
+                                        </Card>
+                                    </Col>
+                                </Row>
 
                                 {/* Form Actions */}
                                 <div className="row mt-4">
@@ -549,7 +618,8 @@ const AddSurveyPage = () => {
                     </div>
                 </div>
             </div>
-        </Container>
+            </Container>
+        </>
     );
 };
 

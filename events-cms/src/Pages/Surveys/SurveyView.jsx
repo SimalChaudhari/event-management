@@ -82,19 +82,34 @@ function atable(data, handleAddSurvey, handleEdit, handleDelete, handleView) {
                 render: function (data, type, row) {
                     const { badgeClass, statusText } = formatSurveyStatus(row);
                     const startDate = new Date(row.startDate);
+                    const endDate = new Date(row.endDate);
                     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
                     return `
                         <div class="d-inline-block align-middle">
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.title}</h6>
-                                <span class="badge ${badgeClass} mr-2">
-                                    ${startDate.getDate()} ${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}
-                                    <span class="ml-1">${statusText}</span>
-                                </span>
-                                <span class="badge badge-primary">
-                                    Sessions: ${row.sessions?.length || 0}
-                                </span>
+                                <div class="m-b-2">
+                                    <span class="badge ${badgeClass} mr-2">
+                                        <i class="fas fa-calendar-alt mr-1"></i>
+                                        ${startDate.getDate()} ${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}
+                                        <span class="ml-1">${statusText}</span>
+                                    </span>
+                                    <span class="badge badge-primary">
+                                        <i class="fas fa-list mr-1"></i>
+                                        Sessions: ${row.sessions?.length || 0}
+                                    </span>
+                                </div>
+                                <div class="text-muted small">
+                                    <div class="mb-1">
+                                        <i class="fas fa-play-circle text-danger mr-1"></i>
+                                        <strong>Start:</strong> ${startDate.getDate()} ${monthNames[startDate.getMonth()]} ${startDate.getFullYear()} at ${formatTime(row.startTime)}
+                                    </div>
+                                    <div>
+                                        <i class="fas fa-stop-circle text-success mr-1"></i>
+                                        <strong>End:</strong> ${endDate.getDate()} ${monthNames[endDate.getMonth()]} ${endDate.getFullYear()} at ${formatTime(row.endTime)}
+                                    </div>
+                                </div>
                             </div>
                         </div>   
                     `;
@@ -107,15 +122,35 @@ function atable(data, handleAddSurvey, handleEdit, handleDelete, handleView) {
                     const eventInfo = row.eventInfo;
                     if (!eventInfo) return '<span class="text-muted">No event linked</span>';
 
+                    const eventStartDate = eventInfo.startDate ? new Date(eventInfo.startDate) : null;
+                    const eventEndDate = eventInfo.endDate ? new Date(eventInfo.endDate) : null;
+                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
                     return `
                         <div class="d-inline-block align-middle">
                             <h6 class="m-b-5">${eventInfo.name || 'N/A'}</h6>
-                            <p class="m-b-0">
+                            <p class="m-b-2">
                                 <span class="badge badge-info">
                                     <i class="feather icon-map-pin mr-1"></i>
                                     ${eventInfo.location || 'N/A'}
                                 </span>
                             </p>
+                            ${eventStartDate ? `
+                                <div class="text-muted small">
+                                    <div class="mb-1">
+                                        <i class="fas fa-calendar-alt text-primary mr-1"></i>
+                                        <strong>Event Date:</strong> ${eventStartDate.getDate()} ${monthNames[eventStartDate.getMonth()]} ${eventStartDate.getFullYear()}
+                                        ${eventInfo.startTime ? ` at ${formatTime(eventInfo.startTime)}` : ''}
+                                    </div>
+                                    ${eventEndDate && eventEndDate.getTime() !== eventStartDate.getTime() ? `
+                                        <div>
+                                            <i class="fas fa-calendar-check text-success mr-1"></i>
+                                            <strong>Ends:</strong> ${eventEndDate.getDate()} ${monthNames[eventEndDate.getMonth()]} ${eventEndDate.getFullYear()}
+                                            ${eventInfo.endTime ? ` at ${formatTime(eventInfo.endTime)}` : ''}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }

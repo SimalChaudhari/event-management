@@ -71,7 +71,7 @@ export const EVENT_PATHS = {
 
 export const MEDIA_MANAGER_PATHS = {
   
-    EVENT_RESOURCES: '/media-manager/event-resources',
+
     BANNER_MANAGEMENT: '/media-manager/banner-management'
 };
 

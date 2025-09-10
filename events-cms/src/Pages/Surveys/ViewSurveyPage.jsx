@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Button from 'react-bootstrap/Button';
-import Badge from 'react-bootstrap/Badge';
-import Table from 'react-bootstrap/Table';
-import Alert from 'react-bootstrap/Alert';
+import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Alert } from 'react-bootstrap';
 import { surveyDetail } from '../../store/actions/surveyActions';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
+import SurveyBasicComponent from '../../components/surveys/SurveyBasicComponent';
+import SurveySessionsComponent from '../../components/surveys/SurveySessionsComponent';
 
 const ViewSurveyPage = () => {
     const { id } = useParams();
@@ -17,6 +13,7 @@ const ViewSurveyPage = () => {
     const dispatch = useDispatch();
     
     const { selectedSurvey, loading } = useSelector((state) => state.survey);
+    const [activeTab, setActiveTab] = useState('details');
 
     useEffect(() => {
         if (id) {
@@ -91,153 +88,147 @@ const ViewSurveyPage = () => {
 
     const surveyStatus = formatSurveyStatus(selectedSurvey);
 
-    return (
+    // 12-hour AM/PM format helper
+    const formatTime = (timeStr) => {
+        if (!timeStr) return '';
+        const [hour, minute] = timeStr.split(':');
+        const date = new Date();
+        date.setHours(hour, minute);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    // Render survey statistics
+    const renderSurveyStats = () => (
         <Row>
-            <Col sm={12}>
-                {/* Survey Header */}
-                <Card className="mb-4">
-                    <Card.Header className="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 className="mb-0">{selectedSurvey.title}</h5>
-                            <Badge variant={surveyStatus.variant} className="mt-1">
-                                {surveyStatus.text}
-                            </Badge>
-                        </div>
+            <Col xs={6} md={3} className="mb-3">
+                <div
+                    className="text-center p-3"
+                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                >
+                    <i className="fas fa-list-alt text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                        Sessions
+                    </h6>
+                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
+                        {selectedSurvey.sessions?.length || 0}
+                    </p>
+                </div>
+            </Col>
+            <Col xs={6} md={3} className="mb-3">
+                <div
+                    className="text-center p-3"
+                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                >
+                    <i className="fas fa-calendar-day text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                        Total Days
+                    </h6>
+                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                        {selectedSurvey.eventStats?.totalDays || 'N/A'}
+                    </p>
+                </div>
+            </Col>
+            <Col xs={6} md={3} className="mb-3">
+                <div
+                    className="text-center p-3"
+                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                >
+                    <i className="fas fa-clock text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                        Total Hours
+                    </h6>
+                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                        {selectedSurvey.eventStats?.totalHours || 'N/A'}
+                    </p>
+                </div>
+            </Col>
+            <Col xs={6} md={3} className="mb-3">
+                <div
+                    className="text-center p-3"
+                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                >
+                    <i className="fas fa-toggle-on text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
+                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
+                        Status
+                    </h6>
+                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
+                        <Badge bg={selectedSurvey.isActive ? 'success' : 'danger'}>
+                            {selectedSurvey.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                    </p>
+                </div>
+            </Col>
+        </Row>
+    );
+
+    return (
+        <>
+            <div className="mt-4">
+                <div
+                    className="mb-3"
+                    style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                >
+                    <div className="d-flex justify-content-between align-items-center">
+                        <h4 className="card-title">View Survey</h4>
                         <div>
                             <Button 
                                 variant="warning" 
                                 className="me-2"
                                 onClick={() => navigate(`/surveys/edit/${selectedSurvey.id}`)}
                             >
-                                <i className="feather icon-edit"></i> Edit
+                                <i className="fas fa-edit me-2"></i> Edit
                             </Button>
                             <Button 
                                 variant="secondary"
                                 onClick={() => navigate('/surveys')}
                             >
-                                <i className="feather icon-arrow-left"></i> Back
+                                <i className="fas fa-arrow-left me-2"></i> Back
                             </Button>
                         </div>
-                    </Card.Header>
-                </Card>
+                    </div>
+                    <hr />
+                    {renderSurveyStats()}
+                </div>
 
-                {/* Survey Details */}
-                <Row>
-                    <Col md={8}>
-                        <Card className="mb-4">
-                            <Card.Header>
-                                <h6>Survey Information</h6>
-                            </Card.Header>
-                            <Card.Body>
-                                <Row>
-                                    <Col md={6}>
-                                        <p><strong>Title:</strong> {selectedSurvey.title}</p>
-                                        <p><strong>Event ID:</strong> {selectedSurvey.eventId}</p>
-                                        <p><strong>Status:</strong> 
-                                            <Badge 
-                                                variant={selectedSurvey.isActive ? 'success' : 'danger'}
-                                                className="ms-2"
-                                            >
-                                                {selectedSurvey.isActive ? 'Active' : 'Inactive'}
-                                            </Badge>
-                                        </p>
-                                    </Col>
-                                    <Col md={6}>
-                                        <p><strong>Start:</strong> {formatDateTimeForTable(selectedSurvey.startDate, selectedSurvey.startTime)}</p>
-                                        <p><strong>End:</strong> {formatDateTimeForTable(selectedSurvey.endDate, selectedSurvey.endTime)}</p>
-                                        <p><strong>Created:</strong> {new Date(selectedSurvey.createdAt).toLocaleDateString()}</p>
-                                    </Col>
-                                </Row>
-                            </Card.Body>
-                        </Card>
-                    </Col>
+                <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                    <Tab.Container id="survey-tabs" defaultActiveKey="details">
+                        <Row>
+                            <Col sm={12}>
+                                <Nav variant="tabs" className="mb-3">
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="details">
+                                            <i className="fas fa-info-circle me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Details
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="sessions">
+                                            <i className="fas fa-list-alt me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            Sessions
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                </Nav>
+                            </Col>
+                        </Row>
 
-                    <Col md={4}>
-                        <Card className="mb-4">
-                            <Card.Header>
-                                <h6>Statistics</h6>
-                            </Card.Header>
-                            <Card.Body>
-                                <div className="text-center">
-                                    <div className="mb-3">
-                                        <h4 className="text-primary">{selectedSurvey.sessions?.length || 0}</h4>
-                                        <p className="mb-0">Total Sessions</p>
-                                    </div>
-                                    <div className="mb-3">
-                                        <h4 className="text-success">{selectedSurvey.eventStats?.totalDays || 'N/A'}</h4>
-                                        <p className="mb-0">Total Days</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-info">{selectedSurvey.eventStats?.totalHours || 'N/A'}</h4>
-                                        <p className="mb-0">Total Hours</p>
-                                    </div>
-                                </div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                </Row>
+                        <Tab.Content>
+                            {/* Details Tab */}
+                            <Tab.Pane eventKey="details">
+                                <SurveyBasicComponent surveyData={selectedSurvey} />
+                            </Tab.Pane>
 
-                {/* Sessions Table */}
-                <Card>
-                    <Card.Header className="d-flex justify-content-between align-items-center">
-                        <h6>Survey Sessions</h6>
-                        <Badge variant="primary">{selectedSurvey.sessions?.length || 0} Sessions</Badge>
-                    </Card.Header>
-                    <Card.Body>
-                        {selectedSurvey.sessions && selectedSurvey.sessions.length > 0 ? (
-                            <Table striped hover responsive>
-                                <thead>
-                                    <tr>
-                                        <th>Session Name</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Description</th>
-                                        <th>Status</th>
-                                        <th>Active</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {selectedSurvey.sessions.map((session) => {
-                                        const sessionStatus = formatSessionStatus(session);
-                                        return (
-                                            <tr key={session.id}>
-                                                <td>
-                                                    <strong>{session.name}</strong>
-                                                </td>
-                                                <td>
-                                                    {new Date(session.date).toLocaleDateString()}
-                                                </td>
-                                                <td>
-                                                    {session.startTime} - {session.endTime}
-                                                </td>
-                                                <td>
-                                                    {session.description || 'No description'}
-                                                </td>
-                                                <td>
-                                                    <Badge variant={sessionStatus.variant}>
-                                                        {sessionStatus.text}
-                                                    </Badge>
-                                                </td>
-                                                <td>
-                                                    <Badge variant={session.isActive ? 'success' : 'danger'}>
-                                                        {session.isActive ? 'Active' : 'Inactive'}
-                                                    </Badge>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </Table>
-                        ) : (
-                            <Alert variant="info" className="text-center">
-                                <i className="feather icon-info"></i>
-                                <p className="mb-0 mt-2">No sessions found for this survey.</p>
-                            </Alert>
-                        )}
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+                            {/* Sessions Tab */}
+                            <Tab.Pane eventKey="sessions">
+                                <SurveySessionsComponent 
+                                    sessions={selectedSurvey.sessions} 
+                                    formatTime={formatTime} 
+                                />
+                            </Tab.Pane>
+                        </Tab.Content>
+                    </Tab.Container>
+                </div>
+            </div>
+        </>
     );
 };
 

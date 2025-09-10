@@ -69,14 +69,11 @@ export const getBannerEvents = () => async (dispatch) => {
 export const uploadBanners = (file, hyperlink) => async dispatch => {
     try {
         const formData = new FormData();
-        formData.append('image', file); // सिर्फ एक file, नाम 'image'
+        formData.append('image', file)
         if (hyperlink) formData.append('hyperlink', hyperlink);
 
         // axios/fetch call
-        const response = await axiosInstance.post('/banners', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
+        const response = await axiosInstance.post('/auth/banners', formData)
         // success dispatch
         dispatch({ type: UPLOAD_BANNERS, payload: response.data });
         return true;
@@ -89,8 +86,7 @@ export const uploadBanners = (file, hyperlink) => async dispatch => {
 // Upload Banner Events
 export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
     try {
-        dispatch(setBannerLoading(true));
-        
+       
         const formData = new FormData();
         files.forEach((file) => {
             formData.append('images', file);
@@ -101,11 +97,7 @@ export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
             formData.append('hyperlink', hyperlink);
         }
 
-        const response = await axiosInstance.post('/banner-events', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+        const response = await axiosInstance.post('/banner-events', formData)
         
         dispatch({
             type: UPLOAD_BANNER_EVENTS,
@@ -116,10 +108,7 @@ export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to upload banner events';
-        dispatch(setBannerError(errorMessage));
         toast.error(errorMessage);
-    } finally {
-        dispatch(setBannerLoading(false));
     }
     return false;
 };
@@ -129,7 +118,7 @@ export const deleteBannerImage = (imageUrl) => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/banners/delete-image', {
+        const response = await axiosInstance.delete('/auth/banners/delete-image', {
             data: { imageUrl }
         });
         
@@ -181,7 +170,7 @@ export const clearAllBanners = () => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/banners/clear-all');
+        const response = await axiosInstance.delete('/auth/banners/clear-all');
         
         dispatch({
             type: CLEAR_ALL_BANNERS,

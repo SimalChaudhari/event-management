@@ -53,8 +53,6 @@ const eventComponents = {
 };
 
 const MediaManagerComponents = {
-    EventResources: React.lazy(() => import('./Pages/MediaManager/Gallery/event-resource/EventResourcesPage.jsx')),
-   
     BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx'))
 };
 
@@ -374,12 +372,6 @@ const eventRoutes = [
 ];
 
 const MediaManagerRoutes = [
-    {
-        path: MEDIA_MANAGER_PATHS.EVENT_RESOURCES,
-        exact: true,
-        name: 'Event Resources',
-        component: MediaManagerComponents.EventResources
-    },
    
     {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,

@@ -1,5 +1,5 @@
-import { toast } from "react-toastify";
-import axiosInstance from "../../configs/axiosInstance";
+import { toast } from 'react-toastify';
+import axiosInstance from '../../configs/axiosInstance';
 
 // Action Types
 export const SURVEY_LIST_REQUEST = 'SURVEY_LIST_REQUEST';
@@ -41,14 +41,14 @@ export const setSurveyError = (error) => ({
 export const surveyList = () => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.get('/events/surveys/current');
-        
+
         dispatch({
             type: SURVEY_LIST_SUCCESS,
-            payload: response.data.data,
+            payload: response.data.data
         });
-        
+
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch surveys';
@@ -64,14 +64,14 @@ export const surveyList = () => async (dispatch) => {
 export const surveyDetail = (surveyId) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.get(`/events/surveys/${surveyId}`);
-        
+
         dispatch({
             type: SURVEY_DETAIL_SUCCESS,
-            payload: response.data.data,
+            payload: response.data.data
         });
-        
+
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch survey details';
@@ -86,23 +86,17 @@ export const surveyDetail = (surveyId) => async (dispatch) => {
 // Create new survey
 export const surveyCreate = (surveyData) => async (dispatch) => {
     try {
-        dispatch(setSurveyLoading(true));
-        
         const response = await axiosInstance.post('/events/surveys', surveyData);
-        
         dispatch({
             type: SURVEY_CREATE_SUCCESS,
-            payload: response.data.data,
+            payload: response.data.data
         });
-        
+
         toast.success(response.data.message || 'Survey created successfully!');
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to create survey';
-        dispatch(setSurveyError(errorMessage));
         toast.error(errorMessage);
-    } finally {
-        dispatch(setSurveyLoading(false));
     }
     return false;
 };
@@ -110,23 +104,18 @@ export const surveyCreate = (surveyData) => async (dispatch) => {
 // Update survey
 export const surveyUpdate = (surveyId, surveyData) => async (dispatch) => {
     try {
-        dispatch(setSurveyLoading(true));
-        
         const response = await axiosInstance.put(`/events/surveys/${surveyId}`, surveyData);
-        
+
         dispatch({
             type: SURVEY_UPDATE_SUCCESS,
-            payload: response.data.survey,
+            payload: response.data.survey
         });
-        
+
         toast.success(response.data.message || 'Survey updated successfully!');
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update survey';
-        dispatch(setSurveyError(errorMessage));
         toast.error(errorMessage);
-    } finally {
-        dispatch(setSurveyLoading(false));
     }
     return false;
 };
@@ -135,14 +124,14 @@ export const surveyUpdate = (surveyId, surveyData) => async (dispatch) => {
 export const surveyDelete = (surveyId) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.delete(`/events/surveys/${surveyId}`);
-        
+
         dispatch({
             type: SURVEY_DELETE_SUCCESS,
-            payload: surveyId,
+            payload: surveyId
         });
-        
+
         toast.success(response.data.message || 'Survey deleted successfully!');
         return true;
     } catch (error) {
@@ -159,9 +148,9 @@ export const surveyDelete = (surveyId) => async (dispatch) => {
 export const addSessionToSurvey = (surveyId, sessionData) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.post(`/events/surveys/${surveyId}/sessions`, sessionData);
-        
+
         toast.success(response.data.message || 'Session added successfully!');
         return true;
     } catch (error) {
@@ -178,9 +167,9 @@ export const addSessionToSurvey = (surveyId, sessionData) => async (dispatch) =>
 export const updateSession = (surveyId, sessionId, sessionData) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.put(`/events/surveys/${surveyId}/sessions/${sessionId}`, sessionData);
-        
+
         toast.success(response.data.message || 'Session updated successfully!');
         return true;
     } catch (error) {
@@ -197,9 +186,9 @@ export const updateSession = (surveyId, sessionId, sessionData) => async (dispat
 export const deleteSession = (surveyId, sessionId) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.delete(`/events/surveys/${surveyId}/sessions/${sessionId}`);
-        
+
         toast.success(response.data.message || 'Session deleted successfully!');
         return true;
     } catch (error) {
@@ -216,9 +205,9 @@ export const deleteSession = (surveyId, sessionId) => async (dispatch) => {
 export const getEventSuggestions = (eventId) => async (dispatch) => {
     try {
         dispatch(setSurveyLoading(true));
-        
+
         const response = await axiosInstance.get(`/events/surveys/suggestions/${eventId}`);
-        
+
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to get event suggestions';
