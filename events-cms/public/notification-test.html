@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Notification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .status {
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .token {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #e9ecef;
+        }
+        .step-number {
+            background: #007bff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Push Notification Chat</h1>
+        <p><strong>Everything is automatic!</strong> Just enter JWT token and start chatting.</p>
+        
+        <!-- JWT Token -->
+        <div class="step">
+            <h3>🔑 JWT Token</h3>
+            <input type="text" id="jwt-token" placeholder="Enter your JWT token here" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 10px;">
+            <button onclick="setJwtToken()" style="background: #007bff; color: white; padding: 15px 30px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer;">Set JWT Token</button>
+            <div id="jwt-status" class="status" style="display: none;"></div>
+        </div>
+
+        <!-- Send Message -->
+        <div class="step">
+            <h3>💬 Send Message</h3>
+            <input type="text" id="receiver-id" placeholder="Receiver User ID" value="user123" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 10px;">
+            <textarea id="message-text" placeholder="Type your message here..." rows="3" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 10px; resize: vertical;"></textarea>
+            <button onclick="sendMessage()" style="background: #28a745; color: white; padding: 15px 30px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer;">Send Message</button>
+            <div id="send-status" class="status" style="display: none;"></div>
+        </div>
+
+        <!-- Hidden Status Areas for Auto-Process -->
+        <div style="display: none;">
+            <div id="vapid-status" class="status"></div>
+            <div id="firebase-status" class="status"></div>
+            <div id="register-status" class="status"></div>
+            <div id="token-display" class="token"></div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-jL5NGhUvYWWlwooVWBvMgby35dyY-WI",
+            authDomain: "react-native-apps-11b65.firebaseapp.com",
+            projectId: "react-native-apps-11b65",
+            storageBucket: "react-native-apps-11b65.firebasestorage.app",
+            messagingSenderId: "899849144398",
+            appId: "1:899849144398:web:a0add6895682e67ceddb1f",
+            measurementId: "G-1STZ7L4GPP"
+        };
+
+        let messaging = null;
+        
+        // VAPID Key - Set directly in code
+        const vapidKey = 'BL3ve9MA8jNcVVlRfkcDDTxetKf4fQzUGrA3YgKpOxgnN0DfWfpHYOEFL0Mrm458t1eFC0rjG5FID1jflQ7w_Lg';
+        let deviceToken = '';
+        let jwtToken = '';
+        let apiBaseUrl = 'http://localhost:5000';
+
+        // VAPID Key is pre-configured in code
+
+        // Step 2: Initialize Firebase and get device token
+        function initFirebase() {
+            return new Promise((resolve, reject) => {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    messaging = firebase.messaging();
+                    
+                    // Register service worker
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                            .then((registration) => {
+                                showStatus('firebase-status', 'Firebase initialized successfully!', 'success');
+                                resolve();
+                            })
+                            .catch((error) => {
+                                showStatus('firebase-status', 'Service Worker registration failed: ' + error.message, 'error');
+                                reject(error);
+                            });
+                    } else {
+                        showStatus('firebase-status', 'Service Worker not supported', 'error');
+                        reject(new Error('Service Worker not supported'));
+                    }
+                } catch (error) {
+                    showStatus('firebase-status', 'Firebase initialization failed: ' + error.message, 'error');
+                    reject(error);
+                }
+            });
+        }
+
+        // Backend handles notification permissions
+
+        function getDeviceToken() {
+            return new Promise((resolve, reject) => {
+                if (!messaging) {
+                    showStatus('firebase-status', 'Initialize Firebase first', 'error');
+                    reject(new Error('Firebase not initialized'));
+                    return;
+                }
+
+                if (!vapidKey) {
+                    showStatus('firebase-status', 'Set VAPID key first', 'error');
+                    reject(new Error('VAPID key not set'));
+                    return;
+                }
+
+                messaging.getToken({ vapidKey: vapidKey })
+                    .then((token) => {
+                        if (token) {
+                            deviceToken = token;
+                            document.getElementById('token-display').textContent = token;
+                            document.getElementById('token-display').style.display = 'block';
+                            
+                            if (token.startsWith('web_')) {
+                                showStatus('firebase-status', 'WARNING: Got mock token, not real FCM token!', 'error');
+                                reject(new Error('Mock token received'));
+                            } else if (token.length > 100) {
+                                showStatus('firebase-status', 'Device token generated successfully!', 'success');
+                                resolve(token);
+                            } else {
+                                showStatus('firebase-status', 'WARNING: Token seems too short', 'error');
+                                reject(new Error('Token too short'));
+                            }
+                        } else {
+                            showStatus('firebase-status', 'No device token available', 'error');
+                            reject(new Error('No token available'));
+                        }
+                    })
+                    .catch((error) => {
+                        showStatus('firebase-status', 'Error getting device token: ' + error.message, 'error');
+                        reject(error);
+                    });
+            });
+        }
+
+        // Set JWT Token and Auto-Register
+        function setJwtToken() {
+            jwtToken = document.getElementById('jwt-token').value.trim();
+            
+            if (!jwtToken) {
+                showStatus('jwt-status', 'Please enter JWT token', 'error');
+                return;
+            }
+
+            showStatus('jwt-status', 'JWT token set! Registering device token...', 'info');
+            
+            // Auto-register device token after JWT is set
+            if (deviceToken) {
+                autoRegisterDeviceToken();
+            } else {
+                showStatus('jwt-status', 'Waiting for device token...', 'info');
+            }
+        }
+
+        // Auto-register device token
+        async function autoRegisterDeviceToken() {
+            if (!deviceToken || !jwtToken) {
+                showStatus('jwt-status', 'Missing device token or JWT token', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/notifications/register-device`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        deviceToken: deviceToken,
+                        platform: 'web'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('jwt-status', '✅ Ready! Device token registered. You can now send messages!', 'success');
+                } else {
+                    showStatus('jwt-status', `❌ Registration failed: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus('jwt-status', '❌ Error registering device token: ' + error.message, 'error');
+            }
+        }
+
+        async function registerDeviceToken() {
+            if (!deviceToken) {
+                showStatus('register-status', 'Please get device token first', 'error');
+                return;
+            }
+
+            if (!jwtToken) {
+                showStatus('register-status', 'Please set JWT token first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/notifications/register-device`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        deviceToken: deviceToken,
+                        platform: 'web'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('register-status', 'Device token registered successfully!', 'success');
+                    await checkRegisteredTokens();
+                } else {
+                    showStatus('register-status', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus('register-status', 'Error registering device token: ' + error.message, 'error');
+            }
+        }
+
+        async function checkRegisteredTokens() {
+            if (!jwtToken) return;
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/notifications/my-tokens`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${jwtToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const tokens = await response.json();
+                    
+                    if (tokens.length > 1) {
+                        showStatus('register-status', `WARNING: You have ${tokens.length} device tokens! This may cause duplicate notifications.`, 'error');
+                        
+                        if (confirm(`You have ${tokens.length} device tokens. This causes duplicate notifications. Do you want to delete old tokens and keep only the current one?`)) {
+                            await cleanupOldTokens();
+                        }
+                    } else {
+                        showStatus('register-status', `You have ${tokens.length} device token registered.`, 'success');
+                    }
+                }
+            } catch (error) {
+                showStatus('register-status', 'Error checking tokens: ' + error.message, 'error');
+            }
+        }
+
+        async function cleanupOldTokens() {
+            if (!jwtToken || !deviceToken) {
+                showStatus('register-status', 'Need JWT token and device token to cleanup', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/notifications/cleanup-tokens`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        keepToken: deviceToken
+                    })
+                });
+
+                if (response.ok) {
+                    showStatus('register-status', 'Old tokens cleaned up successfully!', 'success');
+                } else {
+                    showStatus('register-status', 'Failed to cleanup old tokens', 'error');
+                }
+            } catch (error) {
+                showStatus('register-status', 'Error cleaning up tokens: ' + error.message, 'error');
+            }
+        }
+
+        async function sendMessage() {
+            const receiverId = document.getElementById('receiver-id').value;
+            const messageText = document.getElementById('message-text').value;
+
+            if (!receiverId || !messageText) {
+                showStatus('send-status', 'Please enter receiver ID and message', 'error');
+                return;
+            }
+
+            if (!jwtToken) {
+                showStatus('send-status', 'Please set JWT token first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/chat/send/${receiverId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        msg: messageText,
+                        msgType: 'text'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('send-status', '✅ Message sent! Check for push notification.', 'success');
+                    document.getElementById('message-text').value = '';
+                } else {
+                    showStatus('send-status', `❌ Send failed: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus('send-status', 'Error sending message: ' + error.message, 'error');
+            }
+        }
+
+
+        // Helper function
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+        }
+
+        // Backend handles all notifications - no frontend notification code needed
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            // Auto-initialize Firebase and get device token
+            autoInitialize();
+        });
+
+        // Auto-initialize function
+        async function autoInitialize() {
+            try {
+                // Initialize Firebase automatically
+                await initFirebase();
+                
+                // Get device token automatically
+                await getDeviceToken();
+                
+                // Show status in JWT area
+                showStatus('jwt-status', '✅ System ready! Enter JWT token to start chatting.', 'success');
+            } catch (error) {
+                showStatus('jwt-status', '❌ Auto-initialization failed: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

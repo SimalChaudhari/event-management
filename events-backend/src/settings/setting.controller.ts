@@ -11,24 +11,40 @@ import {
   UseInterceptors,
   UploadedFiles,
   UploadedFile,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   PrivacyPolicyService,
   TermsConditionsService,
   BannerService,
   BannerEventService,
+  UserPermissionsService,
+  PermissionTemplateService,
+  PushNotificationService,
 } from './setting.service';
 import {
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
   CreateBannerDto,
   CreateBannerEventDto,
+  CreatePermissionTemplateDto,
+  UpdateUserPermissionDto,
+  UserPermissionWithTemplate,
+  RegisterDeviceTokenDto,
+  SendNotificationDto,
+  NotificationHistoryDto,
 } from './setting.dto';
-import { PrivacyPolicy, TermsConditions, Banner, BannerEvent } from './setting.entity';
+import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, UserPermissions, PermissionTemplate } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
+import { GetUser } from '../jwt/get-user.decorator';
+import { UserEntity } from '../user/users.entity';
+import { RolesGuard } from '../jwt/roles.guard';
+import { Roles } from '../jwt/roles.decorator';
 
 @Controller('api/privacy-policies')
 export class PrivacyPolicyController {
@@ -178,4 +194,101 @@ export class BannerEventController {
   async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
     return this.bannerEventService.deleteSpecificImage(imageUrl);
   }
+}
+
+// Permission Templates Controller (Admin creates default permissions)
+@Controller('api/permission-templates')
+export class PermissionTemplateController {
+  constructor(private readonly permissionTemplateService: PermissionTemplateService) { }
+
+  // Create permission template (admin only - no user ID needed)
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async createTemplate(
+    @Body() templateData: CreatePermissionTemplateDto,
+  ): Promise<{ message: string; data: PermissionTemplate }> {
+    return this.permissionTemplateService.createTemplate(templateData);
+  }
+
+  // Get all permission templates (public - no authentication needed)
+  @Get()
+  async getAllTemplates(): Promise<PermissionTemplate[]> {
+    return this.permissionTemplateService.getAllTemplates();
+  }
+
+  // Delete permission template (admin only)
+  @Delete(':templateId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async deleteTemplate(@Param('templateId') templateId: string): Promise<{ message: string }> {
+    return this.permissionTemplateService.deleteTemplate(templateId);
+  }
+
+  // Seed default permission templates (admin only)
+  @Post('seed-defaults')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async seedDefaultTemplates(): Promise<{ message: string; count: number }> {
+    return this.permissionTemplateService.seedDefaultTemplates();
+  }
+}
+
+// User Permissions Controller (User-specific settings)
+@Controller('api/user-permissions')
+@UseGuards(JwtAuthGuard)
+export class UserPermissionsController {
+  constructor(private readonly userPermissionsService: UserPermissionsService) { }
+
+  // Get user permissions with template info (shows defaults + user customizations)
+  @Get()
+  async getUserPermissionsWithTemplates(
+    @GetUser() user: UserEntity
+  ): Promise<UserPermissionWithTemplate[]> {
+    return this.userPermissionsService.getUserPermissionsWithTemplates(user.id);
+  }
+
+  // Update user's specific permission
+  @Put(':templateId')
+  async updateUserPermission(
+    @Param('templateId') templateId: string,
+    @Body() permissionData: UpdateUserPermissionDto,
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.userPermissionsService.updateUserPermission(user.id, templateId, permissionData);
+  }
+
+  // Reset specific user permission to default
+  @Delete(':templateId')
+  async resetUserPermission(
+    @Param('templateId') templateId: string,
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.userPermissionsService.resetUserPermission(user.id, templateId);
+  }
+
+  // Reset all user permissions to defaults
+  @Delete()
+  async resetAllUserPermissions(
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.userPermissionsService.resetAllUserPermissions(user.id);
+  }
+}
+
+// Push Notification Controller
+@Controller('api/notifications')
+@UseGuards(JwtAuthGuard)
+export class PushNotificationController {
+  constructor(private readonly pushNotificationService: PushNotificationService) { }
+
+  // Register device token for push notifications
+  @Post('register-device')
+  async registerDeviceToken(
+    @Body() deviceData: RegisterDeviceTokenDto,
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.pushNotificationService.registerDeviceToken(user.id, deviceData);
+  }
+
 }

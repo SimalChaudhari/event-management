@@ -4,6 +4,7 @@ import { Repository, Not } from 'typeorm';
 import { ChatThread, ChatMessage, ChatParticipant, MessageType } from './chat.entity';
 import { UserEntity } from 'user/users.entity';
 import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto, GetChatListDto } from './chat.dto';
+import { ChatNotificationService } from './chat-notification.service';
 
 @Injectable()
 export class ChatService {
@@ -14,6 +15,7 @@ export class ChatService {
     @InjectRepository(ChatMessage) private messageRepo: Repository<ChatMessage>,
     @InjectRepository(ChatParticipant) private participantRepo: Repository<ChatParticipant>,
     @InjectRepository(UserEntity) private userRepo: Repository<UserEntity>,
+    private chatNotificationService: ChatNotificationService
   ) {}
 
   // Method to set gateway reference (called from gateway)
@@ -151,6 +153,19 @@ export class ChatService {
         'unreadCount',
         1
       );
+
+      // Send push notification to receiver
+      try {
+        await this.chatNotificationService.sendChatNotification(
+          senderID,
+          receiverID,
+          dto.msg,
+          dto.msgType || MessageType.TEXT
+        );
+      } catch (error) {
+        console.error('❌ Error sending chat notification:', error);
+        // Don't fail the message sending if notification fails
+      }
 
       // Load complete message with relations
       const savedMessage = await this.messageRepo.findOne({

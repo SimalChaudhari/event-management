@@ -1,12 +1,13 @@
 // src/faq/faq.service.ts
 
-import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {  Banner, BannerEvent, PrivacyPolicy, TermsConditions } from './setting.entity';
-import { CreateBannerDto, CreateBannerEventDto, CreatePrivacyPolicyDto, CreateTermsConditionsDto,} from './setting.dto';
+import {  Banner, BannerEvent, PrivacyPolicy, TermsConditions, UserPermissions, PermissionTemplate, PushNotification, NotificationHistory } from './setting.entity';
+import { CreateBannerDto, CreateBannerEventDto, CreatePrivacyPolicyDto, CreateTermsConditionsDto, CreatePermissionTemplateDto, UpdateUserPermissionDto, UserPermissionWithTemplate, RegisterDeviceTokenDto, SendNotificationDto, NotificationHistoryDto } from './setting.dto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FirebaseUtil } from '../utils/firebase.util';
 
 // Privacy policy
 
@@ -437,4 +438,312 @@ export class BannerEventService {
             console.error('Error deleting files:', error);
         }
     }
+}
+
+// Permission Templates Service (Admin creates default permissions)
+
+@Injectable()
+export class PermissionTemplateService {
+    constructor(
+        @InjectRepository(PermissionTemplate)
+        private permissionTemplateRepository: Repository<PermissionTemplate>
+    ) { }
+
+    // Create permission template (admin only)
+    async createTemplate(templateData: CreatePermissionTemplateDto): Promise<{ message: string; data: PermissionTemplate }> {
+        try {
+            const newTemplate = this.permissionTemplateRepository.create({
+                title: templateData.title,
+                description: templateData.description,
+                defaultEnabled: templateData.defaultEnabled ?? false
+            });
+
+            const result = await this.permissionTemplateRepository.save(newTemplate);
+            return { message: 'Permission template created successfully', data: result };
+        } catch (error: any) {
+            console.log(error);
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error creating permission template', error.message);
+        }
+    }
+
+    // Get all permission templates
+    async getAllTemplates(): Promise<PermissionTemplate[]> {
+        try {
+            const templates = await this.permissionTemplateRepository.find({
+                where: { isActive: true },
+                order: { createdAt: 'ASC' }
+            });
+            return templates;
+        } catch (error: any) {
+            throw new InternalServerErrorException('Error retrieving permission templates', error.message);
+        }
+    }
+
+    // Delete permission template
+    async deleteTemplate(templateId: string): Promise<{ message: string }> {
+        try {
+            const result = await this.permissionTemplateRepository.delete({ id: templateId });
+            
+            if (result.affected === 0) {
+                throw new NotFoundException('Permission template not found');
+            }
+
+            return { message: 'Permission template deleted successfully' };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error deleting permission template', error.message);
+        }
+    }
+
+    // Seed default permission templates
+    async seedDefaultTemplates(): Promise<{ message: string; count: number }> {
+        try {
+            // Check if templates already exist
+            const existingTemplates = await this.permissionTemplateRepository.count();
+            if (existingTemplates > 0) {
+                return { message: 'Default templates already exist', count: existingTemplates };
+            }
+
+            // Define the 6 default templates based on the image
+            const defaultTemplates = [
+                {
+                    title: 'Biometric Sign in',
+                    description: 'Use biometric authentication for secure and quick access to your account',
+                    defaultEnabled: true
+                },
+                {
+                    title: 'Event Notifications',
+                    description: 'Get notified about important updates for your registered events—such as changes in time or location—and receive reminders to download event materials.',
+                    defaultEnabled: false
+                },
+                {
+                    title: 'Networking Notifications',
+                    description: 'Be notified when other attendees reach out, receive messages from event chatrooms, and get reminders for your scheduled meet-ups.',
+                    defaultEnabled: false
+                },
+                {
+                    title: 'Contact',
+                    description: 'Allow other attendees to contact you and share your contact information for networking opportunities.',
+                    defaultEnabled: false
+                },
+                {
+                    title: 'Email Address',
+                    description: 'Share your email address with other attendees for direct communication and follow-ups.',
+                    defaultEnabled: false
+                },
+                {
+                    title: 'LinkedIn',
+                    description: 'Share your LinkedIn profile with other attendees for professional networking and connections.',
+                    defaultEnabled: false
+                }
+            ];
+
+            // Create and save all templates
+            const createdTemplates = [];
+            for (const templateData of defaultTemplates) {
+                const newTemplate = this.permissionTemplateRepository.create(templateData);
+                const savedTemplate = await this.permissionTemplateRepository.save(newTemplate);
+                createdTemplates.push(savedTemplate);
+            }
+
+            return { 
+                message: 'Default permission templates created successfully', 
+                count: createdTemplates.length 
+            };
+        } catch (error: any) {
+            console.error('Error seeding default templates:', error);
+            throw new InternalServerErrorException('Error creating default permission templates', error.message);
+        }
+    }
+}
+
+// User Permissions Service (User-specific settings)
+
+@Injectable()
+export class UserPermissionsService {
+    constructor(
+        @InjectRepository(UserPermissions)
+        private userPermissionsRepository: Repository<UserPermissions>,
+        @InjectRepository(PermissionTemplate)
+        private permissionTemplateRepository: Repository<PermissionTemplate>
+    ) { }
+
+    // Get user permissions with template info (shows defaults + user customizations)
+    async getUserPermissionsWithTemplates(userId: string): Promise<UserPermissionWithTemplate[]> {
+        try {
+            // Get all active permission templates
+            const templates = await this.permissionTemplateRepository.find({
+                where: { isActive: true },
+                order: { createdAt: 'ASC' }
+            });
+
+            // Get user's custom permissions
+            const userPermissions = await this.userPermissionsRepository.find({
+                where: { userId }
+            });
+
+            // Create a map of user permissions for quick lookup
+            const userPermissionMap = new Map();
+            userPermissions.forEach(up => {
+                userPermissionMap.set(up.templateId, up.enabled);
+            });
+
+            // Combine templates with user customizations
+            const result: UserPermissionWithTemplate[] = templates.map(template => {
+                // Get user's custom setting, or use template default if not customized
+                const userEnabled = userPermissionMap.get(template.id);
+                const enabled = userEnabled !== undefined ? userEnabled : template.defaultEnabled;
+
+                return {
+                    id: template.id,
+                    title: template.title,
+                    description: template.description,
+                    defaultEnabled: enabled  // This will be the user's actual setting (default or customized)
+                };
+            });
+
+            return result;
+        } catch (error: any) {
+            throw new InternalServerErrorException('Error retrieving user permissions with templates', error.message);
+        }
+    }
+
+    // Update user's specific permission
+    async updateUserPermission(userId: string, templateId: string, permissionData: UpdateUserPermissionDto): Promise<{ message: string }> {
+        try {
+            // Check if permission template exists
+            const template = await this.permissionTemplateRepository.findOne({
+                where: { 
+                    id: templateId,
+                    isActive: true 
+                }
+            });
+
+            if (!template) {
+                throw new NotFoundException('Permission template not found');
+            }
+
+            // Check if user already has this permission customized
+            let userPermission = await this.userPermissionsRepository.findOne({
+                where: { 
+                    userId: userId,
+                    templateId: templateId 
+                }
+            });
+
+            if (userPermission) {
+                // Update existing user permission
+                userPermission.enabled = permissionData.enabled;
+                await this.userPermissionsRepository.save(userPermission);
+            } else {
+                // Create new user permission
+                const newUserPermission = this.userPermissionsRepository.create({
+                    userId: userId,
+                    templateId: templateId,
+                    enabled: permissionData.enabled
+                });
+                await this.userPermissionsRepository.save(newUserPermission);
+            }
+
+            return { message: 'User permission updated successfully' };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error updating user permission', error.message);
+        }
+    }
+
+    // Reset user permission to default (delete user customization)
+    async resetUserPermission(userId: string, templateId: string): Promise<{ message: string }> {
+        try {
+            const result = await this.userPermissionsRepository.delete({ 
+                userId: userId,
+                templateId: templateId 
+            });
+            
+            if (result.affected === 0) {
+                throw new NotFoundException('User permission not found');
+            }
+
+            return { message: 'User permission reset to default successfully' };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error resetting user permission', error.message);
+        }
+    }
+
+    // Reset all user permissions to defaults
+    async resetAllUserPermissions(userId: string): Promise<{ message: string }> {
+        try {
+            const result = await this.userPermissionsRepository.delete({ userId });
+            
+            if (result.affected === 0) {
+                throw new NotFoundException('No user permissions found');
+            }
+
+            return { message: 'All user permissions reset to defaults successfully' };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Error resetting all user permissions', error.message);
+        }
+    }
+}
+
+// Push Notification Service
+@Injectable()
+export class PushNotificationService {
+  private notificationGateway: any = null;
+
+  constructor(
+    @InjectRepository(PushNotification)
+    private pushNotificationRepository: Repository<PushNotification>,
+    @InjectRepository(NotificationHistory)
+    private notificationHistoryRepository: Repository<NotificationHistory>,
+    @InjectRepository(UserPermissions)
+    private userPermissionsRepository: Repository<UserPermissions>
+  ) {
+    // Initialize Firebase using utility
+    FirebaseUtil.initializeFirebase();
+  }
+
+  // Register device token for push notifications
+  async registerDeviceToken(userId: string, deviceData: RegisterDeviceTokenDto): Promise<{ message: string }> {
+    try {
+      // Check if device token already exists for this user
+      const existingToken = await this.pushNotificationRepository.findOne({
+        where: { userId, deviceToken: deviceData.deviceToken }
+      });
+
+      if (existingToken) {
+        // Update existing token
+        existingToken.platform = deviceData.platform || 'android';
+        existingToken.isActive = true;
+        await this.pushNotificationRepository.save(existingToken);
+        return { message: 'Device token updated successfully' };
+      } else {
+        // Create new token
+        const newToken = this.pushNotificationRepository.create({
+          userId,
+          deviceToken: deviceData.deviceToken,
+          platform: deviceData.platform || 'android',
+          isActive: true
+        });
+        await this.pushNotificationRepository.save(newToken);
+        return { message: 'Device token registered successfully' };
+      }
+    } catch (error: any) {
+      throw new InternalServerErrorException('Error registering device token', error.message);
+    }
+  }
+
 }

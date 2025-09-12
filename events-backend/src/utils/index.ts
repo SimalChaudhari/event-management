@@ -1,6 +1,9 @@
 // src/utils/index.ts
 // Export all utility functions for cleaner imports
 
+export { FirebaseUtil } from './firebase.util';
+
+
 // Speaker time utilities
 export { SpeakerTimeUtils } from './speaker-time.utils';
 export type { SpeakerTimeValidation, EventTimeInfo } from './speaker-time.utils';
@@ -40,3 +43,6 @@ export {
 
 // Interfaces
 export type { SuccessResponse } from './interfaces/error-response.interface';
+
+export * from './firebase.util';
+
