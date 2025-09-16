@@ -288,7 +288,7 @@ export class ExhibitorFileUtils {
           );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
-            console.log(`Cleaned up flyer: ${uploadedPath}`);
+          
           }
         });
       }
@@ -306,7 +306,7 @@ export class ExhibitorFileUtils {
           );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
-            console.log(`Cleaned up document: ${uploadedPath}`);
+        
           }
         });
       }
@@ -324,7 +324,7 @@ export class ExhibitorFileUtils {
           );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
-            console.log(`Cleaned up event image: ${uploadedPath}`);
+           
           }
         });
       }
@@ -342,7 +342,7 @@ export class ExhibitorFileUtils {
           );
           if (fs.existsSync(uploadedPath)) {
             fs.unlinkSync(uploadedPath);
-            console.log(`Cleaned up logo: ${uploadedPath}`);
+          
           }
         });
       }

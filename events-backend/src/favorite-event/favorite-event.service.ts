@@ -135,10 +135,10 @@ export class FavoriteEventService {
             'favorite.eventId IN (:...registeredEventIds)',
             { registeredEventIds },
           );
-          console.log('Query with registered events filter applied');
+       
         } else {
           // If no registered events, return empty array
-          console.log('No registered events found, returning empty array');
+      
           return [];
         }
         break;

@@ -21,6 +21,10 @@ import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
 import { EmailService } from '../service/email.service';
 import { AgendaModule } from '../agenda/agenda.module';
+import { EventNotificationService } from '../utils/event-notification.service';
+import { NotificationUtil } from '../utils/notification.util';
+import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
+import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 
 @Module({
     imports: [
@@ -39,6 +43,11 @@ import { AgendaModule } from '../agenda/agenda.module';
         Exhibitor,
         Survey,
         SurveySession,
+        EventNotification,
+        EventNotificationRead,
+        PushNotification,
+        UserPermissions,
+        PermissionTemplate,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({
@@ -48,7 +57,7 @@ import { AgendaModule } from '../agenda/agenda.module';
       OrderModule,
       AgendaModule,
     ],
-    providers: [EventService, ErrorHandlerService, EmailService],
+    providers: [EventService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
     controllers: [EventController],
 })
 export class EventModule {}

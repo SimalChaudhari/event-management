@@ -220,7 +220,7 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
         e.stopPropagation();
         const withdrawalId = $(this).data('id');
         const withdrawalData = data.find((item) => item.id === withdrawalId);
-        console.log('Approve clicked for ID:', withdrawalId);
+       
         handleStatusClick(withdrawalId, 'approved', withdrawalData);
     });
 
@@ -230,7 +230,7 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
         e.stopPropagation();
         const withdrawalId = $(this).data('id');
         const withdrawalData = data.find((item) => item.id === withdrawalId);
-        console.log('Reject clicked for ID:', withdrawalId);
+        
         handleStatusClick(withdrawalId, 'rejected', withdrawalData);
     });
 }
@@ -310,12 +310,11 @@ const WithrawalRequest = () => {
         
         setIsUpdatingStatus(true);
         try {
-            console.log(`Updating withdrawal ${statusToUpdate.id} to status: ${statusToUpdate.status}`);
-            
+         
             const success = await dispatch(updateWithdrawalStatus(statusToUpdate.id, statusToUpdate.status));
             
             if (success) {
-                console.log('Status updated successfully');
+              
                 setShowStatusModal(false);
                 setStatusToUpdate(null);
                 setWithdrawalToUpdate(null);

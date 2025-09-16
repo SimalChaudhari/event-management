@@ -52,7 +52,7 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
             if (selectedEvent) {
                 // Pass exact event name for filtering
                 filters.eventName = selectedEvent.name;
-                console.log('Filtering by exact event name:', selectedEvent.name);
+                
             }
         }
 
@@ -87,7 +87,7 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
         try {
             // Call the event action without filters (or with just initial filters)
             const result = await dispatch(eventActionRef.current(memoizedInitialFilters));
-            console.log('Event filters cleared');
+           
             return result;
         } catch (error) {
             console.error('Error clearing event filters:', error);

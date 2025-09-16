@@ -70,7 +70,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`OTP sent to ${email}: ${otp}`);
+    
       return otp;
     } catch (error) {
       throw new Error('Failed to send OTP');
@@ -155,7 +155,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`Welcome email sent to ${email}: ${firstName} ${lastName}`);
+  
       return 'Welcome email sent successfully';
     } catch (error) {
       console.error('Failed to send welcome email:', error);
@@ -285,7 +285,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`Exhibitor credentials sent to ${email}: ${firstName} ${lastName}`);
+   
       return 'Exhibitor credentials sent successfully';
     } catch (error) {
       console.error('Failed to send exhibitor credentials:', error);
@@ -303,7 +303,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`Email sent to ${email}: ${subject}`);
+      
       return 'Email sent successfully';
     } catch (error) {
       console.error('Failed to send email:', error);

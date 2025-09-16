@@ -105,7 +105,7 @@ export class SocialAuthService {
         refreshToken,
       };
     } catch (error) {
-        console.log(error,"%%%%%error%%%%%%");
+     
       throw new UnauthorizedException('Google authentication failed');
     }
   }

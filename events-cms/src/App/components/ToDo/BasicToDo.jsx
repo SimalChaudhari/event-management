@@ -30,7 +30,7 @@ const BasicToDo = (props) => {
             formRef.current.resetValidationState(true);
     };
     const handleErrorSubmit = (e, formData, errorInputs) => {
-        //console.log(errorInputs);
+      
     };
     const deleteHandler = (key) => {
         setCardTodo(cardTodo.filter((item, index) => index !== key));

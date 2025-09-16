@@ -273,7 +273,7 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
 const EventView = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
-    console.log(events);
+   
     const [showModal, setShowModal] = React.useState(false);
 
     const [currentTable, setCurrentTable] = useState(null);
@@ -331,7 +331,7 @@ const handleGallery = useCallback(async (data) => {
         const response = await dispatch(getAllGalleries());
         const allGalleries = response?.data || [];
         const existingGallery = allGalleries.find(gallery => gallery.eventId === data.id);
-        console.log({existingGallery});
+       
         if (existingGallery) {
             navigate(`${EVENT_PATHS.VIEW_GALLERY}/${existingGallery.id}`);
         } else {

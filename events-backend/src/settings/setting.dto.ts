@@ -1,6 +1,7 @@
 // src/faq/dto/create-faq.dto.ts
 
-import { IsArray, IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsArray, IsNotEmpty, IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { EventNotificationType, GeneralNotificationType } from '../types/notification.types';
 
 export class CreatePrivacyPolicyDto {
     @IsString()
@@ -53,6 +54,10 @@ export class CreatePermissionTemplateDto {
 
     @IsNotEmpty()
     @IsString()
+    readonly code!: string; // Unique code for programmatic identification
+
+    @IsNotEmpty()
+    @IsString()
     readonly description!: string; // Description text
 
     @IsOptional()
@@ -99,8 +104,8 @@ export class SendNotificationDto {
     readonly data?: any; // Additional data payload
 
     @IsOptional()
-    @IsString()
-    readonly type?: string; // 'general', 'event', 'networking', 'permission', etc.
+    @IsEnum(GeneralNotificationType)
+    readonly type?: GeneralNotificationType;
 
     @IsOptional()
     @IsArray()
@@ -120,5 +125,223 @@ export class NotificationHistoryDto {
     sentAt!: Date;
     createdAt!: Date;
     updatedAt!: Date;
+}
+
+// Simple Event Notification DTO
+export class EventNotificationDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly eventId!: string;
+
+    @IsNotEmpty()
+    @IsString()
+    readonly title!: string;
+
+    @IsNotEmpty()
+    @IsString()
+    readonly description!: string;
+
+    @IsOptional()
+    @IsEnum(EventNotificationType)
+    readonly type?: EventNotificationType;
+}
+
+// Mark event notification as read DTO
+export class MarkEventNotificationReadDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly eventNotificationId!: string;
+}
+
+// Get event notification history DTO
+export class GetEventNotificationHistoryDto {
+    @IsOptional()
+    @IsString()
+    readonly type?: string; // Filter by notification type
+
+    @IsOptional()
+    @IsString()
+    readonly eventId?: string; // Filter by event
+
+    @IsOptional()
+    @IsBoolean()
+    readonly isRead?: boolean; // Filter by read status
+
+    @IsOptional()
+    @IsNumber()
+    readonly page?: number;
+
+    @IsOptional()
+    @IsNumber()
+    readonly limit?: number;
+}
+
+// Event notification response DTO
+export class EventNotificationResponseDto {
+    id!: string;
+    eventId!: string;
+    title!: string;
+    description!: string;
+    type?: string;
+    isRead!: boolean;
+    readAt?: Date;
+    createdAt!: Date;
+    sentAt?: Date;
+}
+
+// Advert Notification DTOs
+export class CreateAdvertNotificationDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly title!: string;
+
+    @IsNotEmpty()
+    @IsString()
+    readonly content!: string; // Rich content (HTML/text) - like EDM content
+
+    @IsOptional()
+    @IsString()
+    readonly imageUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionText?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly isActive?: boolean;
+
+    @IsOptional()
+    readonly scheduledAt?: Date;
+}
+
+export class UpdateAdvertNotificationDto {
+    @IsOptional()
+    @IsString()
+    readonly title?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly content?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly imageUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionText?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly isActive?: boolean;
+
+    @IsOptional()
+    readonly scheduledAt?: Date;
+}
+
+export class AdvertNotificationResponseDto {
+    id!: string;
+    title!: string;
+    content!: string;
+    imageUrl?: string;
+    actionUrl?: string;
+    actionText?: string;
+    isActive!: boolean;
+    isSent!: boolean;
+    scheduledAt?: Date;
+    sentAt?: Date;
+    sentCount!: number;
+    createdAt!: Date;
+    updatedAt!: Date;
+}
+
+export class GetAdvertNotificationHistoryDto {
+    @IsOptional()
+    @IsBoolean()
+    readonly isRead?: boolean;
+
+    @IsOptional()
+    @IsNumber()
+    readonly page?: number;
+
+    @IsOptional()
+    @IsNumber()
+    readonly limit?: number;
+}
+
+export class MarkAdvertNotificationReadDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly advertNotificationId!: string;
+}
+
+export class SendAdvertNotificationDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly advertId!: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly sendToAllUsers?: boolean; // If true, sends to all users who have advert notifications enabled
+}
+
+// DTO for form data (with file upload)
+export class CreateAdvertNotificationFormDto {
+    @IsString()
+    @IsNotEmpty()
+    readonly title!: string;
+
+    @IsString()
+    @IsNotEmpty()
+    readonly content!: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionText?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly isActive?: boolean;
+
+    @IsOptional()
+    readonly scheduledAt?: Date;
+}
+
+export class UpdateAdvertNotificationFormDto {
+    @IsOptional()
+    @IsString()
+    readonly title?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly content?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly actionText?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly isActive?: boolean;
+
+    @IsOptional()
+    readonly scheduledAt?: Date;
 }
 

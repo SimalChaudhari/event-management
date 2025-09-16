@@ -239,8 +239,7 @@ function AddEventPage() {
                         let exhibitorDescription = '';
                         let exhibitorIds = [];
                         if (editData.exhibitors) {
-                            console.log(editData, 'editData.exhibitors');
-                            // console.log(editData, 'editData.exhibitors');
+                          
                             exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
                             exhibitorDescription = editData?.exhibitors?.exhibitorDescription || '';
                         }

@@ -22,7 +22,7 @@ export class DashboardController {
         data: stats,
       });
     } catch (error:any) {
-        console.log(error);
+  
       return response.status(500).json({
         success: false,
         message: 'Failed to retrieve dashboard statistics',

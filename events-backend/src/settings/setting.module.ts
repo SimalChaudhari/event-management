@@ -2,20 +2,26 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {  BannerController, BannerEventController, PrivacyPolicyController, TermsConditionsController, UserPermissionsController, PermissionTemplateController, PushNotificationController } from './setting.controller';
-import {  BannerEventService, BannerService, PrivacyPolicyService, TermsConditionsService, UserPermissionsService, PermissionTemplateService, PushNotificationService } from './setting.service';
-import {  Banner, BannerEvent, PrivacyPolicy, TermsConditions, UserPermissions, PermissionTemplate, PushNotification, NotificationHistory } from './setting.entity';
+import {  BannerController, BannerEventController, PrivacyPolicyController, TermsConditionsController, UserPermissionsController, PermissionTemplateController, PushNotificationController, AdvertNotificationController, AdvertNotificationUserController } from './setting.controller';
+import {  BannerEventService, BannerService, PrivacyPolicyService, TermsConditionsService, UserPermissionsService, PermissionTemplateService, PushNotificationService, AdvertNotificationService } from './setting.service';
+import {  Banner, BannerEvent, PrivacyPolicy, TermsConditions, UserPermissions, PermissionTemplate, PushNotification, NotificationHistory, AdvertNotification, AdvertNotificationRead } from './setting.entity';
 import { JwtModule } from '@nestjs/jwt';
-// import { NotificationGateway } from './notification.gateway';
+import { NotificationGateway } from './notification.gateway';
+import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { EventNotification, EventNotificationRead } from './event-notification.entity';
+import { NotificationUtil } from '../utils/notification.util';
+import { EventNotificationService } from '../utils/event-notification.service';
+import { UserEntity } from 'user/users.entity';
+
 @Module({
-    imports: [TypeOrmModule.forFeature([ PrivacyPolicy, TermsConditions,Banner,BannerEvent, UserPermissions, PermissionTemplate, PushNotification, NotificationHistory]),
+    imports: [TypeOrmModule.forFeature([ PrivacyPolicy, TermsConditions,Banner,BannerEvent, UserPermissions, PermissionTemplate, PushNotification, NotificationHistory, RegisterEvent, EventNotification, EventNotificationRead, AdvertNotification, AdvertNotificationRead, UserEntity]),
     JwtModule.register({
         secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
         signOptions: {},  // Set token expiration
     }), 
 ],
-controllers: [PrivacyPolicyController, TermsConditionsController, BannerController,BannerEventController, UserPermissionsController, PermissionTemplateController, PushNotificationController],
-providers: [PrivacyPolicyService, TermsConditionsService, BannerService,BannerEventService, UserPermissionsService, PermissionTemplateService, PushNotificationService],
+controllers: [PrivacyPolicyController, TermsConditionsController, BannerController,BannerEventController, UserPermissionsController, PermissionTemplateController, PushNotificationController, AdvertNotificationController, AdvertNotificationUserController],
+providers: [PrivacyPolicyService, TermsConditionsService, BannerService,BannerEventService, UserPermissionsService, PermissionTemplateService, PushNotificationService, AdvertNotificationService, NotificationGateway, NotificationUtil, EventNotificationService],
 
 })
 export class SettingModule {}

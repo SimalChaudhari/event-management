@@ -1,6 +1,7 @@
 // src/faq/entities/faq.entity.ts
 
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { GeneralNotificationType } from '../types/notification.types';
 
 @Entity('privacy_policies')
 export class PrivacyPolicy {
@@ -78,8 +79,12 @@ export class PermissionTemplate {
     @Column()
     title!: string; // Display title (e.g., 'Biometric Sign in')
 
+    @Column({ unique: true })
+    code!: string; // Unique code for programmatic identification (e.g., 'biometric_signin', 'event_notifications')
+
     @Column({ type: 'text' })
     description!: string; // Description text
+
 
     @Column({ default: false })
     defaultEnabled!: boolean; // Default boolean value for all users
@@ -159,8 +164,12 @@ export class NotificationHistory {
   @Column({ type: 'json', nullable: true })
   data!: any; // Additional data payload
 
-  @Column({ default: 'general' })
-  type!: string; // 'general', 'event', 'networking', 'permission', etc.
+  @Column({ 
+    type: 'enum', 
+    enum: GeneralNotificationType, 
+    default: GeneralNotificationType.GENERAL 
+  })
+  type!: GeneralNotificationType;
 
   @Column({ default: false })
   isRead!: boolean; // Whether user has read the notification
@@ -170,6 +179,81 @@ export class NotificationHistory {
 
   @Column({ nullable: true })
   sentAt!: Date; // When notification was sent
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
+}
+
+// Advert Notification Entity
+@Entity('advert_notifications')
+export class AdvertNotification {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Column()
+  title!: string; // Advert title
+
+  @Column({ type: 'text' })
+  content!: string; // Rich content (HTML/text) - like EDM content
+
+  @Column({ type: 'text', nullable: true })
+  imageUrl?: string; // Optional image URL
+
+  @Column({ type: 'text', nullable: true })
+  actionUrl?: string; // Optional call-to-action URL
+
+  @Column({ type: 'text', nullable: true })
+  actionText?: string; // Optional call-to-action button text
+
+  @Column({ default: false })
+  isActive!: boolean; // Whether this advert is active/published
+
+  @Column({ default: false })
+  isSent!: boolean; // Whether this advert has been sent to users
+
+  @Column({ nullable: true })
+  scheduledAt?: Date; // Optional scheduled send time
+
+  @Column({ nullable: true })
+  sentAt?: Date; // When advert was actually sent
+
+  @Column({ default: 0 })
+  sentCount!: number; // Number of users who received this advert
+
+  @OneToMany(() => AdvertNotificationRead, (read: AdvertNotificationRead) => read.advertNotification)
+  advertNotificationReads!: AdvertNotificationRead[];
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
+}
+
+// Advert Notification Read Entity (to track which users received/read adverts)
+@Entity('advert_notification_reads')
+export class AdvertNotificationRead {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Column({ nullable: true })
+  advertNotificationId?: string;
+
+  @ManyToOne(() => AdvertNotification, (advert: AdvertNotification) => advert.advertNotificationReads, { nullable: true })
+  @JoinColumn({ name: 'advertNotificationId' })
+  advertNotification?: AdvertNotification;
+
+  @Column()
+  userId!: string;
+
+  @Column({ default: false })
+  isRead!: boolean;
+
+  @Column({ nullable: true })
+  readAt?: Date;
 
   @CreateDateColumn()
   createdAt!: Date;

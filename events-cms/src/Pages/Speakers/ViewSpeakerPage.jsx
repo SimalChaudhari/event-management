@@ -11,7 +11,7 @@ const ViewSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [speakerData, setSpeakerData] = useState(null);
-    console.log(speakerData);
+    
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('professional');
 

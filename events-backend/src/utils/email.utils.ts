@@ -25,7 +25,7 @@ export class EmailUtils {
       );
 
       await emailService.sendEmail(exhibitorEmail, subject, html);
-      console.log(`Booth code email sent to ${exhibitorEmail} for event: ${eventName}`);
+    
     } catch (error) {
       console.error('Failed to send booth code email:', error);
       // Don't throw error as email sending failure shouldn't break the main flow
@@ -55,7 +55,7 @@ export class EmailUtils {
       );
 
       await emailService.sendEmail(exhibitorEmail, subject, html);
-      console.log(`Booth removal email sent to ${exhibitorEmail} for event: ${eventName}`);
+    
     } catch (error) {
       console.error('Failed to send booth removal email:', error);
       // Don't throw error as email sending failure shouldn't break the main flow

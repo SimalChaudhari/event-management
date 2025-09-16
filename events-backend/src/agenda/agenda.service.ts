@@ -24,6 +24,10 @@ import { EmailService } from '../service/email.service';
 import { MeetingEmailTemplates } from '../utils/email-templates';
 import { AgendaUtils } from '../utils/agenda.utils';
 import { ICSGenerator } from '../utils/calendar-utils/ics-generator.utils';
+import { NotificationGateway } from '../settings/notification.gateway';
+import { NotificationUtil } from '../utils/notification.util';
+import { EventNotificationType } from '../types/notification.types';
+import { NotificationTextUtil } from '../utils/notification-text.util';
 
 
 @Injectable()
@@ -44,6 +48,8 @@ export class AgendaService {
 
     private readonly errorHandler: ErrorHandlerService,
     private readonly emailService: EmailService,
+    private readonly notificationGateway: NotificationGateway,
+    private readonly notificationUtil: NotificationUtil,
   ) {}
 
 
@@ -72,13 +78,7 @@ export class AgendaService {
       const requests = await queryBuilder.getMany();
       
       // Debug: Log the raw requests to see what's in the database
-      console.log('Raw incoming requests:', requests.map(r => ({
-        id: r.id,
-        requestType: r.requestType,
-        isMeetingRequest: r.isMeetingRequest,
-        userId: r.userId,
-        createdBy: r.createdBy
-      })));
+  
       
       // Format the requests using AgendaUtils and ensure requestType is 'incoming'
       const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
@@ -87,11 +87,7 @@ export class AgendaService {
       }));
       
       // Debug: Log the formatted requests
-      console.log('Formatted incoming requests:', formattedRequests.map(r => ({
-        id: r.id,
-        requestType: r.requestType,
-        isMeetingRequest: r.isMeetingRequest
-      })));
+   
       
       return formattedRequests;
     } catch (error) {
@@ -127,13 +123,7 @@ export class AgendaService {
       const requests = await queryBuilder.getMany();
       
       // Debug: Log the raw requests to see what's in the database
-      console.log('Raw sent requests:', requests.map(r => ({
-        id: r.id,
-        requestType: r.requestType,
-        isMeetingRequest: r.isMeetingRequest,
-        userId: r.userId,
-        createdBy: r.createdBy
-      })));
+  
       
       // Format the requests using AgendaUtils and ensure requestType is 'sent'
       const formattedRequests = AgendaUtils.formatAgendas(requests).map(request => ({
@@ -142,11 +132,7 @@ export class AgendaService {
       }));
       
       // Debug: Log the formatted requests
-      console.log('Formatted sent requests:', formattedRequests.map(r => ({
-        id: r.id,
-        requestType: r.requestType,
-        isMeetingRequest: r.isMeetingRequest
-      })));
+ 
       
       return formattedRequests;
     } catch (error) {
@@ -279,17 +265,17 @@ export class AgendaService {
 
       // Validate meeting location is provided (optional but recommended)
       if (!createMeetingDto.location || createMeetingDto.location.trim() === '') {
-        console.warn('Meeting location not provided. Consider adding a location for better organization.');
+        console.warn(NotificationTextUtil.getLocationNotProvidedWarning());
       }
 
       // Validate meeting details are provided (optional but recommended)
       if (!createMeetingDto.details || createMeetingDto.details.trim() === '') {
-        console.warn('Meeting details not provided. Consider adding details for better context.');
+        console.warn(NotificationTextUtil.getDetailsNotProvidedWarning());
       }
 
       // Validate meeting notes are provided (optional but recommended)
       if (!createMeetingDto.meetingNotes || createMeetingDto.meetingNotes.trim() === '') {
-        console.warn('Meeting notes not provided. Consider adding notes for better organization.');
+        console.warn(NotificationTextUtil.getNotesNotProvidedWarning());
       }
 
       // Ensure meeting attendees are properly set
@@ -350,31 +336,47 @@ export class AgendaService {
       const savedMeeting = await this.agendaRepository.save(meetingRequest);
 
       // Debug: Log the saved meeting to see what was actually saved
-      console.log('Saved meeting data:', {
-        id: savedMeeting.id,
-        requestType: savedMeeting.requestType,
-        isMeetingRequest: savedMeeting.isMeetingRequest,
-        meetingStatus: savedMeeting.meetingStatus,
-        requestStatus: savedMeeting.requestStatus
-      });
+   
 
       // Send notification to the target user about the meeting request
       await this.sendMeetingRequestNotification(savedMeeting, currentUser, targetUser);
 
-      // Meeting request created successfully
-      console.log(`Meeting request created successfully: ${savedMeeting.id} by ${currentUser.id} for ${targetUser.id}`);
-
-      const response = await this.getAgendaWithRelations(savedMeeting.id);
-      
-      // Debug: Log the response to see what's being returned
-      console.log('Response data:', {
-        id: response?.id,
-        requestType: response?.requestType,
-        isMeetingRequest: response?.isMeetingRequest,
-        meetingStatus: response?.meetingStatus,
-        requestStatus: response?.requestStatus
+      // Send Socket.IO notification to the target user (recipient)
+      this.notificationGateway.sendMeetingRequestNotification(targetUser.id, {
+        id: savedMeeting.id,
+        eventId: savedMeeting.eventId,
+        title: savedMeeting.title,
+        createdBy: savedMeeting.createdBy,
+        meetingDate: savedMeeting.meetingDate,
+        time: savedMeeting.time,
+        location: savedMeeting.location
       });
 
+
+      // Store notification in database for the target user (recipient) only
+      try {
+        await this.notificationUtil.sendTargetedEventNotification({
+          eventId: savedMeeting.eventId,
+          title: NotificationTextUtil.getMeetingRequestTitle(),
+          description: NotificationTextUtil.getMeetingRequestDescription(
+            savedMeeting.title,
+            currentUser.firstName || 'User',
+            savedMeeting.meetingDate!,
+            savedMeeting.time,
+            savedMeeting.location
+          ),
+          type: EventNotificationType.MEETING_REQUEST,
+          targetUserIds: [targetUser.id] // Only send to the recipient
+        });
+      } catch (error) {
+        console.error('Failed to store meeting request notification:', error);
+      }
+
+
+      // Meeting request created successfully
+   
+      const response = await this.getAgendaWithRelations(savedMeeting.id);
+      
       return response;
     } catch (error) {
       if (
@@ -433,7 +435,7 @@ export class AgendaService {
         // Accept the meeting request
         meeting.requestStatus = RequestStatus.Accepted;
         meeting.meetingStatus = MeetingStatus.Confirmed;
-        responseMessage = 'Meeting request accepted successfully';
+        responseMessage = NotificationTextUtil.getMeetingAcceptedResponseMessage();
         
         // Add response message to meeting notes if provided
         if (responseDto.message) {
@@ -447,14 +449,43 @@ export class AgendaService {
         // Send acceptance notification to the meeting creator
         await this.sendMeetingResponseNotification(meeting, responseDto, currentUser);
 
-        // Meeting request accepted successfully
-        console.log(`Meeting request accepted: ${meeting.id} by ${currentUser.id}`);
+        // Send Socket.IO notification to the meeting creator
+        this.notificationGateway.sendMeetingResponseNotification(meeting.createdBy, {
+          meetingId: meeting.id,
+          eventId: meeting.eventId,
+          meetingTitle: meeting.title,
+          response: responseDto.response,
+          responderId: currentUser.id,
+          message: responseDto.message
+        });
 
+        // Store notification in database for the meeting creator only
+        try {
+          await this.notificationUtil.sendTargetedEventNotification({
+            eventId: meeting.eventId,
+            title: NotificationTextUtil.getMeetingAcceptedTitle(),
+            description: NotificationTextUtil.getMeetingAcceptedDescription(
+              meeting.title,
+              currentUser.firstName || 'User',
+              meeting.meetingDate!,
+              meeting.time,
+              meeting.location,
+              responseDto.message
+            ),
+            type: EventNotificationType.MEETING_RESPONSE,
+            targetUserIds: [meeting.createdBy] // Only send to the meeting creator
+          });
+        } catch (error) {
+          console.error('Failed to store meeting acceptance notification:', error);
+        }
+
+        // Meeting request accepted successfully
+  
         return await this.getAgendaWithRelations(updatedMeeting.id);
 
       } else if (responseDto.response === RequestStatus.Rejected) {
         // Reject the meeting request - remove it from both parties
-        responseMessage = 'Meeting request rejected and removed';
+        responseMessage = NotificationTextUtil.getMeetingRejectedResponseMessage();
 
         // Add rejection message to meeting notes if provided
         if (responseDto.message) {
@@ -479,18 +510,44 @@ export class AgendaService {
           responseDto.message
         );
 
-        // Meeting request rejected and removed successfully
-        console.log(`Meeting request rejected and removed: ${meeting.id} by ${currentUser.id}`);
+        // Send Socket.IO notification to the meeting creator
+        this.notificationGateway.sendMeetingResponseNotification(meeting.createdBy, {
+          meetingId: meeting.id,
+          eventId: meeting.eventId,
+          meetingTitle: meeting.title,
+          response: responseDto.response,
+          responderId: currentUser.id,
+          message: responseDto.message
+        });
 
+        // Store notification in database for the meeting creator only
+        try {
+          await this.notificationUtil.sendTargetedEventNotification({
+            eventId: meeting.eventId,
+            title: NotificationTextUtil.getMeetingRejectedTitle(),
+            description: NotificationTextUtil.getMeetingRejectedDescription(
+              meeting.title,
+              currentUser.firstName || 'User',
+              responseDto.message
+            ),
+            type: EventNotificationType.MEETING_RESPONSE,
+            targetUserIds: [meeting.createdBy] // Only send to the meeting creator
+          });
+        } catch (error) {
+          console.error('Failed to store meeting rejection notification:', error);
+        }
+
+        // Meeting request rejected and removed successfully
+    
         return {
-          message: 'Meeting request rejected and removed successfully',
+          message: NotificationTextUtil.getMeetingRejectedSuccessMessage(),
           meetingId: meeting.id,
           rejectedAt: new Date().toISOString(),
           rejectedBy: currentUser.id
         };
       }
 
-      throw new BadRequestException('Invalid response status. Must be either "accepted" or "rejected".');
+      throw new BadRequestException(NotificationTextUtil.getInvalidResponseStatusMessage());
 
     } catch (error) {
       if (
@@ -519,7 +576,7 @@ export class AgendaService {
 
       // Validate that the meeting is active
       if (!meeting.isActive) {
-        throw new BadRequestException('Cannot reschedule an inactive meeting.');
+        throw new BadRequestException(NotificationTextUtil.getCannotRescheduleInactiveMeetingMessage());
       }
 
       // Validate permissions - only meeting creator can reschedule
@@ -542,7 +599,7 @@ export class AgendaService {
 
       // Check if the meeting is already in progress or completed
       if (meeting.meetingDate && meeting.meetingDate <= new Date()) {
-        throw new BadRequestException('Cannot reschedule a meeting that has already started or completed.');
+        throw new BadRequestException(NotificationTextUtil.getCannotRescheduleStartedMeetingMessage());
       }
 
       // Check if current user is registered for the event
@@ -563,7 +620,7 @@ export class AgendaService {
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
       
       if (newMeetingDate <= oneHourFromNow) {
-        throw new BadRequestException('New meeting time must be at least 1 hour from now.');
+        throw new BadRequestException(NotificationTextUtil.getNewTimeTooCloseMessage());
       }
 
       // Validate meeting time format
@@ -576,12 +633,12 @@ export class AgendaService {
       const currentMeetingDate = meeting.meetingDate;
       
       if (!currentMeetingDate) {
-        throw new BadRequestException('Original meeting date is missing. Cannot reschedule.');
+        throw new BadRequestException(NotificationTextUtil.getMissingOriginalDateMessage());
       }
       
       if (newMeetingDate.getTime() === currentMeetingDate.getTime() && 
           rescheduleDto.newTime === meeting.time) {
-        throw new BadRequestException('New date and time must be different from current meeting date and time.');
+        throw new BadRequestException(NotificationTextUtil.getSameDateTimeMessage());
       }
 
       // Check for time conflicts on the new date
@@ -639,9 +696,46 @@ export class AgendaService {
         rescheduleDto
       );
 
-      // Meeting rescheduled successfully
-      console.log(`Meeting rescheduled successfully: ${meeting.id} by ${currentUser.id}`);
+      // Send Socket.IO notification to the other party
+      if (targetUserDetails && currentUserDetails) {
+        this.notificationGateway.sendMeetingRescheduleNotification(targetUserDetails.id, {
+          meetingId: updatedMeeting.id,
+          eventId: updatedMeeting.eventId,
+          meetingTitle: updatedMeeting.title,
+          reschedulerId: currentUserDetails.id,
+          originalDate: originalMeetingData.date,
+          originalTime: originalMeetingData.time,
+          newDate: updatedMeeting.meetingDate,
+          newTime: updatedMeeting.time,
+          newLocation: updatedMeeting.location,
+          reason: rescheduleDto.reason
+        });
+      }
 
+      // Store notification in database for the other party only
+      try {
+        if (targetUserDetails) {
+          await this.notificationUtil.sendTargetedEventNotification({
+            eventId: updatedMeeting.eventId,
+            title: NotificationTextUtil.getMeetingRescheduledTitle(),
+            description: NotificationTextUtil.getMeetingRescheduledDescription(
+              updatedMeeting.title,
+              currentUserDetails?.firstName || 'User',
+              updatedMeeting.meetingDate!,
+              updatedMeeting.time,
+              updatedMeeting.location,
+              rescheduleDto.reason
+            ),
+            type: EventNotificationType.MEETING_RESCHEDULE,
+            targetUserIds: [targetUserDetails.id] // Only send to the other party
+          });
+        }
+      } catch (error) {
+        console.error('Failed to store meeting reschedule notification:', error);
+      }
+
+      // Meeting rescheduled successfully
+ 
       return await this.getAgendaWithRelations(updatedMeeting.id);
     } catch (error) {
       if (
@@ -734,9 +828,7 @@ export class AgendaService {
       await this.agendaRepository.save(meeting);
 
       // Meeting deleted successfully
-      console.log(`Meeting deleted successfully: ${meetingId} by ${currentUser.id}`);
-
-      return { message: 'Meeting deleted successfully' };
+      return { message: NotificationTextUtil.getMeetingDeletedMessage() };
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -777,7 +869,7 @@ export class AgendaService {
       const meetings = await queryBuilder.getMany();
 
       if (meetings.length === 0) {
-        return { message: 'No meetings found to delete' };
+        return { message: NotificationTextUtil.getNoMeetingsFoundMessage() };
       }
 
       // Soft delete all meetings
@@ -791,10 +883,9 @@ export class AgendaService {
       await this.agendaRepository.save(meetings);
 
       // Bulk meeting deletion completed successfully
-      console.log(`Bulk meeting deletion completed successfully: ${meetings.length} meetings deleted by ${currentUser.id}`);
 
       return { 
-        message: `Successfully deleted ${meetings.length} meeting(s)`,
+        message: NotificationTextUtil.getBulkMeetingDeletedMessage(meetings.length),
         deletedCount: meetings.length
       };
     } catch (error) {
@@ -897,7 +988,12 @@ export class AgendaService {
         (startTime <= agendaStartTime && endTime >= agendaEndTime)
       ) {
         throw new ValidationException(
-          `Time conflict detected on ${this.formatDate(meetingDate)}. This time slot overlaps with "${agenda.title}" (${agenda.time} - ${this.formatDuration(agenda.duration)})`,
+          NotificationTextUtil.getTimeConflictMessage(
+            this.formatDate(meetingDate),
+            agenda.title,
+            agenda.time,
+            this.formatDuration(agenda.duration)
+          ),
         );
       }
     }
@@ -987,19 +1083,6 @@ export class AgendaService {
         await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
       }
 
-      // Send email notification to the rescheduler (confirmation)
-      if (currentUser?.email) {
-        const emailSubject = `Meeting Rescheduled Successfully: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateRescheduleConfirmationEmailHTML(
-          currentUser,
-          targetUser,
-          originalMeetingData,
-          updatedMeeting,
-          rescheduleDto
-        );
-
-        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
-      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -1059,19 +1142,6 @@ export class AgendaService {
         await this.emailService.sendEmail(creator.email, emailSubject, emailHtml);
       }
 
-      // Send confirmation email to the rejector
-      if (currentUser?.email) {
-        const emailSubject = `Meeting Request Rejected Successfully: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateMeetingRejectionConfirmationEmailHTML(
-          currentUser,
-          creator,
-          originalMeetingData,
-          rejectedMeeting,
-          rejectionMessage
-        );
-
-        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
-      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -1198,17 +1268,6 @@ export class AgendaService {
         await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
       }
 
-      // Send confirmation email to the sender
-      if (currentUser?.email) {
-        const emailSubject = `Meeting Request Sent: ${meeting.title}`;
-        const emailHtml = MeetingEmailTemplates.generateMeetingRequestConfirmationEmailHTML(
-          currentUser,
-          targetUser,
-          meeting
-        );
-
-        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
-      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -1409,11 +1468,11 @@ export class AgendaService {
 
       // Check if the meeting request is already cancelled or completed
       if (meeting.meetingStatus === MeetingStatus.Cancelled) {
-        throw new BadRequestException('This meeting request is already cancelled.');
+        throw new BadRequestException(NotificationTextUtil.getAlreadyCancelledMessage());
       }
 
       if (meeting.meetingStatus === MeetingStatus.Confirmed) {
-        throw new BadRequestException('Cannot cancel a confirmed meeting. Use reschedule instead.');
+        throw new BadRequestException(NotificationTextUtil.getCannotCancelConfirmedMeetingMessage());
       }
 
       // Check if current user is registered for the event
@@ -1459,9 +1518,36 @@ export class AgendaService {
         targetUser
       );
 
-      // Meeting request cancelled successfully
-      console.log(`Meeting request cancelled successfully: ${meeting.id} by ${currentUser.id}`);
+      // Send Socket.IO notification to the target user
+      this.notificationGateway.sendMeetingCancellationNotification(targetUser.id, {
+        meetingId: updatedMeeting.id,
+        eventId: updatedMeeting.eventId,
+        meetingTitle: updatedMeeting.title,
+        cancellerId: currentUser.id,
+        originalDate: originalMeetingData.date,
+        originalTime: originalMeetingData.time
+      });
 
+      // Store notification in database for the target user only
+      try {
+        await this.notificationUtil.sendTargetedEventNotification({
+          eventId: updatedMeeting.eventId,
+          title: NotificationTextUtil.getMeetingCancelledTitle(),
+          description: NotificationTextUtil.getMeetingCancelledDescription(
+            updatedMeeting.title,
+            currentUser.firstName || 'User',
+            originalMeetingData.date!,
+            originalMeetingData.time,
+            originalMeetingData.location
+          ),
+          type: EventNotificationType.MEETING_CANCELLATION,
+          targetUserIds: [targetUser.id] // Only send to the target user
+        });
+      } catch (error) {
+        console.error('Failed to store meeting cancellation notification:', error);
+      }
+
+      // Meeting request cancelled successfully
       return true
 
     } catch (error) {
@@ -1496,18 +1582,6 @@ export class AgendaService {
         await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
       }
 
-      // Send confirmation email to the canceller
-      if (currentUser?.email) {
-        const emailSubject = `Meeting Request Cancelled Successfully: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateCancellationConfirmationEmailHTML(
-          currentUser,
-          targetUser,
-          originalMeetingData,
-          cancelledMeeting
-        );
-
-        await this.emailService.sendEmail(currentUser.email, emailSubject, emailHtml);
-      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

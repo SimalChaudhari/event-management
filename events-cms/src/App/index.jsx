@@ -20,7 +20,7 @@ const App = () => {
     }, [dispatch]);
 
     if (loading) {
-        console.log("loading", loading);
+       
         return <Loader />;
     }
 

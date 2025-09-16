@@ -613,7 +613,7 @@ export const html = `
       .then(data => {
         if (data.success) {
           showResult('success', \`✅ \${platform} token is valid! User logged in successfully.\`);
-          console.log('Login Response:', data);
+       
         } else {
           showResult('error', \`❌ \${platform} token validation failed: \${data.message}\`);
         }

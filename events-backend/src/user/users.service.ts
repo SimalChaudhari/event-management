@@ -59,9 +59,7 @@ export class UserService {
 
     // Use the existing email service transporter
     await this.emailService['transporter'].sendMail(mailOptions);
-    console.log(
-      `Speaker credentials sent to ${email}: ${firstName} ${lastName}`,
-    );
+ 
   }
 
 

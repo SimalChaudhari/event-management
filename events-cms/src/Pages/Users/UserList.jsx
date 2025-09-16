@@ -289,7 +289,7 @@ const UserList = () => {
                 setCurrentTable(table);
             } catch (error) {
                 console.error('Error initializing user table:', error);
-                console.log('User data:', user);
+              
             }
         } else {
             console.log('User data is not an array or is undefined:', user);

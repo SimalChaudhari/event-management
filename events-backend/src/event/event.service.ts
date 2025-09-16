@@ -195,7 +195,7 @@ export class EventService {
 
       return savedEvent;
     } catch (error) {
-      console.log({ error });
+  
       if (
         error instanceof DuplicateResourceException ||
         error instanceof ValidationException

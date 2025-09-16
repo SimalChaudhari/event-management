@@ -24,7 +24,7 @@ const ViewRegisterEventPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [eventData, setEventData] = useState(null);
-    console.log(eventData, 'eventData');
+   
     const [loading, setLoading] = useState(true);
 
     // For image modals

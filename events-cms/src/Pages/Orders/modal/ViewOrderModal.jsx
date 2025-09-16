@@ -419,7 +419,7 @@ function ViewOrderModal({ show, handleClose, orderData }) {
 
     // Render speakers for an event
     const renderSpeakers = (event) => {
-        console.log(event);
+       
         if (!event?.speakers?.length) {
             return <p>No speakers listed.</p>;
         }

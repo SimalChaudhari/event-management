@@ -33,7 +33,7 @@ export const login = (data) => async (dispatch) => {
         return { success: true, user };
 
     } catch (error) {
-        console.log({error});
+       
         toast.error(error.response.data.message);
         return { success: false };
     } finally {

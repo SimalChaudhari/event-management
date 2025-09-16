@@ -178,11 +178,6 @@ export class PollingService {
         isLive: true,
       };
 
-      if (speakerId) {
-        console.log(whereCondition.speakerId, '&&&&&&&');
-      }
-
-      console.log('🔍 Searching polls with conditions:', whereCondition);
 
       const polls = await this.pollRepository.find({
         where: whereCondition,
@@ -190,17 +185,7 @@ export class PollingService {
         order: { createdAt: 'ASC' },
       });
 
-      console.log('📊 Found polls:', polls.length);
-      console.log(
-        '📋 Polls details:',
-        polls.map((p) => ({
-          id: p.id,
-          question: p.question,
-          isActive: p.isActive,
-          isLive: p.isLive,
-          timerSeconds: p.timerSeconds,
-        })),
-      );
+   
 
       if (polls.length === 0) {
         throw new ValidationException('No active polls found for this event');
@@ -219,17 +204,13 @@ export class PollingService {
         sessionWhereCondition.speakerId = null;
       }
 
-      console.log(
-        '🔍 Searching existing session with conditions:',
-        sessionWhereCondition,
-      );
+  
 
       let existingSession = await this.userPollSessionRepository.findOne({
         where: sessionWhereCondition,
       });
 
-      console.log('📋 Existing session found:', existingSession ? 'Yes' : 'No');
-
+ 
       if (existingSession) {
         // Get current question with timer info
         const currentPoll = polls[existingSession.currentQuestionIndex];
@@ -272,12 +253,7 @@ export class PollingService {
           return await this.advanceToNextQuestion(existingSession.id, userId);
         }
 
-        console.log('🎯 Current question:', {
-          id: currentPoll.id,
-          question: currentPoll.question,
-          timerSeconds: currentPoll.timerSeconds,
-          totalOptions: currentPoll.options.length,
-        });
+   
 
         return {
           sessionId: existingSession.id,
@@ -351,7 +327,7 @@ export class PollingService {
         session.isTimerExpired = false;
 
         existingSession = await this.userPollSessionRepository.save(session);
-        console.log('✅ Created new session');
+     
       }
 
       // Get current question with timer info
@@ -370,12 +346,7 @@ export class PollingService {
       // Get current user's vote for this poll
       const currentUserVote = allVotes.find(vote => vote.userId === userId);
 
-      console.log('🎯 Current question:', {
-        id: currentPoll.id,
-        question: currentPoll.question,
-        timerSeconds: currentPoll.timerSeconds,
-        totalOptions: currentPoll.options.length,
-      });
+  
 
       return {
         sessionId: existingSession.id,
@@ -745,8 +716,6 @@ export class PollingService {
       if (eventId) whereCondition.eventId = eventId;
       if (speakerId) whereCondition.speakerId = speakerId; // Add speaker filtering
 
-      // Debug logging
-      console.log('Searching polls with conditions:', whereCondition);
 
       const polls = await this.pollRepository.find({
         where: whereCondition,

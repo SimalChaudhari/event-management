@@ -20,7 +20,7 @@ export class FeedbackService {
       const feedback = this.feedbackRepo.create(dto);
       return await this.feedbackRepo.save(feedback);
     } catch (error) {
-      console.log(error);
+  
       throw new InternalServerErrorException('Unable to save feedback');
     }
   }

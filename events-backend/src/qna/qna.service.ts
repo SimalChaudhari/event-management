@@ -97,7 +97,7 @@ export class QnaService {
         answeredBy: null,
       };
     } catch (error: any) {
-      console.log(error);
+   
       if (
         error instanceof ResourceNotFoundException ||
         error instanceof ValidationException
@@ -133,8 +133,7 @@ export class QnaService {
       }
 
       // Debug logging
-      console.log('Searching Q&A questions with conditions:', whereConditions);
-
+  
       const questions = await this.qnaQuestionRepository.find({
         where: whereConditions,
         relations: ['askedBy', 'event', 'speaker', 'answeredByUser', 'likes'],

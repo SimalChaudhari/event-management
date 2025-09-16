@@ -10,6 +10,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { UserEntity } from 'user/users.entity';
 import { EmailService } from 'service/email.service';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { NotificationGateway } from '../settings/notification.gateway';
+import { NotificationUtil } from '../utils/notification.util';
+import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
+import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 
 @Module({
   imports: [
@@ -19,6 +23,11 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
       UserEntity,
       Event,
       RegisterEvent,
+      EventNotification,
+      EventNotificationRead,
+      PushNotification,
+      UserPermissions,
+      PermissionTemplate,
     ]),
     UtilsModule,
     JwtModule.register({
@@ -26,7 +35,7 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
       signOptions: { }, // Set your token expiration
     }),
   ],
-  providers: [AgendaService, EmailService],
+  providers: [AgendaService, EmailService, NotificationGateway, NotificationUtil],
   controllers: [AgendaController],
   exports: [AgendaService],
 })

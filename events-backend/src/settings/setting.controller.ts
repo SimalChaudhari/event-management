@@ -13,6 +13,9 @@ import {
   UploadedFile,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
+  Query,
+  Request,
 } from '@nestjs/common';
 import {
   PrivacyPolicyService,
@@ -22,6 +25,7 @@ import {
   UserPermissionsService,
   PermissionTemplateService,
   PushNotificationService,
+  AdvertNotificationService,
 } from './setting.service';
 import {
   CreatePrivacyPolicyDto,
@@ -32,14 +36,23 @@ import {
   UpdateUserPermissionDto,
   UserPermissionWithTemplate,
   RegisterDeviceTokenDto,
-  SendNotificationDto,
-  NotificationHistoryDto,
+  GetEventNotificationHistoryDto,
+  EventNotificationResponseDto,
+  CreateAdvertNotificationDto,
+  UpdateAdvertNotificationDto,
+  AdvertNotificationResponseDto,
+  GetAdvertNotificationHistoryDto,
+  MarkAdvertNotificationReadDto,
+  SendAdvertNotificationDto,
+  CreateAdvertNotificationFormDto,
+  UpdateAdvertNotificationFormDto,
 } from './setting.dto';
-import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, UserPermissions, PermissionTemplate } from './setting.entity';
+import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { GetUser } from '../jwt/get-user.decorator';
 import { UserEntity } from '../user/users.entity';
@@ -291,4 +304,229 @@ export class PushNotificationController {
     return this.pushNotificationService.registerDeviceToken(user.id, deviceData);
   }
 
+  // Send event notification to registered users
+  // REMOVED - Notifications now sent automatically from event controllers
+
+  // Get event notification history for user
+  @Get('event-history')
+  async getEventNotificationHistory(
+    @Query() filters: GetEventNotificationHistoryDto,
+    @GetUser() user: UserEntity
+  ): Promise<{ notifications: EventNotificationResponseDto[]; total: number }> {
+    return this.pushNotificationService.getEventNotificationHistory(user.id, filters);
+  }
+
+  // Get user's notifications (simple endpoint)
+  @Get('my-notifications')
+  async getMyNotifications(
+
+    @GetUser() user: UserEntity,    
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: string,
+    @Query('eventId') eventId?: string,
+    @Query('isRead') isRead?: boolean,
+  ): Promise<{ notifications: EventNotificationResponseDto[]; total: number; unreadCount: number }> {
+    const filters = { page, limit, type, eventId, isRead };
+    const result = await this.pushNotificationService.getEventNotificationHistory(user.id, filters);
+    
+    const unreadCount = await this.pushNotificationService.getUnreadEventNotificationCount(user.id);
+    
+    return {
+      ...result,
+      unreadCount: unreadCount.count
+    };
+  }
+
+  // Mark event notification as read
+  @Put('mark-event-read/:eventNotificationId')
+  async markEventNotificationAsRead(
+    @Param('eventNotificationId') eventNotificationId: string,
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.pushNotificationService.markEventNotificationAsRead(user.id, eventNotificationId);
+  }
+
+  // Mark all notifications as read
+  @Put('mark-all-read')
+  async markAllNotificationsAsRead(
+    @GetUser() user: UserEntity
+  ): Promise<{ message: string }> {
+    return this.pushNotificationService.markAllEventNotificationsAsRead(user.id);
+  }
+}
+
+// Advert Notification Controller (Admin Management)
+@Controller('api/admin/advert-notifications')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+export class AdvertNotificationController {
+  constructor(private readonly advertNotificationService: AdvertNotificationService) { }
+
+  // Create advert notification (admin only) - supports both JSON and form data
+  @Post()
+  @UseInterceptors(FileUploadUtils.createAdvertFileInterceptor())
+  async createAdvertNotification(
+    @Body() createDto: CreateAdvertNotificationDto | CreateAdvertNotificationFormDto,
+    @UploadedFiles() files: FileUploadConfig,
+    @Request() req: any,
+  ): Promise<{ message: string; data: AdvertNotificationResponseDto }> {
+    try {
+      // First validate and process files safely
+      const fileProcessing = FileUploadUtils.processAdvertFilesSafely(files);
+      if (!fileProcessing.success) {
+        // Files are invalid, they've already been cleaned up
+        throw new BadRequestException(`File validation failed: ${fileProcessing.errors?.join(', ')}`);
+      }
+
+      // Process files safely
+      let imageUrl: string | undefined;
+      if (fileProcessing.processedFiles?.advertImage) {
+        imageUrl = fileProcessing.processedFiles.advertImage;
+      }
+
+      // Create the advert with processed image
+      const advertData = {
+        ...createDto,
+        imageUrl,
+      };
+
+      return this.advertNotificationService.createAdvertNotification(advertData);
+    } catch (error: any) {
+      // Clean up uploaded files if error occurs
+      FileUploadUtils.cleanupAdvertFiles(files);
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        throw new BadRequestException('File size too large. Maximum size is 10MB.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Get all advert notifications (admin only)
+  @Get()
+  async getAllAdvertNotifications(): Promise<AdvertNotificationResponseDto[]> {
+    return this.advertNotificationService.getAllAdvertNotifications();
+  }
+
+  // Get advert notification by ID (admin only)
+  @Get(':id')
+  async getAdvertNotificationById(
+    @Param('id') id: string,
+  ): Promise<AdvertNotificationResponseDto> {
+    return this.advertNotificationService.getAdvertNotificationById(id);
+  }
+
+  // Update advert notification (admin only) - supports both JSON and form data
+  @Put(':id')
+  @UseInterceptors(FileUploadUtils.createAdvertFileInterceptor())
+  async updateAdvertNotification(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateAdvertNotificationDto | UpdateAdvertNotificationFormDto,
+    @UploadedFiles() files: FileUploadConfig,
+    @Request() req: any,
+  ): Promise<{ message: string; data: AdvertNotificationResponseDto }> {
+    try {
+      // First validate and process files safely
+      const fileProcessing = FileUploadUtils.processAdvertFilesSafely(files);
+      if (!fileProcessing.success) {
+        // Files are invalid, they've already been cleaned up
+        throw new BadRequestException(`File validation failed: ${fileProcessing.errors?.join(', ')}`);
+      }
+
+      // Process files safely
+      let imageUrl: string | undefined;
+      if (fileProcessing.processedFiles?.advertImage) {
+        imageUrl = fileProcessing.processedFiles.advertImage;
+      }
+
+      // Update the advert with processed image
+      const advertData = {
+        ...updateDto,
+        imageUrl,
+      };
+
+      return this.advertNotificationService.updateAdvertNotification(id, advertData);
+    } catch (error: any) {
+      // Clean up uploaded files if error occurs
+      FileUploadUtils.cleanupAdvertFiles(files);
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        throw new BadRequestException('File size too large. Maximum size is 10MB.');
+      }
+      
+      throw error;
+    }
+  }
+
+  // Delete advert notification (admin only)
+  @Delete(':id')
+  async deleteAdvertNotification(
+    @Param('id') id: string,
+  ): Promise<{ message: string }> {
+    return this.advertNotificationService.deleteAdvertNotification(id);
+  }
+
+  // Send advert notification to all users (admin only)
+  @Post(':id/send')
+  async sendAdvertNotification(
+    @Param('id') id: string,
+  ): Promise<{ message: string; sentCount: number }> {
+    return this.advertNotificationService.sendAdvertNotification(id);
+  }
+
+  // Cleanup orphaned read records (admin only)
+  @Post('cleanup-orphaned-records')
+  async cleanupOrphanedRecords(): Promise<{ message: string; deletedCount: number }> {
+    return this.advertNotificationService.cleanupOrphanedReadRecords();
+  }
+
+}
+
+// Advert Notification User Controller (User-facing endpoints)
+@Controller('api/notifications/advert')
+@UseGuards(JwtAuthGuard)
+export class AdvertNotificationUserController {
+  constructor(private readonly advertNotificationService: AdvertNotificationService) { }
+
+  // Get user's advert notification history
+  @Get('history')
+  async getMyAdvertNotificationHistory(
+    @Query() filters: GetAdvertNotificationHistoryDto,
+    @GetUser() user: UserEntity,
+  ): Promise<{ notifications: any[]; total: number; unreadCount: number }> {
+    const result = await this.advertNotificationService.getUserAdvertNotificationHistory(user.id, filters);
+    const unreadCount = await this.advertNotificationService.getUnreadAdvertNotificationCount(user.id);
+    
+    return {
+      ...result,
+      unreadCount: unreadCount.count
+    };
+  }
+
+  // Mark advert notification as read
+  @Put('mark-read/:advertNotificationId')
+  async markAdvertNotificationAsRead(
+    @Param('advertNotificationId') advertNotificationId: string,
+    @GetUser() user: UserEntity,
+  ): Promise<{ message: string }> {
+    return this.advertNotificationService.markAdvertNotificationAsRead(user.id, advertNotificationId);
+  }
+
+  // Mark all advert notifications as read
+  @Put('mark-all-read')
+  async markAllAdvertNotificationsAsRead(
+    @GetUser() user: UserEntity,
+  ): Promise<{ message: string }> {
+    return this.advertNotificationService.markAllAdvertNotificationsAsRead(user.id);
+  }
+
+  // Get unread advert notification count
+  @Get('unread-count')
+  async getUnreadAdvertNotificationCount(
+    @GetUser() user: UserEntity,
+  ): Promise<{ count: number }> {
+    return this.advertNotificationService.getUnreadAdvertNotificationCount(user.id);
+  }
 }

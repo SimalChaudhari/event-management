@@ -30,7 +30,7 @@ const CardToDo = (props) => {
             formRef.current.resetValidationState(true);
     };
     const handleErrorSubmit = (e, formData, errorInputs) => {
-        //console.log(errorInputs);
+
     };
     const completeStyle = {
         backgroundImage: `url(${complete})`,

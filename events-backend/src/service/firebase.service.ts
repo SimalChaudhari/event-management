@@ -50,7 +50,7 @@ export class FirebaseService {
 
       try {
         await file.delete(); // Delete the file from Firebase Storage
-        console.log(`Successfully deleted file: ${fileName}`);
+     
       } catch (error) {
         console.error(`Failed to delete file ${fileName}:`, error);
       }
@@ -76,7 +76,7 @@ export class FirebaseService {
 
       try {
         await file.delete();
-        console.log(`Successfully deleted file: ${filePath}`);
+       
       } catch (error :any) {
         if (error.code === 404) {
           console.warn(`File not found in Firebase Storage: ${filePath}`);
@@ -105,7 +105,7 @@ export class FirebaseService {
 
     try {
         await file.delete();
-        console.log(`Successfully deleted file: ${filePath}`);
+     
     } catch (error: any) {
         if (error.code === 404) {
             console.warn(`File not found in Firebase Storage: ${filePath}`);

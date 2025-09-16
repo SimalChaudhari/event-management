@@ -128,7 +128,7 @@ export const upcomingEventList = (filters = {}) => async (dispatch) => {
 export const createEvent = (data) => async (dispatch) => {
     try {
         const response = await axiosInstance.post('/events/create', data);
-        console.log({ response });
+       
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Event registered successfully!');
             return true;

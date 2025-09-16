@@ -59,7 +59,7 @@ export class AuthService {
           role: user.role,
           // type: 'access' // Add a type claim
         },
-        { expiresIn: '1d', secret: process.env.JWT_SECRET }, // Use a specific secret for access tokens
+        { expiresIn: '100d', secret: process.env.JWT_SECRET }, // Use a specific secret for access tokens
       ); // Access token expires in 15 minutes
     } catch (error) {
       this.handleError(error);
@@ -197,7 +197,7 @@ export class AuthService {
           const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(credentialsData);
           await this.emailService['transporter'].sendMail(mailOptions);
           
-          console.log(`User credentials sent to ${userDto.email}: ${userDto.firstName} ${userDto.lastName}`);
+ 
         } catch (emailError) {
           console.error('Error sending credentials email:', emailError);
           // Continue without throwing error - user was created successfully

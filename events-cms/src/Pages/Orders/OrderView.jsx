@@ -205,7 +205,7 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
         e.stopPropagation();
         const orderItemId = $(this).data('id');
         const orderData = data.find((item) => item.orderItems.some(orderItem => orderItem.id === orderItemId));
-        console.log('Complete clicked for OrderItem ID:', orderItemId);
+       
         handleStatusClick(orderItemId, 'Completed', orderData);
     });
 
@@ -215,7 +215,7 @@ function atable(data, handleDelete, handleView, handleStatusClick) {
         e.stopPropagation();
         const orderItemId = $(this).data('id');
         const orderData = data.find((item) => item.orderItems.some(orderItem => orderItem.id === orderItemId));
-        console.log('Cancel clicked for OrderItem ID:', orderItemId);
+       
         handleStatusClick(orderItemId, 'Cancelled', orderData);
     });
 }
@@ -308,8 +308,7 @@ const OrderView = () => {
         
         setIsUpdatingStatus(true);
         try {
-            console.log(`Updating order item ${statusToUpdate.id} to status: ${statusToUpdate.status}`);
-            
+        
             // Use the actual API call
             await dispatch(updateOrderStatus(statusToUpdate.id, statusToUpdate.status));
             
@@ -320,7 +319,7 @@ const OrderView = () => {
             setStatusToUpdate(null);
             setOrderToUpdate(null);
             
-            console.log('Order status updated successfully');
+        
         } catch (error) {
             console.error('Error updating order status:', error);
         } finally {

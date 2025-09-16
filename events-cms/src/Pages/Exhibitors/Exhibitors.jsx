@@ -195,7 +195,7 @@ const Exhibitors = () => {
     const [currentTable, setCurrentTable] = useState(null);
 
     const { exhibitors, loading } = useSelector((state) => state.exhibitor);
-    console.log(exhibitors,"%%%%%%%%%%");
+    
 
     useEffect(() => {
         dispatch(exhibitorList());

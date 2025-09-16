@@ -44,14 +44,14 @@ const useFilterLogic = ({
             const results = await Promise.all(promises);
             
             if (loadUsersAction && results[0]) {
-                console.log('Loaded users:', results[0].length, 'users');
+               
                 setUsers(results[0]);
             }
             
             if (loadEventsAction) {
                 const eventIndex = loadUsersAction ? 1 : 0;
                 if (results[eventIndex]) {
-                    console.log('Loaded events:', results[eventIndex].length, 'events');
+                
                     setEvents(results[eventIndex]);
                 }
             }
@@ -129,11 +129,11 @@ const useFilterLogic = ({
         // Dispatch the filter action if provided
         if (filterAction) {
             try {
-                console.log('Applying filters:', filters);
+               
                 await dispatch(filterAction(filters));
                 return true;
             } catch (error) {
-                console.error('Error applying filters:', error);
+               
                 return false;
             }
         }
@@ -235,7 +235,7 @@ const useFilterLogic = ({
             const hasUrlFilters = urlParams.get('userId') || urlParams.get('eventId');
             
             if (!hasUrlFilters && filterAction) {
-                console.log('Loading all events by default');
+              
                 dispatch(filterAction({})); // Empty object = all data
             }
         };
@@ -267,7 +267,7 @@ const useFilterLogic = ({
             if (selectedUser) {
                 filters.userFilter = selectedUser.email;
                 hasValidFilters = true;
-                console.log('Applied user filter:', selectedUser.email);
+             
             }
         }
         
@@ -276,12 +276,12 @@ const useFilterLogic = ({
             if (selectedEvent) {
                 filters.eventFilter = selectedEvent.name;
                 hasValidFilters = true;
-                console.log('Applied event filter:', selectedEvent.name);
+               
             }
         }
         
         if (hasValidFilters) {
-            console.log('Dispatching URL filters:', filters);
+           
             dispatch(filterAction(filters));
         }
     }, [users.length, events.length, location.search]); // Only re-run when data length changes or URL changes

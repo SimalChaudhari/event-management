@@ -60,7 +60,7 @@ export const getGalleryById = (id) => async (dispatch) => {
 };
 
 export const createOrUpdateGallery = (data , id) => async (dispatch) => {
-    console.log({data});
+
     try {
         const response = await axiosInstance.post(`/gallery/create-or-update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {

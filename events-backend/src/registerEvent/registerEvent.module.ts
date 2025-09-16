@@ -15,16 +15,20 @@ import { UserEntity } from 'user/users.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { UtilsModule } from 'utils/utils.module';
+import { EventNotificationService } from '../utils/event-notification.service';
+import { NotificationUtil } from '../utils/notification.util';
+import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
+import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate]), UtilsModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration
         }),
     ],
-    providers: [RegisterEventService, AdminInfoService, ErrorHandlerService],
+    providers: [RegisterEventService, AdminInfoService, ErrorHandlerService, EventNotificationService, NotificationUtil],
     controllers: [RegisterEventController, AdminInfoController],
     exports: [RegisterEventService, AdminInfoService], // Export the service to be used in other modules
 })

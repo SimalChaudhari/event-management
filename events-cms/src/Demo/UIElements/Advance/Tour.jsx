@@ -41,9 +41,7 @@ const AdvanceTour = () => {
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
             setRun(false);
         }
-        /*console.groupCollapsed(type);
-        console.log(data);
-        console.groupEnd();*/
+      
     };
     return (<>
             <Row className="btn-page">

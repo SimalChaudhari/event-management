@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { GeneralNotificationType } from '../types/notification.types';
 
 export class FirebaseUtil {
   private static fcmApp: admin.app.App | null = null;
@@ -38,13 +39,12 @@ export class FirebaseUtil {
 
       } else {
         this.fcmApp = admin.apps[0];
-        console.log('🔥 Firebase Admin SDK already initialized');
+       
       }
 
       return this.fcmApp;
     } catch (error) {
-      console.error('❌ Firebase initialization failed:', error);
-      console.log('📝 Make sure to set FIREBASE_* environment variables');
+     
       return null;
     }
   }
@@ -81,13 +81,7 @@ export class FirebaseUtil {
       const app = this.getFirebaseApp();
 
       if (!app) {
-        console.log('⚠️ Firebase not initialized, using mock notification');
-        console.log(`📱 Mock notification to ${platform} device:`, {
-          token: deviceToken.substring(0, 20) + '...',
-          title: notificationData.title,
-          body: notificationData.body,
-          data: notificationData.data,
-        });
+     
         return;
       }
 
@@ -99,7 +93,7 @@ export class FirebaseUtil {
         },
         data: {
           ...notificationData.data,
-          type: notificationData.type || 'general',
+          type: notificationData.type || GeneralNotificationType.GENERAL,
           timestamp: new Date().toISOString(),
         },
         android: {
@@ -121,17 +115,9 @@ export class FirebaseUtil {
       };
 
       const response = await admin.messaging().send(message);
-      console.log(`✅ FCM notification sent successfully:`, response);
+     
     } catch (error) {
       console.error(`❌ Failed to send FCM notification:`, error);
-
-      // If FCM fails, fallback to mock for development
-      console.log(`📱 Fallback mock notification to ${platform} device:`, {
-        token: deviceToken.substring(0, 20) + '...',
-        title: notificationData.title,
-        body: notificationData.body,
-        data: notificationData.data,
-      });
     }
   }
 
@@ -192,7 +178,6 @@ export class FirebaseUtil {
       return false;
     }
 
-    console.log('✅ Firebase configuration is valid');
     return true;
   }
 

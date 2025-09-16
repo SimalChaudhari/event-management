@@ -9,9 +9,7 @@ export class JwtAuthGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
         const request: Request = context.switchToHttp().getRequest();
         const token = this.extractTokenFromHeader(request);
-      
-        // console.log(token);
-        // console.log(request);
+    
         if (!token) throw new UnauthorizedException('Token is required for authentication');
 
         try {

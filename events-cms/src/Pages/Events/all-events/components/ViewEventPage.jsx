@@ -46,7 +46,7 @@ const ViewEventPage = () => {
 
     useEffect(() => {
         dispatch(eventById(id)).then((res) => {
-            console.log(res?.data);
+           
             setEventData(res?.data);
             setLoading(false);
         });

@@ -32,6 +32,7 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
 import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
+import { EventNotificationService } from '../utils/event-notification.service';
 
 @Controller('api/events')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,6 +40,7 @@ export class EventController {
   constructor(
     private readonly eventService: EventService,
     private readonly errorHandler: ErrorHandlerService,
+    private readonly eventNotificationService: EventNotificationService,
   ) {}
 
   @Post('create')
@@ -344,6 +346,26 @@ export class EventController {
 
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
 
+      // Send notification to all registered users about event update
+      try {
+  
+        const changes = this.detectEventChanges(existingEvent, eventDto);
+     
+        if (changes.length > 0) {
+         
+          await this.eventNotificationService.sendEventUpdateNotification(
+            id,
+            updatedEvent.name || 'Event',
+            changes
+          );
+        } else {
+          console.log('⚠️ No changes detected, skipping notification');
+        }
+      } catch (notificationError) {
+        console.error('❌ Failed to send event update notification:', notificationError);
+        // Don't fail the update if notification fails
+      }
+
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event updated successfully',
@@ -371,7 +393,22 @@ export class EventController {
   @Roles(UserRole.Admin)
   async deleteEvent(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
     try {
+      // Get event details before deletion for notification
+      const eventToDelete = await this.eventService.getEventEntityById(id);
+      
       const result = await this.eventService.deleteEvent(id);
+      
+      // Send notification to all registered users about event cancellation
+      try {
+        await this.eventNotificationService.sendEventCancellationNotification(
+          id,
+          eventToDelete.name || 'Event',
+          'Event has been cancelled by admin'
+        );
+      } catch (notificationError) {
+        console.error('Failed to send event cancellation notification:', notificationError);
+        // Don't fail the deletion if notification fails
+      }
       
       const successResponse: SuccessResponse = {
         success: true,
@@ -588,5 +625,74 @@ export class EventController {
     }
   }
 
+  /**
+   * Helper method to detect what fields were changed in event update
+   */
+  private detectEventChanges(oldEvent: any, newEvent: any): string[] {
+    const changes: string[] = [];
+    
+   
+    // Check for actual changes (not just undefined vs defined)
+    if (newEvent.name !== undefined && oldEvent?.name !== newEvent.name) {
+     
+      changes.push('Event Name');
+    }
+    if (newEvent.description !== undefined && oldEvent?.description !== newEvent.description) {
+     
+      changes.push('Description');
+    }
+    if (newEvent.startDate !== undefined && oldEvent?.startDate !== newEvent.startDate) {
+   
+      changes.push('Start Date');
+    }
+    if (newEvent.endDate !== undefined && oldEvent?.endDate !== newEvent.endDate) {
+   
+      changes.push('End Date');
+    }
+    if (newEvent.startTime !== undefined && oldEvent?.startTime !== newEvent.startTime) {
+    
+      changes.push('Start Time');
+    }
+    if (newEvent.endTime !== undefined && oldEvent?.endTime !== newEvent.endTime) {
+    
+      changes.push('End Time');
+    }
+    // Combined time field check
+    if (newEvent.time !== undefined && oldEvent?.time !== newEvent.time) {
+   
+      changes.push('Time');
+    }
+    if (newEvent.location !== undefined && oldEvent?.location !== newEvent.location) {
+
+      changes.push('Location');
+    }
+    if (newEvent.price !== undefined && oldEvent?.price !== newEvent.price) {
+    
+      changes.push('Price');
+    }
+    if (newEvent.capacity !== undefined && oldEvent?.capacity !== newEvent.capacity) {
+
+      changes.push('Capacity');
+    }
+    if (newEvent.eventType !== undefined && oldEvent?.eventType !== newEvent.eventType) {
+    
+      changes.push('Event Type');
+    }
+    if (newEvent.status !== undefined && oldEvent?.status !== newEvent.status) {
+    
+      changes.push('Status');
+    }
+    if (newEvent.images !== undefined && oldEvent?.images !== newEvent.images) {
+     
+      changes.push('Images');
+    }
+    if (newEvent.documents !== undefined && oldEvent?.documents !== newEvent.documents) {
+    
+      changes.push('Documents');
+    }
+    
+
+    return changes;
+  }
 
 }
