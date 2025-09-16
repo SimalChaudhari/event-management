@@ -1397,7 +1397,10 @@ export class AdvertNotificationService {
     statistics?: {
       totalUsers: number;
       eligibleUsers: number;
-      notificationsSent: number;
+      usersWithDeviceTokens: number;
+      pushNotificationsSent: number;
+      socketNotificationsSent: number;
+      pendingUsers: number;
       usersSkipped: number;
     }
   }> {
@@ -1438,7 +1441,7 @@ export class AdvertNotificationService {
         userPermissionMap.set(permission.userId, permission.enabled);
       });
 
-      // Get all users for socket notifications
+      // Get all users for notifications
       let users = [];
       try {
         users = await this.pushNotificationRepository.manager
@@ -1465,39 +1468,64 @@ export class AdvertNotificationService {
         };
       }
 
-      const uniqueUsers = eligibleUsers;
+      // Get users with device tokens for push notifications
+      const usersWithDeviceTokens = await this.pushNotificationRepository.find({
+        where: { isActive: true },
+      });
 
-      // Send socket notifications to all eligible users
-      const userIds = uniqueUsers.map(user => user.user_id);
-      
+      const userIdsWithTokens = [...new Set(usersWithDeviceTokens.map(pn => pn.userId))];
+      const eligibleUsersWithTokens = eligibleUsers.filter(user => 
+        userIdsWithTokens.includes(user.user_id)
+      );
+      const eligibleUsersWithoutTokens = eligibleUsers.filter(user => 
+        !userIdsWithTokens.includes(user.user_id)
+      );
+
       let sentCount = 0;
-      if (userIds.length > 0) {
+      let pendingCount = 0;
+
+      // Send push notifications to users with device tokens
+      if (eligibleUsersWithTokens.length > 0) {
         try {
-          // Send socket notifications directly to all eligible users
-          for (const userId of userIds) {
-            try {
-              this.sendSocketNotificationToUser(userId, {
-                id: advert.id,
-                title: advert.title,
-                content: advert.content,
-                imageUrl: advert.imageUrl,
-                actionUrl: advert.actionUrl,
-                actionText: advert.actionText,
-                type: 'advert',
-                createdAt: new Date()
-              });
-              sentCount++;
-            } catch (socketError) {
-              // Silent fail for individual users
-            }
-          }
-        } catch (notificationError) {
-          sentCount = 0;
+          const pushUserIds = eligibleUsersWithTokens.map(user => user.user_id);
+          const pushResult = await this.notificationUtil.sendAdvertNotification({
+            id: advert.id,
+            title: advert.title,
+            content: advert.content,
+            imageUrl: advert.imageUrl,
+            actionUrl: advert.actionUrl,
+            actionText: advert.actionText,
+            userIds: pushUserIds
+          });
+          sentCount += pushResult.sentCount;
+        } catch (pushError) {
+          // Silent fail for push notifications
         }
       }
 
-      // Create read records for tracking (same as event notifications)
-      for (const user of uniqueUsers) {
+      // Send socket notifications to ALL eligible users (with and without device tokens)
+      for (const user of eligibleUsers) {
+        try {
+          this.sendSocketNotificationToUser(user.user_id, {
+            id: advert.id,
+            title: advert.title,
+            content: advert.content,
+            imageUrl: advert.imageUrl,
+            actionUrl: advert.actionUrl,
+            actionText: advert.actionText,
+            type: 'advert',
+            createdAt: new Date()
+          });
+        } catch (socketError) {
+          // Silent fail for socket notifications
+        }
+      }
+
+      // Count users without device tokens as pending
+      pendingCount = eligibleUsersWithoutTokens.length;
+
+      // Create read records for tracking (only for users who received notifications)
+      for (const user of eligibleUsers) {
         try {
           const readRecord = this.advertNotificationReadRepository.create({
             advertNotificationId: advert.id,
@@ -1517,12 +1545,15 @@ export class AdvertNotificationService {
       await this.advertNotificationRepository.save(advert);
 
       return {
-        message: `Socket notifications sent to ${sentCount} users. Total users in database: ${users.length}, Eligible users: ${eligibleUsers.length}`,
+        message: `Push notifications sent to ${sentCount} users with device tokens. Socket notifications sent to ${eligibleUsers.length} users. ${pendingCount} users pending (no device tokens).`,
         sentCount,
         statistics: {
           totalUsers: users.length,
           eligibleUsers: eligibleUsers.length,
-          notificationsSent: sentCount,
+          usersWithDeviceTokens: eligibleUsersWithTokens.length,
+          pushNotificationsSent: sentCount,
+          socketNotificationsSent: eligibleUsers.length,
+          pendingUsers: pendingCount,
           usersSkipped: users.length - eligibleUsers.length
         }
       };

@@ -482,7 +482,6 @@ export class AdvertNotificationController {
     return this.advertNotificationService.cleanupOrphanedReadRecords();
   }
 
-
 }
 
 // Advert Notification User Controller (User-facing endpoints)
