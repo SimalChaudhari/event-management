@@ -11,6 +11,7 @@ import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { EventNotification, EventNotificationRead } from './event-notification.entity';
 import { NotificationUtil } from '../utils/notification.util';
 import { EventNotificationService } from '../utils/event-notification.service';
+import { NotificationConnectionService } from './notification-connection.service';
 import { UserEntity } from 'user/users.entity';
 
 @Module({
@@ -21,7 +22,7 @@ import { UserEntity } from 'user/users.entity';
     }), 
 ],
 controllers: [PrivacyPolicyController, TermsConditionsController, BannerController,BannerEventController, UserPermissionsController, PermissionTemplateController, PushNotificationController, AdvertNotificationController, AdvertNotificationUserController],
-providers: [PrivacyPolicyService, TermsConditionsService, BannerService,BannerEventService, UserPermissionsService, PermissionTemplateService, PushNotificationService, AdvertNotificationService, NotificationGateway, NotificationUtil, EventNotificationService],
+providers: [PrivacyPolicyService, TermsConditionsService, BannerService,BannerEventService, UserPermissionsService, PermissionTemplateService, PushNotificationService, AdvertNotificationService, NotificationGateway, NotificationUtil, EventNotificationService, NotificationConnectionService],
 
 })
 export class SettingModule {}

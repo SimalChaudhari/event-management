@@ -1203,6 +1203,12 @@ export class AdvertNotificationService {
     private readonly notificationUtil: NotificationUtil,
   ) {}
 
+  private notificationGateway: any = null;
+
+  setNotificationGateway(gateway: any) {
+    this.notificationGateway = gateway;
+  }
+
   // Create advert notification (admin only) - supports both JSON and form data
   async createAdvertNotification(
     createDto: CreateAdvertNotificationDto | CreateAdvertNotificationFormDto,
@@ -1385,7 +1391,16 @@ export class AdvertNotificationService {
   }
 
   // Send advert notification to all users who have advert notifications enabled
-  async sendAdvertNotification(advertId: string): Promise<{ message: string; sentCount: number }> {
+  async sendAdvertNotification(advertId: string): Promise<{ 
+    message: string; 
+    sentCount: number; 
+    statistics?: {
+      totalUsers: number;
+      eligibleUsers: number;
+      notificationsSent: number;
+      usersSkipped: number;
+    }
+  }> {
     try {
       const advert = await this.advertNotificationRepository.findOne({
         where: { id: advertId },
@@ -1412,11 +1427,6 @@ export class AdvertNotificationService {
         throw new NotFoundException('Advert notification permission template not found');
       }
 
-      // Get all users with push notifications (these are users who can receive notifications)
-      const allPushNotifications = await this.pushNotificationRepository.find({
-        where: { isActive: true },
-      });
-
       // Get all custom permissions for advert notifications
       const customPermissions = await this.userPermissionsRepository.find({
         where: { templateId: advertTemplate.id },
@@ -1428,54 +1438,75 @@ export class AdvertNotificationService {
         userPermissionMap.set(permission.userId, permission.enabled);
       });
 
-      // Get unique user IDs from push notifications
-      const userIdsWithPushNotifications = [...new Set(allPushNotifications.map(pn => pn.userId))];
-
-      // Get user details for all users with push notifications
-      const users = await this.pushNotificationRepository.manager
-        .createQueryBuilder()
-        .select(['user.id', 'user.firstName', 'user.lastName', 'user.email'])
-        .from('users', 'user')
-        .where('user.id IN (:...userIds)', { userIds: userIdsWithPushNotifications })
-        .getRawMany();
+      // Get all users for socket notifications
+      let users = [];
+      try {
+        users = await this.pushNotificationRepository.manager
+          .createQueryBuilder()
+          .select(['user.id', 'user.firstName', 'user.lastName', 'user.email'])
+          .from('users', 'user')
+          .getRawMany();
+      } catch (queryError: any) {
+        throw new Error(`Database query error: ${queryError.message}`);
+      }
 
       // Filter users based on their advert notification preference
       const eligibleUsers = users.filter(user => {
         const userPreference = userPermissionMap.get(user.user_id);
-        // If user has custom preference, use it; otherwise use default
-        return userPreference !== undefined ? userPreference : advertTemplate.defaultEnabled;
+        const isEligible = userPreference !== undefined ? userPreference : advertTemplate.defaultEnabled;
+        return isEligible;
       });
+
+      // Check if we have eligible users
+      if (eligibleUsers.length === 0) {
+        return {
+          message: `No eligible users found. Total users in database: ${users.length}, Eligible users: 0`,
+          sentCount: 0,
+        };
+      }
 
       const uniqueUsers = eligibleUsers;
 
+      // Send socket notifications to all eligible users
+      const userIds = uniqueUsers.map(user => user.user_id);
+      
       let sentCount = 0;
+      if (userIds.length > 0) {
+        try {
+          // Send socket notifications directly to all eligible users
+          for (const userId of userIds) {
+            try {
+              this.sendSocketNotificationToUser(userId, {
+                id: advert.id,
+                title: advert.title,
+                content: advert.content,
+                imageUrl: advert.imageUrl,
+                actionUrl: advert.actionUrl,
+                actionText: advert.actionText,
+                type: 'advert',
+                createdAt: new Date()
+              });
+              sentCount++;
+            } catch (socketError) {
+              // Silent fail for individual users
+            }
+          }
+        } catch (notificationError) {
+          sentCount = 0;
+        }
+      }
 
-      // Send notification to each user
+      // Create read records for tracking (same as event notifications)
       for (const user of uniqueUsers) {
         try {
-          // Send push notification
-          await this.sendPushNotificationToUser(user.user_id, {
-            title: advert.title,
-            body: this.extractTextFromContent(advert.content), // Extract plain text from HTML content
-            data: {
-              advertId: advert.id,
-              type: 'advert',
-              actionUrl: advert.actionUrl,
-              actionText: advert.actionText,
-            },
-          });
-
-          // Create read record for tracking
           const readRecord = this.advertNotificationReadRepository.create({
             advertNotificationId: advert.id,
             userId: user.user_id,
             isRead: false,
           });
           await this.advertNotificationReadRepository.save(readRecord);
-
-          sentCount++;
-        } catch (userError) {
-          console.error(`Failed to send advert notification to user ${user.user_id}:`, userError);
+        } catch (readError) {
+          // Silent fail for read records
         }
       }
 
@@ -1486,17 +1517,34 @@ export class AdvertNotificationService {
       await this.advertNotificationRepository.save(advert);
 
       return {
-        message: `Advert notification sent to ${sentCount} users`,
+        message: `Socket notifications sent to ${sentCount} users. Total users in database: ${users.length}, Eligible users: ${eligibleUsers.length}`,
         sentCount,
+        statistics: {
+          totalUsers: users.length,
+          eligibleUsers: eligibleUsers.length,
+          notificationsSent: sentCount,
+          usersSkipped: users.length - eligibleUsers.length
+        }
       };
     } catch (error: any) {
-      console.error('Error sending advert notification:', error);
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       ErrorHandlerUtil.handleError(error);
     }
   }
+
+  // Send socket notification to user
+  private sendSocketNotificationToUser(userId: string, notification: any): void {
+    try {
+      if (this.notificationGateway) {
+        this.notificationGateway.sendAdvertNotificationToUser(userId, notification);
+      }
+    } catch (error: any) {
+      // Silent fail for socket notifications
+    }
+  }
+
 
   // Get user's advert notification history
   async getUserAdvertNotificationHistory(

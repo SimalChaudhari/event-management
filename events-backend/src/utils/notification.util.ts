@@ -44,6 +44,8 @@ export interface NotificationResult {
 
 @Injectable()
 export class NotificationUtil {
+  private notificationGateway: any = null;
+
   constructor(
     @InjectRepository(EventNotification)
     private eventNotificationRepository: Repository<EventNotification>,
@@ -54,6 +56,11 @@ export class NotificationUtil {
     @InjectRepository(PushNotification)
     private pushNotificationRepository: Repository<PushNotification>,
   ) {}
+
+  // Set notification gateway reference
+  setNotificationGateway(gateway: any) {
+    this.notificationGateway = gateway;
+  }
 
 
   /**
@@ -386,12 +393,99 @@ export class NotificationUtil {
    */
   private async sendSocketNotificationToUser(userId: string, notification: any): Promise<void> {
     try {
-      // This would be implemented with your socket gateway
-      // For now, just log it
-      console.log(`Socket notification to user ${userId}:`, notification);
+      if (this.notificationGateway) {
+        // Send event notification via socket
+        if (notification.type === 'event' || notification.eventId) {
+          this.notificationGateway.sendEventNotification(notification.eventId, notification);
+        }
+        // Send advert notification via socket
+        else if (notification.type === 'advert') {
+          this.notificationGateway.sendAdvertNotificationToUser(userId, notification);
+        }
+        // Send general notification via socket
+        else {
+          this.notificationGateway.sendToUser(userId, notification);
+        }
+        console.log(`📡 Socket notification sent to user ${userId}`);
+      } else {
+        console.log(`⚠️ Notification gateway not available for user ${userId}`);
+      }
     } catch (error: any) {
       console.error(`Failed to send socket notification to user ${userId}:`, error);
     }
+  }
+
+  /**
+   * Send advert notification to specific users (similar to event notifications)
+   */
+  async sendAdvertNotification(advertData: {
+    id: string;
+    title: string;
+    content: string;
+    imageUrl?: string;
+    actionUrl?: string;
+    actionText?: string;
+    userIds: string[];
+  }): Promise<{ message: string; sentCount: number }> {
+    try {
+      let sentCount = 0;
+
+      // Send notification to each user
+      for (const userId of advertData.userIds) {
+        try {
+          // Send push notification
+          await this.sendPushNotificationToUser(userId, {
+            title: advertData.title,
+            body: this.extractTextFromContent(advertData.content),
+            data: {
+              advertId: advertData.id,
+              type: 'advert',
+              actionUrl: advertData.actionUrl,
+              actionText: advertData.actionText,
+            }
+          }).catch(pushError => {
+            console.error(`Push notification failed for user ${userId}:`, pushError);
+          });
+
+          // Send socket notification (if gateway is available) - don't block on this
+          this.sendSocketNotificationToUser(userId, {
+            id: advertData.id,
+            title: advertData.title,
+            content: advertData.content,
+            imageUrl: advertData.imageUrl,
+            actionUrl: advertData.actionUrl,
+            actionText: advertData.actionText,
+            type: 'advert',
+            createdAt: new Date()
+          }).catch(socketError => {
+            console.error(`Socket notification failed for user ${userId}:`, socketError);
+          });
+
+          sentCount++;
+        } catch (userError) {
+          console.error(`❌ Failed to send advert notification to user ${userId}:`, userError);
+          // Continue with other users even if one fails
+        }
+      }
+
+      return {
+        message: `Advert notification sent to ${sentCount} users`,
+        sentCount
+      };
+    } catch (error: any) {
+      console.error('❌ Error sending advert notification:', error);
+      return {
+        message: 'Error sending advert notification',
+        sentCount: 0
+      };
+    }
+  }
+
+  /**
+   * Extract plain text from HTML content
+   */
+  private extractTextFromContent(content: string): string {
+    return content.replace(/<[^>]*>/g, '').substring(0, 150) + '...';
   }
 
   /**

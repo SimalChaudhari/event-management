@@ -88,6 +88,24 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     });
   }
 
+  // Send advert notification to specific user
+  sendAdvertNotificationToUser(userId: string, notification: any) {
+    this.server.to(`user:${userId}`).emit('advert_notification', {
+      type: 'advert',
+      ...notification
+    });
+  }
+
+  // Send advert notification to multiple users
+  sendAdvertNotificationToUsers(userIds: string[], notification: any) {
+    userIds.forEach(userId => {
+      this.server.to(`user:${userId}`).emit('advert_notification', {
+        type: 'advert',
+        ...notification
+      });
+    });
+  }
+
   // Join user to event room for event-specific notifications
   @SubscribeMessage('join_event')
   async handleJoinEvent(@ConnectedSocket() client: Socket, @MessageBody() data: { eventId: string }) {
