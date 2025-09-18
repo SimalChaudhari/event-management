@@ -29,6 +29,7 @@ const PrivacyPolicy = () => {
     }, [termsConditions]);
 
     const fetchTermsConditions = async () => {
+        setInitialLoading(true);
         try {
             await dispatch(getTermsConditions());
         } catch (error) {
@@ -57,7 +58,7 @@ const PrivacyPolicy = () => {
     if (initialLoading) {
         return (
             <div style={{ background: '#fff', borderRadius: 10, padding: 24 }}>
-                <h1>Settings</h1>
+                <h4>Settings</h4>
                 <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>
             </div>
         );
@@ -65,9 +66,9 @@ const PrivacyPolicy = () => {
 
     return (
         <div style={{ background: '#fff', borderRadius: 10, padding: 24 }}>
-            <h1>Settings</h1>
+            <h4>Settings</h4>
             <div style={{ marginTop: 24 }}>
-                <label style={{ fontWeight: 600, fontSize: 18, marginBottom: 8, display: 'block' }}>Term & Conditions</label>
+                <label style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'block' }}>Term & Conditions</label>
                 
                 <SettingsEditor
                     data={content}

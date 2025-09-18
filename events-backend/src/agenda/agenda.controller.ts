@@ -20,6 +20,8 @@ import {
   CreateMeetingRequestDto,
   RespondToMeetingRequestDto,
   RescheduleMeetingDto,
+  GetMonthlyAgendaDto,
+  MonthlyAgendaResponseDto,
 } from './agenda.dto';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
@@ -459,6 +461,108 @@ export class AgendaController {
       this.errorHandler.logError(
         error,
         'All meetings ICS download',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  // Get monthly agenda grouped by date
+  @Get('calendar')
+  async getMonthlyAgenda(
+    @Request() req: any,
+    @Res() response: Response,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('day') day?: string,
+  ) {
+    try {
+      const currentDate = new Date();
+      
+      // If no parameters provided at all, default to current date
+      if (!month && !year && !day) {
+        const finalMonth = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+        const finalYear = currentDate.getFullYear().toString();
+        const finalDay = currentDate.getDate().toString().padStart(2, '0');
+        
+        const monthlyAgenda = await this.agendaService.getMonthlyAgenda(
+          req.user.id,
+          finalMonth,
+          finalYear,
+          finalDay,
+        );
+
+        // Calculate total count
+        const totalCount = Object.values(monthlyAgenda).reduce((sum, items) => sum + items.length, 0);
+        
+        const successResponse = {
+          success: true,
+          message: 'Daily agenda retrieved successfully',
+          length: totalCount,
+
+          data: monthlyAgenda,
+          metadata: {
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        return response.status(HttpStatus.OK).json(successResponse);
+      }
+      
+      // Default missing month/year to current values, but don't default day
+      const finalMonth = month || (currentDate.getMonth() + 1).toString().padStart(2, '0');
+      const finalYear = year || currentDate.getFullYear().toString();
+      const finalDay = day; // Only use day if explicitly provided
+
+      // Validate month format (01-12)
+      if (!/^(0[1-9]|1[0-2])$/.test(finalMonth)) {
+        throw new BadRequestException('Month must be in MM format (01-12)');
+      }
+
+      // Validate year format (YYYY)
+      if (!/^\d{4}$/.test(finalYear)) {
+        throw new BadRequestException('Year must be in YYYY format');
+      }
+
+      // Validate day format (01-31) only if day is provided
+      if (finalDay && !/^(0[1-9]|[12][0-9]|3[01])$/.test(finalDay)) {
+        throw new BadRequestException('Day must be in DD format (01-31)');
+      }
+
+      // Validate that the date is valid only if day is provided
+      if (finalDay) {
+        const testDate = new Date(`${finalYear}-${finalMonth}-${finalDay}`);
+        if (testDate.getMonth() !== parseInt(finalMonth) - 1) {
+          throw new BadRequestException('Invalid date provided');
+        }
+      }
+
+      const monthlyAgenda = await this.agendaService.getMonthlyAgenda(
+        req.user.id,
+        finalMonth,
+        finalYear,
+        finalDay,
+      );
+
+      // Calculate total count
+      const totalCount = Object.values(monthlyAgenda).reduce((sum, items) => sum + items.length, 0);
+      
+      const successResponse = {
+        success: true,
+        message: 'Monthly agenda retrieved successfully',
+        length: totalCount,
+
+        data: monthlyAgenda,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'Monthly agenda retrieval',
         req.user?.id,
       );
       throw error;

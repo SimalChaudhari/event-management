@@ -12,7 +12,7 @@ const chartData = {
                     type: 'item',
                     icon: 'feather icon-home',
                     url: '/'
-                },
+                }
             ]
         },
 
@@ -27,25 +27,24 @@ const chartData = {
                     id: 'users',
                     title: 'Users',
                     type: 'item',
-                    icon: 'feather icon-user',          // Single person icon
+                    icon: 'feather icon-user', // Single person icon
                     url: '/users'
                 },
-                {
-                    id: 'exhibitors',
-                    title: 'Exhibitor Booths',
-                    type: 'item',
-                    icon: 'feather icon-users',         // Group of people icon
-                    url: '/exhibitors'
-                },
+                // {
+                //     id: 'exhibitors',
+                //     title: 'Exhibitor Booths',
+                //     type: 'item',
+                //     icon: 'feather icon-users', // Group of people icon
+                //     url: '/exhibitors'
+                // },
                 {
                     id: 'speakers',
                     title: 'Speakers',
                     type: 'item',
-                    icon: 'feather icon-mic',           // Microphone icon for speakers
+                    icon: 'feather icon-mic', // Microphone icon for speakers
                     url: '/speakers'
                 }
             ]
-            
         },
 
         {
@@ -54,7 +53,6 @@ const chartData = {
             type: 'group',
             icon: 'icon-monitor',
             children: [
-              
                 {
                     id: 'events',
                     title: 'Events',
@@ -65,7 +63,7 @@ const chartData = {
                             id: 'all-events',
                             title: 'All Events',
                             type: 'item',
-                            url: '/events/event-list',
+                            url: '/events/event-list'
                         },
                         {
                             id: 'upcoming-events',
@@ -85,41 +83,63 @@ const chartData = {
                         }
                     ]
                 },
-              
                 {
-                    id: 'categories',
-                    title: 'Categories',
-                    type: 'item',
-                    icon: 'feather icon-tag',
-                    url: '/categories'
+                    id: 'Business Hub',
+                    title: 'Business Hub',
+                    type: 'collapse',
+                    icon: 'feather icon-briefcase',
+                    children: [
+                        {
+                            id: 'exhibitors',
+                            title: 'Exhibitor Booths',
+                            type: 'item',
+                            // icon: 'feather icon-users', // Group of people icon
+                            url: '/exhibitors'
+                        },
+                        {
+                            id: 'withrawal ',
+                            title: 'Withdrawal Requests',
+                            type: 'item',
+                            // icon: 'feather icon-credit-card',
+                            url: '/withrawal'
+                        }
+                    ]
                 },
+
                 {
-                    id: 'surveys',
-                    title: 'Surveys',
-                    type: 'item',
-                    icon: 'feather icon-clipboard',
-                    url: '/surveys'
-                },
-               
-                {
-                    id: 'order ',
-                    title: 'Orders ',
-                    type: 'item',
-                    icon: 'feather icon-shopping-cart',
-                    badge: {
-                        title: 'New',
-                        type: 'badge-success'
-                    },
-                    url: '/order'
-                },
-                {
-                    id: 'withrawal ',
-                    title: 'Withdrawal Requests',
-                    type: 'item',
-                    icon: 'feather icon-credit-card',
-                    url: '/withrawal'
-                },
-            
+                    id: 'Module',
+                    title: 'Module',
+                    type: 'collapse',
+                    icon: 'feather icon-package',
+                    children: [
+                        {
+                            id: 'categories',
+                            title: 'Categories',
+                            type: 'item',
+                            // icon: 'feather icon-tag',
+                            url: '/categories'
+                        },
+                        {
+                            id: 'surveys',
+                            title: 'Surveys',
+                            type: 'item',
+                            // icon: 'feather icon-clipboard',
+                            url: '/surveys'
+                        },
+
+                        {
+                            id: 'order ',
+                            title: 'Orders ',
+                            type: 'item',
+                            // icon: 'feather icon-shopping-cart',
+                            badge: {
+                                title: 'New',
+                                type: 'badge-success'
+                            },
+                            url: '/order'
+                        }
+                    ]
+                }
             ]
         },
         {
@@ -128,7 +148,12 @@ const chartData = {
             type: 'group',
             icon: 'icon-ui',
             children: [
-              
+                {
+                    id: 'Media Library',
+                    title: 'Media Library',
+                    type: 'collapse',
+                    icon: 'feather icon-image',
+                    children: [
                 {
                     id: 'gallery',
                     title: 'Gallery',
@@ -144,26 +169,13 @@ const chartData = {
                     url: '/media-manager/banner-management'
                 }
             ]
-        },
-        {
-            id: 'reports',
-            title: 'Reports',
-            type: 'group',
-            icon: 'icon-ui',
-            children: [
-                {
-                    id: 'reports',
-                    title: 'Reports',
-                    type: 'item',
-                    icon: 'feather icon-bar-chart',
-                    url: '/reports'
-                }
+            }
             ]
         },
-        // Settings 
+        // Settings
         {
             id: 'system-config',
-            title: 'System Configuration',
+            title: 'Configuration & Reports',
             type: 'group',
             icon: 'icon-ui',
             children: [
@@ -177,28 +189,36 @@ const chartData = {
                             id: 'profile',
                             title: 'Profile',
                             type: 'item',
-                           
+
                             url: '/profile'
                         },
                         {
                             id: 'terms-conditions',
                             title: 'Terms and Conditions',
                             type: 'item',
-                           
+
                             url: '/settings/terms-conditions'
                         },
                         {
                             id: 'privacy-policy',
                             title: 'Privacy Policy',
                             type: 'item',
-                          
+
                             url: '/settings/privacy-policy'
-                        },
-                     
+                        }
                     ]
-                }
+                },
+                {
+                    id: 'reports',
+                    title: 'Reports',
+                    type: 'item',
+                    icon: 'feather icon-bar-chart',
+                    url: '/reports'
+                   
+                },
             ]
         },
+     
     ]
 };
 export default chartData;

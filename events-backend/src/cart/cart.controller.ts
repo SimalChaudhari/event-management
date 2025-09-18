@@ -100,5 +100,47 @@ export class CartController {
         const result = await this.cartService.deleteCart(id, userId);
         return response.status(200).json(result);
     }
+
+
+    // Step 1: Get cart items (basic display without coupon)
+    @Post('get-by-ids')
+    async getCartItemsByIds(
+        @Body() body: { cartIds: string[] },
+        @Request() req: any,
+        @Res() response: Response
+    ) {
+        const userId = req.user.id;
+        const result = await this.cartService.getCartItemsByIds(userId, body.cartIds);
+        return response.status(200).json({
+            success: true,
+            message: `${result.totalCount} items retrieved`,
+            data: result
+        });
+    }
+
+    // Step 2: Apply coupon (separate API)
+    @Post('apply-coupon')
+    async applyCoupon(
+        @Body() body: { cartIds: string[]; couponCode: string },
+        @Request() req: any,
+        @Res() response: Response
+    ) {
+        try {
+            const userId = req.user.id;
+            const result = await this.cartService.applyCoupon(userId, body.cartIds, body.couponCode);
+            return response.status(200).json({
+                success: true,
+                message: `Coupon ${body.couponCode} applied successfully`,
+                data: result
+            });
+        } catch (error: any) {
+            return response.status(400).json({
+                success: false,
+                message: error.message || 'Failed to apply coupon'
+            });
+        }
+    }
+
+
     
 }

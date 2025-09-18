@@ -33,6 +33,8 @@ import { QnaModule } from 'qna/qna.module';
 import { ChatModule } from './chat/chat.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { ContactInfoModule } from './contact-info/contact-info.module';
+import { OrderModule } from './order/order.module';
+import { CheckoutModule } from './checkout/checkout.module';
 
 @Module({
   imports: [
@@ -61,7 +63,7 @@ import { ContactInfoModule } from './contact-info/contact-info.module';
     QnaModule,
     PollingModule,
     EventModule, AgendaModule, AgendaCategoryModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
-    ChatModule, AttendanceModule, ContactInfoModule,
+    ChatModule, AttendanceModule, ContactInfoModule, OrderModule, CheckoutModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

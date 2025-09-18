@@ -32,6 +32,13 @@ export interface FormattedAgenda {
     lastName: string;
     email: string;
   } | null;
+  eventInfo?: {
+    id: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    location?: string;
+  } | null;
 }
 
 export class AgendaUtils {
@@ -184,7 +191,14 @@ export class AgendaUtils {
       durationFormatted: this.formatDuration(agenda.duration),
       startTime: agenda.time,
       endTime: this.calculateEndTime(agenda.time, agenda.duration),
-      meetingWith: null
+      meetingWith: null,
+      eventInfo: agenda.event ? {
+        id: agenda.event.id,
+        name: agenda.event.name,
+        startDate: agenda.event.startDate,
+        endDate: agenda.event.endDate,
+        location: agenda.event.location
+      } : null
     }));
   }
 
@@ -203,10 +217,10 @@ export class AgendaUtils {
     return agendas.map(agenda => {
       let meetingWith = null;
 
-      // Determine who the meeting is with based on user roles
-      if (agenda.isMeetingRequest && currentUserId) {
+      // Determine who the meeting is with based on user roles (for ALL meetings, not just requests)
+      if (currentUserId) {
         if (agenda.userId === currentUserId && agenda.createdBy !== currentUserId) {
-          // Current user is recipient, meeting is with creator
+          // Current user is recipient/participant, meeting is with creator
           const creator = creators.get(agenda.createdBy);
           if (creator) {
             meetingWith = {
@@ -256,7 +270,14 @@ export class AgendaUtils {
         durationFormatted: this.formatDuration(agenda.duration),
         startTime: agenda.time,
         endTime: this.calculateEndTime(agenda.time, agenda.duration),
-        meetingWith
+        meetingWith,
+        eventInfo: agenda.event ? {
+          id: agenda.event.id,
+          name: agenda.event.name,
+          startDate: agenda.event.startDate,
+          endDate: agenda.event.endDate,
+          location: agenda.event.location
+        } : null
       };
     });
   }

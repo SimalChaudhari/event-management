@@ -22,3 +22,31 @@ export class Cart {
     @UpdateDateColumn()
     updatedAt!: Date;
 }
+
+// New entity for user cart preferences (coupon & card details)
+@Entity('user_cart_preferences')
+export class UserCartPreference {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column({ type: 'uuid' })
+    userId!: string; // User ID
+
+    @Column({ type: 'varchar', nullable: true })
+    appliedCoupon?: string; // Currently applied coupon code
+
+    @Column({ type: 'decimal', nullable: true })
+    couponDiscount?: number; // Discount amount from coupon
+
+    @Column({ type: 'varchar', nullable: true })
+    selectedCardId?: string; // Selected card ID
+
+    @Column({ type: 'json', nullable: true })
+    savedCards?: any[]; // Array of saved cards
+
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @UpdateDateColumn()
+    updatedAt!: Date;
+}

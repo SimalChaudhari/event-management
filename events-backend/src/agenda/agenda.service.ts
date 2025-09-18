@@ -9,7 +9,10 @@ import { AgendaCategory } from './agenda-category.entity';
 import { 
   CreateMeetingRequestDto,
   RespondToMeetingRequestDto,
-  RescheduleMeetingDto
+  RescheduleMeetingDto,
+  GetMonthlyAgendaDto,
+  AgendaItemDto,
+  MonthlyAgendaResponseDto
 } from './agenda.dto';
 import { Event } from '../event/event.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
@@ -1588,6 +1591,122 @@ export class AgendaService {
       console.error('Failed to send cancellation notifications:', errorMessage);
       // Don't fail the cancellation if notifications fail
     }
+  }
+
+  // New method for getting monthly agenda grouped by date
+  async getMonthlyAgenda(
+    userId: string,
+    month: string,
+    year: string,
+    day?: string
+  ): Promise<MonthlyAgendaResponseDto> {
+    try {
+      // Get all events that the user is registered for
+      const userRegistrations = await this.registerEventRepository.find({
+        where: { 
+          userId, 
+          isRegister: true,
+          status: Status.Sucesss
+        }
+      });
+
+      if (userRegistrations.length === 0) {
+        // Return empty object if user is not registered for any events
+        return {};
+      }
+
+      // Extract event IDs from registrations
+      const registeredEventIds = userRegistrations.map(reg => reg.eventId);
+
+      // Create date range based on whether day filter is provided
+      let startDate: Date;
+      let endDate: Date;
+      
+      if (day) {
+        // If day is provided, filter for specific day
+        startDate = new Date(`${year}-${month}-${day}`);
+        endDate = new Date(startDate);
+        endDate.setHours(23, 59, 59, 999); // End of the specific day
+      } else {
+        // If no day provided, filter for entire month
+        startDate = new Date(`${year}-${month}-01`);
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of month
+        endDate.setHours(23, 59, 59, 999); // End of the last day of month
+      }
+
+      // Debug logging (can be removed in production)
+      // console.log('Date filtering debug:', { month, year, day, startDate, endDate, registeredEventIds, userId });
+
+      // Build query to get agenda items for the specified month/year from all registered events
+      const queryBuilder = this.agendaRepository
+        .createQueryBuilder('agenda')
+        .leftJoinAndSelect('agenda.category', 'category')
+        .leftJoinAndSelect('agenda.event', 'event')
+        .leftJoinAndSelect('agenda.user', 'user')
+        .leftJoinAndSelect('agenda.creator', 'creator')
+        .where('(agenda.userId = :userId OR agenda.createdBy = :userId)', { userId })
+        .andWhere('agenda.isActive = :isActive', { isActive: true })
+        .andWhere('agenda.meetingDate >= :startDate', { startDate })
+        .andWhere('agenda.meetingDate <= :endDate', { endDate })
+        .andWhere('agenda.eventId IN (:...eventIds)', { eventIds: registeredEventIds });
+
+      // Order by meeting date and time
+      queryBuilder.orderBy('agenda.meetingDate', 'ASC').addOrderBy('agenda.time', 'ASC');
+
+      const agendaItems = await queryBuilder.getMany();
+
+      // Debug logging for query results (can be removed in production)
+      // console.log('Query results debug:', { totalAgendaItems: agendaItems.length });
+
+      // Get all unique creator IDs to fetch their information
+      const creatorIds = [...new Set(agendaItems.map(item => item.createdBy))];
+      
+      // Fetch creator user information if there are any creators
+      let creators = new Map();
+      if (creatorIds.length > 0) {
+        const creatorUsers = await this.userRepository.find({
+          where: creatorIds.map(id => ({ id })),
+          select: ['id', 'firstName', 'lastName', 'email', 'role', 'profilePicture']
+        });
+        creators = new Map(creatorUsers.map(user => [user.id, user]));
+      }
+
+      // Use AgendaUtils to format the agenda items with user information
+      const formattedAgendas = AgendaUtils.formatAgendasWithUsers(agendaItems, creators, userId);
+
+      // Group formatted agenda items by date
+      const groupedByDate: MonthlyAgendaResponseDto = {};
+
+      for (const item of formattedAgendas) {
+        if (!item.meetingDate) continue;
+
+        // Format date as DD/MM/YYYY
+        const dateKey = this.formatDateKey(item.meetingDate);
+        
+        // Add to grouped result
+        if (!groupedByDate[dateKey]) {
+          groupedByDate[dateKey] = [];
+        }
+        groupedByDate[dateKey].push(item);
+      }
+
+      return groupedByDate;
+
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Monthly agenda retrieval');
+      throw error;
+    }
+  }
+
+  // Helper method to format date as DD/MM/YYYY
+  private formatDateKey(date: Date): string {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString();
+    return `${day}/${month}/${year}`;
   }
 
 

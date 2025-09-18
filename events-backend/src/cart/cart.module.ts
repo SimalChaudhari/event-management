@@ -1,7 +1,7 @@
 // src/modules/cart.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Cart } from './cart.entity';
+import { Cart, UserCartPreference } from './cart.entity';
 import { CartService } from './cart.service';
 import { CartController } from './cart.controller';
 import { JwtModule } from '@nestjs/jwt';
@@ -24,7 +24,7 @@ import { EventAgenda } from 'agenda/agenda.entity';
 
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Cart,Event,EventSpeaker,
+    imports: [TypeOrmModule.forFeature([Cart,UserCartPreference,Event,EventSpeaker,
       Survey,
       UserEntity,
       SurveySession,    // Add this

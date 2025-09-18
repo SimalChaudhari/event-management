@@ -127,4 +127,10 @@ export class EventAgenda {
   })
   @JoinColumn({ name: 'userId' })
   user!: UserEntity;
+
+  @ManyToOne(() => UserEntity, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'createdBy' })
+  creator!: UserEntity;
 }

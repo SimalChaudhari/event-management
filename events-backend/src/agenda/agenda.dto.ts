@@ -299,3 +299,73 @@ export class EventAgendaListResponseDto {
   isMeetingRequest?: boolean;
   meetingDate?: Date;
 }
+
+// DTO for monthly agenda filter
+export class GetMonthlyAgendaDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^(0[1-9]|1[0-2])$/, {
+    message: 'Month must be in MM format (01-12)',
+  })
+  month?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}$/, {
+    message: 'Year must be in YYYY format',
+  })
+  year?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(0[1-9]|[12][0-9]|3[01])$/, {
+    message: 'Day must be in DD format (01-31)',
+  })
+  day?: string;
+}
+
+// Response DTO for monthly agenda grouped by date (using FormattedAgenda from utils)
+export class AgendaItemDto {
+  id!: string;
+  eventId!: string;
+  userId!: string;
+  createdBy!: string;
+  title!: string;
+  time!: string;
+  duration!: number;
+  location?: string;
+  details?: string;
+  category!: {
+    id: string;
+    name: string;
+    color?: string;
+    isActive: boolean;
+  } | null;
+  categoryId!: string;
+  meetingStatus?: string;
+  requestStatus?: string;
+  requestType?: string;
+  meetingNotes?: string;
+  meetingDate?: Date;
+  isMeetingRequest?: boolean;
+  durationFormatted!: string;
+  startTime!: string;
+  endTime!: string;
+  meetingWith?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  eventInfo?: {
+    id: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    location?: string;
+  } | null;
+}
+
+export class MonthlyAgendaResponseDto {
+  [date: string]: AgendaItemDto[];
+}

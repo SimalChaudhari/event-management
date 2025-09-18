@@ -414,6 +414,96 @@ export class UserController {
     }
   }
 
+  // Update current user profile (no ID needed, uses JWT token)
+  @Put('profile/update')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('profilePicture', {
+      storage: diskStorage({
+        destination: './uploads/images',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+          return cb(null, true);
+        } else {
+          cb(new Error('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  async updateCurrentUserProfile(
+    @Body() updateData: Partial<UserEntity>,
+    @UploadedFile() file: Express.Multer.File,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    let existingUser = null;
+    
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      // Get existing user first
+      existingUser = await this.userService.getById(userId);
+
+      if (file) {
+        // Delete old file if it exists
+        if (existingUser.profilePicture) {
+          const oldPath = path.join(__dirname, '..', '..', existingUser.profilePicture);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+
+        updateData.profilePicture = `uploads/images/${file.filename}`;
+      }
+
+      const result = await this.userService.update(userId, updateData);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Profile updated successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      // If user not found or update failed, delete newly uploaded file
+      if (file) {
+        const uploadedPath = path.join(__dirname, '..', '..', 'uploads', 'images', file.filename);
+        if (fs.existsSync(uploadedPath)) {
+          fs.unlinkSync(uploadedPath);
+        }
+      }
+      
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        this.errorHandler.handleFileUploadError(error, 'Profile Picture Upload');
+      }
+      
+      this.errorHandler.logError(error, 'Profile update', req.user?.id);
+      throw error;
+    }
+  }
+
   // Role Switch Endpoint
   /**
    * Switch user role directly
