@@ -200,6 +200,24 @@ export class CheckoutService {
 
     const savedCheckout = await this.checkoutRepository.save(checkout);
 
+    // Get coupon details if coupon code exists
+    let couponDetails = null;
+    if (savedCheckout.couponCode) {
+      try {
+        const coupon = await this.couponService.getCouponByCode(savedCheckout.couponCode);
+        couponDetails = {
+          id: coupon.id,
+          code: coupon.code,
+          discountValue: coupon.discountValue,
+          discountType: coupon.discountType,
+          actualValue: coupon.actualValue,
+          expiryDate: coupon.expiryDate
+        };
+      } catch (error: any) {
+        console.log('⚠️ Could not fetch coupon details:', error.message);
+      }
+    }
+
     return {
       id: savedCheckout.id,
       checkoutId: savedCheckout.checkoutId,
@@ -207,6 +225,7 @@ export class CheckoutService {
       totalAmount: savedCheckout.totalAmount,
       discount: savedCheckout.discount,
       couponCode: savedCheckout.couponCode,
+      coupon: couponDetails, // Add coupon details with ID
       cartItems: validatedCartItems,
       user: {
         id: user.id,

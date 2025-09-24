@@ -106,7 +106,7 @@ export class CartController {
     async createCheckout(
         @Body() body: { 
             selectedCartIds: string[],
-            couponCode?: string  // Optional - can be null or empty
+            couponId?: string  // Optional - can be null or empty
         },
         @Request() req: any,
         @Res() response: Response
@@ -140,9 +140,13 @@ export class CartController {
             }
 
             // Apply coupon if provided (optional)
-            if (body.couponCode && body.couponCode.trim() !== '') {
+            if (body.couponId && body.couponId.trim() !== '') {
                 try {
-                    const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, body.couponCode);
+                    // Get coupon by ID first, then apply using the code
+                    const couponService = this.cartService['couponService']; // Access coupon service
+                    const coupon = await couponService.getCouponById(body.couponId);
+                    
+                    const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, coupon.code);
                     // Update result with coupon data
                     result = {
                         ...result,
@@ -153,7 +157,7 @@ export class CartController {
                 } catch (error: any) {
                     return response.status(400).json({
                         success: false,
-                        message: error.message || 'Invalid coupon code',
+                        message: error.message || 'Invalid coupon ID',
                         error: error.message
                     });
                 }
@@ -172,10 +176,18 @@ export class CartController {
             const finalAmount = totalAmount - discount;
 
             // Create checkout DTO
+            let couponCodeForCheckout = undefined;
+            if (body.couponId && body.couponId.trim() !== '') {
+                // Get coupon code from coupon ID
+                const couponService = this.cartService['couponService'];
+                const coupon = await couponService.getCouponById(body.couponId);
+                couponCodeForCheckout = coupon.code;
+            }
+
             const checkoutDto: CreateCheckoutDto = {
                 cartItems: checkoutItems,
                 totalAmount: finalAmount,
-                couponCode: body.couponCode || undefined,
+                couponCode: couponCodeForCheckout,
                 useSelectedItemsOnly: true,
             };
 
@@ -183,39 +195,60 @@ export class CartController {
             const checkout = await this.checkoutService.createCheckout(userId, checkoutDto);
 
             // Determine success message based on coupon application
-            const successMessage = body.couponCode && body.couponCode.trim() !== '' 
+            const successMessage = body.couponId && body.couponId.trim() !== '' 
                 ? 'Checkout session created successfully with coupon applied'
                 : 'Checkout session created successfully';
+
+            // Prepare response data based on whether coupon is applied
+            const responseData: any = {
+                checkoutId: checkout.checkoutId,
+                status: checkout.status,
+                totalAmount: body.couponId && body.couponId.trim() !== '' 
+                    ? finalAmount  // Show discounted amount when coupon applied
+                    : totalAmount, // Show original amount when no coupon
+                cartItems: checkout.cartItems,
+                itemCount: checkout.cartItems.length,
+                user: checkout.user,
+                createdAt: checkout.createdAt,
+                // Payment URLs and methods will be available in the checkout session
+                paymentMethods: {
+                    inAppPayment: true,
+                    savedPaymentMethods: true,
+                    cardValidation: true
+                }
+            };
+
+            // Add coupon-related fields only if coupon is applied
+            if (body.couponId && body.couponId.trim() !== '') {
+                responseData.couponCode = checkout.couponCode;
+                responseData.coupon = checkout.coupon;
+                responseData.couponApplied = result.couponApplied || null;
+                responseData.discount = discount;
+                responseData.originalTotal = totalAmount;
+                
+                // Price breakdown with discount
+                responseData.priceBreakdown = {
+                    subtotal: totalAmount, // Original total
+                    discount: discount, // Discount applied
+                    total: finalAmount, // Final amount after discount
+                    currency: 'USD',
+                    gstInclusive: true
+                };
+            } else {
+                // Price breakdown without discount
+                responseData.priceBreakdown = {
+                    subtotal: totalAmount, // Same as total when no discount
+                    discount: 0, // No discount
+                    total: totalAmount, // Same as subtotal
+                    currency: 'USD',
+                    gstInclusive: true
+                };
+            }
 
             return response.status(201).json({
                 success: true,
                 message: successMessage,
-                data: {
-                    checkoutId: checkout.checkoutId,
-                    status: checkout.status,
-                    totalAmount: checkout.totalAmount,
-                    discount: checkout.discount,
-                    couponCode: checkout.couponCode,
-                    couponApplied: result.couponApplied || null,
-                    cartItems: checkout.cartItems,
-                    itemCount: checkout.cartItems.length,
-                    user: checkout.user,
-                    createdAt: checkout.createdAt,
-                    // Price breakdown
-                    priceBreakdown: {
-                        subtotal: totalAmount,
-                        discount: discount,
-                        total: finalAmount,
-                        currency: 'USD',
-                        gstInclusive: true
-                    },
-                    // Payment URLs and methods will be available in the checkout session
-                    paymentMethods: {
-                        inAppPayment: true,
-                        savedPaymentMethods: true,
-                        cardValidation: true
-                    }
-                }
+                data: responseData
             });
 
         } catch (error: any) {
