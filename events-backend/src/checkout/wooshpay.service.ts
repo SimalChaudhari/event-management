@@ -144,7 +144,6 @@ export class WooShPayService {
 
       return response.data;
     } catch (error: any) {
-      console.log(error);
       this.logger.error(`API request failed`, {
         endpoint,
         status: error.response?.status,

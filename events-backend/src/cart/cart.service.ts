@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cart, UserCartPreference } from './cart.entity';
 import { CartDto } from './cart.dto';
 import { EventService } from 'event/event.service';
+import { CouponService } from 'coupon/coupon.service';
 
 @Injectable()
 export class CartService {
@@ -14,6 +15,7 @@ export class CartService {
         @InjectRepository(UserCartPreference)
         private userCartPreferenceRepository: Repository<UserCartPreference>,
         private eventService: EventService, // Inject EventService
+        private couponService: CouponService, // Inject CouponService
     ) {}
 
     async cartExists(userId: string, eventId: string): Promise<boolean> {
@@ -32,7 +34,7 @@ export class CartService {
         const enrichedCarts = await Promise.all(
             carts.map(async (cart) => {
                 const event = await this.eventService.getEventById(cart.eventId);
-                const { userId, eventId, ...cartDetails } = cart;
+                const { userId, ...cartDetails } = cart; // Keep eventId in cartDetails
     
                 return {
                     ...cartDetails,
@@ -100,6 +102,7 @@ export class CartService {
                 
                 return {
                     cartId: cart.id,
+                    eventId: cart.eventId, // Add eventId to the response
                     eventName: event.name,
                     price: Number(event.price || 0),
                     image: event.images && event.images.length > 0 
@@ -112,7 +115,7 @@ export class CartService {
             })
         );
 
-        // Check if user has applied coupon
+        // Check if user has applied coupon to these specific cart items
         const userPreference = await this.userCartPreferenceRepository.findOne({
             where: { userId }
         });
@@ -120,26 +123,9 @@ export class CartService {
         let discount = 0;
         let couponApplied = null;
         
-        if (userPreference && userPreference.appliedCoupon) {
-            discount = Number(userPreference.couponDiscount || 0);
-            
-            // Get coupon details
-            const couponDiscounts: Record<string, { type: string; value: number }> = {
-                'SAVE10': { type: 'percentage', value: 10 },
-                'SAVE20': { type: 'percentage', value: 20 },
-                'SAVE50': { type: 'percentage', value: 50 },
-                'FLAT100': { type: 'flat', value: 100 }
-            };
-
-            const couponInfo = couponDiscounts[userPreference.appliedCoupon];
-            if (couponInfo) {
-                couponApplied = {
-                    code: userPreference.appliedCoupon,
-                    discount: discount,
-                    type: couponInfo.type
-                };
-            }
-        }
+        // Only apply coupon if it was specifically applied to these cart items
+        // For now, we'll not apply any coupon unless explicitly requested
+        // This prevents automatic coupon application to new cart items
 
         const finalAmount = Math.max(0, totalAmount - discount);
 
@@ -150,8 +136,21 @@ export class CartService {
             discount,
             finalAmount,
             currency: 'USD',
-            couponApplied
+            couponApplied: null
         };
+    }
+
+    // Clear coupon preferences for user
+    async clearCouponPreferences(userId: string) {
+        const userPreference = await this.userCartPreferenceRepository.findOne({
+            where: { userId }
+        });
+
+        if (userPreference) {
+            userPreference.appliedCoupon = undefined;
+            userPreference.couponDiscount = 0;
+            await this.userCartPreferenceRepository.save(userPreference);
+        }
     }
 
     // Step 2: Apply coupon and save to database
@@ -159,28 +158,14 @@ export class CartService {
         // Get cart items total
         const cartData = await this.getCartItemsByIds(userId, cartIds);
         
-        // Validate coupon
-        const couponDiscounts: Record<string, { type: string; value: number }> = {
-            'SAVE10': { type: 'percentage', value: 10 },
-            'SAVE20': { type: 'percentage', value: 20 },
-            'SAVE50': { type: 'percentage', value: 50 },
-            'FLAT100': { type: 'flat', value: 100 }
-        };
+        // Use CouponService to validate and calculate discount
+        const couponResult = await this.couponService.validateAndApplyCoupon(
+            couponCode, 
+            userId, 
+            cartData.totalAmount
+        );
 
-        if (!couponDiscounts[couponCode]) {
-            throw new Error('Invalid coupon code');
-        }
-
-        const coupon = couponDiscounts[couponCode];
-        let discount = 0;
-
-        if (coupon.type === 'flat') {
-            discount = coupon.value;
-        } else {
-            discount = (cartData.totalAmount * coupon.value) / 100;
-        }
-
-        const finalAmount = Math.max(0, cartData.totalAmount - discount);
+        const { coupon, discount, finalAmount } = couponResult;
 
         // Save/Update user cart preferences
         let userPreference = await this.userCartPreferenceRepository.findOne({
@@ -207,11 +192,29 @@ export class CartService {
             couponApplied: {
                 code: couponCode,
                 discount: discount,
-                type: coupon.type
+                type: coupon.discountType,
+                couponId: coupon.id,
+                actualValue: coupon.actualValue,
+                discountValue: coupon.discountValue
             }
         };
     }
 
+    // Record coupon usage when order is completed
+    async recordCouponUsage(userId: string, orderId: string) {
+        const userPreference = await this.userCartPreferenceRepository.findOne({
+            where: { userId }
+        });
+
+        if (userPreference && userPreference.appliedCoupon) {
+            // Get coupon by code to get couponId
+            const coupon = await this.couponService.getCouponByCode(userPreference.appliedCoupon);
+            
+            if (coupon) {
+                await this.couponService.recordCouponUsage(userId, coupon.id, orderId);
+            }
+        }
+    }
 
     
 }

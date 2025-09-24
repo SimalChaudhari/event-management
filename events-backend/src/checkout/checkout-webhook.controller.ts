@@ -86,5 +86,45 @@ export class CheckoutWebhookController {
         }
     }
 
+    // Test webhook endpoint for development (remove in production)
+    @Post('webhook/test')
+    @HttpCode(HttpStatus.OK)
+    async testWebhook(
+        @Body() testData: any,
+        @Res() response: Response
+    ) {
+        console.log('🧪 Test webhook received:', testData);
+        
+        try {
+            // Simulate a successful payment webhook
+            const mockWebhookData = {
+                type: 'payment_intent.succeeded',
+                data: {
+                    object: {
+                        id: testData.paymentIntentId || 'pi_test_1234567890',
+                        status: 'succeeded',
+                        metadata: {
+                            checkout_id: testData.checkoutId
+                        }
+                    }
+                }
+            };
+            
+            await this.checkoutService.processPaymentCompletion(mockWebhookData);
+            
+            return response.status(HttpStatus.OK).json({
+                success: true,
+                message: 'Test webhook processed successfully',
+                data: mockWebhookData
+            });
+        } catch (error: any) {
+            console.error('❌ Test webhook error:', error);
+            return response.status(HttpStatus.BAD_REQUEST).json({
+                success: false,
+                message: error.message || 'Test webhook failed'
+            });
+        }
+    }
+
     // Only real webhook processing - test endpoints removed for production
 }

@@ -40,6 +40,14 @@ export class CouponService {
     return coupon;
   }
 
+  async getCouponByCode(code: string) {
+    const coupon = await this.couponRepo.findOne({ where: { code } });
+    if (!coupon) {
+      throw new NotFoundException('Coupon not found');
+    }
+    return coupon;
+  }
+
   async validateAndApplyCoupon(code: string, userId: string, orderAmount: number): Promise<any> {
     // 1. Check if coupon exists and is active
     const coupon = await this.couponRepo.findOne({ where: { code } });

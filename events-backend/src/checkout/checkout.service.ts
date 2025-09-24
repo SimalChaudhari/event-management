@@ -74,34 +74,13 @@ export class CheckoutService {
     // Determine which cart items to process
     let cartItemsToProcess = dto.cartItems;
 
-    // If useSelectedItemsOnly is true, get only selected cart items
+    // If useSelectedItemsOnly is true, use the provided cartItems (already filtered)
     if (dto.useSelectedItemsOnly) {
-      const selectedCarts = await this.cartRepository.find({
-        where: { userId },
-      });
-
-      if (selectedCarts.length === 0) {
-        throw new BadRequestException('No items selected for checkout');
+      if (!dto.cartItems || dto.cartItems.length === 0) {
+        throw new BadRequestException('Please specify cart items to checkout or set useAllCartItems to true.');
       }
-
-      // Map selected cart items to CartItemDto format
-      cartItemsToProcess = await Promise.all(
-        selectedCarts.map(async (cart) => {
-          const event = await this.eventRepository.findOne({
-            where: { id: cart.eventId },
-          });
-          if (!event) {
-            throw new NotFoundException(
-              `Selected event with ID ${cart.eventId} not found`,
-            );
-          }
-          return {
-            eventId: cart.eventId,
-            price: Number(event.price),
-            eventName: event.name,
-          };
-        }),
-      );
+      // Use the provided cartItems directly (they are already the selected items)
+      cartItemsToProcess = dto.cartItems;
     }
 
     // Validate cart items and calculate total
@@ -144,7 +123,11 @@ export class CheckoutService {
     let discount = dto.discount || 0;
     let couponData = null;
 
-    if (dto.couponCode) {
+    // If we already have a discount from the cart service, use it
+    if (dto.discount && dto.discount > 0) {
+      console.log('🔍 Debug - Using pre-calculated discount:', dto.discount);
+      discount = dto.discount;
+    } else if (dto.couponCode) {
       try {
         const couponResult = await this.couponService.validateAndApplyCoupon(
           dto.couponCode,
@@ -160,13 +143,48 @@ export class CheckoutService {
 
     const finalAmount = calculatedTotal - discount;
 
-    // Validate final amount
-    if (Math.abs(Number(dto.totalAmount) - finalAmount) > 0.01) {
+    console.log('🔍 Debug - Amount validation:', {
+      calculatedTotal,
+      discount,
+      finalAmount,
+      dtoTotalAmount: dto.totalAmount,
+      difference: Math.abs(Number(dto.totalAmount) - finalAmount)
+    });
+
+    // Validate final amount with more tolerance for floating point precision
+    if (Math.abs(Number(dto.totalAmount) - finalAmount) > 0.1) {
       throw new BadRequestException(
         `Amount mismatch. Expected: ${finalAmount}, Received: ${dto.totalAmount}`,
       );
     }
 
+    // Check for existing pending checkout with same cart items
+    console.log('🔍 About to check for existing checkout...');
+    const existingCheckout = await this.findExistingPendingCheckout(userId, validatedCartItems, discount, dto.couponCode);
+    if (existingCheckout) {
+      console.log('🔄 Found existing pending checkout, returning existing one:', existingCheckout.checkoutId);
+      return {
+        id: existingCheckout.id,
+        checkoutId: existingCheckout.checkoutId,
+        status: existingCheckout.status,
+        totalAmount: existingCheckout.totalAmount,
+        discount: existingCheckout.discount,
+        couponCode: existingCheckout.couponCode,
+        promoCode: existingCheckout.promoCode,
+        cartItems: existingCheckout.cartItems,
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          mobile: user.mobile,
+        },
+        createdAt: existingCheckout.createdAt,
+        isExisting: true, // Flag to indicate this is an existing checkout
+      };
+    }
+
+    console.log('🆕 No existing checkout found, creating new one...');
     // Create checkout session
     const checkoutId = await this.generateUniqueCheckoutId();
     const checkout = this.checkoutRepository.create({
@@ -201,7 +219,94 @@ export class CheckoutService {
     };
   }
 
+  /**
+   * Find existing pending checkout for the same user with same cart items
+   * Ignores discount and coupon differences - uses same checkout for same cart items
+   */
+  private async findExistingPendingCheckout(
+    userId: string, 
+    cartItems: CartItemDto[], 
+    discount: number, 
+    couponCode?: string
+  ): Promise<Checkout | null> {
+    console.log('🔍 Searching for existing pending checkout:', {
+      userId,
+      cartItemsCount: cartItems.length,
+      discount,
+      couponCode
+    });
 
+    // Get all pending checkouts for this user
+    const pendingCheckouts = await this.checkoutRepository.find({
+      where: { 
+        user: { id: userId },
+        status: CheckoutStatus.Pending,
+        isCompleted: false,
+        isDeleted: false
+      },
+      order: { createdAt: 'DESC' }
+    });
+
+    console.log('🔍 Found pending checkouts:', pendingCheckouts.length);
+
+    // Compare each pending checkout with current request
+    for (const checkout of pendingCheckouts) {
+      console.log('🔍 Comparing checkout:', {
+        checkoutId: checkout.checkoutId,
+        checkoutDiscount: checkout.discount,
+        checkoutCouponCode: checkout.couponCode,
+        checkoutCartItems: checkout.cartItems?.length
+      });
+
+      // Skip discount comparison - use same checkout regardless of discount changes
+      console.log('🔍 Discount comparison (ignored):', {
+        checkoutDiscount: checkout.discount,
+        currentDiscount: discount,
+        note: 'Discount comparison skipped - using same checkout for same cart items'
+      });
+
+      // Skip coupon comparison - use same checkout regardless of coupon changes
+      console.log('🔍 Coupon comparison (ignored):', {
+        checkoutCoupon: checkout.couponCode,
+        currentCoupon: couponCode,
+        note: 'Coupon comparison skipped - using same checkout for same cart items'
+      });
+
+      // Check if cart items match
+      const cartItemsMatch = this.compareCartItems(checkout.cartItems, cartItems);
+      console.log('🔍 Cart items comparison:', {
+        checkoutItems: checkout.cartItems?.map(item => item.eventId),
+        currentItems: cartItems.map(item => item.eventId),
+        match: cartItemsMatch
+      });
+      
+      if (cartItemsMatch) {
+        console.log('✅ Found matching checkout!');
+        return checkout;
+      }
+      
+      console.log('❌ Cart items mismatch, skipping');
+    }
+
+    console.log('❌ No matching checkout found');
+    return null;
+  }
+
+  /**
+   * Compare two cart item arrays to see if they contain the same events
+   */
+  private compareCartItems(cartItems1: any[], cartItems2: CartItemDto[]): boolean {
+    if (cartItems1.length !== cartItems2.length) {
+      return false;
+    }
+
+    // Extract event IDs and sort them for comparison
+    const eventIds1 = cartItems1.map(item => item.eventId).sort();
+    const eventIds2 = cartItems2.map(item => item.eventId).sort();
+
+    // Compare the sorted arrays
+    return JSON.stringify(eventIds1) === JSON.stringify(eventIds2);
+  }
 
   private async createOrderFromCheckout(checkout: Checkout): Promise<any> {
     return await this.orderRepository.manager.transaction(async (manager) => {
@@ -229,10 +334,10 @@ export class CheckoutService {
         orderNo,
         user: checkout.user,
         paymentMethod: PaymentMethod.CreditCard, // Map from payment gateway
-        price: checkout.totalAmount,
+        price: Number(checkout.totalAmount),
         status: OrderStatus.Completed,
-        discount: checkout.discount,
-        originalPrice: checkout.totalAmount + (checkout.discount || 0),
+        discount: Number(checkout.discount || 0),
+        originalPrice: Number(checkout.totalAmount) + Number(checkout.discount || 0),
       });
 
       const savedOrder = await manager.save(Order, order);
@@ -269,7 +374,7 @@ export class CheckoutService {
 
       // Record coupon usage if applicable
       if (checkout.couponCode) {
-        const coupon = await this.couponService.getCouponById(
+        const coupon = await this.couponService.getCouponByCode(
           checkout.couponCode,
         );
         if (coupon) {

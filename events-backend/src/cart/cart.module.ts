@@ -8,6 +8,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { EventService } from 'event/event.service';
 import { Event, EventExhibitor } from 'event/event.entity';
 import { EventModule } from 'event/event.module';
+import { CheckoutService } from 'checkout/checkout.service';
+import { CheckoutModule } from 'checkout/checkout.module';
 import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
@@ -21,6 +23,7 @@ import { UserEntity } from 'user/users.entity';
 import { EventBooth } from 'event/event-booth.entity';
 import { EmailService } from 'service/email.service';
 import { EventAgenda } from 'agenda/agenda.entity';
+import { CouponModule } from 'coupon/coupon.module';
 
 
 @Module({
@@ -37,6 +40,8 @@ import { EventAgenda } from 'agenda/agenda.entity';
       signOptions: { }, // Set your token expiration
     }),
     EventModule, // Add EventModule here
+    CheckoutModule, // Add CheckoutModule for checkout integration
+    CouponModule, // Add CouponModule for coupon integration
   ],
     providers: [CartService,EventService,SurveyService,ErrorHandlerService,EmailService],
     controllers: [CartController],
