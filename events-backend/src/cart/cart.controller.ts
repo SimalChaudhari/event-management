@@ -103,7 +103,7 @@ export class CartController {
 
 
     // Step 1: Get cart items (basic display without coupon)
-    @Post('get-by-ids')
+    @Post('initiate')
     async getCartItemsByIds(
         @Body() body: { cartIds: string[] },
         @Request() req: any,

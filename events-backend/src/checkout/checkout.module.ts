@@ -2,8 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
+import { CheckoutWebhookController } from './checkout-webhook.controller';
+import { PaymentMethodController } from './payment-method.controller';
+import { CardValidationController } from './card-validation.controller';
 
 import { WooShPayService } from './wooshpay.service';
+import { PaymentMethodService } from './payment-method.service';
+import { UserPaymentMethod } from './payment-method.entity';
 import { Checkout } from './checkout.entity';
 import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
@@ -20,6 +25,7 @@ import { JwtModule } from '@nestjs/jwt';
     imports: [
         TypeOrmModule.forFeature([
             Checkout,
+            UserPaymentMethod,
             UserEntity,
             Event,
             Cart,
@@ -34,8 +40,8 @@ import { JwtModule } from '@nestjs/jwt';
             signOptions: {},
         }),
     ],
-    providers: [CheckoutService, CouponService, WooShPayService],
-    controllers: [CheckoutController],
+    providers: [CheckoutService, CouponService, WooShPayService, PaymentMethodService],
+    controllers: [CheckoutController, CheckoutWebhookController, PaymentMethodController, CardValidationController],   
     exports: [CheckoutService],
 })
 export class CheckoutModule {}

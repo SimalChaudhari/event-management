@@ -176,7 +176,7 @@ const ViewRegisterEventPage = () => {
             if (image.startsWith('http')) {
                 return image;
             } else {
-                return `${API_URL}/${image.replace(/\\/g, '/')}`;
+                return `${API_URL}/${image?.replace(/\\/g, '/')}`;
             }
         }
         return '';
@@ -1216,7 +1216,7 @@ const ViewRegisterEventPage = () => {
             <ImageModalComponent
                 show={showImageModal}
                 onHide={() => setShowImageModal(false)}
-                imageSrc={getImageSrc(eventData.event.images[currentImageIndex])}
+                imageSrc={getImageSrc(eventData?.event?.images?.[currentImageIndex])}
                 imageAlt={`Event Image ${currentImageIndex + 1}`}
                 downloadFileName={`event-image-${currentImageIndex + 1}.jpg`}
                 currentIndex={currentImageIndex}

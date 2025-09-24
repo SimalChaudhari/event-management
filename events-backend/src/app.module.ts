@@ -2,6 +2,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
+import { SSOModule } from './auth/sso.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
@@ -52,11 +53,12 @@ import { CheckoutModule } from './checkout/checkout.module';
       // },
     }),
     AuthModule,
+    SSOModule,
     SettingModule,
     UserModule,
     AddressModule,
     GalleryModule,
-  
+    
     ExhibitorModule,
     PromotionalOfferModule,
     SurveyModule,

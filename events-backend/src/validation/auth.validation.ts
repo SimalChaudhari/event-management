@@ -199,3 +199,28 @@ export class LinkedInLoginDto {
   @IsString({ message: 'Access token is required' })
   accessToken!: string;
 }
+
+// SSO Provider enum
+export enum SSOProvider {
+  GOOGLE = 'google',
+  FACEBOOK = 'facebook',
+  APPLE = 'apple',
+  LINKEDIN = 'linkedin'
+}
+
+// Unified SSO Login DTO
+export class SSOLoginDto {
+  @IsEnum(SSOProvider, { message: 'Provider must be one of: google, facebook, apple, linkedin' })
+  provider!: SSOProvider;
+
+  @IsString({ message: 'Token is required' })
+  token!: string;
+
+  @IsOptional()
+  @IsString({ message: 'Device info must be a string' })
+  deviceInfo?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Client info must be a string' })
+  clientInfo?: string;
+}

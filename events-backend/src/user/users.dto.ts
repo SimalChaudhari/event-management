@@ -41,6 +41,18 @@ export class UserDto {
   mobile?: string; // Updated field
 
   @IsOptional()
+  @IsString()
+  salutation?: string; // Mr., Mrs., Dr., etc.
+
+  @IsOptional()
+  @IsString()
+  company?: string; // Company/Organization name
+
+  @IsOptional()
+  @IsString()
+  industry?: string; // Industry sector
+
+  @IsOptional()
   @IsBoolean()
   isMember?: boolean; // Updated field
 

@@ -20,10 +20,7 @@ export enum UserRole {
 }
 export enum AuthProvider {
   LOCAL = 'local',
-  GOOGLE = 'google',
-  FACEBOOK = 'facebook',
-  APPLE = 'apple',
-  LINKEDIN = 'linkedin',
+  OAUTH = 'oauth',
 }
 
 @Entity('users')
@@ -43,8 +40,17 @@ export class UserEntity {
   @Column()
   password!: string; // Updated field
 
-  @Column()
-  mobile!: string; // Updated field
+  @Column({ nullable: true })
+  mobile?: string; // Updated field - Made optional for social login
+
+  @Column({ nullable: true })
+  salutation?: string; // Mr., Mrs., Dr., etc.
+
+  @Column({ nullable: true })
+  company?: string; // Company/Organization name
+
+  @Column({ nullable: true })
+  industry?: string; // Industry sector
 
   @Column({
     type: 'enum',

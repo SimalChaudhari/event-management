@@ -8,7 +8,7 @@ import * as dotenv from 'dotenv';
 import { UserEntity } from './../user/users.entity';
 import { AddressEntity } from './../user/address.entity';
 import { EmailService } from './../service/email.service';
-import { SocialAuthService } from './social-auth.service';
+import { OAuthAuthService } from './oauth-auth.service';
 import { AddressService } from './../user/address.service';
 import { ErrorHandlerService } from './../utils/services/error-handler.service';
 
@@ -22,8 +22,8 @@ dotenv.config(); // Load environment variables
   }),
 
 ],
-  providers: [AuthService, SocialAuthService, EmailService, AddressService, ErrorHandlerService],
+  providers: [AuthService, OAuthAuthService, EmailService, AddressService, ErrorHandlerService],
   controllers: [AuthController],
-  exports: [AuthService,SocialAuthService],
+  exports: [AuthService, OAuthAuthService],
 })
 export class AuthModule {}
