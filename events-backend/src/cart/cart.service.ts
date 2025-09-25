@@ -1,5 +1,5 @@
 // src/services/cart.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cart, UserCartPreference } from './cart.entity';
@@ -14,6 +14,7 @@ export class CartService {
         private cartRepository: Repository<Cart>,
         @InjectRepository(UserCartPreference)
         private userCartPreferenceRepository: Repository<UserCartPreference>,
+        @Inject(forwardRef(() => EventService))
         private eventService: EventService, // Inject EventService
         private couponService: CouponService, // Inject CouponService
     ) {}

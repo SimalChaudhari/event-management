@@ -50,6 +50,9 @@ const eventComponents = {
     AddGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
     EditGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
     ViewGallery: React.lazy(() => import('./Pages/Events/gallery/ViewGalleryPage.jsx')),
+    
+    // Q&A
+    QA: React.lazy(() => import('./Pages/Events/qa/QAPage.jsx')),
 };
 
 const MediaManagerComponents = {
@@ -368,6 +371,14 @@ const eventRoutes = [
         exact: true,
         name: 'View Category',
         component: eventComponents.ViewCategory
+    },
+    
+    // Q&A
+    {
+        path: EVENT_PATHS.QA + '/:eventId',
+        exact: true,
+        name: 'Q&A Management',
+        component: eventComponents.QA
     }
 ];
 

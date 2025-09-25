@@ -1,5 +1,5 @@
 // src/services/event.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, forwardRef, Inject } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
@@ -36,6 +36,7 @@ import {
   GlobalSearchUtils,
 } from '../utils/searchEvent';
 import { SpeakerTimeUtils } from '../utils';
+import { QnaUtils } from '../utils/qna.utils';
 
 @Injectable()
 export class EventService {
@@ -67,6 +68,7 @@ export class EventService {
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
+    private readonly qnaUtils: QnaUtils,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -348,11 +350,11 @@ export class EventService {
             registerEventId = registration?.id || null;
           }
 
-          const { exhibitorDescription,surveys, ...eventFiltered } = eventData;
+          const { exhibitorDescription,surveys, ...eventFilteredData } = eventData;
           
           // Build the complete event object
           const completeEvent = {
-            ...eventFiltered,
+            ...eventFilteredData,
             color: getEventColor(event.type),
             documents: formattedDocuments,
             eventStamps: {
@@ -381,6 +383,18 @@ export class EventService {
                   }) || [],
             },
           };
+
+          // Add Q&A data for admin users
+          if (userRole === UserRole.Admin) {
+            try {
+              const qnaData = await this.qnaUtils.getAllQuestionsForEvent(event.id);
+              (completeEvent as any).qnaData = qnaData.data;
+            } catch (error) {
+              // If Q&A data fails to load, continue without it
+              console.warn(`Failed to load Q&A data for event ${event.id}:`, error);
+              (completeEvent as any).qnaData = null;
+            }
+          }
 
           // For global search, we still return the complete event structure
           // but mark it as having a global match if search terms are found
@@ -574,11 +588,11 @@ export class EventService {
         surveys,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
-        ...eventFiltered
+        ...eventFilteredData
       } = eventData;
 
-      return {
-        ...eventFiltered,
+      const eventResponse = {
+        ...eventFilteredData,
         color: getEventColor(event.type),
         speakers: eventSpeakers.map((es) => ({
           ...UserUtils.getBasicSpeakerInfo(es.speaker),
@@ -607,6 +621,20 @@ export class EventService {
         isRegistered: isRegistered,
         registerEventId: registerEventId,
       };
+
+      // Add Q&A data for admin users
+      if (userRole === UserRole.Admin) {
+        try {
+          const qnaData = await this.qnaUtils.getAllQuestionsForEvent(id);
+          (eventResponse as any).qnaData = qnaData.data;
+        } catch (error) {
+          // If Q&A data fails to load, continue without it
+          console.warn(`Failed to load Q&A data for event ${id}:`, error);
+          (eventResponse as any).qnaData = null;
+        }
+      }
+
+      return eventResponse;
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;

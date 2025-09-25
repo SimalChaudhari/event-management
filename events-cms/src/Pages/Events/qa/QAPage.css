@@ -1,0 +1,136 @@
+.qa-page {
+    padding: 20px;
+}
+
+.qa-page .card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+    margin-bottom: 20px;
+}
+
+.qa-page .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.qa-page .table th {
+    background-color: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.qa-page .table td {
+    vertical-align: middle;
+}
+
+.qa-page .btn-group .btn {
+    margin-right: 5px;
+}
+
+.qa-page .btn-group .btn:last-child {
+    margin-right: 0;
+}
+
+.qa-page .badge {
+    font-size: 0.75em;
+}
+
+.qa-page .text-center .display-1 {
+    font-size: 4rem;
+    opacity: 0.3;
+}
+
+.qa-page .statistics-card {
+    transition: transform 0.2s ease-in-out;
+    margin-bottom: 0;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    height: 100%;
+}
+
+.qa-page .statistics-card:hover {
+    transform: translateY(-2px);
+}
+
+.qa-page .statistics-card .card-body {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.qa-page .statistics-card h5 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    line-height: 1.2;
+}
+
+.qa-page .statistics-card small {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.qa-page .row.mb-3 {
+    margin-bottom: 1rem !important;
+}
+
+.qa-page .question-text {
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.qa-page .answer-text {
+    background-color: #f8f9fa;
+    border-left: 3px solid #007bff;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 0 4px 4px 0;
+}
+
+.qa-page .speaker-info {
+    display: flex;
+    align-items: center;
+}
+
+.qa-page .speaker-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 8px;
+}
+
+.qa-page .action-buttons {
+    white-space: nowrap;
+}
+
+.qa-page .status-badges {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .qa-page {
+        padding: 10px;
+    }
+    
+    .qa-page .table {
+        font-size: 0.875rem;
+    }
+    
+    .qa-page .btn-group .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .qa-page .question-text {
+        max-width: 200px;
+    }
+}

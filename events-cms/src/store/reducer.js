@@ -11,6 +11,7 @@ import categoryReducer from './reducer/categoryReducer';
 import settingsReducer from './reducer/settingsReducer';
 import withdrawReducer from './reducer/withdrawReducer';
 import surveyReducer from './reducer/surveyReducer';
+import qaReducer from './reducer/qaReducer';
 import loadingReducer from './reducer/loadingReducer';
 import errorReducer from './reducer/errorReducer';
 import ableReducer from './ableReducer';
@@ -32,6 +33,7 @@ const reducer = combineReducers({
     settings: settingsReducer,
     withdraw: withdrawReducer,
     survey: surveyReducer,
+    qa: qaReducer,
     loading: loadingReducer,
     error: errorReducer
 });

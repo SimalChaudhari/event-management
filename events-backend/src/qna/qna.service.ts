@@ -21,6 +21,7 @@ import {
 import { Event } from 'event/event.entity';
 import { UserEntity, UserRole } from '../user/users.entity';
 import { UserUtils } from '../utils/user.utils';
+import { QnaUtils } from '../utils/qna.utils';
 
 @Injectable()
 export class QnaService {
@@ -31,10 +32,10 @@ export class QnaService {
     private qnaLikeRepository: Repository<QnaLike>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
-
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
+    private readonly qnaUtils: QnaUtils,
   ) {}
 
   // Create Question (Always for a specific speaker)
@@ -97,7 +98,6 @@ export class QnaService {
         answeredBy: null,
       };
     } catch (error: any) {
-   
       if (
         error instanceof ResourceNotFoundException ||
         error instanceof ValidationException
@@ -132,8 +132,6 @@ export class QnaService {
         whereConditions.answeredAt = null;
       }
 
-      // Debug logging
-  
       const questions = await this.qnaQuestionRepository.find({
         where: whereConditions,
         relations: ['askedBy', 'event', 'speaker', 'answeredByUser', 'likes'],
@@ -227,7 +225,7 @@ export class QnaService {
           id: event.id,
           name: event.name,
         },
-                speaker: UserUtils.getBasicSpeakerInfo(speaker),
+        speaker: UserUtils.getBasicSpeakerInfo(speaker),
         questions: sortedQuestions,
       };
 
@@ -375,10 +373,6 @@ export class QnaService {
       if (!question) {
         throw new ResourceNotFoundException('Question', id);
       }
-
-      // Check if the user answering is admin (you can add role check here)
-      // For now, we'll allow any user to answer (you can modify this logic)
-      // You can check user role from the request context
 
       question.answer = answerDto.answer;
       question.answeredBy = answeredById;
@@ -588,6 +582,11 @@ export class QnaService {
       this.errorHandler.logError(error, 'Delete question');
       this.errorHandler.handleDatabaseError(error, 'Question deletion');
     }
+  }
+
+  // Get All Questions for Event (Admin Only) - Returns all questions for a specific event
+  async getAllQuestionsForEvent(eventId: string) {
+    return await this.qnaUtils.getAllQuestionsForEvent(eventId);
   }
 
   private getSortOrder(sortBy?: QuestionSortBy): any {

@@ -1,5 +1,5 @@
 // src/modules/event.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventService } from './event.service';
 import { EventController } from './event.controller';
@@ -59,5 +59,6 @@ import { PushNotification, UserPermissions, PermissionTemplate } from '../settin
     ],
     providers: [EventService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
     controllers: [EventController],
+    exports: [EventService],
 })
 export class EventModule {}

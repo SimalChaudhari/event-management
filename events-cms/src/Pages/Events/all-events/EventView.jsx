@@ -31,7 +31,7 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery) {
+function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -178,6 +178,10 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-image"></i>
                             </button>
+                            <button type="button" class="btn btn-primary btn-circle btn-sm qa-btn" data-id="${row.id}" title="Q&A" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-message-circle"></i>
+                            </button>
                             <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-edit"></i>
@@ -268,6 +272,14 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
         const eventId = $(this).data('id');
         handleDelete(eventId);
     });
+
+    $(document).on('click', '.qa-btn', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((event) => event.id === eventId);
+        if (dataEvent) {
+            handleQA(dataEvent);
+        }
+    });
 }
 
 const EventView = () => {
@@ -343,13 +355,17 @@ const handleGallery = useCallback(async (data) => {
     }
 }, [dispatch, navigate]);
 
+const handleQA = useCallback((data) => {
+    navigate(`/events/qa/${data.id}`);
+}, [navigate]);
+
     const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
-            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery);
+            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA);
             setCurrentTable(table);
         }
-    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery]);
+    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
 
 
     useEffect(() => {

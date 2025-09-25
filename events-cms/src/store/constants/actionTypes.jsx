@@ -86,3 +86,15 @@ export const SET_BANNER_ERROR = 'SET_BANNER_ERROR';
 // Gallery Action Types
 export const GALLERY_BY_ID = 'GALLERY_BY_ID';
 export const ALL_GALLERIES = 'ALL_GALLERIES';
+
+// QA Action Types
+export const QA_LOADING = 'QA_LOADING';
+export const QA_ERROR = 'QA_ERROR';
+export const QA_QUESTIONS_LIST = 'QA_QUESTIONS_LIST';
+export const QA_QUESTION_BY_ID = 'QA_QUESTION_BY_ID';
+export const ANSWER_QUESTION = 'ANSWER_QUESTION';
+export const PIN_QUESTION = 'PIN_QUESTION';
+export const UNPIN_QUESTION = 'UNPIN_QUESTION';
+export const LIKE_QUESTION = 'LIKE_QUESTION';
+export const UNLIKE_QUESTION = 'UNLIKE_QUESTION';
+export const CLEAR_QA_ERROR = 'CLEAR_QA_ERROR';

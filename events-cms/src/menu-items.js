@@ -27,7 +27,7 @@ const chartData = {
                     id: 'users',
                     title: 'Users',
                     type: 'item',
-                    icon: 'feather icon-user', // Single person icon
+                    icon: 'feather icon-user',
                     url: '/users'
                 },
                 // {
@@ -41,7 +41,7 @@ const chartData = {
                     id: 'speakers',
                     title: 'Speakers',
                     type: 'item',
-                    icon: 'feather icon-mic', // Microphone icon for speakers
+                    icon: 'feather icon-mic',
                     url: '/speakers'
                 }
             ]
@@ -158,14 +158,14 @@ const chartData = {
                     id: 'gallery',
                     title: 'Gallery',
                     type: 'item',
-                    icon: 'feather icon-image',
+                    // icon: 'feather icon-image',
                     url: '/media-manager/gallery'
                 },
                 {
                     id: 'banners',
                     title: 'Banners',
                     type: 'item',
-                    icon: 'feather icon-image',
+                    // icon: 'feather icon-image',
                     url: '/media-manager/banner-management'
                 }
             ]

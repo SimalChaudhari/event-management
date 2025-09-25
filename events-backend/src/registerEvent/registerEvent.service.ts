@@ -285,6 +285,7 @@ export class RegisterEventService {
 
           const event = {
             ...restEvent,
+            registerEventId: registerEvent.id, // Add registerEventId inside event object
             color: getEventColor(registerEvent.event?.type),
             speakers,
             categories,
@@ -341,7 +342,6 @@ export class RegisterEventService {
 
           return {
             ...cleanRegisterEvent,
-            registerEventId: registerEvent.id, // Show primary ID as registerEventId
             event,
             user: cleanedUser,
             isCreatedByAdmin: registerEvent.isCreatedByAdmin,
@@ -496,6 +496,7 @@ export class RegisterEventService {
 
       const event = {
         ...restEvent,
+        registerEventId: registerEvent.id, // Add registerEventId inside event object
         color: getEventColor(registerEvent.event?.type),
         speakers,
         categories,
@@ -545,7 +546,6 @@ export class RegisterEventService {
         message: 'Register event fetched successfully',
         data: {
           ...cleanRegisterEvent,
-          registerEventId: registerEvent.id, // Show primary ID as registerEventId
           event,
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,

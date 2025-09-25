@@ -67,6 +67,9 @@ export const EVENT_PATHS = {
     ADD_GALLERY: '/events/gallery/add',
     EDIT_GALLERY: '/events/gallery/edit',
     VIEW_GALLERY: '/events/gallery/view',
+
+    // Q&A
+    QA: '/events/qa',
 };  
 
 export const MEDIA_MANAGER_PATHS = {

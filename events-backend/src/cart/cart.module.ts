@@ -1,5 +1,5 @@
 // src/modules/cart.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Cart, UserCartPreference } from './cart.entity';
 import { CartService } from './cart.service';
@@ -33,17 +33,18 @@ import { CouponModule } from 'coupon/coupon.module';
       SurveySession,    // Add this
       SurveyResponse,    // Add this
       EventAgenda,
+    
       EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration
     }),
-    EventModule, // Add EventModule here
+    forwardRef(() => EventModule), // Add EventModule here
     CheckoutModule, // Add CheckoutModule for checkout integration
     CouponModule, // Add CouponModule for coupon integration
   ],
-    providers: [CartService,EventService,SurveyService,ErrorHandlerService,EmailService],
+    providers: [CartService,SurveyService,ErrorHandlerService,EmailService],
     controllers: [CartController],
 })
 export class CartModule {}

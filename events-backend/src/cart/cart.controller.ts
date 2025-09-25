@@ -1,5 +1,5 @@
 // src/controllers/cart.controller.ts
-import { Controller, Post, Get, Put, Delete, Body, Param, Res, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Res, UseGuards, Request, forwardRef, Inject } from '@nestjs/common';
 import { Response } from 'express';
 import { CartService } from './cart.service';
 import { CartDto } from './cart.dto';
@@ -14,6 +14,7 @@ import { CreateCheckoutDto, InAppPaymentDto } from 'checkout/checkout.dto';
 export class CartController {
     constructor(
         private readonly cartService: CartService,
+        @Inject(forwardRef(() => EventService))
         private readonly eventService: EventService, // Inject EventService
         private readonly checkoutService: CheckoutService, // Inject CheckoutService
     ) {}

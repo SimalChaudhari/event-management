@@ -1,5 +1,5 @@
 // src/qna/qna.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { QnaController } from './qna.controller';
 import { QnaService } from './qna.service';
@@ -8,6 +8,8 @@ import { Event } from 'event/event.entity';
 import { UserEntity } from '../user/users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { JwtModule } from '@nestjs/jwt';
+import { EventModule } from '../event/event.module';
+import { UtilsModule } from '../utils/utils.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { JwtModule } from '@nestjs/jwt';
         secret: process.env.JWT_SECRET,
         signOptions: {},
       }),
+    forwardRef(() => EventModule),
+    UtilsModule,
     ],
 
   controllers: [QnaController],
