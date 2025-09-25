@@ -148,11 +148,15 @@ export class UserPaymentMethod {
     if (this.nickname) {
       return this.nickname;
     }
-    return `${this.brand.charAt(0).toUpperCase() + this.brand.slice(1)} ****${this.last4}`;
+    return `xxxx xxxx xxxx ${this.last4}`;
+  }
+
+  getCardBrandName(): string {
+    return this.brand.charAt(0).toUpperCase() + this.brand.slice(1);
   }
 
   getMaskedCardNumber(): string {
-    return `****-****-****-${this.last4}`;
+    return `xxxx xxxx xxxx ${this.last4}`;
   }
 
   getExpiryDisplay(): string {

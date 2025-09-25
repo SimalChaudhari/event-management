@@ -10,6 +10,7 @@ import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
 import { validateCard, detectCardTypeRealtime } from '../utils/card-validation.utils';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
+import { CheckoutResponseUtils } from '../utils/checkout-response.utils';
 import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
 import { Cart } from 'cart/cart.entity';
@@ -1272,6 +1273,81 @@ export class CheckoutService {
     const expectedLength = savedPaymentMethod.cvvLength;
 
     return `Invalid CVV. Your ${cardBrand} card requires ${expectedLength}-digit CVV.`;
+  }
+
+  /**
+   * Get all completed checkouts for a user
+   * This method retrieves only completed payment data from the checkout table
+   */
+  async getCompletedCheckouts(userId: string): Promise<any[]> {
+    try {
+      const completedCheckouts = await this.checkoutRepository.find({
+        where: {
+          user: { id: userId },
+          status: CheckoutStatus.Completed,
+          isCompleted: true
+        },
+        relations: ['user'],
+        order: { createdAt: 'DESC' }
+      });
+      console.log('completedCheckouts', completedCheckouts);
+
+      if (!completedCheckouts || completedCheckouts.length === 0) {
+        return [];
+      }
+
+      // Get payment methods for all checkouts
+      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(userId);
+      
+      // Format the response using utility function
+      return CheckoutResponseUtils.formatMultipleCheckoutsResponse(completedCheckouts, paymentMethods);
+    } catch (error: any) {
+      console.error('❌ Error getting completed checkouts:', error);
+      throw new InternalServerErrorException(
+        `Failed to retrieve completed checkouts: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Get specific completed checkout by ID for a user
+   * This method retrieves only completed payment data from the checkout table
+   */
+  async getCompletedCheckoutById(checkoutId: string, userId: string): Promise<any> {
+    try {
+      const checkout = await this.checkoutRepository.findOne({
+        where: {
+          checkoutId: checkoutId,
+          user: { id: userId },
+          status: CheckoutStatus.Completed,
+          isCompleted: true
+        },
+        relations: ['user']
+      });
+
+      if (!checkout) {
+        throw new NotFoundException('Completed checkout not found or you are not authorized to view this checkout');
+      }
+
+      // Get payment methods for this user
+      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(userId);
+      const recentPaymentMethod = paymentMethods.length > 0 ? paymentMethods[0] : null;
+
+      // Format the response using utility function (include details for single checkout)
+      return CheckoutResponseUtils.formatCheckoutResponse(checkout, recentPaymentMethod, true);
+    } catch (error: any) {
+      console.error('❌ Error getting checkout by ID:', error);
+      
+      // Re-throw NotFoundException as is
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      // Handle other errors
+      throw new InternalServerErrorException(
+        `Failed to retrieve checkout details: ${error.message}`
+      );
+    }
   }
 
 }

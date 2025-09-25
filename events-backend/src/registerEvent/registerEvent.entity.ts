@@ -18,6 +18,9 @@ export class RegisterEvent {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Column({ nullable: true })
+  registerEventId?: string;
+
   @Column()
   userId?: string;
 

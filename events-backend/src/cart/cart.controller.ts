@@ -83,6 +83,71 @@ export class CartController {
         });
     }
 
+    @Get('checkouts')
+    async getCompletedCheckouts(@Request() req: any, @Res() response: Response) {
+        try {
+            const userId = req.user.id;
+            const role = req.user.role;
+
+            if (role !== 'user') {
+                return response.status(403).json({
+                    success: false,
+                    message: 'Access denied. Only users can view checkout data.',
+                });
+            }
+
+            // Get completed checkouts from checkout service
+            const completedCheckouts = await this.checkoutService.getCompletedCheckouts(userId);
+
+            return response.status(200).json({
+                success: true,
+                message: 'Completed checkouts retrieved successfully',
+                count: completedCheckouts.length,
+                data: completedCheckouts,
+            });
+
+        } catch (error: any) {
+            console.error('❌ Get completed checkouts failed:', error);
+            return response.status(400).json({
+                success: false,
+                message: error.message || 'Failed to retrieve completed checkouts',
+                error: error.message
+            });
+        }
+    }
+
+    @Get('checkouts/:checkoutId')
+    async getCheckoutById(@Param('checkoutId') checkoutId: string, @Request() req: any, @Res() response: Response) {
+        try {
+            const userId = req.user.id;
+            const role = req.user.role;
+
+            if (role !== 'user') {
+                return response.status(403).json({
+                    success: false,
+                    message: 'Access denied. Only users can view checkout data.',
+                });
+            }
+
+            // Get specific completed checkout
+            const checkout = await this.checkoutService.getCompletedCheckoutById(checkoutId, userId);
+
+            return response.status(200).json({
+                success: true,
+                message: 'Checkout details retrieved successfully',
+                data: checkout,
+            });
+
+        } catch (error: any) {
+            console.error('❌ Get checkout by ID failed:', error);
+            return response.status(400).json({
+                success: false,
+                message: error.message || 'Failed to retrieve checkout details',
+                error: error.message
+            });
+        }
+    }
+
     @Get(':id')
     async getCartById(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
         const userId = req.user.id;
@@ -94,7 +159,6 @@ export class CartController {
         });
     }
     
-
     @Delete(':id')
     async deleteCart(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
         const userId = req.user.id;
@@ -187,6 +251,7 @@ export class CartController {
             const checkoutDto: CreateCheckoutDto = {
                 cartItems: checkoutItems,
                 totalAmount: finalAmount,
+                discount: discount, // ✅ Include the discount amount
                 couponCode: couponCodeForCheckout,
                 useSelectedItemsOnly: true,
             };

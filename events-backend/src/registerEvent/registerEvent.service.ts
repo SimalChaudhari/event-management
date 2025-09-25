@@ -324,6 +324,7 @@ export class RegisterEventService {
             orderId: _,
             eventId: __,
             isRegister: ___,
+          
             ...cleanRegisterEvent
           } = registerEvent;
 
@@ -340,6 +341,7 @@ export class RegisterEventService {
 
           return {
             ...cleanRegisterEvent,
+            registerEventId: registerEvent.id, // Show primary ID as registerEventId
             event,
             user: cleanedUser,
             isCreatedByAdmin: registerEvent.isCreatedByAdmin,
@@ -543,6 +545,7 @@ export class RegisterEventService {
         message: 'Register event fetched successfully',
         data: {
           ...cleanRegisterEvent,
+          registerEventId: registerEvent.id, // Show primary ID as registerEventId
           event,
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
