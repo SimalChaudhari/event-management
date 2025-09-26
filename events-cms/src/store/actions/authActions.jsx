@@ -73,25 +73,20 @@ export const logout = () => async (dispatch) => {
 
 export const forgetPassword = (data) => async (dispatch) => {
     try {
-        setLoading(dispatch, true);
+        const response = await axiosInstance.post('/auth/forgot-password', data);
         
-        const response = await axiosInstance.post('/auth/forget', data);
-       if (response.data) {
-            toast.success(response.data.message);
+        if (response.data) {
+            toast.success(response.data.message || 'OTP sent successfully');
             return { success: true };
         } else {
-            const errorMessage = response.data.message || 'Failed to send reset link';
+            const errorMessage = response.data?.message || 'Failed to send reset link';
             toast.error(errorMessage);
-          
             return { success: false };
         }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'An error occurred. Please try again.';
         toast.error(errorMessage);
-      
         return { success: false };
-    } finally {
-        setLoading(dispatch, false);
     }
 };
 
@@ -169,25 +164,22 @@ export const resendVerificationOTP = (data) => async (dispatch) => {
 
 export const resetPassword = (data) => async (dispatch) => {
     try {
-        setLoading(dispatch, true);
+        const response = await axiosInstance.post('/auth/reset-password', data);
+        console.log('Reset password API response:', response.data);
         
-        const response = await axiosInstance.post('/auth/reset', data);
         if (response.data) {
             toast.success(response.data.message || 'Password reset successfully');
             return { success: true };
         } else {
-            const errorMessage = response.data.message || 'Failed to reset password';
+            const errorMessage = response.data?.message || 'Failed to reset password';
             toast.error(errorMessage);
-          
             return { success: false };
         }
     } catch (error) {
-        const errorMessage = 'Failed to reset password';
+        console.error('Reset password error:', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to reset password';
         toast.error(errorMessage);
-      
         return { success: false };
-    } finally {
-        setLoading(dispatch, false);
     }
 };
 

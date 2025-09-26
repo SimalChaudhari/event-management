@@ -46,7 +46,18 @@ const AUTH_ENDPOINTS = [
 
 // Helper function to check if endpoint should skip token refresh
 const shouldSkipTokenRefresh = (url) => {
-    return AUTH_ENDPOINTS.some(endpoint => url.endsWith(endpoint));
+    // Extract the path from the full URL
+    const urlPath = url.replace(`${API_URL}/api`, '');
+    const shouldSkip = AUTH_ENDPOINTS.some(endpoint => urlPath.includes(endpoint));
+    
+    console.log('shouldSkipTokenRefresh:', { 
+        fullUrl: url, 
+        urlPath, 
+        shouldSkip,
+        endpoints: AUTH_ENDPOINTS 
+    });
+    
+    return shouldSkip;
 };
 
 // Simple response interceptor
@@ -88,10 +99,30 @@ axiosInstance.interceptors.response.use(
                 return axiosInstance(originalRequest);
 
             } catch (refreshError) {
+                console.log('Token refresh failed:', refreshError);
                 processQueue(refreshError, null);
                 localStorage.clear();
-                if (!shouldSkipTokenRefresh(originalRequest.url)) {
-                    window.location.href = '/auth/signin';
+                
+                const shouldSkip = shouldSkipTokenRefresh(originalRequest.url);
+                console.log('About to check redirect:', { 
+                    url: originalRequest.url, 
+                    shouldSkip,
+                    willRedirect: !shouldSkip 
+                });
+                
+                if (!shouldSkip) {
+                    console.log('🚨 Token expired - Redirecting to login');
+                    
+                    // Only redirect if not already on login page
+                    if (window.location.pathname !== '/auth/signin') {
+                        // Clear any pending requests and redirect
+                        localStorage.clear();
+                        window.location.href = '/auth/signin';
+                    } else {
+                        console.log('Already on login page, skipping redirect');
+                    }
+                } else {
+                    console.log('✅ Skipping redirect for auth endpoint');
                 }
                 return Promise.reject(refreshError);
             } finally {
