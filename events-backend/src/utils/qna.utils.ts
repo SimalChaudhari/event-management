@@ -63,6 +63,7 @@ export class QnaUtils {
           likesCount: question.likesCount,
           isPinned: question.isPinned,
           isActive: question.isActive,
+          status: question.status || 'not_answered', // Default to 'not_answered' if null
           answeredAt: question.answeredAt,
           answer: question.answer || null,
           createdAt: question.createdAt,
@@ -101,15 +102,16 @@ export class QnaUtils {
             createdAt: like.createdAt,
           })) || [],
           // Computed fields
-          isAnswered: !!question.answeredAt,
+          isAnswered: question.status === 'answered',
           totalLikes: question.likesCount,
         };
       });
 
       // Calculate statistics
       const totalQuestions = questions.length;
-      const answeredQuestions = questions.filter((q) => q.answeredAt).length;
-      const unansweredQuestions = totalQuestions - answeredQuestions;
+      const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
+      const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
+      const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
       const anonymousQuestions = questions.filter((q) => q.isAnonymous).length;
       const activeQuestions = questions.filter((q) => q.isActive).length;
@@ -137,6 +139,7 @@ export class QnaUtils {
           statistics: {
             total: totalQuestions,
             answered: answeredQuestions,
+            answering: answeringQuestions,
             unanswered: unansweredQuestions,
             pinned: pinnedQuestions,
             anonymous: anonymousQuestions,
@@ -166,6 +169,7 @@ export class QnaUtils {
           statistics: {
             total: 0,
             answered: 0,
+            answering: 0,
             unanswered: 0,
             pinned: 0,
             anonymous: 0,
@@ -194,7 +198,25 @@ export class QnaUtils {
       });
 
       const answeredQuestions = await this.qnaQuestionRepository.count({
-        where: { eventId: eventId, answeredAt: Not(IsNull()) },
+        where: { eventId: eventId, status: 'answered' },
+      });
+
+      const answeringQuestions = await this.qnaQuestionRepository.count({
+        where: { eventId: eventId, status: 'answering' },
+      });
+
+      const unansweredQuestions = await this.qnaQuestionRepository.count({
+        where: { 
+          eventId: eventId, 
+          status: 'not_answered' 
+        },
+      });
+
+      const nullStatusQuestions = await this.qnaQuestionRepository.count({
+        where: { 
+          eventId: eventId, 
+          status: IsNull() 
+        },
       });
 
       const pinnedQuestions = await this.qnaQuestionRepository.count({
@@ -208,7 +230,8 @@ export class QnaUtils {
       return {
         total: totalQuestions,
         answered: answeredQuestions,
-        unanswered: totalQuestions - answeredQuestions,
+        answering: answeringQuestions,
+        unanswered: unansweredQuestions + nullStatusQuestions,
         pinned: pinnedQuestions,
         active: activeQuestions,
         inactive: totalQuestions - activeQuestions,
@@ -218,6 +241,7 @@ export class QnaUtils {
       return {
         total: 0,
         answered: 0,
+        answering: 0,
         unanswered: 0,
         pinned: 0,
         active: 0,
@@ -248,6 +272,7 @@ export class QnaUtils {
         isAnonymous: question.isAnonymous,
         likesCount: question.likesCount,
         isPinned: question.isPinned,
+        status: question.status || 'not_answered', // Default to 'not_answered' if null
         answeredAt: question.answeredAt,
         answer: question.answer || null,
         createdAt: question.createdAt,
@@ -263,7 +288,7 @@ export class QnaUtils {
           lastName: question.answeredByUser.lastName,
           fullName: `${question.answeredByUser.firstName} ${question.answeredByUser.lastName}`.trim(),
         } : null,
-        isAnswered: !!question.answeredAt,
+        isAnswered: question.status === 'answered',
       }));
 
       return {

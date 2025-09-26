@@ -10,8 +10,9 @@ export enum QuestionSortBy {
 
 export enum QuestionStatus {
   ALL = 'all',
-  ANSWERED = 'answered',
-  UNANSWERED = 'unanswered'
+  NOT_ANSWERED = 'not_answered',
+  ANSWERING = 'answering',
+  ANSWERED = 'answered'
 }
 
 export class CreateQuestionDto {
@@ -84,4 +85,32 @@ export class PinQuestionDto {
   @IsOptional()
   @IsBoolean()
   isPinned?: boolean = true;
+}
+
+export class UpdateQuestionStatusDto {
+  @IsNotEmpty()
+  @IsUUID()
+  questionId!: string;
+
+  @IsNotEmpty()
+  @IsEnum(QuestionStatus)
+  status!: QuestionStatus;
+}
+
+export class GetEventQuestionsDto {
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
+  @IsOptional()
+  @IsEnum(QuestionStatus)
+  status?: QuestionStatus = QuestionStatus.ALL;
+
+  @IsOptional()
+  @IsEnum(QuestionSortBy)
+  sortBy?: QuestionSortBy = QuestionSortBy.LIKES;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 } 

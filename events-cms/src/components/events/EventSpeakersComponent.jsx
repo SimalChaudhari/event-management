@@ -70,7 +70,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                             {speaker.profilePicture ? (
                                 <img
                                     src={`${API_URL}/${speaker.profilePicture}`}
-                                    alt={speaker.name}
+                                    alt={`${speaker.firstName} ${speaker.lastName}`}
                                     style={{
                                         width: '100%',
                                         height: '100%',
@@ -80,7 +80,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                                 />
                             ) : (
                                 <span style={{ fontSize: '28px', fontWeight: 'bold' }}>
-                                    {speaker.name?.charAt(0) || 'S'}
+                                    {speaker.firstName?.charAt(0) || 'S'}
                                 </span>
                             )}
                         </div>
@@ -93,7 +93,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                         margin: '0',
                         lineHeight: '1.2'
                     }}>
-                        {speaker.name}
+                        {`${speaker.firstName} ${speaker.lastName}`}
                     </h5>
                     
                     {/* Label Box */}

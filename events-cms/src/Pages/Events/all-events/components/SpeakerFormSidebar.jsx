@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Form, Button, Col, Row } from 'react-bootstrap';
 
-const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
+const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData, isLoading = false }) => {
     return (
         <Modal
             show={show}
@@ -22,16 +22,16 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
                  <Row>
                     <Col sm={6}>
                         <div className="form-group fill">
-                            <label className="floating-label" htmlFor="name">
-                                Name
+                            <label className="floating-label" htmlFor="firstName">
+                                First Name <span style={{ color: '#dc3545' }}>*</span>
                             </label>
                             <input
                                 type="text"
                                 className="form-control"
-                                name="name"
-                                value={formData.name}
+                                name="firstName"
+                                value={formData.firstName}
                                 onChange={onChange}
-                                placeholder="Event Name"
+                                placeholder="Enter first name"
                                 required
                             />
                         </div>
@@ -39,49 +39,16 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
 
                     <Col sm={6}>
                         <div className="form-group fill">
-                            <label className="floating-label" htmlFor="companyName">
-                            Company Name
+                            <label className="floating-label" htmlFor="lastName">
+                                Last Name <span style={{ color: '#dc3545' }}>*</span>
                             </label>
                             <input
                                 type="text"
                                 className="form-control"
-                                name="companyName"
-                                value={formData.companyName}
+                                name="lastName"
+                                value={formData.lastName}
                                 onChange={onChange}
-                                placeholder="companyName "
-                                required
-                            />
-                        </div>
-                    </Col>
-
-                    <Col sm={6}>
-                        <div className="form-group fill">
-                            <label className="floating-label" htmlFor="position">
-                            Position
-                            </label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                name="position"
-                                value={formData.position}
-                                onChange={onChange}
-                                placeholder="position "
-                                required
-                            />
-                        </div>
-                    </Col>
-                    <Col sm={6}>
-                        <div className="form-group fill">
-                            <label className="floating-label" htmlFor="mobile">
-                            Mobile
-                            </label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                name="mobile"
-                                value={formData.mobile}
-                                onChange={onChange}
-                                placeholder="Mobile"
+                                placeholder="Enter last name"
                                 required
                             />
                         </div>
@@ -90,66 +57,116 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
                     <Col sm={6}>
                         <div className="form-group fill">
                             <label className="floating-label" htmlFor="email">
-                            Email
+                                Email <span style={{ color: '#dc3545' }}>*</span>
                             </label>
                             <input
-                                type="text"
+                                type="email"
                                 className="form-control"
                                 name="email"
                                 value={formData.email}
                                 onChange={onChange}
-                                placeholder="email"
+                                placeholder="Enter email address"
                                 required
                             />
                         </div>
                     </Col>
 
-        
                     <Col sm={6}>
                         <div className="form-group fill">
-                            <label className="floating-label" htmlFor="location">
-                            Location
+                            <label className="floating-label" htmlFor="mobile">
+                                Mobile <span style={{ color: '#dc3545' }}>*</span>
+                            </label>
+                            <input
+                                type="tel"
+                                className="form-control"
+                                name="mobile"
+                                value={formData.mobile}
+                                onChange={onChange}
+                                placeholder="Enter mobile number"
+                                required
+                            />
+                        </div>
+                    </Col>
+
+                    <Col sm={6}>
+                        <div className="form-group fill">
+                            <label className="floating-label" htmlFor="position">
+                                Position <span style={{ color: '#dc3545' }}>*</span>
                             </label>
                             <input
                                 type="text"
                                 className="form-control"
-                                name="location"
-                                value={formData.location}
+                                name="position"
+                                value={formData.position}
                                 onChange={onChange}
-                                placeholder="location"
+                                placeholder="Enter position/designation"
                                 required
+                            />
+                        </div>
+                    </Col>
+
+                    <Col sm={6}>
+                        <div className="form-group fill">
+                            <label className="floating-label" htmlFor="companyName">
+                                Company Name
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                name="companyName"
+                                value={formData.companyName}
+                                onChange={onChange}
+                                placeholder="Enter company name"
                             />
                         </div>
                     </Col>
 
                     <Col sm={12}>
-                            <div className="form-group fill">
-                                <label className="floating-label" htmlFor="description">
-                                    Description
-                                </label>
-                                <textarea
-                                    className="form-control"
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={onChange}
-                                    placeholder="Description"
-                                    rows={2}
-                                />
-                            </div>
-                        </Col>
-
-                    <Col sm={6}>
                         <div className="form-group fill">
-                            <label className="floating-label" htmlFor="speakerProfile">
-                                Image
+                            <label className="floating-label" htmlFor="description">
+                                Description
                             </label>
-                            <input type="file" className="form-control" name="speakerProfile" onChange={onChange} accept="image/*" />
-                            {formData.speakerProfile && (
-                                <img
-                                    src={typeof formData.speakerProfile === 'string' ? formData.speakerProfile : URL.createObjectURL(formData.speakerProfile)}
-                                    alt="speaker"
-                                    style={{ width: '100px', height: '100px', marginTop: '10px' }}
-                                />
+                            <textarea
+                                className="form-control"
+                                name="description"
+                                value={formData.description}
+                                onChange={onChange}
+                                placeholder="Enter speaker description"
+                                rows={3}
+                            />
+                        </div>
+                    </Col>
+
+                    <Col sm={12}>
+                        <div className="form-group fill">
+                            <label className="floating-label" htmlFor="profilePicture">
+                                Profile Image
+                            </label>
+                            <input 
+                                type="file" 
+                                className="form-control" 
+                                name="profilePicture" 
+                                onChange={onChange} 
+                                accept="image/*" 
+                            />
+                            {formData.profilePicture && (
+                                <div className="mt-3 text-start">
+                                    <img
+                                        src={typeof formData.profilePicture === 'string' ? formData.profilePicture : URL.createObjectURL(formData.profilePicture)}
+                                        alt="Speaker Profile Preview"
+                                        style={{ 
+                                            width: '120px', 
+                                            height: '120px', 
+                                            objectFit: 'cover',
+                                            borderRadius: '10px',
+                                            border: '2px solid #4680ff',
+                                            marginTop: '10px'
+                                        }}
+                                    />
+                                    <p className="text-muted mt-2" style={{ fontSize: '12px' }}>
+                                        Image Preview
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </Col>
@@ -159,8 +176,27 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData }) => {
                 <Button variant="danger" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button variant="primary" type="submit" onClick={onSubmit}>
-                    Save Speaker
+                <Button 
+                    variant="primary" 
+                    type="submit" 
+                    onClick={onSubmit}
+                    disabled={
+                        isLoading ||
+                        !formData.firstName?.trim() ||
+                        !formData.lastName?.trim() ||
+                        !formData.email?.trim() ||
+                        !formData.mobile?.trim() ||
+                        !formData.position?.trim()
+                    }
+                >
+                    {isLoading ? (
+                        <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Saving...
+                        </>
+                    ) : (
+                        'Save Speaker'
+                    )}
                 </Button>
             </Modal.Footer>
         </Modal>

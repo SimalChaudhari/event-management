@@ -10,6 +10,8 @@ import {
   LikeQuestionDto,
   GetQuestionsDto,
   PinQuestionDto,
+  UpdateQuestionStatusDto,
+  GetEventQuestionsDto,
   QuestionSortBy,
   QuestionStatus,
 } from './qna.dto';
@@ -67,6 +69,7 @@ export class QnaService {
       question.likesCount = 0;
       question.isPinned = false;
       question.isActive = true;
+      question.status = undefined; // Default undefined, will be set to 'not_answered' when first viewed
 
       const savedQuestion = await this.qnaQuestionRepository.save(question);
 
@@ -127,9 +130,11 @@ export class QnaService {
 
       // Handle status filter
       if (getDto.status === QuestionStatus.ANSWERED) {
-        whereConditions.answeredAt = { $ne: null };
-      } else if (getDto.status === QuestionStatus.UNANSWERED) {
-        whereConditions.answeredAt = null;
+        whereConditions.status = 'answered';
+      } else if (getDto.status === QuestionStatus.NOT_ANSWERED) {
+        whereConditions.status = 'not_answered';
+      } else if (getDto.status === QuestionStatus.ANSWERING) {
+        whereConditions.status = 'answering';
       }
 
       const questions = await this.qnaQuestionRepository.find({
@@ -203,6 +208,7 @@ export class QnaService {
           likesCount: question.likesCount,
           isPinned: question.isPinned,
           isActive: question.isActive,
+          status: question.status || 'not_answered', // Default to 'not_answered' if null
           answeredAt: question.answeredAt,
           answer: question.answer || null,
           createdAt: question.createdAt,
@@ -231,8 +237,9 @@ export class QnaService {
 
       // Calculate summary statistics
       const totalQuestions = questions.length;
-      const answeredQuestions = questions.filter((q) => q.answeredAt).length;
-      const unansweredQuestions = totalQuestions - answeredQuestions;
+      const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
+      const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
+      const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
 
       return {
@@ -242,6 +249,7 @@ export class QnaService {
         metadata: {
           total: totalQuestions,
           answered: answeredQuestions,
+          answering: answeringQuestions,
           unanswered: unansweredQuestions,
           pinned: pinnedQuestions,
           eventId: getDto.eventId,
@@ -267,6 +275,7 @@ export class QnaService {
         metadata: {
           total: 0,
           answered: 0,
+          answering: 0,
           unanswered: 0,
           pinned: 0,
           eventId: getDto.eventId,
@@ -310,6 +319,7 @@ export class QnaService {
         likesCount: question.likesCount,
         isPinned: question.isPinned,
         isActive: question.isActive,
+        status: question.status || 'not_answered', // Default to 'not_answered' if null
         answeredAt: question.answeredAt,
         answer: question.answer || null, // Always show answer field
         createdAt: question.createdAt,
@@ -377,6 +387,7 @@ export class QnaService {
       question.answer = answerDto.answer;
       question.answeredBy = answeredById;
       question.answeredAt = new Date();
+      question.status = 'answered';
 
       const savedQuestion = await this.qnaQuestionRepository.save(question);
 
@@ -587,6 +598,304 @@ export class QnaService {
   // Get All Questions for Event (Admin Only) - Returns all questions for a specific event
   async getAllQuestionsForEvent(eventId: string) {
     return await this.qnaUtils.getAllQuestionsForEvent(eventId);
+  }
+
+  // Admin: Get all events with Q&A questions
+  async getEventsWithQuestions() {
+    try {
+      const events = await this.eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
+        .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
+        .leftJoin('qna_questions', 'qna', 'qna.eventId = event.id')
+        .addSelect('COUNT(DISTINCT qna.id)', 'questionCount')
+        .addSelect('COUNT(CASE WHEN qna.status = \'answered\' THEN 1 END)', 'answeredCount')
+        .addSelect('COUNT(CASE WHEN qna.status = \'answering\' THEN 1 END)', 'answeringCount')
+        .addSelect('COUNT(CASE WHEN qna.status = \'not_answered\' OR qna.status IS NULL THEN 1 END)', 'unansweredCount')
+        .groupBy('event.id, eventSpeaker.id, speaker.id')
+        .orderBy('event.startDate', 'DESC')
+        .getRawAndEntities();
+
+      const eventsWithStats = events.entities.map((event, index) => {
+        const raw = events.raw[index];
+        return {
+          id: event.id,
+          name: event.name,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          venue: event.venue,
+          speakers: event.eventSpeakers?.map(es => ({
+            id: es.speaker?.id,
+            name: es.speaker ? `${es.speaker.firstName} ${es.speaker.lastName}`.trim() : 'Unknown',
+            email: es.speaker?.email
+          })) || [],
+          questionStats: {
+            total: parseInt(raw.questionCount) || 0,
+            answered: parseInt(raw.answeredCount) || 0,
+            answering: parseInt(raw.answeringCount) || 0,
+            unanswered: parseInt(raw.unansweredCount) || 0
+          }
+        };
+      });
+
+      return {
+        success: true,
+        message: 'Events with Q&A questions retrieved successfully',
+        data: eventsWithStats,
+        metadata: {
+          total: eventsWithStats.length,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get events with Q&A questions');
+      return {
+        success: false,
+        message: 'Failed to retrieve events with Q&A questions',
+        data: [],
+        metadata: {
+          total: 0,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  }
+
+  // Admin: Get all questions for an event (consolidated view)
+  async getEventQuestions(getDto: GetEventQuestionsDto) {
+    try {
+      const whereConditions: any = {
+        isActive: true
+      };
+
+      if (getDto.eventId) {
+        whereConditions.eventId = getDto.eventId;
+      }
+
+      // Handle status filter
+      if (getDto.status === QuestionStatus.ANSWERED) {
+        whereConditions.status = 'answered';
+      } else if (getDto.status === QuestionStatus.NOT_ANSWERED) {
+        whereConditions.status = 'not_answered';
+      } else if (getDto.status === QuestionStatus.ANSWERING) {
+        whereConditions.status = 'answering';
+      }
+
+      // Handle search
+      if (getDto.search) {
+        whereConditions.question = { $like: `%${getDto.search}%` };
+      }
+
+      const questions = await this.qnaQuestionRepository.find({
+        where: whereConditions,
+        relations: ['askedBy', 'event', 'speaker', 'answeredByUser', 'likes'],
+        order: this.getSortOrder(getDto.sortBy),
+      });
+
+      const processedQuestions = questions.map((question) => {
+        return {
+          id: question.id,
+          question: question.question,
+          event: question.event ? {
+            id: question.event.id,
+            name: question.event.name,
+            startDate: question.event.startDate,
+            location: question.event.location,
+            venue: question.event.venue
+          } : null,
+          speaker: question.speaker ? UserUtils.getBasicSpeakerInfo(question.speaker) : null,
+          askedBy: question.isAnonymous
+            ? null
+            : question.askedBy
+              ? {
+                  id: question.askedBy.id,
+                  firstName: question.askedBy.firstName,
+                  lastName: question.askedBy.lastName,
+                  email: question.askedBy.email,
+                  fullName: `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
+                }
+              : null,
+          answeredBy: question.answeredByUser
+            ? {
+                id: question.answeredByUser.id,
+                firstName: question.answeredByUser.firstName,
+                lastName: question.answeredByUser.lastName,
+                email: question.answeredByUser.email,
+                fullName: `${question.answeredByUser.firstName} ${question.answeredByUser.lastName}`.trim(),
+              }
+            : null,
+          isAnonymous: question.isAnonymous,
+          likesCount: question.likesCount,
+          isPinned: question.isPinned,
+          isActive: question.isActive,
+          status: question.status || 'not_answered',
+          answeredAt: question.answeredAt,
+          answer: question.answer || null,
+          createdAt: question.createdAt,
+          updatedAt: question.updatedAt,
+          isAnswered: question.status === 'answered',
+        };
+      });
+
+      // Calculate summary statistics
+      const totalQuestions = questions.length;
+      const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
+      const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
+      const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+      const pinnedQuestions = questions.filter((q) => q.isPinned).length;
+
+      return {
+        success: true,
+        message: 'Event questions retrieved successfully',
+        data: processedQuestions,
+        metadata: {
+          total: totalQuestions,
+          answered: answeredQuestions,
+          answering: answeringQuestions,
+          unanswered: unansweredQuestions,
+          pinned: pinnedQuestions,
+          eventId: getDto.eventId,
+          status: getDto.status,
+          sortBy: getDto.sortBy,
+          search: getDto.search,
+          timestamp: new Date().toISOString(),
+        }
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get event questions');
+      return {
+        success: false,
+        message: 'Failed to retrieve event questions',
+        data: [],
+        metadata: {
+          total: 0,
+          answered: 0,
+          answering: 0,
+          unanswered: 0,
+          pinned: 0,
+          eventId: getDto.eventId,
+          status: getDto.status,
+          sortBy: getDto.sortBy,
+          search: getDto.search,
+          timestamp: new Date().toISOString(),
+        }
+      };
+    }
+  }
+
+  // Admin: Update question status
+  async updateQuestionStatus(updateDto: UpdateQuestionStatusDto) {
+    try {
+      const question = await this.qnaQuestionRepository.findOne({
+        where: { id: updateDto.questionId },
+      });
+
+      if (!question) {
+        throw new ResourceNotFoundException('Question', updateDto.questionId);
+      }
+
+      question.status = updateDto.status;
+      
+      // If marking as answered, set answeredAt timestamp
+      if (updateDto.status === 'answered' && !question.answeredAt) {
+        question.answeredAt = new Date();
+      }
+
+      const savedQuestion = await this.qnaQuestionRepository.save(question);
+
+      return {
+        success: true,
+        message: 'Question status updated successfully',
+        data: {
+          id: savedQuestion.id,
+          status: savedQuestion.status,
+          answeredAt: savedQuestion.answeredAt
+        }
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Update question status');
+      this.errorHandler.handleDatabaseError(error, 'Question status update');
+    }
+  }
+
+  // Admin: Delete question
+  async adminDeleteQuestion(questionId: string) {
+    try {
+      const question = await this.qnaQuestionRepository.findOne({
+        where: { id: questionId },
+      });
+
+      if (!question) {
+        throw new ResourceNotFoundException('Question', questionId);
+      }
+
+      await this.qnaQuestionRepository.remove(question);
+
+      return {
+        success: true,
+        message: 'Question deleted successfully by admin'
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Admin delete question');
+      this.errorHandler.handleDatabaseError(error, 'Question deletion by admin');
+    }
+  }
+
+  // Public: Get question for slideshow (answering status)
+  async getSlideshowQuestion(questionId: string) {
+    try {
+      const question = await this.qnaQuestionRepository.findOne({
+        where: { 
+          id: questionId,
+          status: 'answering',
+          isActive: true
+        },
+        relations: ['event', 'speaker', 'askedBy']
+      });
+
+      if (!question) {
+        throw new ResourceNotFoundException('Question', questionId);
+      }
+
+      return {
+        success: true,
+        message: 'Slideshow question retrieved successfully',
+        data: {
+          id: question.id,
+          question: question.question,
+          event: question.event ? {
+            id: question.event.id,
+            name: question.event.name
+          } : null,
+          speaker: question.speaker ? UserUtils.getBasicSpeakerInfo(question.speaker) : null,
+          askedBy: question.isAnonymous
+            ? null
+            : question.askedBy
+              ? {
+                  firstName: question.askedBy.firstName,
+                  lastName: question.askedBy.lastName,
+                  fullName: `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
+                }
+              : null,
+          isAnonymous: question.isAnonymous,
+          likesCount: question.likesCount,
+          createdAt: question.createdAt
+        }
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Get slideshow question');
+      this.errorHandler.handleDatabaseError(error, 'Slideshow question retrieval');
+    }
   }
 
   private getSortOrder(sortBy?: QuestionSortBy): any {

@@ -56,6 +56,14 @@ export class QnaQuestion {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ 
+    type: 'enum', 
+    enum: ['not_answered', 'answering', 'answered'], 
+    nullable: true,
+    default: null
+  })
+  status?: string;
+
   @Column({ type: 'timestamp', nullable: true })
   answeredAt?: Date;
 

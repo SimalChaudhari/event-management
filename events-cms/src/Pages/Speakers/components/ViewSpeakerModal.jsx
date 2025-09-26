@@ -9,12 +9,12 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
 
     if (!speakerData) return null;
 
-    const imageUrl = speakerData.speakerProfile ? `${API_URL}/${speakerData.speakerProfile}` : DUMMY_PATH;
+    const imageUrl = speakerData.profilePicture ? `${API_URL}/${speakerData.profilePicture}` : DUMMY_PATH;
 
     // Speaker image zoom function
-    const handleSpeakerImageClick = (speakerProfile) => {
-        if(speakerProfile){
-            setCurrentSpeakerImage(speakerProfile);
+    const handleSpeakerImageClick = (profilePicture) => {
+        if(profilePicture){
+            setCurrentSpeakerImage(profilePicture);
             setShowSpeakerImageModal(true);
         }else{
             setShowSpeakerImageModal(false);
@@ -62,7 +62,7 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                 <hr />
                                 <Row className="align-items-center">
                                     <Col xs={12} md={4} className="text-center mb-3 mb-md-0">
-                                        {speakerData.speakerProfile && (
+                                        {speakerData.profilePicture && (
                                             <div style={{ position: 'relative', display: 'inline-block' }}>
                                                 <img 
                                                     src={imageUrl} 
@@ -77,7 +77,7 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                         cursor: 'pointer',
                                                         transition: 'transform 0.2s'
                                                     }}
-                                                    onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                                    onClick={() => handleSpeakerImageClick(speakerData.profilePicture)}
                                                     onMouseEnter={(e) => (e.target.style.transform = 'scale(1.04)')}
                                                     onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
                                                 />
@@ -93,13 +93,13 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                         fontSize: '12px',
                                                         cursor: 'pointer'
                                                     }}
-                                                    onClick={() => handleSpeakerImageClick(speakerData.speakerProfile)}
+                                                    onClick={() => handleSpeakerImageClick(speakerData.profilePicture)}
                                                 >
                                                     <i className="fas fa-search-plus"></i>
                                                 </div>
                                             </div>
                                         )}
-                                        {!speakerData.speakerProfile && (
+                                        {!speakerData.profilePicture && (
                                             <img 
                                                 src={imageUrl} 
                                                 alt="speaker" 
@@ -117,7 +117,7 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                     <Col xs={12} md={8}>
                                         <div className="row">
                                             <div className="col-12 mb-2">
-                                                <strong>Name:</strong> {speakerData.name}
+                                                <strong>Name:</strong> {`${speakerData.firstName} ${speakerData.lastName}`}
                                             </div>
                                             <div className="col-12 mb-2">
                                                 <strong>Email:</strong> {speakerData.email || 'N/A'}

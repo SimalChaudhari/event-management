@@ -45,11 +45,11 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
             {
-                data: 'name',
+                data: 'firstName',
                 title: 'Speaker Name',
                 render: function (data, type, row) {
                     const imageUrl = row.profilePicture ? `${API_URL}/${row.profilePicture}` : DUMMY_PATH_USER;
-                    const fullName = row.name || `${row.firstName || ''} ${row.lastName || ''}`.trim();
+                    const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim();
                     return `
                         <div class="d-inline-block align-middle">
                             <img src="${imageUrl}" alt="speaker" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />

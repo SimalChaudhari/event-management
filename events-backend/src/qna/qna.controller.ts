@@ -21,7 +21,9 @@ import {
   AnswerQuestionDto, 
   LikeQuestionDto,
   GetQuestionsDto,
-  PinQuestionDto
+  PinQuestionDto,
+  UpdateQuestionStatusDto,
+  GetEventQuestionsDto
 } from './qna.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -345,6 +347,142 @@ export class QnaController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Delete question', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Admin: Get all events with Q&A questions
+  @Get('admin/events')
+  @Roles(UserRole.Admin)
+  async getEventsWithQuestions(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.qnaService.getEventsWithQuestions();
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          ...result.metadata,
+          requestedBy: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get events with Q&A questions', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Admin: Get all questions for an event (consolidated view)
+  @Get('admin/event-questions')
+  @Roles(UserRole.Admin)
+  async getEventQuestions(
+    @Query() query: GetEventQuestionsDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.qnaService.getEventQuestions(query);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          ...result.metadata,
+          requestedBy: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get event questions', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Admin: Update question status
+  @Put('admin/update-status')
+  @Roles(UserRole.Admin)
+  async updateQuestionStatus(
+    @Body() updateDto: UpdateQuestionStatusDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.qnaService.updateQuestionStatus(updateDto);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          updatedBy: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Update question status', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Admin: Delete question
+  @Delete('admin/:id')
+  @Roles(UserRole.Admin)
+  async adminDeleteQuestion(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.qnaService.adminDeleteQuestion(id);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          deletedBy: req.user?.id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Admin delete question', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Public: Get question for slideshow (answering status)
+  @Get('slideshow/:id')
+  async getSlideshowQuestion(
+    @Param('id') id: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.qnaService.getSlideshowQuestion(id);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          questionId: id,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get slideshow question');
       throw error;
     }
   }

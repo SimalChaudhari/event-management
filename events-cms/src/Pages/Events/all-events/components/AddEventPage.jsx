@@ -156,14 +156,14 @@ function AddEventPage() {
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const navigate = useNavigate();
     const [newSpeaker, setNewSpeaker] = useState({
-        name: '',
-        companyName: '',
-        position: '',
-        mobile: '',
+        firstName: '',
+        lastName: '',
         email: '',
-        location: '',
+        mobile: '',
+        position: '',
+        companyName: '',
         description: '',
-        speakerProfile: null
+        profilePicture: null
     });
     const [newCategory, setNewCategory] = useState({
         name: '',
@@ -183,6 +183,9 @@ function AddEventPage() {
 
     // Add loading state for form submission
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Add loading state for speaker modal
+    const [isSpeakerLoading, setIsSpeakerLoading] = useState(false);
 
     // Fetch current location
     const getCurrentLocation = () => {
@@ -797,7 +800,7 @@ function AddEventPage() {
 
     // Speaker and category options
     const speakerOptions = speakerList.map((speaker) => ({
-        label: speaker.name,
+        label: `${speaker.firstName} ${speaker.lastName}`,
         value: speaker.id
     }));
 
@@ -821,10 +824,11 @@ function AddEventPage() {
     };
 
     const handleAddSpeaker = async () => {
+        setIsSpeakerLoading(true);
         const formDataToSend = new FormData();
 
         Object.keys(newSpeaker).forEach((key) => {
-            if (key === 'speakerProfile' && newSpeaker[key]) {
+            if (key === 'profilePicture' && newSpeaker[key]) {
                 formDataToSend.append(key, newSpeaker[key]);
             } else {
                 formDataToSend.append(key, newSpeaker[key]);
@@ -836,19 +840,21 @@ function AddEventPage() {
             if (success) {
                 fetchSpeakers();
                 setNewSpeaker({
-                    name: '',
-                    companyName: '',
-                    position: '',
-                    mobile: '',
+                    firstName: '',
+                    lastName: '',
                     email: '',
-                    location: '',
+                    mobile: '',
+                    position: '',
+                    companyName: '',
                     description: '',
-                    speakerProfile: null
+                    profilePicture: null
                 });
                 setShowSidebar(false);
             }
         } catch (error) {
             console.error('Error adding speaker:', error);
+        } finally {
+            setIsSpeakerLoading(false);
         }
     };
 
@@ -1370,6 +1376,7 @@ function AddEventPage() {
                                             onChange={handleInputChange}
                                             onSubmit={handleAddSpeaker}
                                             formData={newSpeaker}
+                                            isLoading={isSpeakerLoading}
                                         />
 
                                         <CategoryFormModal
