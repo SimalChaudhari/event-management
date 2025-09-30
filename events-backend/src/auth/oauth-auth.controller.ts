@@ -14,7 +14,7 @@ import { OAuthAuthService } from './oauth-auth.service';
 
 @Controller('api/auth/oauth')
 export class OAuthAuthController {
-  constructor(private readonly oauthAuthService: OAuthAuthService) {}
+  constructor(private readonly oauthAuthService: OAuthAuthService) { }
 
   /**
    * Direct redirect to Salesforce login
@@ -26,7 +26,7 @@ export class OAuthAuthController {
   ) {
     try {
       const authUrl = this.oauthAuthService.generateAuthUrl(state);
-      
+
       // Direct redirect to Salesforce
       return response.redirect(authUrl);
     } catch (error: any) {
@@ -47,6 +47,7 @@ export class OAuthAuthController {
     @Query('state') state?: string,
     @Query('error') error?: string,
   ) {
+    console.log("Hello")
     try {
       if (error) {
         throw new BadRequestException(`OAuth error: ${error}`);
@@ -57,9 +58,9 @@ export class OAuthAuthController {
       }
 
       const result = await this.oauthAuthService.processOAuthAuthentication(code);
-
+      console.log(result, "%%%%%%%%%%%%%%")
       // Redirect to frontend with tokens as URL parameters
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://events.isca.org.sg:3000';
       const redirectUrl = `${frontendUrl}/auth/sso-success?` + new URLSearchParams({
         success: 'true',
         accessToken: result.accessToken,
@@ -73,6 +74,7 @@ export class OAuthAuthController {
 
       return response.redirect(redirectUrl);
     } catch (error: any) {
+      console.log(error, "%%%%%%%%")
       // Redirect to frontend error page
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const errorUrl = `${frontendUrl}/auth/sso-error?` + new URLSearchParams({

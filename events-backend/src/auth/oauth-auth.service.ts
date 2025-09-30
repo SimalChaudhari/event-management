@@ -10,7 +10,7 @@ export class OAuthAuthService {
   private readonly salesforceConfig = {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
-    redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://your-app.com/api/auth/oauth/callback',
+    redirectUri: process.env.SALESFORCE_REDIRECT_URI || '"https://events.isca.org.sg:5000/api/auth/callback',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com',
     authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com'}/services/oauth2/authorize`,
@@ -56,6 +56,7 @@ export class OAuthAuthService {
         grant_type: 'authorization_code',
         redirect_uri: this.salesforceConfig.redirectUri,
       };
+      console.log(tokenData,"&^&^&^&^&^")
 
       const response = await axios.post(
         this.salesforceConfig.tokenUrl,
