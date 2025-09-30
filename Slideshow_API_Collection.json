@@ -1,0 +1,136 @@
+{
+  "info": {
+    "name": "Q&A Slideshow API Collection",
+    "description": "API collection for Q&A slideshow functionality - when question status is 'answering'",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001/api/events/qna",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "your_admin_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "question_id",
+      "value": "your_question_id_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Set Question Status to 'Answering' (Admin)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"questionId\": \"{{question_id}}\",\n  \"status\": \"answering\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/update-status",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "update-status"]
+        },
+        "description": "Admin sets question status to 'answering' - this generates slideshow URL"
+      }
+    },
+    {
+      "name": "2. Get Slideshow URL from Status Update Response",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"questionId\": \"{{question_id}}\",\n  \"status\": \"answering\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/update-status",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "update-status"]
+        },
+        "description": "Response will include slideshowUrl: '/api/events/qna/slideshow/{question_id}'"
+      }
+    },
+    {
+      "name": "3. Get Specific Question for Slideshow (Public)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": {
+          "raw": "{{base_url}}/slideshow/{{question_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["slideshow", "{{question_id}}"]
+        },
+        "description": "Public endpoint - no authentication required. Only works for questions with 'answering' status"
+      }
+    },
+    {
+      "name": "4. Get All Active Slideshow Questions (Public)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": {
+          "raw": "{{base_url}}/slideshow/active",
+          "host": ["{{base_url}}"],
+          "path": ["slideshow", "active"]
+        },
+        "description": "Get all questions currently in 'answering' status - useful for slideshow management"
+      }
+    },
+    {
+      "name": "5. Set Question Status to 'Answered' (Admin)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"questionId\": \"{{question_id}}\",\n  \"status\": \"answered\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/update-status",
+          "host": ["{{base_url}}"],
+          "path": ["admin", "update-status"]
+        },
+        "description": "Admin sets question status to 'answered' - removes from slideshow"
+      }
+    }
+  ]
+}

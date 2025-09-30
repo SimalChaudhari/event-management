@@ -5,8 +5,9 @@ import { Card, Table, Row, Col, Badge, Button, Spinner, Alert } from 'react-boot
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { eventList } from '../../../store/actions/eventActions';
-import { getQAQuestions, answerQuestion, pinQuestion, unpinQuestion } from '../../../store/actions/qaActions';
+import { getQAQuestions, answerQuestion, pinQuestion, unpinQuestion, updateQuestion, deleteQuestion, updateQuestionStatus } from '../../../store/actions/qaActions';
 import AnswerQuestionModal from './components/AnswerQuestionModal';
+import DeleteQuestionModal from './components/DeleteQuestionModal';
 import * as $ from 'jquery';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../../assets/css/event.css';
@@ -14,7 +15,7 @@ import '../../../assets/css/event.css';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleView) {
+function qaTable(data, eventData, handleBack, handleAnswer, handleView, handleDelete, handleStatusUpdate) {
     let tableZero = '#qa-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -46,17 +47,23 @@ function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleVie
                 data: 'question',
                 title: 'Question / Answer',
                 render: function (data, type, row) {
+                    // Truncate question text to 2 lines
+                    const questionText = row.question;
+                    const truncatedQuestion = questionText.length > 100 ? questionText.substring(0, 100) + '...' : questionText;
+                    
                     const answerHtml = row.answer ? `
                         <div class="mt-2 p-2" style="background-color: #f8f9fa; border-left: 3px solid #007bff; border-radius: 0 4px 4px 0;">
                             <small class="text-muted">Answer:</small>
-                            <p class="mb-0">${row.answer}</p>
+                            <p class="mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; max-height: 2.8em;">
+                                ${row.answer.length > 100 ? row.answer.substring(0, 100) + '...' : row.answer}
+                            </p>
                         </div>
                     ` : '';
                     
                     return `
                         <div class="d-inline-block align-middle">
                             <div class="d-inline-block">
-                                <p class="m-b-0 fw-bold">${row.question}</p>
+                                <p class="m-b-0 fw-bold" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; max-height: 2.8em;">${truncatedQuestion}</p>
                                 ${answerHtml}
                             </div>
                         </div>   
@@ -115,6 +122,57 @@ function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleVie
                 }
             },
             {
+                data: 'status',
+                title: 'Status',
+                render: function (data, type, row) {
+                    const status = row.status || (row.answer ? 'answered' : 'not_answered');
+                    let badgeClass = 'badge-secondary';
+                    let statusText = status;
+                    
+                    switch(status) {
+                        case 'answered':
+                            badgeClass = 'badge-success';
+                            statusText = 'Answered';
+                            break;
+                        case 'not_answered':
+                            badgeClass = 'badge-warning';
+                            statusText = 'Not Answered';
+                            break;
+                        case 'answering':
+                            badgeClass = 'badge-info';
+                            statusText = 'Answering';
+                            break;
+                        default:
+                            badgeClass = 'badge-secondary';
+                            statusText = status;
+                    }
+                    
+                    return `
+                        <div class="text-start" style="margin-top: 10px; position: relative;">
+                            <span class="badge ${badgeClass} status-badge" 
+                                  data-id="${row.id}" 
+                                  data-current-status="${status}"
+                                  style="cursor: pointer; position: relative;" 
+                                  title="Click to change status">
+                                ${statusText}
+                                <i class="feather icon-chevron-down ml-1" style="font-size: 10px;"></i>
+                            </span>
+                            <div class="status-dropdown-menu" data-question-id="${row.id}" style="display: none;">
+                                <div class="dropdown-item ${status === 'not_answered' ? 'active' : ''}" data-status="not_answered">
+                                    <span class="badge badge-warning mr-2">Not Answered</span>
+                                </div>
+                                <div class="dropdown-item ${status === 'answering' ? 'active' : ''}" data-status="answering">
+                                    <span class="badge badge-info mr-2">Answering</span>
+                                </div>
+                                <div class="dropdown-item ${status === 'answered' ? 'active' : ''}" data-status="answered">
+                                    <span class="badge badge-success mr-2">Answered</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            {
                 data: 'createdAt',
                 title: 'Date',
                 render: function (data, type, row) {
@@ -132,15 +190,15 @@ function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleVie
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
-                            ${!row.isAnswered ? `
-                                <button type="button" class="btn btn-info btn-circle btn-sm answer-btn" data-id="${row.id}" title="Answer" 
-                                    style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                    <i class="feather icon-message-square"></i>
-                                </button>
-                            ` : ''}
-                            <button type="button" class="btn btn-warning btn-circle btn-sm pin-btn" data-id="${row.id}" title="${row.isPinned ? 'Unpin' : 'Pin'}" 
+                            <button type="button" class="btn btn-info btn-circle btn-sm answer-btn" data-id="${row.id}" title="${row.answer ? 'Edit Answer' : 'Answer'}" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather ${row.isPinned ? 'icon-unlock' : 'icon-lock'}"></i>
+                                <i class="feather icon-message-square"></i>
+                            </button>
+                        
+                
+                            <button type="button" class="btn btn-danger btn-circle btn-sm delete-btn" data-id="${row.id}" title="Delete" 
+                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                <i class="feather icon-trash-2"></i>
                             </button>
                         </div>
                     `;
@@ -153,7 +211,7 @@ function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleVie
                 $('.back-button').html(`
                     <button class="btn btn-secondary d-flex align-items-center ml-2" id="backBtn">
                         <i class="feather icon-arrow-left mr-1"></i>
-                        Back to Events
+                        Back
                     </button>
                 `);
 
@@ -182,13 +240,90 @@ function qaTable(data, eventData, handleBack, handleAnswer, handlePin, handleVie
         }
     });
 
-    $(document).on('click', '.pin-btn', function () {
+    $(document).on('click', '.delete-btn', function () {
         const questionId = $(this).data('id');
         const questionData = data.find((q) => q.id === questionId);
         if (questionData) {
-            handlePin(questionData);
+            handleDelete(questionData);
         }
     });
+
+    // Use unique namespace for events to prevent accumulation
+    const eventNamespace = `qaTable_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Handle status badge click to show/hide dropdown
+    $(document).off(`click.${eventNamespace}`, '.status-badge').on(`click.${eventNamespace}`, '.status-badge', function (e) {
+        e.stopPropagation();
+        
+        // Close all other dropdowns
+        $('.status-dropdown-menu').hide();
+        
+        // Toggle current dropdown
+        const dropdown = $(this).siblings('.status-dropdown-menu');
+        dropdown.toggle();
+    });
+
+    // Handle dropdown item click
+    $(document).off(`click.${eventNamespace}`, '.status-dropdown-menu .dropdown-item').on(`click.${eventNamespace}`, '.status-dropdown-menu .dropdown-item', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const $this = $(this);
+        const questionId = $this.closest('.status-dropdown-menu').data('question-id');
+        const newStatus = $this.data('status');
+        const questionData = data.find((q) => q.id === questionId);
+        
+        // Prevent multiple clicks on the same item
+        if ($this.hasClass('updating')) {
+            return;
+        }
+        
+        // Determine current status the same way as in the render function
+        const currentStatus = questionData.status || (questionData.answer ? 'answered' : 'not_answered');
+        
+        console.log(`Debug - Question ${questionId}:`, {
+            questionData,
+            newStatus,
+            currentStatus,
+            questionDataStatus: questionData.status,
+            questionDataAnswer: questionData.answer,
+            willUpdate: newStatus !== currentStatus
+        });
+        
+        if (questionData && newStatus && newStatus !== currentStatus) {
+            console.log(`Status update initiated for question ${questionId}: ${currentStatus} -> ${newStatus}`);
+            
+            // Mark as updating to prevent multiple calls
+            $this.addClass('updating');
+            
+            if (handleStatusUpdate) {
+                handleStatusUpdate(questionData, newStatus).then(() => {
+                    console.log(`Status update completed for question ${questionId}`);
+                }).catch((error) => {
+                    console.error(`Status update failed for question ${questionId}:`, error);
+                }).finally(() => {
+                    // Remove updating class after completion
+                    $this.removeClass('updating');
+                });
+            }
+        }
+        
+        // Close the dropdown
+        $this.closest('.status-dropdown-menu').hide();
+    });
+
+    // Close dropdown when clicking outside (only once per table initialization)
+    if (!window.statusDropdownOutsideHandler) {
+        window.statusDropdownOutsideHandler = function (e) {
+            if (!$(e.target).closest('.status-badge, .status-dropdown-menu').length) {
+                $('.status-dropdown-menu').hide();
+            }
+        };
+        $(document).off('click.statusDropdown').on('click.statusDropdown', window.statusDropdownOutsideHandler);
+    }
+    
+    // Store namespace for cleanup
+    window.currentQaTableNamespace = eventNamespace;
 }
 
 const QAPage = () => {
@@ -196,20 +331,25 @@ const QAPage = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
-    const { questions, loading: qaLoading, error: qaError } = useSelector((state) => state.qa);
-    
+
     const [eventData, setEventData] = useState(null);
     const [qaData, setQaData] = useState(null);
+    const [filteredQaData, setFilteredQaData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentTable, setCurrentTable] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('all');
     
     // Answer modal state
     const [showAnswerModal, setShowAnswerModal] = useState(false);
     const [selectedQuestion, setSelectedQuestion] = useState(null);
     const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+    
 
-    // Find the event data
+    // Delete modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+    // Find the event data and update qaData when events change (including Redux updates)
     useEffect(() => {
         if (events && events.length > 0) {
             const event = events.find(e => e.id === eventId);
@@ -223,6 +363,22 @@ const QAPage = () => {
             }
         }
     }, [events, eventId]);
+
+    // Filter qaData based on status filter
+    useEffect(() => {
+        if (qaData && qaData.questions) {
+            let filtered = qaData.questions;
+            
+            if (statusFilter !== 'all') {
+                filtered = qaData.questions.filter(question => {
+                    const status = question.status || (question.answer ? 'answered' : 'not_answered');
+                    return status === statusFilter;
+                });
+            }
+            
+            setFilteredQaData({ ...qaData, questions: filtered });
+        }
+    }, [qaData, statusFilter]);
 
     // Load events if not already loaded
     useEffect(() => {
@@ -241,36 +397,69 @@ const QAPage = () => {
         setShowAnswerModal(true);
     }, []);
 
-    const handlePin = useCallback(async (question) => {
-        console.log('Pin/Unpin question:', question);
-        try {
-            if (question.isPinned) {
-                await dispatch(unpinQuestion(question.id));
-            } else {
-                await dispatch(pinQuestion(question.id));
-            }
-        } catch (error) {
-            console.error('Error pinning/unpinning question:', error);
-        }
-    }, [dispatch]);
+
 
     const handleView = useCallback((question) => {
         console.log('View question:', question);
-        // TODO: Implement view functionality
+        navigate(`/events/qa/${eventId}/view/${question.id}`);
+    }, [navigate, eventId]);
+
+    const handleDelete = useCallback((question) => {
+        console.log('Delete question:', question);
+        setSelectedQuestion(question);
+        setShowDeleteModal(true);
     }, []);
 
-    const handleAnswerSubmit = useCallback(async (result, question) => {
-        console.log('Answer submitted successfully:', result);
-        
-        // The Redux action already updates the state, so we just need to refresh the table
-        if (currentTable) {
-            currentTable.ajax.reload();
+    const handleStatusUpdate = useCallback(async (question, newStatus) => {
+        // Prevent multiple simultaneous updates for the same question
+        const updateKey = `statusUpdate_${question.id}_${newStatus}`;
+        if (window.activeStatusUpdates && window.activeStatusUpdates[updateKey]) {
+            console.log(`Status update already in progress for question ${question.id}`);
+            return;
         }
-    }, [currentTable]);
+        
+        // Mark update as active
+        if (!window.activeStatusUpdates) {
+            window.activeStatusUpdates = {};
+        }
+        window.activeStatusUpdates[updateKey] = true;
+        
+        try {
+            console.log(`Starting status update for question ${question.id}: ${question.status} -> ${newStatus}`);
+            await dispatch(updateQuestionStatus(question.id, newStatus));
+            console.log(`Status update successful for question ${question.id}`);
+            
+            // Update local state immediately
+            if (qaData && qaData.questions) {
+                const updatedQuestions = qaData.questions.map(q => 
+                    q.id === question.id 
+                        ? { ...q, status: newStatus, updatedAt: new Date().toISOString() }
+                        : q
+                );
+                const updatedQaData = { ...qaData, questions: updatedQuestions };
+                setQaData(updatedQaData);
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+        } finally {
+            // Remove from active updates
+            if (window.activeStatusUpdates) {
+                delete window.activeStatusUpdates[updateKey];
+            }
+        }
+    }, [dispatch, qaData]);
 
     const destroyTable = useCallback(() => {
         if (currentTable) {
-            $('#qa-data-table').off('click', '.view-btn, .answer-btn, .pin-btn');
+            $('#qa-data-table').off('click', '.view-btn, .answer-btn, .pin-btn, .edit-btn, .delete-btn');
+            
+            // Clean up namespaced events
+            if (window.currentQaTableNamespace) {
+                $(document).off(`click.${window.currentQaTableNamespace}`, '.status-badge');
+                $(document).off(`click.${window.currentQaTableNamespace}`, '.status-dropdown-menu .dropdown-item');
+                delete window.currentQaTableNamespace;
+            }
+            
             currentTable.destroy();
             setCurrentTable(null);
         }
@@ -278,44 +467,109 @@ const QAPage = () => {
 
     const initializeTable = useCallback(() => {
         destroyTable();
-        if (qaData && qaData.questions && qaData.questions.length >= 0) {
-            const table = qaTable(qaData.questions, eventData, handleBack, handleAnswer, handlePin, handleView);
+        if (filteredQaData && filteredQaData.questions && filteredQaData.questions.length >= 0) {
+            const table = qaTable(filteredQaData.questions, eventData, handleBack, handleAnswer, handleView, handleDelete, handleStatusUpdate);
             setCurrentTable(table);
         }
-    }, [qaData, eventData, destroyTable, handleBack, handleAnswer, handlePin, handleView]);
+    }, [filteredQaData, eventData, destroyTable, handleBack, handleAnswer, handleView, handleDelete, handleStatusUpdate]);
+
+    const handleAnswerSubmit = useCallback(async (result, question) => {
+        
+        // Directly update the local qaData state to trigger immediate refresh
+        if (qaData && qaData.questions) {
+            const updatedQuestions = qaData.questions.map(q => 
+                q.id === question.id 
+                    ? { 
+                        ...q, 
+                        answer: result.data.answer, 
+                        answeredAt: result.data.answeredAt || new Date().toISOString(),
+                        answeredBy: result.data.answeredBy,
+                        isUpdated: result.data.isUpdated,
+                        status: result.data.status || 'answered'
+                    }
+                    : q
+            );
+            const updatedQaData = { ...qaData, questions: updatedQuestions };
+            setQaData(updatedQaData);
+        }
+    }, [qaData]);
+
+    const handleDeleteSubmit = useCallback(async (result, question) => {
+        
+        // Directly update the local qaData state to trigger immediate refresh
+        if (qaData && qaData.questions) {
+            const updatedQuestions = qaData.questions.filter(q => q.id !== question.id);
+            const updatedQaData = { ...qaData, questions: updatedQuestions };
+            setQaData(updatedQaData);
+        }
+    }, [qaData]);
 
     useEffect(() => {
-        if (qaData) {
+        if (filteredQaData) {
             initializeTable();
         }
         return destroyTable;
-    }, [initializeTable, destroyTable]);
+    }, [filteredQaData, initializeTable, destroyTable]);
 
-    if (loading) {
-        return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-                <Spinner animation="border" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                </Spinner>
-            </div>
-        );
-    }
+    // Cleanup global outside click handler on unmount
+    useEffect(() => {
+        return () => {
+            if (window.statusDropdownOutsideHandler) {
+                $(document).off('click.statusDropdown', window.statusDropdownOutsideHandler);
+                delete window.statusDropdownOutsideHandler;
+            }
+            // Also clean up any remaining namespaced events
+            if (window.currentQaTableNamespace) {
+                $(document).off(`click.${window.currentQaTableNamespace}`);
+                delete window.currentQaTableNamespace;
+            }
+        };
+    }, []);
 
-    if (error) {
-        return (
-            <Row>
-                <Col sm={12}>
-                    <Alert variant="danger">
-                        <Alert.Heading>Error</Alert.Heading>
-                        <p>{error}</p>
-                        <Button variant="outline-danger" onClick={handleBack}>
-                            Back to Events
-                        </Button>
-                    </Alert>
-                </Col>
-            </Row>
-        );
-    }
+    // Add CSS for custom dropdown in DataTable
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.textContent = `
+            .status-dropdown-menu {
+                position: absolute !important;
+                top: 100% !important;
+                left: 0 !important;
+                z-index: 1050 !important;
+                // min-width: 160px;
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin-top: 2px;
+            }
+            .status-dropdown-menu .dropdown-item {
+                padding: 8px 12px;
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                border-bottom: 1px solid #f1f3f4;
+                transition: background-color 0.2s;
+            }
+            .status-dropdown-menu .dropdown-item:last-child {
+                border-bottom: none;
+            }
+            .status-dropdown-menu .dropdown-item:hover {
+                background-color: #f8f9fa;
+            }
+            .status-dropdown-menu .dropdown-item.active {
+                background-color: #e3f2fd;
+            }
+            .status-dropdown-menu .dropdown-item .badge {
+                margin-right: 8px;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
+
 
     if (!eventData || !qaData) {
         return (
@@ -325,7 +579,7 @@ const QAPage = () => {
                         <Alert.Heading>No Q&A Data</Alert.Heading>
                         <p>No Q&A data found for this event.</p>
                         <Button variant="outline-warning" onClick={handleBack}>
-                            Back to Events
+                            Back
                         </Button>
                     </Alert>
                 </Col>
@@ -335,6 +589,33 @@ const QAPage = () => {
 
     return (
         <div className="qa-page">
+            {/* Status Filter */}
+            <Row className="mb-3">
+                <Col sm={12}>
+                    <Card>
+                        <Card.Body>
+                            <div className="d-flex justify-content-between align-items-center">
+                                <h5 className="mb-0">Q&A Questions</h5>
+                                <div className="d-flex align-items-center">
+                                    <label className="form-label mb-0 mr-2">Filter by Status:</label>
+                                    <select 
+                                        className="form-select" 
+                                        style={{width: 'auto'}}
+                                        value={statusFilter} 
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                    >
+                                        <option value="all">All Questions</option>
+                                        <option value="not_answered">Not Answered</option>
+                                        <option value="answered">Answered</option>
+                                        <option value="answering">Answering</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
             {/* Q&A Table */}
             <Row>
                 <Col sm={12} className="btn-page">
@@ -346,8 +627,8 @@ const QAPage = () => {
                                         <th>Question / Answer</th>
                                         <th>Asked By</th>
                                         <th>Speaker</th>
-                                      
                                         <th>Likes</th>
+                                        <th>Status</th>
                                         <th>Date</th>
                                         <th>Actions</th>
                                     </tr>
@@ -364,6 +645,16 @@ const QAPage = () => {
                 onHide={() => setShowAnswerModal(false)}
                 question={selectedQuestion}
                 onSubmit={handleAnswerSubmit}
+            />
+
+
+
+            {/* Delete Question Modal */}
+            <DeleteQuestionModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                question={selectedQuestion}
+                onSubmit={handleDeleteSubmit}
             />
         </div>
     );

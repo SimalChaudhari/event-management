@@ -368,7 +368,7 @@ export class QnaService {
     }
   }
 
-  // Answer Question (Admin only)
+  // Answer Question (Admin only) - Can both answer and update existing answers
   async answerQuestion(
     id: string,
     answerDto: AnswerQuestionDto,
@@ -384,9 +384,16 @@ export class QnaService {
         throw new ResourceNotFoundException('Question', id);
       }
 
+      const isUpdating = !!question.answer; // Check if this is an update to existing answer
+      
       question.answer = answerDto.answer;
       question.answeredBy = answeredById;
-      question.answeredAt = new Date();
+      
+      // Only update answeredAt if this is a new answer (not an update)
+      if (!isUpdating) {
+        question.answeredAt = new Date();
+      }
+      
       question.status = 'answered';
 
       const savedQuestion = await this.qnaQuestionRepository.save(question);
@@ -398,7 +405,9 @@ export class QnaService {
 
       return {
         success: true,
-        message: 'Question answered successfully',
+        message: isUpdating 
+          ? 'Question answer updated successfully' 
+          : 'Question answered successfully',
         data: {
           ...savedQuestion,
           answeredBy: user
@@ -410,6 +419,7 @@ export class QnaService {
                 fullName: `${user.firstName} ${user.lastName}`.trim(),
               }
             : null,
+          isUpdated: isUpdating,
         },
       };
     } catch (error: any) {
@@ -789,6 +799,7 @@ export class QnaService {
     try {
       const question = await this.qnaQuestionRepository.findOne({
         where: { id: updateDto.questionId },
+        relations: ['event', 'speaker']
       });
 
       if (!question) {
@@ -804,13 +815,26 @@ export class QnaService {
 
       const savedQuestion = await this.qnaQuestionRepository.save(question);
 
+      // Generate slideshow URL if status is "answering"
+      let slideshowUrl = null;
+      if (updateDto.status === 'answering') {
+        slideshowUrl = `/api/events/qna/slideshow/${savedQuestion.id}`;
+      }
+
       return {
         success: true,
         message: 'Question status updated successfully',
         data: {
           id: savedQuestion.id,
           status: savedQuestion.status,
-          answeredAt: savedQuestion.answeredAt
+          answeredAt: savedQuestion.answeredAt,
+          slideshowUrl: slideshowUrl,
+          question: savedQuestion.question,
+          event: question.event ? {
+            id: question.event.id,
+            name: question.event.name
+          } : null,
+          speaker: question.speaker ? UserUtils.getBasicSpeakerInfo(question.speaker) : null
         }
       };
     } catch (error: any) {
@@ -848,6 +872,67 @@ export class QnaService {
     }
   }
 
+  // Public: Get all currently answering questions for slideshow
+  async getActiveSlideshowQuestions() {
+    try {
+      const questions = await this.qnaQuestionRepository.find({
+        where: { 
+          status: 'answering',
+          isActive: true
+        },
+        relations: ['event', 'speaker', 'askedBy'],
+        order: { createdAt: 'DESC' }
+      });
+
+      const slideshowQuestions = questions.map((question) => ({
+        id: question.id,
+        question: question.question,
+        slideshowUrl: `/api/events/qna/slideshow/${question.id}`,
+        event: question.event ? {
+          id: question.event.id,
+          name: question.event.name,
+          startDate: question.event.startDate,
+          location: question.event.location,
+          venue: question.event.venue
+        } : null,
+        speaker: question.speaker ? UserUtils.getBasicSpeakerInfo(question.speaker) : null,
+        askedBy: question.isAnonymous
+          ? null
+          : question.askedBy
+            ? {
+                firstName: question.askedBy.firstName,
+                lastName: question.askedBy.lastName,
+                fullName: `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
+                email: question.askedBy.email
+              }
+            : null,
+        isAnonymous: question.isAnonymous,
+        status: question.status,
+        likesCount: question.likesCount,
+        isPinned: question.isPinned,
+        createdAt: question.createdAt,
+        slideshowInfo: {
+          isLive: true,
+          lastUpdated: new Date().toISOString(),
+          displayFormat: 'slideshow'
+        }
+      }));
+
+      return {
+        success: true,
+        message: 'Active slideshow questions retrieved successfully',
+        data: slideshowQuestions
+      };
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get active slideshow questions');
+      return {
+        success: false,
+        message: 'Failed to retrieve active slideshow questions',
+        data: []
+      };
+    }
+  }
+
   // Public: Get question for slideshow (answering status)
   async getSlideshowQuestion(questionId: string) {
     try {
@@ -872,7 +957,10 @@ export class QnaService {
           question: question.question,
           event: question.event ? {
             id: question.event.id,
-            name: question.event.name
+            name: question.event.name,
+            startDate: question.event.startDate,
+            location: question.event.location,
+            venue: question.event.venue
           } : null,
           speaker: question.speaker ? UserUtils.getBasicSpeakerInfo(question.speaker) : null,
           askedBy: question.isAnonymous
@@ -882,11 +970,20 @@ export class QnaService {
                   firstName: question.askedBy.firstName,
                   lastName: question.askedBy.lastName,
                   fullName: `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
+                  email: question.askedBy.email
                 }
               : null,
           isAnonymous: question.isAnonymous,
+          status: question.status,
           likesCount: question.likesCount,
-          createdAt: question.createdAt
+          isPinned: question.isPinned,
+          createdAt: question.createdAt,
+          // Add slideshow specific metadata
+          slideshowInfo: {
+            isLive: true,
+            lastUpdated: new Date().toISOString(),
+            displayFormat: 'slideshow'
+          }
         }
       };
     } catch (error: any) {

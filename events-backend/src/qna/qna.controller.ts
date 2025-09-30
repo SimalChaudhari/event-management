@@ -201,9 +201,9 @@ export class QnaController {
     }
   }
 
-  // Answer Question (Admin only)
+  // Answer Question (Admin only) - Can both answer and update existing answers
   @Put(':id/answer')
-  @Roles(UserRole.Admin) // Only Admin can answer
+  @Roles(UserRole.Admin) // Only Admin can answer/update
   async answerQuestion(
     @Param('id') id: string,
     @Body() answerDto: AnswerQuestionDto,
@@ -224,12 +224,13 @@ export class QnaController {
         metadata: {
           timestamp: new Date().toISOString(),
           answeredBy: req.user?.id,
+          isUpdated: result.data?.isUpdated || false,
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Answer question', req.user?.id);
+      this.errorHandler.logError(error, 'Answer/Update question', req.user?.id);
       throw error;
     }
   }
@@ -461,8 +462,37 @@ export class QnaController {
     }
   }
 
-  // Public: Get question for slideshow (answering status)
+  // Public: Get all currently answering questions for slideshow
+  @Get('slideshow/active')
+  @UseGuards() // Override class-level guards to make this endpoint public
+  async getActiveSlideshowQuestions(
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.qnaService.getActiveSlideshowQuestions();
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          isPublicEndpoint: true,
+          slideshowMode: true,
+          totalActiveQuestions: result.data?.length || 0
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get active slideshow questions');
+      throw error;
+    }
+  }
+
+  // Public: Get question for slideshow (answering status) - No authentication required
   @Get('slideshow/:id')
+  @UseGuards() // Override class-level guards to make this endpoint public
   async getSlideshowQuestion(
     @Param('id') id: string,
     @Res() response: Response,
@@ -477,6 +507,8 @@ export class QnaController {
         metadata: {
           timestamp: new Date().toISOString(),
           questionId: id,
+          isPublicEndpoint: true,
+          slideshowMode: true
         },
       };
 

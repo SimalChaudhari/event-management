@@ -8,6 +8,8 @@ import {
     UNPIN_QUESTION, 
     LIKE_QUESTION, 
     UNLIKE_QUESTION,
+    UPDATE_QUESTION,
+    DELETE_QUESTION,
     CLEAR_QA_ERROR 
 } from "../constants/actionTypes";
 
@@ -65,6 +67,9 @@ const qaReducer = (state = initialState, { type, payload } = {}) => {
                             answer: payload.answer,
                             isAnswered: true,
                             answeredAt: payload.answeredAt,
+                            answeredBy: payload.answeredBy,
+                            isUpdated: payload.isUpdated,
+                            status: payload.status,
                             updatedAt: payload.answeredAt
                         }
                         : question
@@ -75,6 +80,9 @@ const qaReducer = (state = initialState, { type, payload } = {}) => {
                         answer: payload.answer,
                         isAnswered: true,
                         answeredAt: payload.answeredAt,
+                        answeredBy: payload.answeredBy,
+                        isUpdated: payload.isUpdated,
+                        status: payload.status,
                         updatedAt: payload.answeredAt
                     }
                     : state.questionById,
@@ -182,6 +190,38 @@ const qaReducer = (state = initialState, { type, payload } = {}) => {
                         updatedAt: payload.unlikedAt
                     }
                     : state.questionById,
+                loading: false,
+                error: null
+            };
+
+        case UPDATE_QUESTION:
+            return {
+                ...state,
+                questions: state.questions.map(question => 
+                    question.id === payload.questionId 
+                        ? { 
+                            ...question, 
+                            ...payload,
+                            updatedAt: new Date().toISOString()
+                        }
+                        : question
+                ),
+                questionById: state.questionById?.id === payload.questionId 
+                    ? { 
+                        ...state.questionById, 
+                        ...payload,
+                        updatedAt: new Date().toISOString()
+                    }
+                    : state.questionById,
+                loading: false,
+                error: null
+            };
+
+        case DELETE_QUESTION:
+            return {
+                ...state,
+                questions: state.questions.filter(question => question.id !== payload),
+                questionById: state.questionById?.id === payload ? null : state.questionById,
                 loading: false,
                 error: null
             };

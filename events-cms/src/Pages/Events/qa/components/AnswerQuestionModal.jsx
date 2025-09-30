@@ -17,11 +17,12 @@ const AnswerQuestionModal = ({
 
     // Reset form when modal opens/closes
     React.useEffect(() => {
-        if (show) {
-            setAnswer('');
+        if (show && question) {
+            // If question already has an answer, pre-fill it for editing
+            setAnswer(question.answer || '');
             setLocalError('');
         }
-    }, [show]);
+    }, [show, question]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -50,7 +51,7 @@ const AnswerQuestionModal = ({
             onHide();
             
         } catch (err) {
-            console.error('Error submitting answer:', err);
+            console.error('Error submitting/updating answer:', err);
             setLocalError(err.message || 'Failed to submit answer. Please try again.');
         }
     };
@@ -70,10 +71,10 @@ const AnswerQuestionModal = ({
             backdrop={loading ? 'static' : true}
             keyboard={!loading}
         >
-            <Modal.Header>
+            <Modal.Header style={{ backgroundColor: '#4680ff', color: 'white' }}>
                 <Modal.Title>
                     <i className="feather icon-message-square mr-2"></i>
-                    Answer Question
+                    {question?.answer ? 'Edit Answer' : 'Answer Question'}
                 </Modal.Title>
             </Modal.Header>
             
@@ -92,10 +93,29 @@ const AnswerQuestionModal = ({
                     </div>
                 )}
 
+                {question?.answer && (
+                    <div className="mb-4">
+                        <h6 className="text-muted mb-2">Current Answer:</h6>
+                        <div className="p-3 bg-info text-white rounded">
+                            <p className="mb-0">{question.answer}</p>
+                            {question.answeredBy && (
+                                <small className="text-light mt-2 d-block">
+                                    Answered by: {question.answeredBy.fullName}
+                                </small>
+                            )}
+                            {question.answeredAt && (
+                                <small className="text-light mt-1 d-block">
+                                    Answered on: {new Date(question.answeredAt).toLocaleString()}
+                                </small>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <Form onSubmit={handleSubmit}>
                     <Form.Group className="mb-3">
                         <Form.Label>
-                            <strong>Your Answer:</strong>
+                            <strong>{question?.answer ? 'Edit Answer:' : 'Your Answer:'}</strong>
                         </Form.Label>
                         <Form.Control
                             as="textarea"
@@ -106,11 +126,16 @@ const AnswerQuestionModal = ({
                             disabled={loading}
                             className={localError ? 'is-invalid' : ''}
                         />
-                        {localError && (
-                            <Form.Text className="text-danger">
-                                {localError}
+                        <div className="d-flex justify-content-between mt-1">
+                            {localError && (
+                                <Form.Text className="text-danger">
+                                    {localError}
+                                </Form.Text>
+                            )}
+                            <Form.Text className="text-muted ml-auto">
+                                {answer.length} characters
                             </Form.Text>
-                        )}
+                        </div>
                     </Form.Group>
 
                     {(error || localError) && (
@@ -145,12 +170,12 @@ const AnswerQuestionModal = ({
                                 aria-hidden="true" 
                                 className="mr-2"
                             />
-                            Submitting...
+                            {question?.answer ? 'Updating...' : 'Submitting...'}
                         </>
                     ) : (
                         <>
                             <i className="feather icon-send mr-2"></i>
-                            Submit Answer
+                            {question?.answer ? 'Update' : 'Submit Answer'}
                         </>
                     )}
                 </Button>

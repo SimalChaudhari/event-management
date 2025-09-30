@@ -53,6 +53,7 @@ const eventComponents = {
     
     // Q&A
     QA: React.lazy(() => import('./Pages/Events/qa/QAPage.jsx')),
+    ViewQuestion: React.lazy(() => import('./Pages/Events/qa/ViewQuestionPage.jsx')),
 };
 
 const MediaManagerComponents = {
@@ -379,6 +380,12 @@ const eventRoutes = [
         exact: true,
         name: 'Q&A Management',
         component: eventComponents.QA
+    },
+    {
+        path: EVENT_PATHS.QA + '/:eventId/view/:questionId',
+        exact: true,
+        name: 'View Question',
+        component: eventComponents.ViewQuestion
     }
 ];
 

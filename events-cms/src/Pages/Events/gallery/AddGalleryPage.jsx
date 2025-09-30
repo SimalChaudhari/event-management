@@ -275,7 +275,7 @@ const AddGalleryPage = () => {
 
             const response = await dispatch(createOrUpdateGallery(submitData, id));
             if (response) {
-                navigate(`${EVENT_PATHS.VIEW_GALLERY}/${galleryId}`);
+                navigate(`${EVENT_PATHS.LIST_EVENTS}`);
             }
         } catch (error) {
             console.log('An error occurred while saving gallery');
@@ -285,7 +285,7 @@ const AddGalleryPage = () => {
     };
 
     const handleCancel = () => {
-        navigate(`${EVENT_PATHS.VIEW_GALLERY}/${galleryId}`);
+        navigate(`${EVENT_PATHS.LIST_EVENTS}`);
     };
 
     // Cleanup preview URLs
