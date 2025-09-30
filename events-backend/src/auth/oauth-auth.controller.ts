@@ -17,6 +17,32 @@ export class OAuthAuthController {
   constructor(private readonly oauthAuthService: OAuthAuthService) { }
 
   /**
+   * Get OAuth authentication URL for frontend
+   */
+  @Get('auth-url')
+  async getAuthUrl(
+    @Res() response: Response,
+
+    @Query('state') state?: string,
+  ) {
+    try {
+      const authUrl = this.oauthAuthService.generateAuthUrl(state);
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Authentication URL generated successfully',
+        authUrl: authUrl,
+        state: state || '',
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to generate authentication URL',
+      });
+    }
+  }
+
+  /**
    * Direct redirect to Salesforce login
    */
   @Get('login')
@@ -47,7 +73,7 @@ export class OAuthAuthController {
     @Query('state') state?: string,
     @Query('error') error?: string,
   ) {
-    console.log("Hello")
+    console.log('OAuth callback received with code:', code ? 'present' : 'missing');
     try {
       if (error) {
         throw new BadRequestException(`OAuth error: ${error}`);
@@ -58,33 +84,29 @@ export class OAuthAuthController {
       }
 
       const result = await this.oauthAuthService.processOAuthAuthentication(code);
-      console.log(result, "%%%%%%%%%%%%%%")
-      // Redirect to frontend with tokens as URL parameters
-      const frontendUrl = process.env.FRONTEND_URL || 'https://events.isca.org.sg:3000';
-      const redirectUrl = `${frontendUrl}/auth/sso-success?` + new URLSearchParams({
-        success: 'true',
+      console.log('OAuth authentication result:', result)
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'OAuth authentication successful',
+        user: result.user,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        user: JSON.stringify(result.user),
+        isNewUser: result.isNewUser,
         provider: 'oauth',
         loginMethod: 'sso',
         state: state || '',
         loginTimestamp: new Date().toISOString(),
-      }).toString();
-
-      return response.redirect(redirectUrl);
+      });
     } catch (error: any) {
-      console.log(error, "%%%%%%%%")
-      // Redirect to frontend error page
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const errorUrl = `${frontendUrl}/auth/sso-error?` + new URLSearchParams({
-        success: 'false',
+      console.error('OAuth callback error:', error.message);
+      
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
         message: error.message || 'OAuth authentication failed',
         errorCode: 'OAUTH_AUTHENTICATION_FAILED',
         state: state || '',
-      }).toString();
-
-      return response.redirect(errorUrl);
+      });
     }
   }
 
@@ -118,28 +140,35 @@ export class OAuthAuthController {
   }
 
   /**
-   * Revoke access token
+   * SSO Login API - Exchange authorization code for tokens and user info
    */
-  @Post('revoke')
-  async revokeToken(
-    @Body() body: { token: string },
+  @Post('login')
+  async ssoLogin(
+    @Body() body: { code: string; state?: string },
     @Res() response: Response,
   ) {
     try {
-      if (!body.token) {
-        throw new BadRequestException('Token is required');
+      if (!body.code) {
+        throw new BadRequestException('Authorization code is required');
       }
 
-      const success = await this.oauthAuthService.revokeToken(body.token);
+      const result = await this.oauthAuthService.processOAuthAuthentication(body.code);
 
       return response.status(HttpStatus.OK).json({
-        success: success,
-        message: success ? 'Token revoked successfully' : 'Failed to revoke token',
+        success: true,
+        message: 'SSO login successful',
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        isNewUser: result.isNewUser,
+        provider: 'oauth',
+        loginMethod: 'sso',
       });
     } catch (error: any) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
+      return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
-        message: error.message || 'Failed to revoke token',
+        message: error.message || 'SSO login failed',
+        errorCode: 'SSO_LOGIN_FAILED',
       });
     }
   }
@@ -151,10 +180,10 @@ export class OAuthAuthController {
   async getOAuthConfig(@Res() response: Response) {
     try {
       const config = {
-        clientId: process.env.AZURE_CLIENT_ID,
-        tenantId: process.env.AZURE_TENANT_ID,
-        redirectUri: process.env.AZURE_REDIRECT_URI,
-        scope: 'openid profile email',
+        clientId: process.env.SALESFORCE_CLIENT_ID,
+        instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com',
+        redirectUri: process.env.SALESFORCE_REDIRECT_URI,
+        scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
         responseType: 'code',
         responseMode: 'query',
       };

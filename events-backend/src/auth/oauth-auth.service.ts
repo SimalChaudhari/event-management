@@ -10,13 +10,14 @@ export class OAuthAuthService {
   private readonly salesforceConfig = {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
-    redirectUri: process.env.SALESFORCE_REDIRECT_URI || '"https://events.isca.org.sg:5000/api/auth/callback',
+    redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
-    instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com',
-    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com'}/services/oauth2/authorize`,
-    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com'}/services/oauth2/token`,
-    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://login.salesforce.com'}/services/oauth2/userinfo`,
+    instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com',
+    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/authorize`,
+    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/token`,
+    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/userinfo`,
   };
+
 
   constructor(
     @InjectRepository(UserEntity)
@@ -46,7 +47,6 @@ export class OAuthAuthService {
     accessToken: string;
     refreshToken: string;
     idToken: string;
-    expiresIn: number;
   }> {
     try {
       const tokenData = {
@@ -56,7 +56,8 @@ export class OAuthAuthService {
         grant_type: 'authorization_code',
         redirect_uri: this.salesforceConfig.redirectUri,
       };
-      console.log(tokenData,"&^&^&^&^&^")
+      console.log('Token exchange data:', tokenData)
+      console.log('Token URL:', this.salesforceConfig.tokenUrl)
 
       const response = await axios.post(
         this.salesforceConfig.tokenUrl,
@@ -68,7 +69,9 @@ export class OAuthAuthService {
         }
       );
 
-      const { access_token, refresh_token, id_token, expires_in } = response.data;
+      const { access_token, refresh_token, id_token } = response.data;
+
+      console.log('Salesforce token response:', response.data);
 
       if (!access_token) {
         throw new UnauthorizedException('Failed to obtain access token');
@@ -78,10 +81,29 @@ export class OAuthAuthService {
         accessToken: access_token,
         refreshToken: refresh_token,
         idToken: id_token,
-        expiresIn: expires_in,
       };
     } catch (error: any) {
       console.error('OAuth token exchange error:', error.response?.data || error.message);
+      console.error('Full error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
+      
+      // Provide more specific error messages
+      if (error.response?.data?.error === 'invalid_grant') {
+        throw new UnauthorizedException('Invalid authorization code. The code may have expired or already been used. Please try logging in again.');
+      } else if (error.response?.data?.error === 'invalid_client') {
+        throw new UnauthorizedException('Invalid client credentials. Please check your Salesforce Connected App configuration.');
+      } else if (error.response?.data?.error === 'redirect_uri_mismatch') {
+        throw new UnauthorizedException('Redirect URI mismatch. Please check your Salesforce Connected App callback URL.');
+      }
+      
       throw new UnauthorizedException('Failed to exchange authorization code for token');
     }
   }
@@ -102,6 +124,8 @@ export class OAuthAuthService {
           Authorization: `Bearer ${accessToken}`,
         },
       });
+
+      console.log('Salesforce user info response:', response.data);
 
       const { user_id, email, given_name, family_name, name } = response.data;
 
@@ -176,11 +200,13 @@ export class OAuthAuthService {
       const jwtAccessToken = this.generateAccessToken(user);
       const jwtRefreshToken = this.generateRefreshToken(user);
 
-      // Save refresh token
+      // Store both Salesforce tokens and our JWT tokens with user
       user.refreshToken = jwtRefreshToken;
+      user.socialAccessToken = tokens.accessToken;
+      user.socialRefreshToken = tokens.refreshToken;
       await this.userRepository.save(user);
 
-      const isNewUser = !user.id || user.id === undefined;
+      const isNewUser = user.id === undefined;
       
       return {
         message: isNewUser ? 'New user created and logged in successfully' : 'Existing user logged in successfully',
@@ -203,6 +229,33 @@ export class OAuthAuthService {
       console.error('OAuth authentication error:', error);
       throw new UnauthorizedException('OAuth authentication failed');
     }
+  }
+
+
+  /**
+   * Revoke access token
+   */
+  async revokeToken(token: string): Promise<boolean> {
+    try {
+      const revokeUrl = `${this.salesforceConfig.instanceUrl}/event/services/oauth2/revoke`;
+      
+      await axios.post(revokeUrl, new URLSearchParams({
+        token: token,
+      }), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error('OAuth token revocation error:', error.response?.data || error.message);
+      return false;
+    }
+  }
+
+  private generateState(): string {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 
   /**
@@ -240,32 +293,6 @@ export class OAuthAuthService {
       console.error('OAuth token refresh error:', error.response?.data || error.message);
       throw new UnauthorizedException('Failed to refresh access token');
     }
-  }
-
-  /**
-   * Revoke access token
-   */
-  async revokeToken(token: string): Promise<boolean> {
-    try {
-      const revokeUrl = `${this.salesforceConfig.instanceUrl}/services/oauth2/revoke`;
-      
-      await axios.post(revokeUrl, new URLSearchParams({
-        token: token,
-      }), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('OAuth token revocation error:', error.response?.data || error.message);
-      return false;
-    }
-  }
-
-  private generateState(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 
   private generateAccessToken(user: UserEntity): string {
