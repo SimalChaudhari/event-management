@@ -93,12 +93,12 @@ export const surveyCreate = (surveyData) => async (dispatch) => {
         });
 
         toast.success(response.data.message || 'Survey created successfully!');
-        return true;
+        return { success: true };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to create survey';
         toast.error(errorMessage);
+        return { error: true };
     }
-    return false;
 };
 
 // Update survey
@@ -108,16 +108,16 @@ export const surveyUpdate = (surveyId, surveyData) => async (dispatch) => {
 
         dispatch({
             type: SURVEY_UPDATE_SUCCESS,
-            payload: response.data.survey
+            payload: response.data.data?.survey || response.data.survey
         });
 
         toast.success(response.data.message || 'Survey updated successfully!');
-        return true;
+        return { success: true };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update survey';
         toast.error(errorMessage);
+        return { error: true };
     }
-    return false;
 };
 
 // Delete survey

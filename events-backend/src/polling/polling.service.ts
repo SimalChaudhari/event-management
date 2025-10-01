@@ -695,6 +695,104 @@ export class PollingService {
     };
   }
 
+  // Get All Polls for Admin - Returns all polls without filters
+  async getAllPollsForAdmin() {
+    try {
+      const polls = await this.pollRepository.find({
+        where: {
+          isActive: true,
+        },
+        relations: ['options', 'event', 'speaker', 'createdBy'],
+        order: { createdAt: 'DESC' },
+      });
+
+      // Get all votes for admin
+      const pollIds = polls.map((poll) => poll.id);
+      const allVotes = pollIds.length > 0
+        ? await this.pollVoteRepository.find({
+            where: { pollId: In(pollIds) },
+            relations: ['user', 'option'],
+          })
+        : [];
+
+      // Format each poll with complete information
+      return polls.map((poll) => {
+        const totalVotes = poll.options.reduce(
+          (sum, opt) => sum + opt.voteCount,
+          0,
+        );
+        const pollVotes = allVotes.filter((vote) => vote.pollId === poll.id);
+
+        return {
+          id: poll.id,
+          question: poll.question,
+          timerSeconds: poll.timerSeconds,
+          isActive: poll.isActive,
+          isLive: poll.isLive,
+          createdAt: poll.createdAt,
+          updatedAt: poll.updatedAt,
+          event: poll.event
+            ? {
+                id: poll.event.id,
+                name: poll.event.name,
+              }
+            : null,
+          speaker: poll.speaker
+            ? UserUtils.getBasicSpeakerInfo(poll.speaker)
+            : null,
+          createdBy: poll.createdBy
+            ? {
+                id: poll.createdBy.id,
+                name: `${poll.createdBy.firstName} ${poll.createdBy.lastName}`,
+              }
+            : null,
+          totalVotes: totalVotes,
+          totalVoters: pollVotes.length,
+          options: poll.options.map((option) => {
+            const optionVotes = pollVotes.filter(
+              (vote) => vote.optionId === option.id,
+            );
+            const percentage =
+              totalVotes > 0
+                ? Math.round((option.voteCount / totalVotes) * 100)
+                : 0;
+
+            return {
+              id: option.id,
+              optionText: option.optionText,
+              voteCount: option.voteCount,
+              percentage: percentage,
+              voters: optionVotes.map((vote) => ({
+                userId: vote.userId,
+                user: vote.user
+                  ? {
+                      id: vote.user.id,
+                      firstName: vote.user.firstName,
+                      lastName: vote.user.lastName,
+                      email: vote.user.email,
+                      mobile: vote.user.mobile,
+                      fullName:
+                        `${vote.user.firstName} ${vote.user.lastName}`.trim(),
+                    }
+                  : null,
+                votedAt: vote.createdAt,
+                selectedOption: vote.option
+                  ? {
+                      id: vote.option.id,
+                      optionText: vote.option.optionText,
+                    }
+                  : null,
+              })),
+            };
+          }),
+        };
+      });
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get all polls for admin');
+      throw error;
+    }
+  }
+
   // Get All Questions List - Updated to show one event with multiple questions
   async getAllQuestionsList(
     eventId?: string,
@@ -702,7 +800,9 @@ export class PollingService {
     isAdmin: boolean = false,
   ) {
     try {
-      if (!eventId && !speakerId) {
+      // Admin can see all polls without filters
+      // Regular users need eventId or speakerId
+      if (!isAdmin && !eventId && !speakerId) {
         throw new ValidationException(
           'Either eventId or speakerId must be provided to retrieve polling questions',
         );
@@ -713,6 +813,7 @@ export class PollingService {
         // isLive: true,
       };
 
+      // Only apply filters if provided (Admin can get all without filters)
       if (eventId) whereCondition.eventId = eventId;
       if (speakerId) whereCondition.speakerId = speakerId; // Add speaker filtering
 

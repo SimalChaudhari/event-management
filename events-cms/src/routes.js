@@ -8,7 +8,8 @@ import {
     SPEAKER_PATHS,
     SURVEY_PATHS,
     TRANSACTION_PATHS,
-    USER_PATHS
+    USER_PATHS,
+    POLLING_PATHS
 } from './utils/constants.js';
 
 /**
@@ -107,6 +108,17 @@ const surveyComponents = {
     List: React.lazy(() => import('./Pages/Surveys/SurveyView.jsx')),
     AddSurvey: React.lazy(() => import('./Pages/Surveys/AddSurveyPage.jsx')),
     ViewSurvey: React.lazy(() => import('./Pages/Surveys/ViewSurveyPage.jsx'))
+};
+
+/**
+ * Polling related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const pollingComponents = {
+    List: React.lazy(() => import('./Pages/Polling/PollsView.jsx')),
+    AddPoll: React.lazy(() => import('./Pages/Polling/AddPollPage.jsx')),
+    ViewPoll: React.lazy(() => import('./Pages/Polling/ViewPollPage.jsx')),
+    Results: React.lazy(() => import('./Pages/Polling/PollResultsPage.jsx'))
 };
 
 /**
@@ -484,6 +496,43 @@ const surveyRoutes = [
 ];
 
 /**
+ * Polling routes configuration
+ * @type {RouteConfig[]}
+ */
+const pollingRoutes = [
+    {
+        path: POLLING_PATHS.LIST_POLLS,
+        exact: true,
+        name: 'Polls List',
+        component: pollingComponents.List
+    },
+    {
+        path: POLLING_PATHS.ADD_POLL,
+        exact: true,
+        name: 'Add Poll',
+        component: pollingComponents.AddPoll
+    },
+    {
+        path: POLLING_PATHS.EDIT_POLL + '/:id',
+        exact: true,
+        name: 'Edit Poll',
+        component: pollingComponents.AddPoll
+    },
+    {
+        path: POLLING_PATHS.VIEW_POLL + '/:id',
+        exact: true,
+        name: 'View Poll',
+        component: pollingComponents.ViewPoll
+    },
+    {
+        path: POLLING_PATHS.POLL_RESULTS + '/:eventId',
+        exact: true,
+        name: 'Poll Results',
+        component: pollingComponents.Results
+    }
+];
+
+/**
  * Combined routes configuration
  * @type {RouteConfig[]}
  */
@@ -495,6 +544,7 @@ const routes = [
     ...exhibitorRoutes,
     ...speakerRoutes,
     ...surveyRoutes,
+    ...pollingRoutes,
     ...settingsRoutes,
     ...transactionRoutes,
     ...demoRoutes

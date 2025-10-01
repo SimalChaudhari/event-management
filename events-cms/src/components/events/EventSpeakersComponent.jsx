@@ -9,6 +9,7 @@ import { SPEAKER_PATHS } from '../../utils/constants';
  * @param {Function} handleSpeakerImageClick - Function to handle speaker image click
  */
 const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
+    console.log(speakers,"%%%%%%%%%");
     const navigate = useNavigate();
     // Check if speakers data exists
     if (!speakers?.length) {

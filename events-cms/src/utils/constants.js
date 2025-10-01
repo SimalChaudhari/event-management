@@ -96,3 +96,11 @@ export const SURVEY_PATHS = {
     VIEW_SURVEY: '/surveys/view'
 };
 
+export const POLLING_PATHS = {
+    LIST_POLLS: '/polls',
+    ADD_POLL: '/polls/add',
+    EDIT_POLL: '/polls/edit',
+    VIEW_POLL: '/polls/view',
+    POLL_RESULTS: '/polls/results'
+};
+

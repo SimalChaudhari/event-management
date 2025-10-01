@@ -68,7 +68,6 @@ const ViewQuestionPage = () => {
         navigate(`/events/qa/${eventId}`);
     }, [navigate, eventId]);
 
-
     const handleStatusUpdate = useCallback(
         async (newStatus) => {
             if (!questionData?.id) return;
@@ -319,23 +318,34 @@ const ViewQuestionPage = () => {
                                                     <div className="mb-4">
                                                         <div
                                                             className="p-4"
-                                                            style={{
-                                                                backgroundColor: '#fff5f5',
-                                                                border: '2px solid #fecaca',
-                                                                borderRadius: '12px',
-                                                                boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
-                                                            }}
+                                                            style={
+                                                                {
+                                                                    // backgroundColor: '#fff5f5',
+                                                                    // border: '2px solid #fecaca',
+                                                                    // borderRadius: '12px',
+                                                                    // boxShadow: '0 2px 8px rgba(220, 53, 69, 0.1)'
+                                                                }
+                                                            }
                                                         >
+                                                            <div className="d-flex align-items-center mb-3">
+                                                                <i
+                                                                    className="fas fa-question-circle text-primary"
+                                                                    style={{ fontSize: '18px', marginRight: '12px' }}
+                                                                ></i>
+                                                                <h6 className="mb-0 text-primary fw-bold">Question</h6>
+                                                            </div>
                                                             <p
                                                                 className="mb-0"
                                                                 style={{
-                                                                    fontSize: '18px',
+                                                                    fontSize: '16px',
                                                                     lineHeight: '1.6',
-                                                                    color: '#dc2626',
+                                                                    // color: '#dc2626',
                                                                     fontWeight: '500'
                                                                 }}
                                                             >
-                                                                {showFullQuestion ? questionData.question : truncateText(questionData.question)}
+                                                                {showFullQuestion
+                                                                    ? questionData.question
+                                                                    : truncateText(questionData.question)}
                                                             </p>
                                                             {questionData.question && questionData.question.length > 200 && (
                                                                 <div className="mt-3 d-flex justify-content-end">
@@ -350,13 +360,16 @@ const ViewQuestionPage = () => {
                                                                             fontWeight: '500'
                                                                         }}
                                                                     >
-                                                                        <i className={`fas fa-${showFullQuestion ? 'eye-slash' : 'eye'}`} style={{ marginRight: '6px' }}></i>
+                                                                        <i
+                                                                            className={`fas fa-${showFullQuestion ? 'eye-slash' : 'eye'}`}
+                                                                            style={{ marginRight: '6px' }}
+                                                                        ></i>
                                                                         {showFullQuestion ? 'Show Less' : 'Show More'}
                                                                     </Button>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="mt-3 d-flex align-items-center">
+                                                        <div className="mt-3 d-flex align-items-end justify-content-end">
                                                             <i className="fas fa-clock text-danger" style={{ marginRight: '12px' }}></i>
                                                             <span className="text-muted fw-bold">
                                                                 Asked on: <DateTimeFormatter date={questionData.createdAt} />
@@ -385,13 +398,15 @@ const ViewQuestionPage = () => {
                                                                 <p
                                                                     className="mb-0"
                                                                     style={{
-                                                                        fontSize: '18px',
+                                                                        fontSize: '16px',
                                                                         lineHeight: '1.6',
                                                                         color: '#1e40af',
                                                                         fontWeight: '500'
                                                                     }}
                                                                 >
-                                                                    {showFullAnswer ? questionData.answer : truncateText(questionData.answer)}
+                                                                    {showFullAnswer
+                                                                        ? questionData.answer
+                                                                        : truncateText(questionData.answer)}
                                                                 </p>
                                                                 {questionData.answer && questionData.answer.length > 200 && (
                                                                     <div className="mt-3 d-flex justify-content-end">
@@ -406,15 +421,18 @@ const ViewQuestionPage = () => {
                                                                                 fontWeight: '500'
                                                                             }}
                                                                         >
-                                                                            <i className={`fas fa-${showFullAnswer ? 'eye-slash' : 'eye'}`} style={{ marginRight: '6px' }}></i>
+                                                                            <i
+                                                                                className={`fas fa-${showFullAnswer ? 'eye-slash' : 'eye'}`}
+                                                                                style={{ marginRight: '6px' }}
+                                                                            ></i>
                                                                             {showFullAnswer ? 'Show Less' : 'Show More'}
                                                                         </Button>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <div className="mt-3 d-flex flex-column gap-2">
-                                                                {questionData.answeredBy && (
-                                                                    <div className="d-flex align-items-center">
+                                                                {/* {questionData.answeredBy && (
+                                                                    <div className="d-flex align-items-end justify-content-end">
                                                                         <i
                                                                             className="fas fa-user text-success"
                                                                             style={{ marginRight: '12px' }}
@@ -426,9 +444,9 @@ const ViewQuestionPage = () => {
                                                                             </span>
                                                                         </span>
                                                                     </div>
-                                                                )}
+                                                                )} */}
                                                                 {questionData.answeredAt && (
-                                                                    <div className="d-flex align-items-center">
+                                                                    <div className="d-flex align-items-end justify-content-end">
                                                                         <i
                                                                             className="fas fa-clock text-success"
                                                                             style={{ marginRight: '12px' }}
@@ -476,14 +494,14 @@ const ViewQuestionPage = () => {
                                                             ></i>
                                                             Question Information
                                                         </h6>
-                                                        <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                                                        <div style={{ fontSize: '16px', lineHeight: '1.6' }}>
                                                             <div
                                                                 className="info-field-container mb-3 py-2"
                                                                 style={{ borderBottom: '1px solid #f1f1f1' }}
                                                             >
                                                                 <span
                                                                     className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '13px' }}
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '15px' }}
                                                                 >
                                                                     <i
                                                                         className="fas fa-check-circle"
@@ -493,7 +511,7 @@ const ViewQuestionPage = () => {
                                                                 </span>
                                                                 <span
                                                                     className="field-value"
-                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '14px' }}
+                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '16px' }}
                                                                 >
                                                                     {getStatusBadge(
                                                                         questionData.status ||
@@ -507,7 +525,7 @@ const ViewQuestionPage = () => {
                                                             >
                                                                 <span
                                                                     className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '13px' }}
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '15px' }}
                                                                 >
                                                                     <i
                                                                         className="fas fa-user"
@@ -517,10 +535,10 @@ const ViewQuestionPage = () => {
                                                                 </span>
                                                                 <span
                                                                     className="field-value"
-                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '14px' }}
+                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '16px' }}
                                                                 >
                                                                     {questionData.isAnonymous && (
-                                                                        <Badge variant="info" className="ms-2" style={{ fontSize: '10px' }}>
+                                                                        <Badge variant="info" className="ms-2" style={{ fontSize: '12px' }}>
                                                                             {questionData.isAnonymous
                                                                                 ? 'Anonymous'
                                                                                 : questionData.askedBy?.fullName || 'Unknown'}
@@ -534,7 +552,7 @@ const ViewQuestionPage = () => {
                                                             >
                                                                 <span
                                                                     className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '13px' }}
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '15px' }}
                                                                 >
                                                                     <i
                                                                         className="fas fa-heart"
@@ -544,7 +562,7 @@ const ViewQuestionPage = () => {
                                                                 </span>
                                                                 <span
                                                                     className="field-value"
-                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '14px' }}
+                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '16px' }}
                                                                 >
                                                                     <Badge
                                                                         variant="light"
@@ -564,7 +582,7 @@ const ViewQuestionPage = () => {
                                                             >
                                                                 <span
                                                                     className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '13px' }}
+                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '15px' }}
                                                                 >
                                                                     <i
                                                                         className="fas fa-calendar-plus"
@@ -574,7 +592,7 @@ const ViewQuestionPage = () => {
                                                                 </span>
                                                                 <span
                                                                     className="field-value"
-                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '14px' }}
+                                                                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '16px' }}
                                                                 >
                                                                     <DateTimeFormatter date={questionData.createdAt} />
                                                                 </span>
@@ -590,7 +608,7 @@ const ViewQuestionPage = () => {
                                                                             style={{
                                                                                 fontWeight: 'bold',
                                                                                 color: '#495057',
-                                                                                fontSize: '13px'
+                                                                                fontSize: '15px'
                                                                             }}
                                                                         >
                                                                             <i
@@ -604,7 +622,7 @@ const ViewQuestionPage = () => {
                                                                             style={{
                                                                                 color: '#212529',
                                                                                 fontWeight: 'normal',
-                                                                                fontSize: '14px'
+                                                                                fontSize: '16px'
                                                                             }}
                                                                         >
                                                                             <DateTimeFormatter date={questionData.updatedAt} />
@@ -1019,14 +1037,14 @@ const ViewQuestionPage = () => {
                         display: block !important;
                         min-width: auto !important;
                         margin-bottom: 4px !important;
-                        font-size: 13px !important;
+                        font-size: 15px !important;
                         color: #495057 !important;
                     }
 
                     .field-value {
                         display: block !important;
                         text-align: left !important;
-                        font-size: 14px !important;
+                        font-size: 16px !important;
                         font-weight: 600 !important;
                         color: #212529 !important;
                         padding-left: 0 !important;
@@ -1036,11 +1054,11 @@ const ViewQuestionPage = () => {
 
                 @media (max-width: 576px) {
                     .field-label {
-                        font-size: 12px !important;
+                        font-size: 14px !important;
                     }
 
                     .field-value {
-                        font-size: 13px !important;
+                        font-size: 15px !important;
                     }
                 }
             `}</style>

@@ -1690,7 +1690,25 @@ export class SurveyService {
 
       const updatedSurvey = await this.surveyRepository.save(survey);
 
-      // 8. Return response with auto-filled information (like createSurvey)
+      // 8. Handle sessions update if provided
+      let sessionsUpdateResult = {
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        total: 0,
+      };
+
+      if (updateSurveyDto.sessions !== undefined) {
+        const result = await this.updateSurveySessions(
+          surveyId,
+          updateSurveyDto.sessions,
+          survey,
+          event,
+        );
+        sessionsUpdateResult = result;
+      }
+
+      // 9. Return response with auto-filled information (like createSurvey)
       return {
         message: 'Survey successfully updated',
         survey: updatedSurvey,
@@ -1706,6 +1724,7 @@ export class SurveyService {
           },
         },
         existingSessionsValidated: existingSessions.length,
+        sessionsUpdateResult,
       };
     } catch (error: any) {
       if (
@@ -2218,6 +2237,104 @@ export class SurveyService {
         'Validate single session with survey and event',
       );
       throw new ValidationException('Session validation failed');
+    }
+  }
+
+  // Helper method to update survey sessions (create, update, delete)
+  private async updateSurveySessions(
+    surveyId: string,
+    newSessionsData: CreateSessionDto[],
+    survey: Survey,
+    event: Event,
+  ) {
+    try {
+      // Get existing sessions from database
+      const existingSessions = await this.surveySessionRepository.find({
+        where: { surveyId },
+      });
+
+      const existingSessionsMap = new Map(
+        existingSessions.map(s => [s.id, s])
+      );
+
+      // Track sessions from the incoming data that have IDs
+      const incomingSessionIds = new Set(
+        newSessionsData
+          .map(s => (s as any).id)
+          .filter(id => id !== undefined)
+      );
+
+      let created = 0;
+      let updated = 0;
+      let deleted = 0;
+
+      // Validate all sessions before processing
+      if (newSessionsData && newSessionsData.length > 0) {
+        await this.validateSessionsWithSuggestions(
+          newSessionsData,
+          event,
+          new Date(survey.startDate),
+          new Date(survey.endDate),
+        );
+      }
+
+      // Process each session in the incoming data
+      for (const sessionData of newSessionsData) {
+        const sessionId = (sessionData as any).id;
+
+        if (sessionId && existingSessionsMap.has(sessionId)) {
+          // Update existing session
+          const existingSession = existingSessionsMap.get(sessionId);
+          if (existingSession) {
+            existingSession.name = sessionData.name;
+            existingSession.date = new Date(sessionData.date);
+            existingSession.startTime = sessionData.startTime;
+            existingSession.endTime = sessionData.endTime;
+            existingSession.description = sessionData.description;
+            existingSession.isActive = sessionData.isActive ?? true;
+
+            await this.surveySessionRepository.save(existingSession);
+            updated++;
+          }
+        } else {
+          // Create new session (no ID or ID not found)
+          const newSession = new SurveySession();
+          newSession.surveyId = surveyId;
+          newSession.name = sessionData.name;
+          newSession.date = new Date(sessionData.date);
+          newSession.startTime = sessionData.startTime;
+          newSession.endTime = sessionData.endTime;
+          newSession.description = sessionData.description;
+          newSession.isActive = sessionData.isActive ?? true;
+
+          await this.surveySessionRepository.save(newSession);
+          created++;
+        }
+      }
+
+      // Delete sessions that exist in DB but not in incoming data
+      for (const [sessionId, session] of existingSessionsMap) {
+        if (!incomingSessionIds.has(sessionId)) {
+          // Delete responses first
+          await this.surveyResponseRepository.delete({ sessionId });
+          // Then delete the session
+          await this.surveySessionRepository.delete(sessionId);
+          deleted++;
+        }
+      }
+
+      return {
+        created,
+        updated,
+        deleted,
+        total: newSessionsData.length,
+      };
+    } catch (error: any) {
+      if (error instanceof ValidationException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Update survey sessions');
+      throw new ValidationException('Failed to update survey sessions');
     }
   }
 

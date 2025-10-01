@@ -12,6 +12,7 @@ import settingsReducer from './reducer/settingsReducer';
 import withdrawReducer from './reducer/withdrawReducer';
 import surveyReducer from './reducer/surveyReducer';
 import qaReducer from './reducer/qaReducer';
+import pollingReducer from './reducer/pollingReducer';
 import loadingReducer from './reducer/loadingReducer';
 import errorReducer from './reducer/errorReducer';
 import ableReducer from './ableReducer';
@@ -34,6 +35,7 @@ const reducer = combineReducers({
     withdraw: withdrawReducer,
     survey: surveyReducer,
     qa: qaReducer,
+    polling: pollingReducer,
     loading: loadingReducer,
     error: errorReducer
 });

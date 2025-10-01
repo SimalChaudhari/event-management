@@ -105,6 +105,10 @@ export class UpdateSurveyDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsArray()
+  @IsOptional()
+  sessions?: CreateSessionDto[];
 }
 
 

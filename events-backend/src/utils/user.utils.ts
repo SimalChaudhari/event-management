@@ -100,6 +100,8 @@ export class UserUtils {
   
     return {
       id: user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
       name: user.firstName && user.lastName 
         ? `${user.firstName} ${user.lastName}`.trim() 
         : user.firstName || 'Unknown Speaker',

@@ -218,6 +218,33 @@ export class PollingController {
     }
   }
 
+  // Get All Polls for Admin (No filters required)
+  @Get('admin/all')
+  @Roles(UserRole.Admin)
+  async getAllPollsForAdmin(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const polls = await this.pollingService.getAllPollsForAdmin();
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'All polls retrieved successfully',
+        data: polls,
+        metadata: {
+          total: polls.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get all polls for admin', req.user?.id);
+      throw error;
+    }
+  }
+
   // Get Poll by ID
   @Get(':id')
   async getPollById(

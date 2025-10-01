@@ -170,6 +170,7 @@ const AddSurveyPage = () => {
                 startTime: formatTime(formData.startTime),
                 endTime: formatTime(formData.endTime),
                 sessions: sessionsList.map(session => ({
+                    ...(session.id && { id: session.id }), // Include ID if it exists (for updates)
                     name: session.name,
                     date: session.date,
                     startTime: formatTime(session.startTime),
@@ -187,10 +188,12 @@ const AddSurveyPage = () => {
             }
 
             // Only navigate if the action was successful
-            if (response && !response.error) {
+            if (response && response.success) {
                 navigate('/surveys');
+            } else if (response && response.error) {
+                // Error already displayed via toast, stay on page
+                console.error('Survey save failed');
             }
-            // If error occurs, stay on page (backend will handle error display)
         } catch (error) {
             console.error('Error saving survey:', error);
             // Stay on page if error occurs (backend will handle error display)

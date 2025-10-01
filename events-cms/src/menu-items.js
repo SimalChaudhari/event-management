@@ -126,7 +126,17 @@ const chartData = {
                             // icon: 'feather icon-clipboard',
                             url: '/surveys'
                         },
-
+                        {
+                            id: 'polling',
+                            title: 'Polling',
+                            type: 'item',
+                            // icon: 'feather icon-bar-chart-2',
+                            url: '/polls',
+                            badge: {
+                                title: 'NEW',
+                                type: 'badge-info'
+                            }
+                        },
                         {
                             id: 'order ',
                             title: 'Orders ',

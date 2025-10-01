@@ -390,6 +390,7 @@ export class RegisterEventService {
           'event',
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
+          'event.eventSpeakers.speaker.speakerProfile',
           'event.category',
           'event.category.category',
           'event.galleries',

@@ -210,7 +210,7 @@ const SurveyBasicComponent = ({ surveyData }) => {
                         <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
                             <InfoField 
                                 label="Event Price" 
-                                value={surveyData.eventInfo.price || 'N/A'} 
+                                value={surveyData.eventInfo?.price || 'N/A'} 
                                 iconClass="fas fa-hashtag" 
                             />
                             <InfoField 

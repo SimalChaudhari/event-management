@@ -100,3 +100,16 @@ export const UNLIKE_QUESTION = 'UNLIKE_QUESTION';
 export const UPDATE_QUESTION = 'UPDATE_QUESTION';
 export const DELETE_QUESTION = 'DELETE_QUESTION';
 export const CLEAR_QA_ERROR = 'CLEAR_QA_ERROR';
+
+// Polling Action Types
+export const POLLING_LOADING = 'POLLING_LOADING';
+export const POLLING_ERROR = 'POLLING_ERROR';
+export const POLLING_LIST = 'POLLING_LIST';
+export const POLL_BY_ID = 'POLL_BY_ID';
+export const CREATE_POLL = 'CREATE_POLL';
+export const UPDATE_POLL = 'UPDATE_POLL';
+export const DELETE_POLL = 'DELETE_POLL';
+export const TOGGLE_POLL_LIVE = 'TOGGLE_POLL_LIVE';
+export const POLL_RESULTS = 'POLL_RESULTS';
+export const POLL_VOTES = 'POLL_VOTES';
+export const CLEAR_POLLING_ERROR = 'CLEAR_POLLING_ERROR';
