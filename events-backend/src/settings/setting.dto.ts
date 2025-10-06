@@ -46,6 +46,18 @@ export class CreateBannerEventDto {
     readonly hyperlink?: string;
 }
 
+export class CreateLogoDto {
+    @IsString()
+    readonly id?: string;
+
+    @IsString()
+    readonly imageUrl!: string;
+
+    @IsOptional()
+    @IsString()
+    readonly hyperlink?: string;
+}
+
 // DTO for creating permission templates (admin only)
 export class CreatePermissionTemplateDto {
     @IsNotEmpty()

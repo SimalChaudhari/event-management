@@ -24,6 +24,7 @@ export const CATEGORY_LOADING = 'CATEGORY_LOADING';
 export const SETTINGS_LOADING = 'SETTINGS_LOADING';
 export const WITHDRAW_LOADING = 'WITHDRAW_LOADING';
 export const PROMOTIONAL_OFFER_LOADING = 'PROMOTIONAL_OFFER_LOADING';
+export const LOGS_LOADING = 'LOGS_LOADING';
 
 // Error Action Types for all reducers
 export const EVENT_ERROR = 'EVENT_ERROR';
@@ -113,3 +114,11 @@ export const TOGGLE_POLL_LIVE = 'TOGGLE_POLL_LIVE';
 export const POLL_RESULTS = 'POLL_RESULTS';
 export const POLL_VOTES = 'POLL_VOTES';
 export const CLEAR_POLLING_ERROR = 'CLEAR_POLLING_ERROR';
+
+// Logs Action Types
+export const LOGS_ERROR = 'LOGS_ERROR';
+export const LOGS_LIST = 'LOGS_LIST';
+export const LOG_BY_ID = 'LOG_BY_ID';
+export const LOGS_STATISTICS = 'LOGS_STATISTICS';
+export const CREATE_SAMPLE_LOGS = 'CREATE_SAMPLE_LOGS';
+export const CLEAR_LOGS_ERROR = 'CLEAR_LOGS_ERROR';

@@ -14,6 +14,8 @@ import {
   Req,
   UnauthorizedException,
   BadRequestException,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Response } from 'express';
@@ -21,7 +23,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import * as fs from 'fs';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { Roles } from './../jwt/roles.decorator';
+import { RolesGuard } from './../jwt/roles.guard';
+import { UserRole } from './../user/users.entity';
 // Import validation DTOs
 import {
   RegisterDto,
@@ -32,6 +38,8 @@ import {
   VerifyOTPDto,
   ResetPasswordDto,
   RefreshTokenDto,
+  CsvUserDto,
+  CsvUploadResponseDto,
 } from '../validation/auth.validation';
 
 @Controller('api/auth')
@@ -326,6 +334,292 @@ export class AuthController {
         success: false,
         message: error.message,
       });
+    }
+  }
+
+  @Post('upload-csv-users')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('csvFile', {
+      storage: diskStorage({
+        destination: './uploads/temp',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only CSV files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
+    }),
+  )
+  async uploadCsvUsers(
+    @Res() response: Response,
+
+    @Body() body: { users?: CsvUserDto[] },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try {
+      let csvData: CsvUserDto[] = [];
+
+      // Handle CSV file upload using professional CSV processor
+      if (file) {
+        try {
+          const csvProcessingResult = await this.authService.processCsvFile(file.path);
+          
+          if (!csvProcessingResult.success) {
+            return response.status(HttpStatus.BAD_REQUEST).json({
+              success: false,
+              message: 'CSV file processing failed',
+              errors: csvProcessingResult.errors,
+              warnings: csvProcessingResult.warnings,
+              statistics: csvProcessingResult.statistics
+            });
+          }
+          
+          csvData = csvProcessingResult.data;
+          
+          // Clean up temp file
+          await this.authService.cleanupTempFile(file.path);
+          
+        } catch (parseError: any) {
+          return response.status(HttpStatus.BAD_REQUEST).json({
+            success: false,
+            message: 'Failed to parse CSV file',
+            error: parseError.message,
+          });
+        }
+      } 
+      // Handle JSON data
+      else if (body.users && Array.isArray(body.users) && body.users.length > 0) {
+        csvData = body.users;
+      } 
+      else {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'Either CSV file or JSON data is required',
+        });
+      }
+
+      // Filter out invalid users and log them
+      const validUsers: CsvUserDto[] = [];
+      const skippedUsers: string[] = [];
+      
+      csvData.forEach((user, index) => {
+        const missingFields: string[] = [];
+        
+        if (!user.firstName || user.firstName.trim() === '') missingFields.push('firstName');
+        if (!user.lastName || user.lastName.trim() === '') missingFields.push('lastName');
+        if (!user.email || user.email.trim() === '') missingFields.push('email');
+        if (!user.mobile || user.mobile.trim() === '') missingFields.push('mobile');
+        
+        if (missingFields.length > 0) {
+          skippedUsers.push(`Row ${index + 1}: Skipped due to missing fields (${missingFields.join(', ')})`);
+        } else {
+          validUsers.push(user);
+        }
+      });
+
+      if (validUsers.length === 0) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'No valid users found in CSV data',
+          skippedUsers: skippedUsers,
+        });
+      }
+
+      const result = await this.authService.uploadCsvUsers(validUsers);
+      
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: result.message,
+        data: {
+          totalProcessed: result.totalProcessed,
+          newUsersCreated: result.newUsersCreated,
+          existingUsersSkipped: result.existingUsersSkipped,
+          passwordsGenerated: result.passwordsGenerated,
+          emailsSent: result.emailsSent,
+          emailsFailed: result.emailsFailed,
+          details: result.details,
+          skippedUsers: skippedUsers.length > 0 ? skippedUsers : undefined,
+        },
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: error.message || 'Failed to process CSV upload',
+      });
+    }
+  }
+
+  /**
+   * Bulk delete users with foreign key handling
+   * DELETE /auth/bulk-delete-users
+   */
+  @Delete('bulk-delete-users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async bulkDeleteUsers(@Body() body: { userIds: string[] }) {
+    try {
+      const { userIds } = body;
+      
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        return {
+          success: false,
+          message: 'User IDs array is required',
+          statusCode: 400,
+        };
+      }
+
+      console.log(`🗑️ Bulk delete API called for ${userIds.length} users`);
+      
+      const result = await this.authService.bulkDeleteUsers(userIds);
+      
+      return {
+        success: true,
+        message: result.message,
+        deletedCount: result.deletedCount,
+        skippedUsers: result.skippedUsers,
+        statusCode: 200,
+      };
+    } catch (error: any) {
+      console.error('❌ Bulk delete API error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete users',
+        statusCode: error.status || 500,
+      };
+    }
+  }
+
+  /**
+   * Simple delete all users - handles foreign key constraints gracefully  
+   * DELETE /auth/delete-all-users
+   */
+  @Get('email-status/:sessionId')
+  @UseGuards(JwtAuthGuard)
+  async getEmailStatus(@Param('sessionId') sessionId: string, @Res() response: Response) {
+    try {
+      if (!sessionId) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'Session ID is required',
+        });
+      }
+
+      const logEntry = await this.authService.getEmailStatusFromLogs(sessionId);
+      
+      if (!logEntry) {
+        return response.status(HttpStatus.NOT_FOUND).json({
+          success: false,
+          message: 'Log entry not found',
+        });
+      }
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        data: {
+          sessionId: logEntry.sessionId,
+          emailsSent: logEntry.emailsSent,
+          emailsFailed: logEntry.emailsFailed,
+          emailsPending: logEntry.emailsPending,
+          emailsTotal: logEntry.emailsTotal,
+          status: logEntry.status,
+          emailDetails: logEntry.emailDetails ? JSON.parse(logEntry.emailDetails) : null,
+          summary: logEntry.summary,
+          updatedAt: logEntry.updatedAt,
+        },
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: error.message || 'Failed to get email status',
+      });
+    }
+  }
+
+  @Delete('delete-all-users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async deleteAllUsers() {
+    try {
+      console.log(`🗑️ DELETE ALL USERS API called`);
+      
+      // Step 1: Get all users
+      const allUsers = await this.authService.userRepository.find({
+        select: ['id', 'email', 'firstName', 'lastName', 'role']
+      });
+
+      console.log(`🔍 Found ${allUsers.length} total users`);
+
+      if (allUsers.length === 0) {
+        return {
+          success: true,
+          message: 'No users found to delete',
+          deletedCount: 0,
+          skippedCount: 0,
+          statusCode: 200,
+        };
+      }
+
+      // Step 2: Try direct bulk delete first
+      console.log(`🗑️ Attempting bulk delete of ${allUsers.length} users...`);
+      
+      try {
+        const userIds = allUsers.map(user => user.id);
+        const result = await this.authService.userRepository.delete(userIds);
+        
+        const deletedCount = result.affected || 0;
+        
+        return {
+          success: true,
+          message: `Successfully deleted ${deletedCount} users out of ${allUsers.length}`,
+          deletedCount: deletedCount,
+          skippedCount: allUsers.length - deletedCount,
+          statusCode: 200,
+        };
+
+      } catch (bulkError: any) {
+        console.log(`⚠️ Bulk delete failed, trying individual deletes...`);
+        
+        let deletedCount = 0;
+        let skippedCount = 0;
+        
+        // Individual delete with error handling
+        for (const user of allUsers) {
+          try {
+            await this.authService.userRepository.delete(user.id);
+            deletedCount++;
+            console.log(`✅ Deleted user: ${user.email}`);
+          } catch (deleteError: any) {
+            skippedCount++;
+            console.log(`⏭️ Skipped ${user.email} - has foreign key dependencies`);
+          }
+        }
+        
+        return {
+          success: true,
+          message: `Deleted ${deletedCount} users, skipped ${skippedCount} users (foreign key constraints)`,
+          deletedCount: deletedCount,
+          skippedCount: skippedCount,
+          statusCode: 200,
+        };
+      }
+
+    } catch (error: any) {
+      console.error('❌ Delete all users API error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete all users',
+        statusCode: error.status || 500,
+      };
     }
   }
 

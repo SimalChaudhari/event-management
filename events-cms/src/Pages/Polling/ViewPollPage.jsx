@@ -21,18 +21,6 @@ const ViewPollPage = () => {
         }
     }, [dispatch, id]);
 
-    const handleToggleLive = async () => {
-        try {
-            await dispatch(togglePollLive(id));
-            dispatch(getPollById(id));
-        } catch (error) {
-            console.error('Error toggling poll status:', error);
-        }
-    };
-
-    const handleEdit = () => {
-        navigate(`${POLLING_PATHS.EDIT_POLL}/${id}`);
-    };
 
     const handleBack = () => {
         navigate(POLLING_PATHS.LIST_POLLS);
@@ -193,17 +181,6 @@ const ViewPollPage = () => {
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View Poll</h4>
                         <div className="d-flex gap-2">
-                            <Button 
-                                variant={poll?.isLive ? 'success' : 'secondary'} 
-                                onClick={handleToggleLive}
-                            >
-                                <i className={`fas ${poll?.isLive ? 'fa-pause' : 'fa-play'}`} style={{ marginRight: '8px' }}></i>
-                                {poll?.isLive ? 'Live' : 'Go Live'}
-                            </Button>
-                            <Button variant="primary" onClick={handleEdit}>
-                                <i className="fas fa-edit" style={{ marginRight: '8px' }}></i>
-                                Edit
-                            </Button>
                             <Button variant="secondary" onClick={handleBack}>
                                 <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
                                 Back
@@ -321,77 +298,192 @@ const ViewPollPage = () => {
 
                             {/* Results & Analytics Tab */}
                             <Tab.Pane eventKey="results">
-                                <div className="p-2 bg-light">
+                                <div className="p-2">
+                                    {/* Vote Distribution Chart */}
                                     <InfoCard title="Vote Distribution" iconClass="fas fa-pie-chart" borderColor="#28a745">
                                         <Row>
                                             <Col lg={8} md={12}>
                                                 {poll?.options && poll.options.length > 0 ? (
-                                                    poll.options.map((option, index) => {
-                                                        const percentage = totalVotes > 0
-                                                            ? Math.round((option.voteCount / totalVotes) * 100)
-                                                            : 0;
+                                                    <div className="vote-options-container">
+                                                        {poll.options.map((option, index) => {
+                                                            const percentage = totalVotes > 0
+                                                                ? Math.round((option.voteCount / totalVotes) * 100)
+                                                                : 0;
 
-                                                        return (
-                                                            <div key={option.id} className="mb-3">
-                                                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                                                    <div className="d-flex align-items-center gap-2" style={{ flex: '1', minWidth: '0' }}>
-                                                                        <Badge bg="light" text="dark" style={{ fontSize: '0.9rem', padding: '6px 12px', minWidth: '40px', flexShrink: '0' }}>
-                                                                            {String.fromCharCode(65 + index)}
-                                                                        </Badge>
-                                                                        <strong style={{ fontSize: '0.95rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                                                                            {option.optionText}
-                                                                        </strong>
+                                                            return (
+                                                                <div key={option.id} className="vote-option-item">
+                                                                    {/* Option Header */}
+                                                                    <div className="vote-option-header">
+                                                                        <div className="option-info">
+                                                                            <Badge 
+                                                                                bg="primary" 
+                                                                                style={{ 
+                                                                                    fontSize: '12px', 
+                                                                                    padding: '4px 8px', 
+                                                                                    minWidth: '32px',
+                                                                                    fontWeight: '600',
+                                                                                    borderRadius: '12px'
+                                                                                }}
+                                                                            >
+                                                                                {String.fromCharCode(65 + index)}
+                                                                            </Badge>
+                                                                            <div className="option-text">
+                                                                                <strong style={{ 
+                                                                                    fontSize: '14px', 
+                                                                                    color: '#2c3e50',
+                                                                                    lineHeight: '1.3',
+                                                                                    marginLeft: '8px'
+                                                                                }}>
+                                                                                    {option.optionText}
+                                                                                </strong>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="vote-stats">
+                                                                            <div className="vote-count">
+                                                                                <span style={{ 
+                                                                                    fontSize: '16px', 
+                                                                                    fontWeight: '700', 
+                                                                                    color: '#495057',
+                                                                                    marginRight: '4px'
+                                                                                }}>
+                                                                                    {option.voteCount}
+                                                                                </span>
+                                                                                <span style={{ 
+                                                                                    fontSize: '10px', 
+                                                                                    color: '#6c757d',
+                                                                                    textTransform: 'uppercase',
+                                                                                    letterSpacing: '0.5px'
+                                                                                }}>
+                                                                                    votes
+                                                                                </span>
+                                                                            </div>
+                                                                            <Badge 
+                                                                                bg={percentage >= 50 ? 'success' : percentage >= 25 ? 'info' : 'warning'}
+                                                                                style={{ 
+                                                                                    fontSize: '12px', 
+                                                                                    padding: '4px 12px', 
+                                                                                    minWidth: '50px',
+                                                                                    fontWeight: '600',
+                                                                                    borderRadius: '12px'
+                                                                                }}
+                                                                            >
+                                                                                {percentage}%
+                                                                            </Badge>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="d-flex align-items-center gap-2" style={{ flexShrink: '0', marginLeft: '10px' }}>
-                                                                        <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                                                            {option.voteCount}
-                                                                        </span>
-                                                                        <Badge bg="primary" style={{ fontSize: '0.85rem', padding: '6px 12px', minWidth: '55px' }}>
-                                                                            {percentage}%
-                                                                        </Badge>
+                                                                    
+                                                                    {/* Progress Bar */}
+                                                                    <div className="progress-container">
+                                                                        <div 
+                                                                            className="progress" 
+                                                                            style={{ 
+                                                                                height: '12px', 
+                                                                                borderRadius: '6px',
+                                                                                backgroundColor: '#e9ecef',
+                                                                                overflow: 'hidden',
+                                                                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                                                                            }}
+                                                                        >
+                                                                            <div
+                                                                                className={`progress-bar ${
+                                                                                    percentage >= 50 ? 'bg-success' : percentage >= 25 ? 'bg-info' : 'bg-warning'
+                                                                                }`}
+                                                                                role="progressbar"
+                                                                                style={{ 
+                                                                                    width: `${percentage}%`,
+                                                                                    transition: 'width 0.6s ease-in-out',
+                                                                                    borderRadius: '6px'
+                                                                                }}
+                                                                                aria-valuenow={percentage}
+                                                                                aria-valuemin="0"
+                                                                                aria-valuemax="100"
+                                                                            >
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="progress" style={{ height: '24px', borderRadius: '5px' }}>
-                                                                    <div
-                                                                        className={`progress-bar ${
-                                                                            percentage >= 50 ? 'bg-success' : percentage >= 25 ? 'bg-info' : 'bg-warning'
-                                                                        }`}
-                                                                        role="progressbar"
-                                                                        style={{ width: `${percentage}%`, fontSize: '0.85rem' }}
-                                                                        aria-valuenow={percentage}
-                                                                        aria-valuemin="0"
-                                                                        aria-valuemax="100"
-                                                                    >
-                                                                        {percentage}%
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
+                                                            );
+                                                        })}
+                                                    </div>
                                                 ) : (
-                                                    <div className="text-center py-4">
-                                                        <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc' }}></i>
-                                                        <p className="text-muted mt-3">No options available</p>
+                                                    <div className="text-center py-5">
+                                                        <i className="fas fa-inbox" style={{ fontSize: '4rem', color: '#dee2e6', marginBottom: '20px' }}></i>
+                                                        <h5 className="text-muted mb-2">No Options Available</h5>
+                                                        <p className="text-muted mb-0">This poll doesn't have any voting options configured.</p>
                                                     </div>
                                                 )}
                                             </Col>
-                                            <Col lg={4} md={12}>
-                                                <div style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', padding: '20px', border: '1px solid #e9ecef' }}>
-                                                    <h6 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#2c3e50' }}>
-                                                        <i className="fas fa-chart-line text-primary me-2"></i>
-                                                        Summary Statistics
-                                                    </h6>
-                                                    <div className="mb-3 pb-3" style={{ borderBottom: '1px solid #dee2e6' }}>
-                                                        <small className="text-muted d-block mb-1">Total Responses</small>
-                                                        <h4 className="mb-0 text-primary">{totalVotes}</h4>
+                                            
+                                            {/* Summary Statistics Sidebar */}
+                                            <Col lg={4} md={12} className="mt-lg-0 mt-4">
+                                                <div 
+                                                    className="summary-stats-card"
+                                                    style={{ 
+                                                        backgroundColor: '#ffffff', 
+                                                        borderRadius: '8px', 
+                                                        padding: '16px', 
+                                                        border: '1px solid #e9ecef',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                                                        height: 'fit-content'
+                                                    }}
+                                                >
+                                                    <div className="d-flex align-items-center mb-3">
+                                                        <div 
+                                                            style={{ 
+                                                                backgroundColor: '#007bff', 
+                                                                borderRadius: '6px', 
+                                                                padding: '6px', 
+                                                                marginRight: '10px'
+                                                            }}
+                                                        >
+                                                            <i className="fas fa-chart-line text-white" style={{ fontSize: '14px' }}></i>
+                                                        </div>
+                                                        <h6 className="mb-0" style={{ fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>
+                                                            Summary Statistics
+                                                        </h6>
                                                     </div>
-                                                    <div className="mb-3 pb-3" style={{ borderBottom: '1px solid #dee2e6' }}>
-                                                        <small className="text-muted d-block mb-1">Unique Voters</small>
-                                                        <h4 className="mb-0 text-success">{poll?.totalVoters || 0}</h4>
-                                                    </div>
-                                                    <div>
-                                                        <small className="text-muted d-block mb-1">Response Rate</small>
-                                                        <h4 className="mb-0 text-info">{totalVotes > 0 ? '100%' : '0%'}</h4>
+                                                    
+                                                    {/* Stats Items */}
+                                                    <div className="stats-items">
+                                                        <div className="stat-item">
+                                                            <div className="stat-icon">
+                                                                <i className="fas fa-vote-yea text-primary"></i>
+                                                            </div>
+                                                            <div className="stat-content">
+                                                                <div className="stat-label">Total Votes</div>
+                                                                <div className="stat-value text-primary">{totalVotes}</div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="stat-item">
+                                                            <div className="stat-icon">
+                                                                <i className="fas fa-users text-success"></i>
+                                                            </div>
+                                                            <div className="stat-content">
+                                                                <div className="stat-label">Unique Voters</div>
+                                                                <div className="stat-value text-success">{poll?.totalVoters || 0}</div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="stat-item">
+                                                            <div className="stat-icon">
+                                                                <i className="fas fa-percentage text-info"></i>
+                                                            </div>
+                                                            <div className="stat-content">
+                                                                <div className="stat-label">Participation Rate</div>
+                                                                <div className="stat-value text-info">{totalVotes > 0 ? '100%' : '0%'}</div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="stat-item">
+                                                            <div className="stat-icon">
+                                                                <i className="fas fa-list text-warning"></i>
+                                                            </div>
+                                                            <div className="stat-content">
+                                                                <div className="stat-label">Total Options</div>
+                                                                <div className="stat-value text-warning">{poll?.options?.length || 0}</div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </Col>
@@ -456,7 +548,7 @@ const ViewPollPage = () => {
                 </div>
             </div>
 
-            {/* Custom CSS for Responsive Behavior - Same as Event */}
+            {/* Custom CSS for Responsive Behavior */}
             <style jsx>{`
                 /* Desktop: side-by-side layout */
                 .info-field-container {
@@ -472,6 +564,114 @@ const ViewPollPage = () => {
                 .field-value {
                     text-align: right;
                     flex: 1;
+                }
+
+                /* Results & Analytics Styles */
+                .vote-options-container {
+                    padding: 8px 0;
+                }
+
+                .vote-option-item {
+                    margin-bottom: 16px;
+                    padding: 12px;
+                    background: #ffffff;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                    transition: all 0.3s ease;
+                }
+
+                .vote-option-item:hover {
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    transform: translateY(-2px);
+                }
+
+                .vote-option-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                }
+
+                .option-info {
+                    display: flex;
+                    align-items: center;
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .vote-stats {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex-shrink: 0;
+                }
+
+                .vote-count {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 4px;
+                }
+
+                .progress-container {
+                    margin-top: 4px;
+                }
+
+                /* Summary Statistics Styles */
+                .stats-items {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .stat-item {
+                    display: flex;
+                    align-items: center;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    border-radius: 6px;
+                    border: 1px solid #e9ecef;
+                    transition: all 0.3s ease;
+                }
+
+                .stat-item:hover {
+                    background: #e9ecef;
+                    transform: translateX(4px);
+                }
+
+                .stat-icon {
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #ffffff;
+                    border-radius: 6px;
+                    margin-right: 12px;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                }
+
+                .stat-icon i {
+                    font-size: 14px;
+                }
+
+                .stat-content {
+                    flex: 1;
+                }
+
+                .stat-label {
+                    font-size: 12px;
+                    color: #6c757d;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 4px;
+                    font-weight: 500;
+                }
+
+                .stat-value {
+                    font-size: 16px;
+                    font-weight: 700;
+                    margin: 0;
                 }
 
                 /* Mobile: stacked layout */
@@ -498,6 +698,48 @@ const ViewPollPage = () => {
                         padding-left: 0 !important;
                         margin-left: 0 !important;
                     }
+
+                    .vote-option-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 12px;
+                    }
+
+                    .vote-stats {
+                        align-self: flex-end;
+                    }
+
+                    .option-info {
+                        width: 100%;
+                    }
+
+                    .option-text strong {
+                        margin-left: 0 !important;
+                        margin-top: 8px;
+                        display: block;
+                    }
+
+                    .stats-items {
+                        gap: 16px;
+                    }
+
+                    .stat-item {
+                        padding: 12px;
+                    }
+
+                    .stat-icon {
+                        width: 36px;
+                        height: 36px;
+                        margin-right: 12px;
+                    }
+
+                    .stat-icon i {
+                        font-size: 16px;
+                    }
+
+                    .stat-value {
+                        font-size: 18px;
+                    }
                 }
 
                 @media (max-width: 576px) {
@@ -507,6 +749,45 @@ const ViewPollPage = () => {
 
                     .field-value {
                         font-size: 15px !important;
+                    }
+
+                    .vote-option-item {
+                        padding: 16px;
+                        margin-bottom: 24px;
+                    }
+
+                    .vote-option-header {
+                        gap: 8px;
+                    }
+
+                    .vote-stats {
+                        gap: 12px;
+                    }
+
+                    .vote-count span:first-child {
+                        font-size: 16px !important;
+                    }
+
+                    .vote-count span:last-child {
+                        font-size: 11px !important;
+                    }
+
+                    .stat-item {
+                        padding: 10px;
+                    }
+
+                    .stat-icon {
+                        width: 32px;
+                        height: 32px;
+                        margin-right: 10px;
+                    }
+
+                    .stat-icon i {
+                        font-size: 14px;
+                    }
+
+                    .stat-value {
+                        font-size: 16px;
                     }
                 }
             `}</style>

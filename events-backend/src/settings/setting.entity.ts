@@ -68,6 +68,24 @@ export class BannerEvent {
     @UpdateDateColumn()
     updatedAt!: Date;
 }
+
+@Entity('logos')
+export class Logo {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column('text')
+    imageUrl!: string; // Single logo image URL
+
+    @Column('text', { nullable: true })
+    hyperlink?: string; // Optional hyperlink for logo
+
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @UpdateDateColumn()
+    updatedAt!: Date;
+}
 @Entity('permission_templates')
 export class PermissionTemplate {
     @PrimaryGeneratedColumn('uuid')

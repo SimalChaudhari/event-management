@@ -9,7 +9,8 @@ import {
     SURVEY_PATHS,
     TRANSACTION_PATHS,
     USER_PATHS,
-    POLLING_PATHS
+    POLLING_PATHS,
+    LOGS_PATHS
 } from './utils/constants.js';
 
 /**
@@ -128,6 +129,15 @@ const pollingComponents = {
 const settingsComponents = {
     TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
     PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx'))
+};
+
+/**
+ * Logs related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const logsComponents = {
+    LogsPage: React.lazy(() => import('./Pages/Logs/LogsPage.jsx')),
+    // LogDetailsPage: React.lazy(() => import('./Pages/Logs/LogDetailsPage.jsx'))
 };
 
 /**
@@ -465,6 +475,25 @@ const settingsRoutes = [
 ];
 
 /**
+ * Logs routes configuration
+ * @type {RouteConfig[]}
+ */
+const logsRoutes = [
+    {
+        path: LOGS_PATHS.LIST_LOGS,
+        exact: true,
+        name: 'System Logs',
+        component: logsComponents.LogsPage
+    },
+    {
+        path: LOGS_PATHS.LOG_DETAILS,
+        exact: true,
+        name: 'Log Details',
+        component: logsComponents.LogDetailsPage
+    }
+];
+
+/**
  * Survey routes configuration
  * @type {RouteConfig[]}
  */
@@ -546,6 +575,7 @@ const routes = [
     ...surveyRoutes,
     ...pollingRoutes,
     ...settingsRoutes,
+    ...logsRoutes,
     ...transactionRoutes,
     ...demoRoutes
 ];

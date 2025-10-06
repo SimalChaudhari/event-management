@@ -11,18 +11,22 @@ import { EmailService } from './../service/email.service';
 import { OAuthAuthService } from './oauth-auth.service';
 import { AddressService } from './../user/address.service';
 import { ErrorHandlerService } from './../utils/services/error-handler.service';
+import { CsvUploadLogModule } from '../logs/csv-upload-log.module';
+import { EmailBatchService } from '../utils/email-batch.service';
+import { CsvProcessorService } from '../utils/csv-processor.service';
 
 
 dotenv.config(); // Load environment variables
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, AddressEntity]),
-  JwtModule.register({
-    secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
-    signOptions: { }, // Set your token expiration
-  }),
-
-],
-  providers: [AuthService, OAuthAuthService, EmailService, AddressService, ErrorHandlerService],
+  imports: [
+    TypeOrmModule.forFeature([UserEntity, AddressEntity]),
+    JwtModule.register({
+      secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
+      signOptions: { }, // Set your token expiration
+    }),
+    CsvUploadLogModule,
+  ],
+  providers: [AuthService, OAuthAuthService, EmailService, AddressService, ErrorHandlerService, EmailBatchService, CsvProcessorService],
   controllers: [AuthController],
   exports: [AuthService, OAuthAuthService],
 })

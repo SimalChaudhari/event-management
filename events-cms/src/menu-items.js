@@ -226,6 +226,17 @@ const chartData = {
                     url: '/reports'
                    
                 },
+                {
+                    id: 'logs',
+                    title: 'System Logs',
+                    type: 'item',
+                    icon: 'feather icon-file-text',
+                    url: '/logs',
+                    badge: {
+                        title: 'NEW',
+                        type: 'badge-info'
+                    }
+                },
             ]
         },
      

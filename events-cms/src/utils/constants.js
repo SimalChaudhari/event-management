@@ -104,3 +104,8 @@ export const POLLING_PATHS = {
     POLL_RESULTS: '/polls/results'
 };
 
+export const LOGS_PATHS = {
+    LIST_LOGS: '/logs',
+    LOG_DETAILS: '/logs/:sessionId'
+};
+

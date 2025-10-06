@@ -36,6 +36,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { ContactInfoModule } from './contact-info/contact-info.module';
 import { OrderModule } from './order/order.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { CsvUploadLogModule } from './logs/csv-upload-log.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { CheckoutModule } from './checkout/checkout.module';
     PollingModule,
     EventModule, AgendaModule, AgendaCategoryModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     ChatModule, AttendanceModule, ContactInfoModule, OrderModule, CheckoutModule,
+    CsvUploadLogModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

@@ -200,6 +200,62 @@ export class LinkedInLoginDto {
   accessToken!: string;
 }
 
+// CSV Upload DTOs
+export class CsvUserDto {
+  @IsValidFirstName()
+  firstName!: string;
+
+  @IsValidLastName()
+  lastName!: string;
+
+  @IsValidEmail()
+  email!: string;
+
+  @IsValidMobile()
+  mobile!: string;
+}
+
+export class CsvUploadResponseDto {
+  @IsString()
+  message!: string;
+
+  @IsString()
+  totalProcessed!: string;
+
+  @IsString()
+  newUsersCreated!: string;
+
+  @IsString()
+  existingUsersSkipped!: string;
+
+  @IsString()
+  passwordsGenerated!: string;
+
+  @IsString()
+  emailsSent!: string;
+
+  @IsString()
+  emailsFailed!: string;
+
+  @IsString()
+  details!: string;
+
+  @IsOptional()
+  skippedUsers?: string[];
+
+  @IsOptional()
+  emailStatus?: {
+    totalEmails: number;
+    emailsSent: number;
+    emailsFailed: number;
+    emailsProcessing: number;
+    status: 'sending' | 'completed' | 'background_processing' | 'disabled' | 'none';
+  };
+
+  @IsOptional()
+  sessionId?: string;
+}
+
 // SSO Provider enum
 export enum SSOProvider {
   GOOGLE = 'google',
