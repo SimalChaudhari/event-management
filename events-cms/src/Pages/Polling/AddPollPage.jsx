@@ -23,10 +23,7 @@ const AddPollPage = () => {
         eventId: '',
         speakerId: '',
         timerSeconds: 30,
-        options: [
-            { optionText: '' },
-            { optionText: '' }
-        ]
+        options: [{ optionText: '' }, { optionText: '' }]
     });
 
     const [errors, setErrors] = useState({});
@@ -61,7 +58,7 @@ const AddPollPage = () => {
                 eventId: pollById.event?.id || '',
                 speakerId: pollById.speaker?.id || '',
                 timerSeconds: pollById.question?.timerSeconds || 30,
-                options: pollById.question?.options?.map(opt => ({
+                options: pollById.question?.options?.map((opt) => ({
                     id: opt.id,
                     optionText: opt.optionText
                 })) || [{ optionText: '' }, { optionText: '' }]
@@ -69,52 +66,54 @@ const AddPollPage = () => {
         }
     }, [isEditMode, pollById]);
 
-    const eventOptions = events?.map(event => ({
-        value: event.id,
-        label: event.name
-    })) || [];
+    const eventOptions =
+        events?.map((event) => ({
+            value: event.id,
+            label: event.name
+        })) || [];
 
-    const speakerOptions = speakers?.map(speaker => ({
-        value: speaker.id,
-        label: `${speaker.firstName} ${speaker.lastName}`
-    })) || [];
+    const speakerOptions =
+        speakers?.map((speaker) => ({
+            value: speaker.id,
+            label: `${speaker.firstName} ${speaker.lastName}`
+        })) || [];
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             [name]: value
         }));
         if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
+            setErrors((prev) => ({ ...prev, [name]: '' }));
         }
     };
 
     const handleSelectChange = (name, selectedOption) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             [name]: selectedOption?.value || ''
         }));
         if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
+            setErrors((prev) => ({ ...prev, [name]: '' }));
         }
     };
 
     const handleOptionChange = (index, value) => {
         const newOptions = [...formData.options];
         newOptions[index].optionText = value;
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             options: newOptions
         }));
         if (errors[`option_${index}`]) {
-            setErrors(prev => ({ ...prev, [`option_${index}`]: '' }));
+            setErrors((prev) => ({ ...prev, [`option_${index}`]: '' }));
         }
     };
 
     const addOption = () => {
         if (formData.options.length < 6) {
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 options: [...prev.options, { optionText: '' }]
             }));
@@ -124,7 +123,7 @@ const AddPollPage = () => {
     const removeOption = (index) => {
         if (formData.options.length > 2) {
             const newOptions = formData.options.filter((_, i) => i !== index);
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 options: newOptions
             }));
@@ -175,7 +174,7 @@ const AddPollPage = () => {
                 eventId: formData.eventId,
                 speakerId: formData.speakerId, // Now required, no null check
                 timerSeconds: parseInt(formData.timerSeconds),
-                options: formData.options.map(opt => ({
+                options: formData.options.map((opt) => ({
                     optionText: opt.optionText
                 }))
             };
@@ -204,9 +203,7 @@ const AddPollPage = () => {
                 <Col>
                     <Card>
                         <Card.Header>
-                            <Card.Title as="h5">
-                                {isEditMode ? 'Edit Poll' : 'Create New Poll'}
-                            </Card.Title>
+                            <Card.Title as="h5">{isEditMode ? 'Edit Poll' : 'Create New Poll'}</Card.Title>
                             <span className="d-block m-t-5">
                                 {isEditMode ? 'Update poll details' : 'Fill in the details to create a new poll'}
                             </span>
@@ -221,15 +218,13 @@ const AddPollPage = () => {
                                             </Form.Label>
                                             <Select
                                                 options={eventOptions}
-                                                value={eventOptions.find(opt => opt.value === formData.eventId)}
+                                                value={eventOptions.find((opt) => opt.value === formData.eventId)}
                                                 onChange={(option) => handleSelectChange('eventId', option)}
                                                 placeholder="Select Event"
                                                 isSearchable
                                                 className={errors.eventId ? 'is-invalid' : ''}
                                             />
-                                            {errors.eventId && (
-                                                <div className="invalid-feedback d-block">{errors.eventId}</div>
-                                            )}
+                                            {errors.eventId && <div className="invalid-feedback d-block">{errors.eventId}</div>}
                                         </Form.Group>
                                     </Col>
 
@@ -240,15 +235,13 @@ const AddPollPage = () => {
                                             </Form.Label>
                                             <Select
                                                 options={speakerOptions}
-                                                value={speakerOptions.find(opt => opt.value === formData.speakerId)}
+                                                value={speakerOptions.find((opt) => opt.value === formData.speakerId)}
                                                 onChange={(option) => handleSelectChange('speakerId', option)}
                                                 placeholder="Select Speaker"
                                                 isSearchable
                                                 className={errors.speakerId ? 'is-invalid' : ''}
                                             />
-                                            {errors.speakerId && (
-                                                <div className="invalid-feedback d-block">{errors.speakerId}</div>
-                                            )}
+                                            {errors.speakerId && <div className="invalid-feedback d-block">{errors.speakerId}</div>}
                                         </Form.Group>
                                     </Col>
                                 </Row>
@@ -268,9 +261,7 @@ const AddPollPage = () => {
                                                 placeholder="Enter your poll question..."
                                                 isInvalid={!!errors.question}
                                             />
-                                            <Form.Control.Feedback type="invalid">
-                                                {errors.question}
-                                            </Form.Control.Feedback>
+                                            <Form.Control.Feedback type="invalid">{errors.question}</Form.Control.Feedback>
                                         </Form.Group>
                                     </Col>
                                 </Row>
@@ -290,12 +281,8 @@ const AddPollPage = () => {
                                                 max="300"
                                                 isInvalid={!!errors.timerSeconds}
                                             />
-                                            <Form.Text className="text-muted">
-                                                Recommended: 30-60 seconds
-                                            </Form.Text>
-                                            <Form.Control.Feedback type="invalid">
-                                                {errors.timerSeconds}
-                                            </Form.Control.Feedback>
+                                            <Form.Text className="text-muted">Recommended: 30-60 seconds</Form.Text>
+                                            <Form.Control.Feedback type="invalid">{errors.timerSeconds}</Form.Control.Feedback>
                                         </Form.Group>
                                     </Col>
                                 </Row>
@@ -335,11 +322,7 @@ const AddPollPage = () => {
                                         ))}
 
                                         {formData.options.length < 6 && (
-                                            <Button
-                                                variant="outline-primary"
-                                                onClick={addOption}
-                                                className="mb-3"
-                                            >
+                                            <Button variant="outline-primary" onClick={addOption} className="mb-3">
                                                 <i className="feather icon-plus me-2"></i>
                                                 Add Option
                                             </Button>
@@ -347,33 +330,29 @@ const AddPollPage = () => {
                                     </Col>
                                 </Row>
 
-                                <Row>
-                                    <Col md={12}>
-                                        <div className="d-flex gap-2 mt-3">
-                                            <Button
-                                                type="submit"
-                                                variant="primary"
-                                                disabled={submitting || loading}
-                                            >
+                                <div className="row mt-4">
+                                    <div className="col-12">
+                                        <div className="d-flex justify-content-between gap-2">
+                                            <Button variant="danger" onClick={handleCancel} disabled={submitting}>
+                                                Cancel
+                                            </Button>
+                                            <Button type="submit" variant="primary" disabled={submitting || loading}>
                                                 {submitting ? (
                                                     <>
-                                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                                        <span
+                                                            className="spinner-border spinner-border-sm me-2"
+                                                            role="status"
+                                                            aria-hidden="true"
+                                                        ></span>
                                                         {isEditMode ? 'Updating...' : 'Creating...'}
                                                     </>
                                                 ) : (
                                                     <>{isEditMode ? 'Update Poll' : 'Create Poll'}</>
                                                 )}
                                             </Button>
-                                            <Button
-                                                variant="secondary"
-                                                onClick={handleCancel}
-                                                disabled={submitting}
-                                            >
-                                                Cancel
-                                            </Button>
                                         </div>
-                                    </Col>
-                                </Row>
+                                    </div>
+                                </div>
                             </Form>
                         </Card.Body>
                     </Card>

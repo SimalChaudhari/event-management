@@ -1,5 +1,5 @@
 import { useDispatch } from 'react-redux';
-import { deleteUser, userList } from '../../../store/actions/userActions';
+import { deleteUser, userList, uploadCsvUsers, downloadSampleCsv } from '../../../store/actions/userActions';
 
 export const FetchUsers = () => {
   const dispatch = useDispatch();
@@ -22,6 +22,26 @@ export const FetchUsers = () => {
     }
   };
 
-  return { fetchData, deleteUserData };
+  const uploadCsvData = async (csvData) => {
+    try {
+      const result = await dispatch(uploadCsvUsers(csvData));
+      return result;
+    } catch (error) {
+      console.error('Error uploading CSV:', error);
+      throw error;
+    }
+  };
+
+  const downloadCsvSample = async () => {
+    try {
+      const success = await dispatch(downloadSampleCsv());
+      return success;
+    } catch (error) {
+      console.error('Error downloading sample CSV:', error);
+      throw error;
+    }
+  };
+
+  return { fetchData, deleteUserData, uploadCsvData, downloadCsvSample };
 };
 

@@ -13,6 +13,7 @@ import { Repository, In } from 'typeorm';
 import {
   Banner,
   BannerEvent,
+  Logo,
   PrivacyPolicy,
   TermsConditions,
   UserPermissions,
@@ -30,6 +31,7 @@ import {
 import {
   CreateBannerDto,
   CreateBannerEventDto,
+  CreateLogoDto,
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
   CreatePermissionTemplateDto,
@@ -573,6 +575,115 @@ export class BannerEventService {
       }
     } catch (error) {
       console.error('Error deleting files:', error);
+    }
+  }
+}
+
+// Logo Service
+
+@Injectable()
+export class LogoService {
+  constructor(
+    @InjectRepository(Logo)
+    private logoRepository: Repository<Logo>,
+  ) {}
+
+  async getOrShow(): Promise<Logo | { message: string }> {
+    try {
+      const [logo] = await this.logoRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!logo) {
+        return { message: 'No logo found' };
+      }
+      return logo;
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        'Error retrieving logo',
+        error.message,
+      );
+    }
+  }
+
+  async createOrUpdate(
+    createLogoDto: CreateLogoDto,
+  ): Promise<{ message: string; data: Logo }> {
+    try {
+      const [logo] = await this.logoRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (logo) {
+        // Delete previous file from upload folder
+        await this.deleteFileFromFolder(logo.imageUrl);
+
+        // Update existing logo
+        const updatedLogo = this.logoRepository.merge(
+          logo,
+          createLogoDto,
+        );
+        const result = await this.logoRepository.save(updatedLogo);
+        return { message: 'Logo updated successfully', data: result };
+      } else {
+        // Create new logo if none exists
+        const newLogo = this.logoRepository.create(createLogoDto);
+        const result = await this.logoRepository.save(newLogo);
+        return { message: 'Logo created successfully', data: result };
+      }
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        'Error creating or updating logo',
+        error.message,
+      );
+    }
+  }
+
+  // Method to clear logo
+  async clearLogo(): Promise<{ message: string }> {
+    try {
+      const [logo] = await this.logoRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!logo) {
+        throw new NotFoundException('No logo found');
+      }
+
+      // Delete file from upload folder
+      await this.deleteFileFromFolder(logo.imageUrl);
+
+      // Clear the imageUrl and hyperlink with empty strings instead of null
+      logo.imageUrl = '';
+      logo.hyperlink = '';
+      await this.logoRepository.save(logo);
+
+      return { message: 'Logo cleared successfully' };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error clearing logo',
+        error.message,
+      );
+    }
+  }
+
+ 
+  // Helper method to delete a single file from folder
+  private async deleteFileFromFolder(imageUrl: string): Promise<void> {
+    try {
+      if (!imageUrl) return;
+      const filePath = path.join(process.cwd(), imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      console.error(`Error deleting file ${imageUrl}:`, error);
     }
   }
 }

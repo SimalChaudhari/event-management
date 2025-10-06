@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Card, Table, Row, Col, Badge, Button, Spinner, Alert } from 'react-bootstrap';
+import { Card, Table, Row, Col, Badge, Button, Spinner, Alert, Form } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { eventList } from '../../../store/actions/eventActions';
@@ -592,27 +592,76 @@ const QAPage = () => {
             {/* Status Filter */}
             <Row className="mb-3">
                 <Col sm={12}>
-                    <Card>
-                        <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center">
-                                <h5 className="mb-0">Q&A Questions</h5>
+
+                    {/* Filter Component - Same as Polling */}
+                    <Card className="mb-4 shadow-sm border-0" style={{ borderRadius: '8px' }}>
+                        <Card.Header className="bg-light border-0" style={{ padding: '16px 20px', borderRadius: '8px 8px 0 0' }}>
+                            <div className="d-flex align-items-center justify-content-between">
                                 <div className="d-flex align-items-center">
-                                    <label className="form-label mb-0 mr-2">Filter by Status:</label>
-                                    <select 
-                                        className="form-select" 
-                                        style={{width: 'auto'}}
-                                        value={statusFilter} 
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                    >
-                                        <option value="all">All Questions</option>
-                                        <option value="not_answered">Not Answered</option>
-                                        <option value="answered">Answered</option>
-                                        <option value="answering">Answering</option>
-                                    </select>
+                                    <i className="feather icon-filter mr-2" style={{ color: '#4680ff', fontSize: '18px' }}></i>
+                                    <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>
+                                        Filter Options
+                                    </h6>
                                 </div>
+                                {statusFilter !== 'all' && (
+                                    <span
+                                        className="badge badge-primary"
+                                        style={{ backgroundColor: '#4680ff', fontSize: '11px', padding: '4px 8px' }}
+                                    >
+                                        1 Active
+                                    </span>
+                                )}
                             </div>
+                        </Card.Header>
+                        <Card.Body style={{ padding: '20px' }}>
+                            <Row className="align-items-end g-3">
+                                {/* Status Filter */}
+                                <Col xl={4} lg={4} md={6} sm={12} xs={12}>
+                                    <Form.Group className="mb-0">
+                                        <Form.Label style={{ fontSize: '14px', fontWeight: '600', color: '#495057', marginBottom: '8px' }}>
+                                            <i className="feather icon-check-circle mr-1"></i>
+                                            Filter by Status
+                                        </Form.Label>
+                                        <Form.Select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            style={{
+                                                borderRadius: '6px',
+                                                border: '1px solid #ced4da',
+                                                padding: '8px 12px',
+                                                width: '100%',
+                                                maxWidth: '100%',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}
+                                        >
+                                            <option value="all">All Questions</option>
+                                            <option value="not_answered">Not Answered</option>
+                                            <option value="answered">Answered</option>
+                                            <option value="answering">Answering</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                </Col>
+
+                                {/* Clear Button */}
+                                <Col xl={4} lg={4} md={6} sm={12} xs={12} className="mt-md-3 mt-sm-3 mt-3">
+                                    <div className="d-flex align-items-end justify-content-xl-start justify-content-lg-start justify-content-md-start justify-content-sm-start justify-content-start flex-wrap" style={{ gap: '12px' }}>
+                                        {statusFilter !== 'all' && (
+                                            <Button
+                                                variant="outline-secondary"
+                                                onClick={() => setStatusFilter('all')}
+                                                style={{ borderRadius: '6px', padding: '8px 14px', fontSize: '13px', fontWeight: '500', minWidth: '75px', whiteSpace: 'nowrap' }}
+                                            >
+                                                <i className="feather icon-x mr-1"></i>
+                                                Clear
+                                            </Button>
+                                        )}
+                                    </div>
+                                </Col>
+                            </Row>
                         </Card.Body>
                     </Card>
+
                 </Col>
             </Row>
 

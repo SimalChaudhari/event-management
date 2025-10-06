@@ -102,3 +102,109 @@ export const deleteUser = (id) => async (dispatch) => {
         return false;
     }
 };
+
+// CSV Upload functionality
+export const uploadCsvUsers = (csvData) => async (dispatch) => {
+    try {
+        setLoading(dispatch, true);
+        
+        let response;
+        
+        // Check if csvData is a file or array of user data
+        if (csvData instanceof File) {
+            // Handle file upload
+            const formData = new FormData();
+            formData.append('csvFile', csvData);
+
+            response = await axiosInstance.post('/auth/upload-csv-users', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            });
+        } else if (Array.isArray(csvData)) {
+            // Handle JSON data - send as regular JSON request body
+            response = await axiosInstance.post('/auth/upload-csv-users', {
+                users: csvData
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+        } else {
+            throw new Error('Invalid data format. Expected File or Array.');
+        }
+
+        const result = {
+            success: response.data.success,
+            message: response.data.message,
+            data: response.data.data
+        };
+
+        if (result.success) {
+            toast.success(result.message);
+            // Refresh user list after successful upload
+            await dispatch(userList());
+        } else {
+            toast.error(result.message);
+        }
+
+        return result;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to upload CSV file';
+        toast.error(errorMessage);
+        return { success: false, message: errorMessage };
+    } finally {
+        setLoading(dispatch, false);
+    }
+};
+
+// Download Sample CSV
+export const downloadSampleCsv = () => async (dispatch) => {
+    try {
+        setLoading(dispatch, true);
+        
+        // Create sample data with headers and example values
+        const sampleFields = [
+            {
+                header: 'firstName',
+                values: ['John', 'Jane', 'Mike']
+            },
+            {
+                header: 'lastName', 
+                values: ['Doe', 'Smith', 'Johnson']
+            },
+            {
+                header: 'email',
+                values: ['john.doe@example.com', 'jane.smith@example.com', 'mike.johnson@example.com']
+            },
+            {
+                header: 'mobile',
+                values: ['1234567890', '0987654321', '5555555555']
+            }
+        ];
+
+        const response = await axiosInstance.post('/auth/download-csv', { fields: sampleFields }, {
+            responseType: 'blob'
+        });
+
+        // Create blob and trigger download
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'sample_users.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        toast.success('Sample CSV downloaded successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download sample CSV';
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        setLoading(dispatch, false);
+    }
+};

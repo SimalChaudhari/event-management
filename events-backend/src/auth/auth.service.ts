@@ -7,9 +7,9 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { UserDto } from './../user/users.dto';
-import { UserEntity } from './../user/users.entity';
+import { UserEntity, AuthProvider } from './../user/users.entity';
 import { UserRole } from './../user/users.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -23,16 +23,28 @@ import {
   EmailTemplateUtils, 
   UserCredentialsData 
 } from '../utils/email-templates.utils';
+import { CsvUserDto, CsvUploadResponseDto } from '../validation/auth.validation';
+import { CsvUploadLogService } from '../logs/csv-upload-log.service';
+import { EmailBatchService } from '../utils/email-batch.service';
+import { CsvProcessorService } from '../utils/csv-processor.service';
+import { csvUploadConfig } from '../utils/csv-upload.config';
+import * as fs from 'fs';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(UserEntity)
-    private userRepository: Repository<UserEntity>,
+    public userRepository: Repository<UserEntity>,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly addressService: AddressService,
+    private dataSource: DataSource,
+    private readonly csvUploadLogService: CsvUploadLogService,
+    private readonly emailBatchService: EmailBatchService,
+    private readonly csvProcessorService: CsvProcessorService,
   ) {}
 
   private handleError(error: any): never {
@@ -753,6 +765,900 @@ export class AuthService {
 
       return {
         message: 'A new OTP has been sent to your email address. Please check your inbox and enter the code to verify your account.',
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * PROFESSIONAL CSV Upload method with advanced batch processing
+   * 
+   * Key Features:
+   * 1. Professional CSV validation and processing
+   * 2. Advanced email batch service with retry logic
+   * 3. Comprehensive logging and monitoring
+   * 4. Configurable email provider settings
+   * 5. Real-time progress tracking
+   * 6. Professional error handling and recovery
+   */
+  async uploadCsvUsers(csvData: CsvUserDto[], adminId: string = 'system', fileName: string = 'upload.csv'): Promise<CsvUploadResponseDto> {
+    try {
+      const startTime = Date.now();
+      const sessionId = uuidv4();
+
+      console.log(`🚀 PROFESSIONAL CSV UPLOAD: Processing ${csvData.length} users...`);
+
+      // Create initial log entry
+      const logEntry = await this.csvUploadLogService.createLogEntry({
+        sessionId,
+        adminId,
+        fileName,
+        totalRecords: csvData.length,
+        status: 'processing',
+        emailSendingEnabled: csvUploadConfig.isEmailSendingEnabled(),
+      });
+
+      // Step 1: Process users (create/update)
+      const userProcessingResult = await this.processUsersFromCsv(csvData);
+      
+      // Step 2: Send emails using professional batch service
+      let emailResult = null;
+      if (csvUploadConfig.isEmailSendingEnabled() && userProcessingResult.emailsToSend.length > 0) {
+        console.log(`📧 Starting professional email batch processing for ${userProcessingResult.emailsToSend.length} emails...`);
+        
+        // Get email configuration based on provider
+        const emailConfig = csvUploadConfig.getEmailBatchConfig();
+        console.log(`📧 Using ${csvUploadConfig.getConfig().emailProvider} configuration:`, emailConfig);
+        
+        // Start professional email sending
+        emailResult = await this.emailBatchService.sendEmailsInBatches(
+          userProcessingResult.emailsToSend,
+          sessionId,
+          emailConfig
+        );
+        
+        console.log(`🎉 PROFESSIONAL EMAIL BATCH COMPLETED: ${emailResult.message}`);
+      }
+
+      const processingTime = Date.now() - startTime;
+      const existingUsersSkipped = userProcessingResult.existingUsersCount - userProcessingResult.usersToUpdate.length;
+
+      console.log(`✅ PROFESSIONAL CSV UPLOAD COMPLETED: ${processingTime}ms - ${userProcessingResult.newUsersCreated} created, ${userProcessingResult.usersToUpdate.length} updated`);
+
+      // Prepare final response
+      const response: CsvUploadResponseDto = {
+        message: `Professional CSV upload completed in ${processingTime}ms (${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated${emailResult ? ', emails processed' : ', emails disabled'})`,
+        totalProcessed: csvData.length.toString(),
+        newUsersCreated: userProcessingResult.newUsersCreated.toString(),
+        existingUsersSkipped: existingUsersSkipped.toString(),
+        passwordsGenerated: userProcessingResult.passwordsGenerated.toString(),
+        emailsSent: emailResult ? emailResult.emailsSent.toString() : '0',
+        emailsFailed: emailResult ? emailResult.emailsFailed.toString() : '0',
+        details: `Professional processing: ${processingTime}ms`,
+        skippedUsers: userProcessingResult.skippedUsers,
+        emailStatus: emailResult ? {
+          totalEmails: emailResult.totalEmails,
+          emailsSent: emailResult.emailsSent,
+          emailsFailed: emailResult.emailsFailed,
+          emailsProcessing: 0,
+          status: emailResult.success ? 'completed' : 'completed'
+        } : {
+          totalEmails: 0,
+          emailsSent: 0,
+          emailsFailed: 0,
+          emailsProcessing: 0,
+          status: 'disabled'
+        },
+        sessionId: sessionId
+      };
+
+      return response;
+
+    } catch (error) {
+      console.error('❌ Professional CSV upload failed:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Process users from CSV data with professional error handling
+   */
+  private async processUsersFromCsv(csvData: CsvUserDto[]): Promise<{
+    newUsersCreated: number;
+    usersToUpdate: Array<{id: string, password: string}>;
+    emailsToSend: UserCredentialsData[];
+    skippedUsers: string[];
+    passwordsGenerated: number;
+    existingUsersCount: number;
+  }> {
+    // Bulk query for existing users
+    const csvEmails = csvData.map(user => user.email);
+    const existingUsers = await this.userRepository.find({
+      where: csvEmails.map(email => ({ email })),
+      select: ['id', 'email', 'firstName', 'lastName', 'password']
+    });
+
+    // Create lookup map for O(1) performance
+    const existingUsersMap = new Map();
+    existingUsers.forEach(user => {
+      existingUsersMap.set(user.email, user);
+    });
+
+    // Prepare bulk operations data
+    const usersToCreate: any[] = [];
+    const usersToUpdate: Array<{id: string, password: string}> = [];
+    const emailsToSend: UserCredentialsData[] = [];
+    const skippedUsers: string[] = [];
+    let passwordsGenerated = 0;
+
+    // Process each user
+    for (const userData of csvData) {
+      const existingUser = existingUsersMap.get(userData.email);
+
+      if (existingUser) {
+        // Existing user - update password if needed
+        if (!existingUser.password || existingUser.password.trim() === '') {
+          const randomPassword = PasswordUtils.generateRandomPassword(12);
+          usersToUpdate.push({
+            id: existingUser.id,
+            password: await PasswordUtils.hashPassword(randomPassword)
+          });
+          emailsToSend.push({
+            email: existingUser.email,
+            firstName: existingUser.firstName,
+            lastName: existingUser.lastName,
+            password: randomPassword,
+          });
+          passwordsGenerated++;
+        } else {
+          // User exists and has password - skip
+          skippedUsers.push(`${existingUser.email} (already has password)`);
+        }
+      } else {
+        // New user - prepare for bulk creation
+        const randomPassword = PasswordUtils.generateRandomPassword(12);
+        usersToCreate.push({
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          mobile: userData.mobile,
+          password: await PasswordUtils.hashPassword(randomPassword),
+          role: UserRole.User,
+          isVerify: true,
+          authProvider: AuthProvider.LOCAL,
+        });
+        emailsToSend.push({
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          password: randomPassword,
+        });
+        passwordsGenerated++;
+      }
+    }
+
+    // Execute bulk database operations
+    let newUsersCreated = 0;
+    
+    // Bulk create new users
+    if (usersToCreate.length > 0) {
+      try {
+        await this.userRepository.insert(usersToCreate);
+        newUsersCreated = usersToCreate.length;
+      } catch (createError) {
+        console.error('❌ Bulk creation failed, using fallback');
+        // Fallback to individual creation
+        for (const userData of usersToCreate) {
+          try {
+            const newUser = this.userRepository.create(userData);
+            await this.userRepository.save(newUser);
+            newUsersCreated++;
+          } catch (error) {
+            console.error(`Failed to create user ${userData.email}:`, error);
+          }
+        }
+      }
+    }
+
+    // Bulk update existing users
+    if (usersToUpdate.length > 0) {
+      try {
+        const updatePromises = usersToUpdate.map(updateData => 
+          this.userRepository.update({ id: updateData.id }, { password: updateData.password })
+        );
+        await Promise.all(updatePromises);
+      } catch (updateError) {
+        console.error('❌ Bulk update failed:', updateError);
+      }
+    }
+
+    return {
+      newUsersCreated,
+      usersToUpdate,
+      emailsToSend,
+      skippedUsers,
+      passwordsGenerated,
+      existingUsersCount: existingUsers.length
+    };
+  }
+
+  /**
+   * Bulk delete users with proper foreign key handling
+   * Deletes all related data before deleting users
+   */
+  async bulkDeleteUsers(userIds: string[]): Promise<{message: string, deletedCount: number, skippedUsers: string[]}> {
+    try {
+      console.log(`🗑️ Starting bulk delete for ${userIds.length} users...`);
+      console.log(`📊 ================================================`);
+
+      if (!userIds || userIds.length === 0) {
+        throw new BadRequestException('No user IDs provided for deletion');
+      }
+
+      // Step 1: Verify all users exist
+      const existingUsers = await this.userRepository.find({
+        where: userIds.map(id => ({ id })),
+        select: ['id', 'email', 'role']
+      });
+
+      console.log(`🔍 Found ${existingUsers.length} existing users out of ${userIds.length} requested`);
+
+      if (existingUsers.length === 0) {
+        throw new BadRequestException('No valid users found to delete');
+      }
+
+      const existingUserIds = existingUsers.map(user => user.id);
+      const skippedUsers = userIds.filter(id => !existingUserIds.includes(id));
+
+      console.log(`📝 Users to delete: ${existingUserIds.length}`);
+      console.log(`⚠️ Skipped invalid IDs: ${skippedUsers.length}`);
+
+      // Step 2: Delete foreign key relationships first
+      console.log(`🔄 Step 1: Deleting foreign key relationships...`);
+
+      // Order relationships (user_id foreign key)
+      try {
+        const ordersDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('orders')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Orders deleted: ${ordersDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Orders deletion error: ${error.message}`);
+      }
+
+      // Favorite Events (user_id foreign key)
+      try {
+        const favoritesDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('favorite_events')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Favorite events deleted: ${favoritesDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Favorite events deletion error: ${error.message}`);
+      }
+
+      // Event Speakers (speaker_id foreign key)
+      try {
+        const speakersDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('event_speakers')
+          .where('speakerId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Event speakers deleted: ${speakersDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Event speakers deletion error: ${error.message}`);
+      }
+
+      // Exhibitor Profiles (user_id foreign key)
+      try {
+        const exhibitorsDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('exhibitors')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Exhibitor profiles deleted: ${exhibitorsDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Exhibitor profiles deletion error: ${error.message}`);
+      }
+
+      // Speaker Profiles (user_id foreign key)
+      try {
+        const speakerProfilesDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('speaker_profiles')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Speaker profiles deleted: ${speakerProfilesDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Speaker profiles deletion error: ${error.message}`);
+      }
+
+      // Event Agendas (user_id foreign key)
+      try {
+        const agendasDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('agendas')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ Event agendas deleted: ${agendasDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ Event agendas deletion error: ${error.message}`);
+      }
+
+      // User Addresses (user_id foreign key)
+      try {
+        const addressesDeleted = await this.dataSource
+          .createQueryBuilder()
+          .delete()
+          .from('addresses')
+          .where('userId IN (:...userIds)', { userIds: existingUserIds })
+          .execute();
+        console.log(`   ✅ User addresses deleted: ${addressesDeleted.affected}`);
+      } catch (error: any) {
+        console.log(`   ⚠️ User addresses deletion error: ${error.message}`);
+      }
+
+      // Step 3: Delete the users themselves
+      console.log(`🔄 Step 2: Deleting users...`);
+      
+      try {
+        const usersDeleted = await this.userRepository.delete(existingUserIds);
+        console.log(`✅ Users deleted successfully: ${usersDeleted.affected}`);
+        console.log(`📊 ================================================`);
+        console.log(`✅ BULK DELETE COMPLETED:`);
+        console.log(`   🗑️ Users Deleted: ${usersDeleted.affected}`);
+        console.log(`   ⚠️ Skipped (Invalid IDs): ${skippedUsers.length}`);
+        console.log(`📊 ================================================`);
+
+        return {
+          message: `Successfully deleted ${usersDeleted.affected} users. ${skippedUsers.length} invalid IDs skipped.`,
+          deletedCount: usersDeleted.affected || 0,
+          skippedUsers: skippedUsers
+        };
+
+      } catch (error: any) {
+        console.error(`❌ Users deletion failed:`, error);
+        throw new InternalServerErrorException(`Failed to delete users: ${error.message}`);
+      }
+
+    } catch (error) {
+      console.error(`❌ Bulk delete failed:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Simple delete all users - handles foreign key constraints gracefully
+   */
+  async deleteAllUsers(): Promise<{message: string, deletedCount: number, skippedCount: number}> {
+    try {
+      console.log(`🗑️ Starting DELETE ALL users operation...`);
+      console.log(`📊 ================================================`);
+
+      // Step 1: Get all users first
+      const allUsers = await this.userRepository.find({
+        select: ['id', 'email', 'firstName', 'lastName', 'role']
+      });
+
+      console.log(`🔍 Found ${allUsers.length} total users in system`);
+
+      if (allUsers.length === 0) {
+        return {
+          message: 'No users found to delete',
+          deletedCount: 0,
+          skippedCount: 0
+        };
+      }
+
+      // Step 2: Smart dependency checker
+      console.log(`🔍 Step 1: Checking foreign key dependencies...`);
+      
+      const skippedUsers: any[] = [];
+      const usersToDelete: string[] = [];
+
+      const checkUserDependencies = async (userId: string): Promise<string[]> => {
+        const reasons: string[] = [];
+        
+        const checks = [
+          { query: 'SELECT id FROM orders WHERE userId = $1', reason: 'has orders' },
+          { query: 'SELECT id FROM polls WHERE userId = $1', reason: 'has polls' },
+          { query: 'SELECT id FROM favorite_events WHERE userId = $1', reason: 'has favorite events' },
+          { query: 'SELECT id FROM speaker_profiles WHERE userId = $1', reason: 'has speaker_profile' },
+          { query: 'SELECT id FROM addresses WHERE userId = $1', reason: 'has addresses' },
+          { query: 'SELECT id FROM polls WHERE createdById = $1', reason: 'created polls' }
+        ];
+
+        for (const check of checks) {
+          try {
+            const result = await this.dataSource.query(check.query, [userId]);
+            if (result.length > 0) {
+              reasons.push(check.reason);
+            }
+          } catch (error) {
+            // Silent fail - table/field doesn't exist
+          }
+        }
+
+        return reasons;
+      };
+
+      for (const user of allUsers) {
+        let hasDependencies = false;
+        let dependencyReasons: string[] = [];
+
+        // Check Orders
+        try {
+          const hasOrders = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('orders', 'o')
+            .where('o.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasOrders) {
+            hasDependencies = true;
+            dependencyReasons.push('has orders');
+          }
+        } catch (error: any) {
+          // Table might not exist, ignore error
+        }
+
+        // Check Polls (new table found in error)
+        try {
+          const hasPolls = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('polls', 'p')
+            .where('p.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasPolls) {
+            hasDependencies = true;
+            dependencyReasons.push('has polls');
+          }
+        } catch (error: any) {
+          // Table might not exist, ignore error
+        }
+
+        // Check Favorite Events
+        try {
+          const hasFavorites = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('favorite_events', 'fe')
+            .where('fe.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasFavorites) {
+            hasDependencies = true;
+            dependencyReasons.push('has favorite events');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Favorites check failed for ${user.email}: ${error.message}`);
+        }
+
+        // Check Event Speakers
+        try {
+          const isSpeaker = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('event_speakers', 'es')
+            .where('es.speakerId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (isSpeaker) {
+            hasDependencies = true;
+            dependencyReasons.push('is event speaker');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Speakers check failed for ${user.email}: ${error.message}`);
+        }
+
+        // Check Exhibitor Profiles
+        try {
+          const isExhibitor = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('exhibitors', 'e')
+            .where('e.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (isExhibitor) {
+            hasDependencies = true;
+            dependencyReasons.push('is exhibitor');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Exhibitors check failed for ${user.email}: ${error.message}`);
+        }
+
+        // Check Speaker Profiles
+        try {
+          const hasSpeakerProfile = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('speaker_profiles', 'sp')
+            .where('sp.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasSpeakerProfile) {
+            hasDependencies = true;
+            dependencyReasons.push('has speaker profile');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Speaker profiles check failed for ${user.email}: ${error.message}`);
+        }
+
+        // Check Event Agendas
+        try {
+          const hasAgendas = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('agendas', 'a')
+            .where('a.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasAgendas) {
+            hasDependencies = true;
+            dependencyReasons.push('has event agendas');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Agendas check failed for ${user.email}: ${error.message}`);
+        }
+
+        // Check User Addresses
+        try {
+          const hasAddresses = await this.dataSource
+            .createQueryBuilder()
+            .select('id')
+            .from('addresses', 'addr')
+            .where('addr.userId = :userId', { userId: user.id })
+            .getRawOne();
+          
+          if (hasAddresses) {
+            hasDependencies = true;
+            dependencyReasons.push('has addresses');
+          }
+        } catch (error: any) {
+          console.log(`   ⚠️ Addresses check failed for ${user.email}: ${error.message}`);
+        }
+
+        if (hasDependencies) {
+          skippedUsers.push({
+            id: user.id,
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`,
+            role: user.role,
+            reasons: dependencyReasons
+          });
+          console.log(`   ⏭️ Skipping ${user.email} - ${dependencyReasons.join(', ')}`);
+        } else {
+          usersToDelete.push(user.id);
+        }
+      }
+
+      console.log(`📝 Processing Summary:`);
+      console.log(`   • Total users: ${allUsers.length}`);
+      console.log(`   • Users to delete: ${usersToDelete.length}`);
+      console.log(`   • Users skipped (has dependencies): ${skippedUsers.length}`);
+      console.log(`📊 ================================================`);
+
+      // Step 3: Delete users without dependencies
+      let deletedCount = 0;
+      if (usersToDelete.length > 0) {
+        console.log(`🗑️ Step 2: Deleting ${usersToDelete.length} users...`);
+        
+        try {
+          const deleteResult = await this.userRepository.delete(usersToDelete);
+          deletedCount = deleteResult.affected || 0;
+          console.log(`✅ Successfully deleted ${deletedCount} users`);
+        } catch (error: any) {
+          console.error(`❌ Users deletion failed:`, error.message);
+          throw new InternalServerErrorException(`Failed to delete users: ${error.message}`);
+        }
+      } else {
+        console.log(`ℹ️ No users to delete - all users have dependencies`);
+      }
+
+      console.log(`📊 ================================================`);
+      console.log(`✅ DELETE ALL OPERATION COMPLETED:`);
+      console.log(`   🗑️ Users Deleted: ${deletedCount}`);
+      console.log(`   ⏭️ Users Skipped: ${skippedUsers.length}`);
+      console.log(`📊 ================================================`);
+
+      return {
+        message: `Operation completed. ${deletedCount} users deleted, ${skippedUsers.length} users skipped due to dependencies.`,
+        deletedCount,
+        skippedCount: skippedUsers.length,
+      };
+
+    } catch (error) {
+      console.error(`❌ Delete all users failed:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  // ORIGINAL CSV Upload method (for backup/reference - SLOWER)
+  async uploadCsvUsersOriginal(csvData: CsvUserDto[]): Promise<CsvUploadResponseDto> {
+    try {
+      let totalProcessed = 0;
+      let newUsersCreated = 0;
+      let existingUsersSkipped = 0;
+      let passwordsGenerated = 0;
+      let emailsSent = 0;
+      let emailsFailed = 0;
+      const details: string[] = [];
+
+      for (const userData of csvData) {
+        totalProcessed++;
+        
+        try {
+          // Check if user already exists
+          const existingUser = await this.userRepository.findOne({
+            where: { email: userData.email },
+          });
+
+          if (existingUser) {
+            // User exists - check if password is empty
+            if (!existingUser.password || existingUser.password.trim() === '') {
+              // Generate random password for existing user without password
+              const randomPassword = PasswordUtils.generateRandomPassword(12);
+              const hashedPassword = await PasswordUtils.hashPassword(randomPassword);
+              
+              existingUser.password = hashedPassword;
+              await this.userRepository.save(existingUser);
+              
+              passwordsGenerated++;
+              
+              // Send credentials email
+              try {
+                const credentialsData: UserCredentialsData = {
+                  email: existingUser.email,
+                  firstName: existingUser.firstName,
+                  lastName: existingUser.lastName,
+                  password: randomPassword,
+                };
+
+                const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(credentialsData);
+                await this.emailService['transporter'].sendMail(mailOptions);
+                emailsSent++;
+                details.push(`Password generated and sent to existing user: ${existingUser.email}`);
+              } catch (emailError) {
+                emailsFailed++;
+                details.push(`Failed to send email to existing user: ${existingUser.email}`);
+                console.error('Error sending credentials email:', emailError);
+              }
+            } else {
+              // User exists and has password - skip
+              existingUsersSkipped++;
+              details.push(`Skipped existing user with password: ${existingUser.email}`);
+            }
+          } else {
+            // User doesn't exist - create new user
+            const randomPassword = PasswordUtils.generateRandomPassword(12);
+            const hashedPassword = await PasswordUtils.hashPassword(randomPassword);
+
+            const newUser = this.userRepository.create({
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              email: userData.email,
+              mobile: userData.mobile,
+              password: hashedPassword,
+              role: UserRole.User,
+              isVerify: true, // Auto-verify CSV uploaded users
+              authProvider: AuthProvider.LOCAL,
+            });
+
+            const savedUser = await this.userRepository.save(newUser);
+            newUsersCreated++;
+            passwordsGenerated++;
+
+            // Send credentials email
+            try {
+              const credentialsData: UserCredentialsData = {
+                email: savedUser.email,
+                firstName: savedUser.firstName,
+                lastName: savedUser.lastName,
+                password: randomPassword,
+              };
+
+              const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(credentialsData);
+              await this.emailService['transporter'].sendMail(mailOptions);
+              emailsSent++;
+              details.push(`New user created and credentials sent: ${savedUser.email}`);
+            } catch (emailError) {
+              emailsFailed++;
+              details.push(`New user created but failed to send email: ${savedUser.email}`);
+              console.error('Error sending credentials email:', emailError);
+            }
+          }
+        } catch (userError: any) {
+          details.push(`Error processing user ${userData.email}: ${userError.message}`);
+          console.error(`Error processing user ${userData.email}:`, userError);
+        }
+      }
+
+      return {
+        message: 'CSV upload processing completed',
+        totalProcessed: totalProcessed.toString(),
+        newUsersCreated: newUsersCreated.toString(),
+        existingUsersSkipped: existingUsersSkipped.toString(),
+        passwordsGenerated: passwordsGenerated.toString(),
+        emailsSent: emailsSent.toString(),
+        emailsFailed: emailsFailed.toString(),
+        details: details.join('; '),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+
+  async validateSampleCsv(csvContent: string): Promise<{ isValid: boolean; errors: string[] }> {
+    try {
+      const errors: string[] = [];
+      const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+      
+      if (lines.length < 2) {
+        errors.push('CSV must contain at least a header row and one data row');
+        return { isValid: false, errors };
+      }
+
+      // Validate header row
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const requiredHeaders = ['firstname', 'lastname', 'email', 'mobile'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      
+      if (missingHeaders.length > 0) {
+        errors.push(`Missing required headers: ${missingHeaders.join(', ')}`);
+      }
+
+      // Validate data rows
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        
+        if (values.length !== headers.length) {
+          errors.push(`Row ${i + 1}: Number of values doesn't match headers`);
+        }
+
+        // Check for empty required fields
+        const emptyFields: string[] = [];
+        if (!values[headers.indexOf('firstname')] || values[headers.indexOf('firstname')].trim() === '') {
+          emptyFields.push('firstName');
+        }
+        if (!values[headers.indexOf('lastname')] || values[headers.indexOf('lastname')].trim() === '') {
+          emptyFields.push('lastName');
+        }
+        if (!values[headers.indexOf('email')] || values[headers.indexOf('email')].trim() === '') {
+          emptyFields.push('email');
+        }
+        if (!values[headers.indexOf('mobile')] || values[headers.indexOf('mobile')].trim() === '') {
+          emptyFields.push('mobile');
+        }
+
+        if (emptyFields.length > 0) {
+          errors.push(`Row ${i + 1}: Empty required fields: ${emptyFields.join(', ')}`);
+        }
+      }
+
+      return { isValid: errors.length === 0, errors };
+    } catch (error) {
+      return { isValid: false, errors: ['Invalid CSV format'] };
+    }
+  }
+
+  async updateSampleCsv(csvContent: string): Promise<{ message: string; updatedAt: string }> {
+    try {
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      
+      // Create uploads directory if it doesn't exist
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const sampleFilePath = path.join(uploadsDir, 'sample_users.csv');
+      
+      // Write the new sample content
+      fs.writeFileSync(sampleFilePath, csvContent, 'utf-8');
+      
+      return {
+        message: 'Sample CSV updated successfully',
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get email status from CSV upload logs
+   */
+  async getEmailStatusFromLogs(sessionId: string): Promise<any> {
+    try {
+      const logEntry = await this.csvUploadLogService.getLogBySessionId(sessionId);
+      return logEntry;
+    } catch (error) {
+      console.error('Error getting email status from logs:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Process CSV file using professional CSV processor
+   */
+  async processCsvFile(filePath: string): Promise<any> {
+    return await this.csvProcessorService.processCsvFile(filePath);
+  }
+
+  /**
+   * Clean up temporary CSV file
+   */
+  async cleanupTempFile(filePath: string): Promise<void> {
+    return await this.csvProcessorService.cleanupTempFile(filePath);
+  }
+
+  // Generate sample CSV based on fields with header and values
+  async generateSampleCsv(fields: { header: string; values: string[] }[]): Promise<{
+    csvContent: string;
+    fieldMapping: { [key: string]: string };
+  }> {
+    try {
+      // Create field mapping
+      const fieldMapping: { [key: string]: string } = {};
+      const csvHeaders: string[] = [];
+      
+      fields.forEach((field) => {
+        const header = field.header;
+        csvHeaders.push(header);
+        
+        // Map to standard field names based on header content
+        if (header.toLowerCase().includes('first') || header.toLowerCase().includes('name')) {
+          fieldMapping[header] = 'firstName';
+        } else if (header.toLowerCase().includes('last') || header.toLowerCase().includes('surname')) {
+          fieldMapping[header] = 'lastName';
+        } else if (header.toLowerCase().includes('email') || header.toLowerCase().includes('mail')) {
+          fieldMapping[header] = 'email';
+        } else if (header.toLowerCase().includes('mobile') || header.toLowerCase().includes('phone')) {
+          fieldMapping[header] = 'mobile';
+        } else {
+          fieldMapping[header] = header;
+        }
+      });
+
+      // Generate CSV content
+      const csvRows: string[] = [];
+      
+      // Add header row
+      csvRows.push(csvHeaders.join(','));
+      
+      // Add data rows based on provided values
+      const maxRows = Math.max(...fields.map(field => field.values.length));
+      
+      for (let i = 0; i < maxRows; i++) {
+        const rowData: string[] = [];
+        
+        fields.forEach((field) => {
+          const value = field.values[i] || ''; // Use provided value or empty string
+          rowData.push(value);
+        });
+        
+        csvRows.push(rowData.join(','));
+      }
+
+      const csvContent = csvRows.join('\n');
+
+      return {
+        csvContent,
+        fieldMapping,
       };
     } catch (error) {
       this.handleError(error);

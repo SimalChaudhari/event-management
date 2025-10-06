@@ -9,7 +9,8 @@ import {
     SURVEY_PATHS,
     TRANSACTION_PATHS,
     USER_PATHS,
-    POLLING_PATHS
+    POLLING_PATHS,
+    LOGS_PATHS
 } from './utils/constants.js';
 
 /**
@@ -58,7 +59,8 @@ const eventComponents = {
 };
 
 const MediaManagerComponents = {
-    BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx'))
+    BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx')),
+    LogoManagement: React.lazy(() => import('./Pages/Settings/Logo/LogoManagement.jsx'))
 };
 
 /**
@@ -128,6 +130,15 @@ const pollingComponents = {
 const settingsComponents = {
     TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
     PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx'))
+};
+
+/**
+ * Logs related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const logsComponents = {
+    LogsPage: React.lazy(() => import('./Pages/Logs/LogsPage.jsx')),
+    // LogDetailsPage: React.lazy(() => import('./Pages/Logs/LogDetailsPage.jsx'))
 };
 
 /**
@@ -402,12 +413,17 @@ const eventRoutes = [
 ];
 
 const MediaManagerRoutes = [
-   
     {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,
         exact: true,
         name: 'Banner Management',
         component: MediaManagerComponents.BannerManagement
+    },
+    {
+        path: MEDIA_MANAGER_PATHS.LOGO_MANAGEMENT,
+        exact: true,
+        name: 'Logo Management',
+        component: MediaManagerComponents.LogoManagement
     }
 ];
 
@@ -461,6 +477,25 @@ const settingsRoutes = [
         exact: true,
         name: 'Privacy Policy',
         component: settingsComponents.PrivacyPolicy
+    }
+];
+
+/**
+ * Logs routes configuration
+ * @type {RouteConfig[]}
+ */
+const logsRoutes = [
+    {
+        path: LOGS_PATHS.LIST_LOGS,
+        exact: true,
+        name: 'System Logs',
+        component: logsComponents.LogsPage
+    },
+    {
+        path: LOGS_PATHS.LOG_DETAILS,
+        exact: true,
+        name: 'Log Details',
+        component: logsComponents.LogDetailsPage
     }
 ];
 
@@ -546,6 +581,7 @@ const routes = [
     ...surveyRoutes,
     ...pollingRoutes,
     ...settingsRoutes,
+    ...logsRoutes,
     ...transactionRoutes,
     ...demoRoutes
 ];

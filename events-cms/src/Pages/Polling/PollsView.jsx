@@ -58,7 +58,7 @@ function pollsTable(data, handleAdd, handleEdit, handleDelete, handleView, handl
                     const speakerName = row.speaker?.name || 'No Speaker';
                     const totalVotes = row.totalVotes || 0;
                     const totalVoters = row.totalVoters || 0;
-                    
+
                     return `
                         <div class="d-inline-block align-middle" style="max-width: 100%;">
                             <h6 class="m-b-0" style="font-size: 14px; font-weight: 600;">${truncatedQuestion}</h6>
@@ -109,7 +109,7 @@ function pollsTable(data, handleAdd, handleEdit, handleDelete, handleView, handl
                     const badgeClass = isLive ? 'badge-light-success' : 'badge-light-secondary';
                     const statusText = isLive ? 'Live' : 'Offline';
                     const iconClass = isLive ? 'icon-check-circle' : 'icon-x-circle';
-                    
+
                     return `
                         <span class="badge ${badgeClass} toggle-live-badge" data-id="${row.id}" 
                               style="cursor: pointer; font-size: 13px; padding: 6px 16px; min-width: 90px;" 
@@ -137,15 +137,15 @@ function pollsTable(data, handleAdd, handleEdit, handleDelete, handleView, handl
                     return `
                         <div class="btn-group" role="group" aria-label="Actions">
                             <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View Details" 
-                                style="margin-right: 8px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
-                            <button type="button" class="btn btn-icon btn-primary edit-btn" data-id="${row.id}" title="Edit Poll" 
-                                style="margin-right: 8px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                            <button type="button" class="btn btn-icon btn-warning edit-btn" data-id="${row.id}" title="Edit Poll" 
+                                style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-edit"></i>
                             </button>
                             <button type="button" class="btn btn-icon btn-danger delete-btn" data-id="${row.id}" title="Delete Poll" 
-                                style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                                style="border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-trash-2"></i>
                             </button>
                         </div>
@@ -157,39 +157,49 @@ function pollsTable(data, handleAdd, handleEdit, handleDelete, handleView, handl
             // Add "Create New Poll" button
             $('.add-poll-button').html(
                 '<button type="button" class="btn btn-primary add-new-poll-btn" style="white-space: nowrap;">' +
-                '<i class="feather icon-plus"></i> Create New Poll' +
-                '</button>'
+                    '<i class="feather icon-plus"></i> Create New Poll' +
+                    '</button>'
             );
 
             // Attach event listeners
-            $('.add-new-poll-btn').off('click').on('click', function () {
-                handleAdd();
-            });
+            $('.add-new-poll-btn')
+                .off('click')
+                .on('click', function () {
+                    handleAdd();
+                });
 
             // Restore the previous page
             $(tableZero).DataTable().page(currentPage).draw('page');
         },
         drawCallback: function (settings) {
             // Attach event listeners after each draw
-            $('.view-btn').off('click').on('click', function () {
-                const id = $(this).data('id');
-                handleView(id);
-            });
+            $('.view-btn')
+                .off('click')
+                .on('click', function () {
+                    const id = $(this).data('id');
+                    handleView(id);
+                });
 
-            $('.edit-btn').off('click').on('click', function () {
-                const id = $(this).data('id');
-                handleEdit(id);
-            });
+            $('.edit-btn')
+                .off('click')
+                .on('click', function () {
+                    const id = $(this).data('id');
+                    handleEdit(id);
+                });
 
-            $('.delete-btn').off('click').on('click', function () {
-                const id = $(this).data('id');
-                handleDelete(id);
-            });
+            $('.delete-btn')
+                .off('click')
+                .on('click', function () {
+                    const id = $(this).data('id');
+                    handleDelete(id);
+                });
 
-            $('.toggle-live-badge').off('click').on('click', function () {
-                const id = $(this).data('id');
-                handleToggleLive(id);
-            });
+            $('.toggle-live-badge')
+                .off('click')
+                .on('click', function () {
+                    const id = $(this).data('id');
+                    handleToggleLive(id);
+                });
         }
     });
 }
@@ -197,7 +207,7 @@ function pollsTable(data, handleAdd, handleEdit, handleDelete, handleView, handl
 const PollsView = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    
+
     const { polls, loading } = useSelector((state) => state.polling);
     const events = useSelector((state) => state.event?.event?.events || []);
 
@@ -225,31 +235,32 @@ const PollsView = () => {
     // Flatten and filter polls data for DataTable
     useEffect(() => {
         console.log('Polls state:', polls);
-        
+
         if (polls?.data && Array.isArray(polls.data)) {
             let processedPolls = [];
-            
+
             // Check if it's the new format (flat array)
             if (polls.data.length > 0 && polls.data[0].question && !polls.data[0].questions) {
                 // New admin API format - already flat
                 processedPolls = polls.data;
             } else {
                 // Old grouped format
-                processedPolls = polls.data.flatMap(eventGroup => 
-                    eventGroup.questions?.map(poll => ({
-                        ...poll,
-                        event: eventGroup.event,
-                        speaker: eventGroup.speaker
-                    })) || []
+                processedPolls = polls.data.flatMap(
+                    (eventGroup) =>
+                        eventGroup.questions?.map((poll) => ({
+                            ...poll,
+                            event: eventGroup.event,
+                            speaker: eventGroup.speaker
+                        })) || []
                 );
             }
 
             // Apply filters
             if (selectedEventId) {
-                processedPolls = processedPolls.filter(poll => poll.event?.id === selectedEventId);
+                processedPolls = processedPolls.filter((poll) => poll.event?.id === selectedEventId);
             }
             if (selectedSpeakerId) {
-                processedPolls = processedPolls.filter(poll => poll.speaker?.id === selectedSpeakerId);
+                processedPolls = processedPolls.filter((poll) => poll.speaker?.id === selectedSpeakerId);
             }
 
             setFlatPolls(processedPolls);
@@ -260,14 +271,7 @@ const PollsView = () => {
 
     useEffect(() => {
         if (!loading && flatPolls.length >= 0) {
-            pollsTable(
-                flatPolls,
-                handleAddPoll,
-                handleEditPoll,
-                handleDeletePollClick,
-                handleViewPoll,
-                handleToggleLive
-            );
+            pollsTable(flatPolls, handleAddPoll, handleEditPoll, handleDeletePollClick, handleViewPoll, handleToggleLive);
         }
     }, [flatPolls, loading]);
 
@@ -275,22 +279,31 @@ const PollsView = () => {
         navigate(POLLING_PATHS.ADD_POLL);
     }, [navigate]);
 
-    const handleEditPoll = useCallback((id) => {
-        navigate(`${POLLING_PATHS.EDIT_POLL}/${id}`);
-    }, [navigate]);
+    const handleEditPoll = useCallback(
+        (id) => {
+            navigate(`${POLLING_PATHS.EDIT_POLL}/${id}`);
+        },
+        [navigate]
+    );
 
-    const handleViewPoll = useCallback((id) => {
-        navigate(`${POLLING_PATHS.VIEW_POLL}/${id}`);
-    }, [navigate]);
+    const handleViewPoll = useCallback(
+        (id) => {
+            navigate(`${POLLING_PATHS.VIEW_POLL}/${id}`);
+        },
+        [navigate]
+    );
 
-    const handleDeletePollClick = useCallback((id) => {
-        const poll = flatPolls.find(p => p.id === id);
-        if (poll) {
-            setSelectedPollId(id);
-            setSelectedPollName(poll.question);
-            setShowDeleteModal(true);
-        }
-    }, [flatPolls]);
+    const handleDeletePollClick = useCallback(
+        (id) => {
+            const poll = flatPolls.find((p) => p.id === id);
+            if (poll) {
+                setSelectedPollId(id);
+                setSelectedPollName(poll.question);
+                setShowDeleteModal(true);
+            }
+        },
+        [flatPolls]
+    );
 
     const handleDeleteConfirm = useCallback(async () => {
         if (selectedPollId) {
@@ -306,14 +319,17 @@ const PollsView = () => {
         }
     }, [dispatch, selectedPollId]);
 
-    const handleToggleLive = useCallback(async (id) => {
-        try {
-            await dispatch(togglePollLive(id));
-            dispatch(getAllPollsForAdmin());
-        } catch (error) {
-            console.error('Error toggling poll status:', error);
-        }
-    }, [dispatch]);
+    const handleToggleLive = useCallback(
+        async (id) => {
+            try {
+                await dispatch(togglePollLive(id));
+                dispatch(getAllPollsForAdmin());
+            } catch (error) {
+                console.error('Error toggling poll status:', error);
+            }
+        },
+        [dispatch]
+    );
 
     const handleClearFilters = useCallback(() => {
         setSelectedEventId('');
@@ -332,17 +348,21 @@ const PollsView = () => {
 
     return (
         <>
-    
             {/* Filter Component - Same as Event (No Apply button, auto-filter) */}
             <Card className="mb-4 shadow-sm border-0" style={{ borderRadius: '8px' }}>
                 <Card.Header className="bg-light border-0" style={{ padding: '16px 20px', borderRadius: '8px 8px 0 0' }}>
                     <div className="d-flex align-items-center justify-content-between">
                         <div className="d-flex align-items-center">
                             <i className="feather icon-filter mr-2" style={{ color: '#4680ff', fontSize: '18px' }}></i>
-                            <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>Filter Options</h6>
+                            <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>
+                                Filter Options
+                            </h6>
                         </div>
                         {(selectedEventId || selectedSpeakerId) && (
-                            <span className="badge badge-primary" style={{ backgroundColor: '#4680ff', fontSize: '11px', padding: '4px 8px' }}>
+                            <span
+                                className="badge badge-primary"
+                                style={{ backgroundColor: '#4680ff', fontSize: '11px', padding: '4px 8px' }}
+                            >
                                 {[selectedEventId, selectedSpeakerId].filter(Boolean).length} Active
                             </span>
                         )}
@@ -360,7 +380,15 @@ const PollsView = () => {
                                 <Form.Select
                                     value={selectedEventId}
                                     onChange={(e) => setSelectedEventId(e.target.value)}
-                                    style={{ borderRadius: '6px', border: '1px solid #ced4da', padding: '8px 12px', width: '100%', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    style={{
+                                        borderRadius: '6px',
+                                        border: '1px solid #ced4da',
+                                        padding: '8px 12px',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }}
                                 >
                                     <option value="">All Events</option>
                                     {events?.map((event) => (
@@ -382,7 +410,15 @@ const PollsView = () => {
                                 <Form.Select
                                     value={selectedSpeakerId}
                                     onChange={(e) => setSelectedSpeakerId(e.target.value)}
-                                    style={{ borderRadius: '6px', border: '1px solid #ced4da', padding: '8px 12px', width: '100%', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    style={{
+                                        borderRadius: '6px',
+                                        border: '1px solid #ced4da',
+                                        padding: '8px 12px',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }}
                                 >
                                     <option value="">All Speakers</option>
                                     {speakers?.map((speaker) => (
@@ -396,12 +432,22 @@ const PollsView = () => {
 
                         {/* Clear Button */}
                         <Col xl={4} lg={4} md={12} sm={12} xs={12} className="mt-md-3 mt-sm-3 mt-3">
-                            <div className="d-flex align-items-end justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start flex-wrap" style={{ gap: '12px' }}>
+                            <div
+                                className="d-flex align-items-end justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start flex-wrap"
+                                style={{ gap: '12px' }}
+                            >
                                 {(selectedEventId || selectedSpeakerId) && (
                                     <Button
                                         variant="outline-secondary"
                                         onClick={handleClearFilters}
-                                        style={{ borderRadius: '6px', padding: '8px 14px', fontSize: '13px', fontWeight: '500', minWidth: '75px', whiteSpace: 'nowrap' }}
+                                        style={{
+                                            borderRadius: '6px',
+                                            padding: '8px 14px',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            minWidth: '75px',
+                                            whiteSpace: 'nowrap'
+                                        }}
                                     >
                                         <i className="feather icon-x mr-1"></i>
                                         Clear
@@ -421,11 +467,19 @@ const PollsView = () => {
                                 <thead>
                                     <tr>
                                         <th style={{ width: '35%' }}>Poll Question</th>
-                                        <th style={{ width: '10%' }} className="text-center">Options</th>
-                                        <th style={{ width: '10%' }} className="text-center">Timer</th>
-                                        <th style={{ width: '12%' }} className="text-center">Status</th>
+                                        <th style={{ width: '10%' }} className="text-center">
+                                            Options
+                                        </th>
+                                        <th style={{ width: '10%' }} className="text-center">
+                                            Timer
+                                        </th>
+                                        <th style={{ width: '12%' }} className="text-center">
+                                            Status
+                                        </th>
                                         <th style={{ width: '15%' }}>Created</th>
-                                        <th style={{ width: '18%' }} className="text-center">Actions</th>
+                                        <th style={{ width: '18%' }} className="text-center">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                             </Table>

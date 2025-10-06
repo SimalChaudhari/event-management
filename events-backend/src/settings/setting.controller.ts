@@ -22,6 +22,7 @@ import {
   TermsConditionsService,
   BannerService,
   BannerEventService,
+  LogoService,
   UserPermissionsService,
   PermissionTemplateService,
   PushNotificationService,
@@ -32,6 +33,7 @@ import {
   CreateTermsConditionsDto,
   CreateBannerDto,
   CreateBannerEventDto,
+  CreateLogoDto,
   CreatePermissionTemplateDto,
   UpdateUserPermissionDto,
   UserPermissionWithTemplate,
@@ -47,7 +49,7 @@ import {
   CreateAdvertNotificationFormDto,
   UpdateAdvertNotificationFormDto,
 } from './setting.dto';
-import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
+import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, Logo, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
@@ -207,6 +209,58 @@ export class BannerEventController {
   async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
     return this.bannerEventService.deleteSpecificImage(imageUrl);
   }
+}
+
+@Controller('api/logos')
+export class LogoController {
+  constructor(private readonly logoService: LogoService) { }
+
+  // Public endpoint - anyone can view the logo
+  @Get()
+  async getOrShow(): Promise<Logo | { message: string }> {
+    const logo = await this.logoService.getOrShow();
+    if (!logo) {
+      return { message: 'No logo found' };
+    }
+    return logo;
+  }
+
+  // Admin only - Create/Update logo
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @UseInterceptors(
+    FileInterceptor('image', { // Single image for logo
+      storage: diskStorage({
+        destination: './uploads/logos',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+    }),
+  )
+  async createOrUpdate(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('hyperlink') hyperlink?: string,
+  ): Promise<{ message: string; data: Logo }> {
+    const imageUrl = `uploads/logos/${file.filename}`;
+    
+    const createLogoDto: CreateLogoDto = {
+      imageUrl: imageUrl,
+      hyperlink: hyperlink
+    };
+    return this.logoService.createOrUpdate(createLogoDto);
+  }
+
+  // Admin only - Clear logo
+  @Delete('delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async clearLogo(): Promise<{ message: string }> {
+    return this.logoService.clearLogo();
+  }
+
 }
 
 // Permission Templates Controller (Admin creates default permissions)
