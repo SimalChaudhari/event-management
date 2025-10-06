@@ -73,9 +73,8 @@ export const EVENT_PATHS = {
 };  
 
 export const MEDIA_MANAGER_PATHS = {
-  
-
-    BANNER_MANAGEMENT: '/media-manager/banner-management'
+    BANNER_MANAGEMENT: '/media-manager/banner-management',
+    LOGO_MANAGEMENT: '/media-manager/logo-management'
 };
 
 export const SETTINGS_PATHS = {

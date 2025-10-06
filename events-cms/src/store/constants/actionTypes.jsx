@@ -122,3 +122,11 @@ export const LOG_BY_ID = 'LOG_BY_ID';
 export const LOGS_STATISTICS = 'LOGS_STATISTICS';
 export const CREATE_SAMPLE_LOGS = 'CREATE_SAMPLE_LOGS';
 export const CLEAR_LOGS_ERROR = 'CLEAR_LOGS_ERROR';
+
+// Logo Action Types
+export const LOGO_GET = 'LOGO_GET';
+export const LOGO_UPDATE = 'LOGO_UPDATE';
+export const LOGO_DELETE = 'LOGO_DELETE';
+export const LOGO_LOADING = 'LOGO_LOADING';
+export const LOGO_ERROR = 'LOGO_ERROR';
+export const CLEAR_LOGO_ERROR = 'CLEAR_LOGO_ERROR';

@@ -177,6 +177,13 @@ const chartData = {
                     type: 'item',
                     // icon: 'feather icon-image',
                     url: '/media-manager/banner-management'
+                },
+                {
+                    id: 'logo-management',
+                    title: 'Logo Management',
+                    type: 'item',
+                    // icon: 'feather icon-image',
+                    url: '/media-manager/logo-management'
                 }
             ]
             }
@@ -215,7 +222,7 @@ const chartData = {
                             type: 'item',
 
                             url: '/settings/privacy-policy'
-                        }
+                        },
                     ]
                 },
                 {

@@ -59,7 +59,8 @@ const eventComponents = {
 };
 
 const MediaManagerComponents = {
-    BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx'))
+    BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx')),
+    LogoManagement: React.lazy(() => import('./Pages/Settings/Logo/LogoManagement.jsx'))
 };
 
 /**
@@ -412,12 +413,17 @@ const eventRoutes = [
 ];
 
 const MediaManagerRoutes = [
-   
     {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,
         exact: true,
         name: 'Banner Management',
         component: MediaManagerComponents.BannerManagement
+    },
+    {
+        path: MEDIA_MANAGER_PATHS.LOGO_MANAGEMENT,
+        exact: true,
+        name: 'Logo Management',
+        component: MediaManagerComponents.LogoManagement
     }
 ];
 
