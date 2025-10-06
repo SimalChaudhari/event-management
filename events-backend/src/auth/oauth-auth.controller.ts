@@ -7,7 +7,6 @@ import {
   Res,
   HttpStatus,
   BadRequestException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { OAuthAuthService } from './oauth-auth.service';
@@ -17,101 +16,121 @@ export class OAuthAuthController {
   constructor(private readonly oauthAuthService: OAuthAuthService) { }
 
   /**
-   * Get OAuth authentication URL for frontend
+   * Step 1: Get Salesforce authorization URL
+   * Flutter app calls this to get the URL to open in browser
    */
   @Get('auth-url')
   async getAuthUrl(
     @Res() response: Response,
-
     @Query('state') state?: string,
   ) {
     try {
       const authUrl = this.oauthAuthService.generateAuthUrl(state);
+      console.log('Generated authorization URL:', authUrl);
 
       return response.status(HttpStatus.OK).json({
         success: true,
-        message: 'Authentication URL generated successfully',
+        message: 'Authorization URL generated successfully',
         authUrl: authUrl,
         state: state || '',
       });
     } catch (error: any) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
-        message: error.message || 'Failed to generate authentication URL',
+        message: error.message || 'Failed to generate authorization URL',
       });
     }
   }
 
   /**
-   * Direct redirect to Salesforce login
+   * Step 2: Exchange authorization code for tokens
+   * Flutter app sends the code received from Salesforce callback (iscaevential://auth?code=xxxxx)
+   * Backend exchanges code with Salesforce and returns JWT tokens
    */
-  @Get('login')
-  async initiateLogin(
+  @Post('exchange')
+  async exchangeCode(
+    @Body() body: { code: string; state?: string },
     @Res() response: Response,
-    @Query('state') state?: string,
   ) {
     try {
-      const authUrl = this.oauthAuthService.generateAuthUrl(state);
-
-      // Direct redirect to Salesforce
-      return response.redirect(authUrl);
-    } catch (error: any) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: error.message || 'Failed to redirect to Salesforce login',
-      });
-    }
-  }
-
-  /**
-   * Handle OAuth callback and exchange code for token
-   */
-  @Get('callback')
-  async handleCallback(
-    @Res() response: Response,
-    @Query('code') code: string,
-    @Query('state') state?: string,
-    @Query('error') error?: string,
-  ) {
-    console.log('OAuth callback received with code:', code ? 'present' : 'missing');
-    try {
-      if (error) {
-        throw new BadRequestException(`OAuth error: ${error}`);
-      }
-
-      if (!code) {
+      if (!body.code) {
         throw new BadRequestException('Authorization code is required');
       }
 
-      const result = await this.oauthAuthService.processOAuthAuthentication(code);
-      console.log('OAuth authentication result:', result)
+      console.log('Exchanging authorization code for tokens...');
+      
+      const result = await this.oauthAuthService.processOAuthAuthentication(body.code);
+      
+      console.log('OAuth authentication successful for user:', result.user.email);
+      console.log('User saved to database with ID:', result.user.id);
 
       return response.status(HttpStatus.OK).json({
         success: true,
-        message: 'OAuth authentication successful',
+        message: result.message,
         user: result.user,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         isNewUser: result.isNewUser,
-        provider: 'oauth',
-        loginMethod: 'sso',
-        state: state || '',
-        loginTimestamp: new Date().toISOString(),
       });
     } catch (error: any) {
-      console.error('OAuth callback error:', error.message);
+      console.error('OAuth exchange error:', error.message);
       
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
-        message: error.message || 'OAuth authentication failed',
-        errorCode: 'OAUTH_AUTHENTICATION_FAILED',
-        state: state || '',
+        message: error.message || 'Failed to exchange authorization code',
       });
     }
   }
 
   /**
-   * Refresh access token using refresh token
+   * Web callback endpoint for SSO redirect
+   * This handles the redirect from Salesforce after user enters email/password
+   * After processing, redirects to mobile app with tokens
+   */
+  @Get('callback')
+  async handleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string,
+    @Res() response: Response,
+  ) {
+    try {
+      // Handle OAuth errors
+      if (error) {
+        console.error('OAuth callback error:', error);
+        const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error)}&success=false`;
+        return response.redirect(errorUrl);
+      }
+
+      // Check if authorization code is present
+      if (!code) {
+        const errorUrl = `iscaevential://auth?error=${encodeURIComponent('Authorization code is missing')}&success=false`;
+        return response.redirect(errorUrl);
+      }
+
+      console.log('Processing OAuth callback with code:', code);
+      
+      // Process the OAuth authentication
+      const result = await this.oauthAuthService.processOAuthAuthentication(code);
+      
+      console.log('OAuth authentication successful for user:', result.user.email);
+
+      // Create mobile app redirect URL with tokens
+      const mobileRedirectUrl = this.oauthAuthService.createMobileRedirectUrl(result);
+      console.log('Redirecting to mobile app with URL:', mobileRedirectUrl);
+      
+      // Redirect to mobile app
+      return response.redirect(mobileRedirectUrl);
+    } catch (error: any) {
+      console.error('OAuth callback error:', error.message);
+      
+      const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error.message || 'Failed to process OAuth callback')}&success=false`;
+      return response.redirect(errorUrl);
+    }
+  }
+
+  /**
+   * Refresh JWT access token using refresh token
    */
   @Post('refresh')
   async refreshToken(
@@ -135,68 +154,6 @@ export class OAuthAuthController {
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
         message: error.message || 'Failed to refresh token',
-      });
-    }
-  }
-
-  /**
-   * SSO Login API - Exchange authorization code for tokens and user info
-   */
-  @Post('login')
-  async ssoLogin(
-    @Body() body: { code: string; state?: string },
-    @Res() response: Response,
-  ) {
-    try {
-      if (!body.code) {
-        throw new BadRequestException('Authorization code is required');
-      }
-
-      const result = await this.oauthAuthService.processOAuthAuthentication(body.code);
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'SSO login successful',
-        user: result.user,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        isNewUser: result.isNewUser,
-        provider: 'oauth',
-        loginMethod: 'sso',
-      });
-    } catch (error: any) {
-      return response.status(HttpStatus.UNAUTHORIZED).json({
-        success: false,
-        message: error.message || 'SSO login failed',
-        errorCode: 'SSO_LOGIN_FAILED',
-      });
-    }
-  }
-
-  /**
-   * Get OAuth configuration for frontend
-   */
-  @Get('config')
-  async getOAuthConfig(@Res() response: Response) {
-    try {
-      const config = {
-        clientId: process.env.SALESFORCE_CLIENT_ID,
-        instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com',
-        redirectUri: process.env.SALESFORCE_REDIRECT_URI,
-        scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
-        responseType: 'code',
-        responseMode: 'query',
-      };
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'OAuth configuration retrieved',
-        config: config,
-      });
-    } catch (error: any) {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        success: false,
-        message: 'Failed to retrieve OAuth configuration',
       });
     }
   }

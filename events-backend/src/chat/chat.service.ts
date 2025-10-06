@@ -223,8 +223,8 @@ export class ChatService {
         .leftJoinAndSelect('replyToMessage.sender', 'replyToMessageSender')
         .where('msg.threadID = :threadID', { threadID })
         .andWhere(
-          '(msg.senderID = :userID AND msg.visibleToSender = true) OR (msg.receiverID = :userID AND msg.visibleToReceiver = true)',
-          { userID }
+          '((msg.senderID = :userID AND msg.receiverID = :receiverID AND msg.visibleToSender = true) OR (msg.senderID = :receiverID AND msg.receiverID = :userID AND msg.visibleToReceiver = true))',
+          { userID, receiverID: dto.receiverID }
         )
         .orderBy('msg.msgDateUTC', 'DESC')
         .take(limit)
@@ -236,7 +236,7 @@ export class ChatService {
 
       // Mark messages as delivered for current user
       await this.messageRepo.update(
-        { threadID, receiverID: userID, isDelivered: false },
+        { threadID, senderID: dto.receiverID, receiverID: userID, isDelivered: false },
         { isDelivered: true }
       );
 

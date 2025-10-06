@@ -11,11 +11,12 @@ export class OAuthAuthService {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
     redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
+    mobileRedirectUri: 'iscaevential://auth',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com',
-    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/authorize`,
-    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/token`,
-    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/event/services/oauth2/userinfo`,
+    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/authorize`,
+    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/token`,
+    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/userinfo`,
   };
 
 
@@ -29,15 +30,21 @@ export class OAuthAuthService {
    * Generate OAuth 2.0 authorization URL
    */
   generateAuthUrl(state?: string): string {
+    // Use the exact URL provided by the user
+    // const baseUrl = 'https://eservices-isca--fuat.sandbox.my.site.com/services/oauth2/authorize';
+    const baseUrl = 'https://eservices-isca--fuat.sandbox.my.site.com/event/services/oauth2/authorize';
     const params = new URLSearchParams({
-      client_id: this.salesforceConfig.clientId,
+      client_id: '3MVG9yj3UGaUlj7luLykaRo9nVJl.l_EnrdUAU2iNLQuRwfFhLcJ5jZ9XbU6KSg7gc6wDDYZ.YGe6W7aesNCZ',
       response_type: 'code',
-      redirect_uri: this.salesforceConfig.redirectUri,
-      scope: this.salesforceConfig.scope,
+      redirect_uri: 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
+      scope: 'openid profile email api refresh_token',
       state: state || this.generateState(),
     });
 
-    return `${this.salesforceConfig.authorizationUrl}?${params.toString()}`;
+    const authUrl = `${baseUrl}?${params.toString()}`;
+    console.log('Using exact auth URL:', authUrl);
+    
+    return authUrl;
   }
 
   /**
@@ -168,6 +175,8 @@ export class OAuthAuthService {
         where: { email: userInfo.email },
       });
 
+      let isNewUser = false;
+
       if (!user) {
         // Create new user entry
         console.log(`Creating new user for email: ${userInfo.email}`);
@@ -183,6 +192,7 @@ export class OAuthAuthService {
           role: UserRole.User,
         });
         await this.userRepository.save(user);
+        isNewUser = true;
         console.log(`New user created with ID: ${user.id}`);
       } else {
         // Update existing user
@@ -205,8 +215,6 @@ export class OAuthAuthService {
       user.socialAccessToken = tokens.accessToken;
       user.socialRefreshToken = tokens.refreshToken;
       await this.userRepository.save(user);
-
-      const isNewUser = user.id === undefined;
       
       return {
         message: isNewUser ? 'New user created and logged in successfully' : 'Existing user logged in successfully',
@@ -233,66 +241,47 @@ export class OAuthAuthService {
 
 
   /**
-   * Revoke access token
-   */
-  async revokeToken(token: string): Promise<boolean> {
-    try {
-      const revokeUrl = `${this.salesforceConfig.instanceUrl}/event/services/oauth2/revoke`;
-      
-      await axios.post(revokeUrl, new URLSearchParams({
-        token: token,
-      }), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-
-      return true;
-    } catch (error: any) {
-      console.error('OAuth token revocation error:', error.response?.data || error.message);
-      return false;
-    }
-  }
-
-  private generateState(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
-
-  /**
-   * Refresh access token using refresh token
+   * Refresh JWT access token using refresh token
    */
   async refreshAccessToken(refreshToken: string): Promise<{
     accessToken: string;
     refreshToken: string;
   }> {
     try {
-      const tokenData = {
-        client_id: this.salesforceConfig.clientId,
-        client_secret: this.salesforceConfig.clientSecret,
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      };
+      // Verify and decode the refresh token
+      const decoded = this.jwtService.verify(refreshToken, {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+      });
 
-      const response = await axios.post(
-        this.salesforceConfig.tokenUrl,
-        new URLSearchParams(tokenData),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
-      );
+      // Get user from database
+      const user = await this.userRepository.findOne({
+        where: { id: decoded.id },
+      });
 
-      const { access_token, refresh_token } = response.data;
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // Generate new tokens
+      const newAccessToken = this.generateAccessToken(user);
+      const newRefreshToken = this.generateRefreshToken(user);
+
+      // Update refresh token in database
+      user.refreshToken = newRefreshToken;
+      await this.userRepository.save(user);
 
       return {
-        accessToken: access_token,
-        refreshToken: refresh_token || refreshToken,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
       };
     } catch (error: any) {
-      console.error('OAuth token refresh error:', error.response?.data || error.message);
+      console.error('Token refresh error:', error.message);
       throw new UnauthorizedException('Failed to refresh access token');
     }
+  }
+
+  private generateState(): string {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 
   private generateAccessToken(user: UserEntity): string {
@@ -321,5 +310,32 @@ export class OAuthAuthService {
       },
       { expiresIn: '30d', secret: process.env.REFRESH_TOKEN_SECRET },
     );
+  }
+
+  /**
+   * Create mobile app redirect URL with authentication tokens
+   */
+  createMobileRedirectUrl(result: {
+    message: string;
+    user: Partial<UserEntity>;
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
+  }): string {
+    const params = new URLSearchParams({
+      success: 'true',
+      message: result.message,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      isNewUser: result.isNewUser.toString(),
+      userId: result.user.id?.toString() || '',
+      email: result.user.email || '',
+      firstName: result.user.firstName || '',
+      lastName: result.user.lastName || '',
+    });
+
+    const redirectUrl = `${this.salesforceConfig.mobileRedirectUri}?${params.toString()}`;
+    console.log('Created mobile redirect URL:', redirectUrl);
+    return redirectUrl;
   }
 }
