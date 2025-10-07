@@ -11,6 +11,7 @@ import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import {
   ValidationException
 } from '../utils/exceptions/custom-exceptions';
+import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 
 @Controller('api/register-events')
 @UseGuards(JwtAuthGuard)
@@ -161,6 +162,21 @@ export class RegisterEventController {
         eventFilter
       });
       
+      // Apply tab visibility filtering to events in the result
+      if (result?.data && Array.isArray(result.data)) {
+        // Each item in result.data has structure: { event: EventObject, user: UserObject, ... }
+        const filteredData = result.data.map(item => {
+          if (item.event) {
+            return {
+              ...item,
+              event: TabVisibilityFilterUtil.filterEventDataByTabVisibility(item.event, role)
+            };
+          }
+          return item;
+        });
+        result.data = filteredData;
+      }
+      
       return response.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.errorHandler.logError(error, 'Register Event retrieval', req.user?.id);
@@ -174,6 +190,11 @@ export class RegisterEventController {
       const userId = req.user.id;
       const role = req.user.role;
       const result = await this.registerEventService.findOne(id, userId, role);
+      
+      // Apply tab visibility filtering to the event in the result
+      if (result?.data?.event) {
+        result.data.event = TabVisibilityFilterUtil.filterEventDataByTabVisibility(result.data.event, role);
+      }
       
       return response.status(HttpStatus.OK).json(result);
     } catch (error) {

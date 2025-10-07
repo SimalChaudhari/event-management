@@ -209,12 +209,6 @@ const ViewPollPage = () => {
                                             Results & Analytics
                                         </Nav.Link>
                                     </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="voters">
-                                            <i className="fas fa-users me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Voter Details
-                                        </Nav.Link>
-                                    </Nav.Item>
                                 </Nav>
                             </Col>
                         </Row>
@@ -492,57 +486,6 @@ const ViewPollPage = () => {
                                 </div>
                             </Tab.Pane>
 
-                            {/* Voters Details Tab */}
-                            <Tab.Pane eventKey="voters">
-                                <div className="p-2 bg-light">
-                                    <InfoCard title="Voter Information" iconClass="fas fa-users" borderColor="#6f42c1">
-                                        {poll?.options?.some(opt => opt.voters?.length > 0) ? (
-                                            <div className="table-responsive">
-                                                <table className="table table-hover table-striped">
-                                                    <thead>
-                                                        <tr>
-                                                            <th style={{ width: '5%' }}>#</th>
-                                                            <th style={{ width: '25%' }}>Voter Name</th>
-                                                            <th style={{ width: '30%' }}>Email</th>
-                                                            <th style={{ width: '25%' }}>Selected Option</th>
-                                                            <th style={{ width: '15%' }}>Voted At</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {poll.options.flatMap((option, optIndex) =>
-                                                            option.voters?.map((voter, voterIndex) => (
-                                                                <tr key={`${optIndex}-${voterIndex}`}>
-                                                                    <td>{voterIndex + 1}</td>
-                                                                    <td>
-                                                                        <i className="fas fa-user text-primary me-2"></i>
-                                                                        {voter.user?.fullName || 'N/A'}
-                                                                    </td>
-                                                                    <td>{voter.user?.email || 'N/A'}</td>
-                                                                    <td>
-                                                                        <Badge bg="light" text="dark" className="me-2">
-                                                                            {String.fromCharCode(65 + optIndex)}
-                                                                        </Badge>
-                                                                        {option.optionText}
-                                                                    </td>
-                                                                    <td>
-                                                                        <DateTimeFormatter date={voter.votedAt} />
-                                                                    </td>
-                                                                </tr>
-                                                            )) || []
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-5">
-                                                <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc' }}></i>
-                                                <p className="text-muted mt-3 mb-0">No votes yet</p>
-                                                <small className="text-muted">Votes will appear here once users start voting</small>
-                                            </div>
-                                        )}
-                                    </InfoCard>
-                                </div>
-                            </Tab.Pane>
                         </Tab.Content>
                     </Tab.Container>
                 </div>

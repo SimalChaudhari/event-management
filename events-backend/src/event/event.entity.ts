@@ -153,6 +153,20 @@ export class Event {
   @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.event)
   eventAgendas!: EventAgenda[];
   
+  // Tab visibility configuration - JSON object to control which tabs are visible
+  @Column({ type: 'json', nullable: true })
+  tabVisibility?: {
+    speakers?: boolean;
+    documents?: boolean;
+    floorplan?: boolean;
+    gallery?: boolean;
+    stamps?: boolean;
+    survey?: boolean;
+    exhibitors?: boolean;
+    categories?: boolean;
+    agenda?: boolean;
+    adminInfo?: boolean;
+  };
 
 }
 

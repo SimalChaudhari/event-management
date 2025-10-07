@@ -32,6 +32,7 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
 import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
+import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 import { EventNotificationService } from '../utils/event-notification.service';
 
 @Controller('api/events')
@@ -148,10 +149,13 @@ export class EventController {
 
       const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);
       
+      // Filter data for each event based on tab visibility for non-admin users
+      const filteredResult = TabVisibilityFilterUtil.filterEventResultByTabVisibility(result, userRole);
+      
       const successResponse: any = {
         success: true,
         message: 'Events retrieved successfully',
-        ...result, // This will include events and metadata from the service
+        ...filteredResult, // This will include events and metadata from the service
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
@@ -161,7 +165,50 @@ export class EventController {
     }
   }
 
-
+  @Put(':id/tab-visibility')
+  @Roles(UserRole.Admin)
+  async updateTabVisibility(
+    @Param('id') id: string,
+    @Body() tabVisibility: {
+      speakers?: boolean;
+      documents?: boolean;
+      floorplan?: boolean;
+      gallery?: boolean;
+      stamps?: boolean;
+      survey?: boolean;
+      exhibitors?: boolean;
+      categories?: boolean;
+      agenda?: boolean;
+      adminInfo?: boolean;
+    },
+    @Res() response: Response,
+  ) {
+    try {
+      console.log('🔧 Updating tab visibility:', {
+        eventId: id,
+        tabVisibilitySettings: tabVisibility
+      });
+      
+      const updatedEvent = await this.eventService.updateTabVisibility(id, tabVisibility);
+      
+      console.log('✅ Tab visibility updated successfully:', {
+        eventId: updatedEvent.id,
+        newTabVisibility: updatedEvent.tabVisibility
+      });
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Event tab visibility updated successfully',
+        data: updatedEvent,
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error:any) {
+      console.error('❌ Error updating tab visibility:', error);
+      this.errorHandler.logError(error, 'Tab visibility update');
+      throw error;
+    }
+  }
 
   @Get(':id')
   async getEventById(
@@ -174,10 +221,13 @@ export class EventController {
       const userRole = req?.user?.role; // Get actual role from JWT
       const event = await this.eventService.getEventById(id, userId, userRole);
       
+      // Filter data based on tab visibility for non-admin users
+      const filteredEvent = TabVisibilityFilterUtil.filterEventDataByTabVisibility(event, userRole);
+      
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event retrieved successfully',
-        data: event,
+        data: filteredEvent,
         metadata: {
           timestamp: new Date().toISOString(),
         },

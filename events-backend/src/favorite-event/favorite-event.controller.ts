@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { FavoriteEventService } from './favorite-event.service';
 import { ToggleFavoriteDto, GetFavoritesDto, FavoriteFilterType } from './favorite-event.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 
 @Controller('api/favorites')
 @UseGuards(JwtAuthGuard)
@@ -41,18 +42,30 @@ export class FavoriteEventController {
     
     const favorites = await this.favoriteEventService.getUserFavorites(userId, filter, userRole);
     
+    // Apply tab visibility filtering to favorite events
+    // Each item in favorites has structure: { event: EventObject, ... }
+    const filteredFavorites = favorites.map(item => {
+      if (item.event) {
+        return {
+          ...item,
+          event: TabVisibilityFilterUtil.filterEventDataByTabVisibility(item.event, userRole)
+        };
+      }
+      return item;
+    });
+    
     return response.status(200).json({
       success: true,
       message: `Favorites retrieved successfully with filter: ${filter}`,
       filter: filter,
-      total: favorites.length,
+      total: filteredFavorites.length,
       metadata: {
         filter: filter,
-        totalFavorites: favorites.length,
+        totalFavorites: filteredFavorites.length,
         userId: userId,
         timestamp: new Date().toISOString()
       },
-      data: favorites,
+      data: filteredFavorites,
     });
   }
 }

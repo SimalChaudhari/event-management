@@ -138,6 +138,21 @@ export class EventDto {
   })
   speakerEndTimes?: string; // Comma-separated end times for speakers
 
+  // Tab visibility configuration
+  @IsOptional()
+  tabVisibility?: {
+    speakers?: boolean;
+    documents?: boolean;
+    floorplan?: boolean;
+    gallery?: boolean;
+    stamps?: boolean;
+    survey?: boolean;
+    exhibitors?: boolean;
+    categories?: boolean;
+    agenda?: boolean;
+    adminInfo?: boolean;
+  };
+
   originalImages: any;
   originalDocuments: any;
   originalEventStampImages: any;

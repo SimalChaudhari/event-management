@@ -787,6 +787,42 @@ export class EventService {
     }
   }
 
+  async updateTabVisibility(
+    id: string,
+    tabVisibility: {
+      details?: boolean;
+      location?: boolean;
+      speakers?: boolean;
+      floorplan?: boolean;
+      gallery?: boolean;
+      stamps?: boolean;
+      survey?: boolean;
+      exhibitors?: boolean;
+      categories?: boolean;
+      documents?: boolean;
+    },
+  ): Promise<Partial<Event>> {
+    try {
+      const event = await this.eventRepository.findOne({ where: { id } });
+      if (!event) {
+        throw new ResourceNotFoundException('Event', id);
+      }
+
+      // Merge with existing tab visibility settings
+      event.tabVisibility = {
+        ...event.tabVisibility,
+        ...tabVisibility,
+      };
+
+      return await this.eventRepository.save(event);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      throw this.errorHandler.handleDatabaseError(error, 'Event tab visibility update');
+    }
+  }
+
   async updateEventStampImages(
     id: string,
     eventStampImages: string[],

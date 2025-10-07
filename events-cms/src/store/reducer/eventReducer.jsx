@@ -1,4 +1,4 @@
-import { EVENT_BY_ID, EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS,UPCOMING_EVENT_LIST } from "../constants/actionTypes";
+import { EVENT_BY_ID, EVENT_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY } from "../constants/actionTypes";
 
 const initialState = {
     event: [],
@@ -35,6 +35,14 @@ const eventReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 upcomingEvents: payload
+            };
+        case UPDATE_EVENT_TAB_VISIBILITY:
+            return {
+                ...state,
+                eventByID: {
+                    ...state.eventByID,
+                    tabVisibility: payload.tabVisibility
+                }
             };
         default:
             return state;

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal } from 'react-bootstrap';
-import { useDispatch } from 'react-redux';
-import { eventById } from '../../../../store/actions/eventActions';
+import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal, Form } from 'react-bootstrap';
+import { useDispatch, useSelector } from 'react-redux';
+import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
 import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
 import { EXHIBITOR_PATHS } from '../../../../utils/constants';
@@ -24,6 +24,10 @@ const ViewEventPage = () => {
     const navigate = useNavigate();
     const [eventData, setEventData] = useState(null);
     const [loading, setLoading] = useState(true);
+    
+    // Get user role from Redux state
+    const { authUser } = useSelector((state) => state.auth);
+    const isAdmin = authUser?.role === 'admin';
 
     // Separate modal states for different image types
     const [showEventImageModal, setShowEventImageModal] = useState(false);
@@ -43,11 +47,44 @@ const ViewEventPage = () => {
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
 
     const [activeTab, setActiveTab] = useState('offers');
+    
+    // Tab visibility management
+    const [showTabVisibilityModal, setShowTabVisibilityModal] = useState(false);
+    const [tabVisibilitySettings, setTabVisibilitySettings] = useState({
+        speakers: true,
+        documents: true,
+        floorplan: true,
+        gallery: true,
+        stamps: true,
+        survey: true,
+        exhibitors: true,
+        categories: true,
+        agenda: true,
+        adminInfo: true,
+    });
+    const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
 
     useEffect(() => {
         dispatch(eventById(id)).then((res) => {
            
             setEventData(res?.data);
+            
+            // Initialize tab visibility settings from event data
+            if (res?.data?.tabVisibility) {
+                setTabVisibilitySettings({
+                    speakers: res.data.tabVisibility.speakers !== false,
+                    documents: res.data.tabVisibility.documents !== false,
+                    floorplan: res.data.tabVisibility.floorplan !== false,
+                    gallery: res.data.tabVisibility.gallery !== false,
+                    stamps: res.data.tabVisibility.stamps !== false,
+                    survey: res.data.tabVisibility.survey !== false,
+                    exhibitors: res.data.tabVisibility.exhibitors !== false,
+                    categories: res.data.tabVisibility.categories !== false,
+                    agenda: res.data.tabVisibility.agenda !== false,
+                    adminInfo: res.data.tabVisibility.adminInfo !== false,
+                });
+            }
+            
             setLoading(false);
         });
     }, [id, dispatch]);
@@ -95,7 +132,7 @@ const ViewEventPage = () => {
 
     const renderEventStats = () => (
         <Row>
-            <Col xs={6} md={3} className="mb-3">
+            <Col xs={6} md={3} className="mb-4">
                 <div
                     className="text-center p-3"
                     style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -109,7 +146,7 @@ const ViewEventPage = () => {
                     </p>
                 </div>
             </Col>
-            <Col xs={6} md={3} className="mb-3">
+            <Col xs={6} md={3} className="mb-4">
                 <div
                     className="text-center p-3"
                     style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -123,7 +160,7 @@ const ViewEventPage = () => {
                     </p>
                 </div>
             </Col>
-            <Col xs={6} md={3} className="mb-3">
+            <Col xs={6} md={3} className="mb-4">
                 <div
                     className="text-center p-3"
                     style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -137,7 +174,7 @@ const ViewEventPage = () => {
                     </p>
                 </div>
             </Col>
-            <Col xs={6} md={3} className="mb-3">
+            <Col xs={6} md={3} className="mb-4">
                 <div
                     className="text-center p-3"
                     style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -152,7 +189,7 @@ const ViewEventPage = () => {
                 </div>
             </Col>
             {eventData?.galleries?.length > 0 && (
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={6} md={3} className="mb-4">
                     <div
                         className="text-center p-3"
                         style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -168,7 +205,7 @@ const ViewEventPage = () => {
                 </Col>
             )}
             {eventData?.exhibitorsData?.exhibitors?.length > 0 && (
-                <Col xs={6} md={3} className="mb-3">
+                <Col xs={6} md={3} className="mb-4">
                     <div
                         className="text-center p-3"
                         style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
@@ -256,169 +293,332 @@ const ViewEventPage = () => {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
+    // Helper function to determine if a tab should be visible
+    const isTabVisible = (tabKey) => {
+        // Admins can see all tabs regardless of restrictions
+        if (isAdmin) {
+            return true;
+        }
+        
+        // For regular users, check tab visibility settings
+        // If no tabVisibility settings exist, show all tabs (backward compatibility)
+        if (!eventData?.tabVisibility) {
+            return true;
+        }
+        
+        // Check if the specific tab is disabled
+        // Use both eventData.tabVisibility and tabVisibilitySettings for immediate updates
+        const eventTabVisibility = eventData.tabVisibility[tabKey];
+        const settingsTabVisibility = tabVisibilitySettings[tabKey];
+        
+        // If settings have been updated but eventData hasn't been refreshed yet, use settings
+        if (settingsTabVisibility !== undefined) {
+            return settingsTabVisibility !== false;
+        }
+        
+        return eventTabVisibility !== false;
+    };
+
+    // Check if tab has any data to display
+    const hasTabData = (tabKey) => {
+        if (!eventData) return false;
+        
+        switch (tabKey) {
+            case 'gallery':
+                return eventData.galleries && eventData.galleries.length > 0;
+            case 'survey':
+                return eventData.surveys && eventData.surveys.length > 0;
+            case 'exhibitors':
+                return eventData.exhibitors && eventData.exhibitors.length > 0;
+            case 'speakers':
+                return eventData.speakers && eventData.speakers.length > 0;
+            case 'media':
+                return (eventData.images && eventData.images.length > 0) || 
+                       (eventData.documents && eventData.documents.length > 0);
+            case 'documents':
+                return eventData.documents && eventData.documents.length > 0;
+            case 'floorplan':
+                return eventData.floorPlan && eventData.floorPlan.length > 0;
+            case 'stamps':
+                return eventData.eventStamps && eventData.eventStamps.length > 0;
+            case 'categories':
+                return eventData.categories && eventData.categories.length > 0;
+            case 'agenda':
+                return eventData.eventAgendas && eventData.eventAgendas.length > 0;
+            case 'adminInfo':
+                return eventData.adminInfo || eventData.isCreatedByAdmin;
+            default:
+                return true; // For details, location tabs that always have data
+        }
+    };
+
+    // Tab visibility management functions
+    const handleTabVisibilityChange = (tabKey, isVisible) => {
+        setTabVisibilitySettings(prev => ({
+            ...prev,
+            [tabKey]: isVisible
+        }));
+    };
+
+    const handleUpdateTabVisibility = async () => {
+        setIsUpdatingTabVisibility(true);
+        try {
+            const success = await dispatch(updateEventTabVisibility(id, tabVisibilitySettings));
+            
+            if (success) {
+                // Update local event data state
+                setEventData(prev => ({
+                    ...prev,
+                    tabVisibility: tabVisibilitySettings
+                }));
+                
+                // Close modal
+                setShowTabVisibilityModal(false);
+            }
+        } catch (error) {
+            console.error('Error updating tab visibility:', error);
+        } finally {
+            setIsUpdatingTabVisibility(false);
+        }
+    };
+
     return (
         <>
             <div className="mt-4">
                 <div
-                    className="mb-3"
+                    className="mb-4"
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View</h4>
-                        <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
-                            <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                            Back
-                        </Button>
+                        <div className="d-flex">
+                            {/* Always show button for testing - change back to {isAdmin && ( after testing */}
+                            <Button 
+                                variant="outline-primary" 
+                                onClick={() => setShowTabVisibilityModal(true)}
+                                size="sm"
+                                style={{ marginRight: '15px' }}
+                            >
+                                <i className="fas fa-cog" style={{ marginRight: '8px' }}></i>
+                                Manage Tabs
+                            </Button>
+                            
+                            <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
+                                <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
+                                Back
+                            </Button>
+                        </div>
                     </div>
                     <hr />
                     {renderEventStats()}
                 </div>
 
                 <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                    <Tab.Container id="event-tabs" defaultActiveKey="details">
+                    <Tab.Container id="event-tabs" defaultActiveKey="speakers">
                         <Row>
                             <Col sm={12}>
-                                <Nav variant="tabs" className="mb-3">
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="details">
-                                            <i className="fas fa-info-circle me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Details
-                                        </Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="location">
-                                            <i className="fas fa-map-marker-alt me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Location & Pricing
-                                        </Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="speakers">
-                                            <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Speakers
-                                        </Nav.Link>
-                                    </Nav.Item>
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="media">
-                                            <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Media
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                <Nav variant="tabs" className="mb-4">
+                                    {/* Speakers Tab */}
+                                    {isTabVisible('speakers') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="speakers">
+                                                <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Speakers
+                                                {isAdmin && eventData?.tabVisibility?.speakers === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
+                                    
+                                    {/* Documents Tab */}
+                                    {isTabVisible('documents') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="documents">
+                                                <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Documents
+                                                {isAdmin && eventData?.tabVisibility?.documents === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
 
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="floorplan">
-                                            <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Floor Plan
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                    {/* Floor Plan Tab */}
+                                    {isTabVisible('floorplan') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="floorplan">
+                                                <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Floor Plan
+                                                {isAdmin && eventData?.tabVisibility?.floorplan === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
 
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="gallery">
-                                            <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Gallery
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                    {/* Gallery Tab */}
+                                    {isTabVisible('gallery') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="gallery">
+                                                <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Gallery
+                                                {isAdmin && eventData?.tabVisibility?.gallery === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                                {!hasTabData('gallery') && (
+                                                    <Badge bg="secondary" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        No Data
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
 
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="stamps">
-                                            <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Event Stamps
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                    {/* Event Stamps Tab */}
+                                    {isTabVisible('stamps') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="stamps">
+                                                <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Event Stamps
+                                                {isAdmin && eventData?.tabVisibility?.stamps === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
 
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="survey">
-                                            <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Survey
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                    {/* Survey Tab */}
+                                    {isTabVisible('survey') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="survey">
+                                                <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Survey
+                                                {isAdmin && eventData?.tabVisibility?.survey === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
 
-                                    <Nav.Item>
-                                        <Nav.Link eventKey="exhibitors">
-                                            <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
-                                            Exhibitors
-                                        </Nav.Link>
-                                    </Nav.Item>
+                                    {/* Exhibitors Tab */}
+                                    {isTabVisible('exhibitors') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="exhibitors">
+                                                <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                Exhibitors
+                                                {isAdmin && eventData?.tabVisibility?.exhibitors === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
                                 </Nav>
                             </Col>
                         </Row>
 
                         <Tab.Content>
-                            {/* Details Tab */}
-                            <Tab.Pane eventKey="details">
-                                <EventBasicComponent eventData={eventData} />
-                            </Tab.Pane>
-
-                            {/* Location & Pricing Tab */}
-                            <Tab.Pane eventKey="location">
-                                <EventLocationComponent eventData={eventData} />
-                            </Tab.Pane>
-
                             {/* Speakers Tab */}
-                            <Tab.Pane eventKey="speakers">
-                                <EventSpeakersComponent speakers={eventData?.speakers} handleSpeakerImageClick={handleSpeakerImageClick} />
-                            </Tab.Pane>
+                            {isTabVisible('speakers') && (
+                                <Tab.Pane eventKey="speakers">
+                                    <EventSpeakersComponent speakers={eventData?.speakers} handleSpeakerImageClick={handleSpeakerImageClick} />
+                                </Tab.Pane>
+                            )}
 
-                            {/* Media Tab */}
-                            <Tab.Pane eventKey="media">
-                                <div className="p-3" style={{ padding: '20px' }}>
-                                    <Row>
-                                        <Col md={6}>
-                                            <EventImageGridComponent
-                                                images={eventData?.images}
-                                                getImageSrc={getImageSrc}
-                                                handleEventImageClick={handleEventImageClick}
-                                            />
-                                        </Col>
-                                        <Col md={6} className="section-speakers">
-                                            <EventDocumentsComponent documents={eventData?.documents} />
-                                        </Col>
-                                    </Row>
-                                </div>
-                            </Tab.Pane>
+                            {/* Documents Tab */}
+                            {isTabVisible('documents') && (
+                                <Tab.Pane eventKey="documents">
+                                    <div className="p-3" style={{ padding: '20px' }}>
+                                        <EventDocumentsComponent documents={eventData?.documents} />
+                                    </div>
+                                </Tab.Pane>
+                            )}
 
                             {/* Floor Plan Tab */}
-
-                            <Tab.Pane eventKey="floorplan">
-                                <EventFloorPlanComponent floorPlan={eventData?.floorPlan} getImageSrc={getImageSrc} />
-                            </Tab.Pane>
+                            {isTabVisible('floorplan') && (
+                                <Tab.Pane eventKey="floorplan">
+                                    <EventFloorPlanComponent floorPlan={eventData?.floorPlan} getImageSrc={getImageSrc} />
+                                </Tab.Pane>
+                            )}
 
                             {/* Gallery Tab */}
-
-                            <Tab.Pane eventKey="gallery">
-                                <div className="p-3">
-                                    <EventGalleriesComponent
-                                        galleries={eventData?.galleries}
-                                        getImageSrc={getImageSrc}
-                                        handleGalleryImageClick={handleGalleryImageClick}
-                                    />
-                                </div>
-                            </Tab.Pane>
+                            {isTabVisible('gallery') && (
+                                <Tab.Pane eventKey="gallery">
+                                    <div className="p-3">
+                                        {hasTabData('gallery') ? (
+                                            <EventGalleriesComponent
+                                                galleries={eventData?.galleries}
+                                                getImageSrc={getImageSrc}
+                                                handleGalleryImageClick={handleGalleryImageClick}
+                                            />
+                                        ) : (
+                                            <div className="text-center py-5">
+                                                <i className="fas fa-images fa-3x text-muted mb-4"></i>
+                                                <h5 className="text-muted">No Gallery Data Available</h5>
+                                                <p className="text-muted">This tab has been disabled or contains no data.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Tab.Pane>
+                            )}
 
                             {/* Exhibitors Tab */}
-
-                            <Tab.Pane eventKey="exhibitors">
-                                <EventExhibitorsComponent exhibitors={eventData?.exhibitors} getImageSrc={getImageSrc} />
-                            </Tab.Pane>
+                            {isTabVisible('exhibitors') && (
+                                <Tab.Pane eventKey="exhibitors">
+                                    {hasTabData('exhibitors') ? (
+                                        <EventExhibitorsComponent exhibitors={eventData?.exhibitors} getImageSrc={getImageSrc} />
+                                    ) : (
+                                        <div className="text-center py-5">
+                                            <i className="fas fa-building fa-3x text-muted mb-4"></i>
+                                            <h5 className="text-muted">No Exhibitors Data Available</h5>
+                                            <p className="text-muted">This tab has been disabled or contains no data.</p>
+                                        </div>
+                                    )}
+                                </Tab.Pane>
+                            )}
 
                             {/* Event Stamps Tab */}
-
-                            <Tab.Pane eventKey="stamps">
-                                <div className="p-3">
-                                    <EventStampsComponent
-                                        eventStamps={eventData?.eventStamps}
-                                        getImageSrc={getImageSrc}
-                                        handleStampImageClick={handleStampImageClick}
-                                    />
-                                </div>
-                            </Tab.Pane>
+                            {isTabVisible('stamps') && (
+                                <Tab.Pane eventKey="stamps">
+                                    <div className="p-3">
+                                        <EventStampsComponent
+                                            eventStamps={eventData?.eventStamps}
+                                            getImageSrc={getImageSrc}
+                                            handleStampImageClick={handleStampImageClick}
+                                        />
+                                    </div>
+                                </Tab.Pane>
+                            )}
 
                             {/* Survey Tab */}
+                            {isTabVisible('survey') && (
+                                <Tab.Pane eventKey="survey">
+                                    <div className="p-3">
+                                        <EventSurveyComponent surveyDetails={eventData?.surveyDetails} formatTime={formatTime} />
+                                    </div>
+                                </Tab.Pane>
+                            )}
 
-                            <Tab.Pane eventKey="survey">
-                                <div className="p-3">
-                                    <EventSurveyComponent surveyDetails={eventData?.surveyDetails} formatTime={formatTime} />
-                                </div>
-                            </Tab.Pane>
+                            {/* Categories Tab */}
+                            {/* {isTabVisible('categories') && (
+                                <Tab.Pane eventKey="categories">
+                                    <EventCategoriesComponent categories={eventData?.categories} />
+                                </Tab.Pane>
+                            )} */}
                         </Tab.Content>
                     </Tab.Container>
                 </div>
@@ -473,6 +673,154 @@ const ViewEventPage = () => {
                 currentIndex={0}
                 totalImages={1}
             />
+
+            {/* Tab Visibility Management Modal */}
+            <Modal show={showTabVisibilityModal} onHide={() => setShowTabVisibilityModal(false)} size="lg" centered>
+                <Modal.Header className="border-0 pb-0">
+                    <Modal.Title>
+                        Manage Event Tab Visibility
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="pt-4">
+                    <div className="mb-4">
+                        <p className="text-muted mb-0">
+                            Control which tabs are visible to users on the frontend. Disabled tabs will be hidden from the event view.
+                        </p>
+                    </div>
+                    
+                    <Row className="g-4">
+                        <Col md={6}>
+                            {/* Left Column - 5 tabs */}
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="speakers-tab"
+                                    label="Speakers Tab"
+                                    checked={tabVisibilitySettings.speakers}
+                                    onChange={(e) => handleTabVisibilityChange('speakers', e.target.checked)}
+                                />
+                            </Form.Group>
+                            
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="documents-tab"
+                                    label="Documents Tab"
+                                    checked={tabVisibilitySettings.documents}
+                                    onChange={(e) => handleTabVisibilityChange('documents', e.target.checked)}
+                                />
+                            </Form.Group>
+                            
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="floorplan-tab"
+                                    label="Floor Plan Tab"
+                                    checked={tabVisibilitySettings.floorplan}
+                                    onChange={(e) => handleTabVisibilityChange('floorplan', e.target.checked)}
+                                />
+                            </Form.Group>
+                            
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="gallery-tab"
+                                    label="Gallery Tab"
+                                    checked={tabVisibilitySettings.gallery}
+                                    onChange={(e) => handleTabVisibilityChange('gallery', e.target.checked)}
+                                />
+                            </Form.Group>
+                            
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="stamps-tab"
+                                    label="Event Stamps Tab"
+                                    checked={tabVisibilitySettings.stamps}
+                                    onChange={(e) => handleTabVisibilityChange('stamps', e.target.checked)}
+                                />
+                            </Form.Group>
+                        </Col>
+                        
+                        <Col md={6}>
+                            {/* Right Column - 5 tabs */}
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="survey-tab"
+                                    label="Survey Tab"
+                                    checked={tabVisibilitySettings.survey}
+                                    onChange={(e) => handleTabVisibilityChange('survey', e.target.checked)}
+                                />
+                            </Form.Group>
+                            
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="exhibitors-tab"
+                                    label="Exhibitors Tab"
+                                    checked={tabVisibilitySettings.exhibitors}
+                                    onChange={(e) => handleTabVisibilityChange('exhibitors', e.target.checked)}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="categories-tab"
+                                    label="Categories Tab"
+                                    checked={tabVisibilitySettings.categories}
+                                    onChange={(e) => handleTabVisibilityChange('categories', e.target.checked)}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="agenda-tab"
+                                    label="My Agenda Tab"
+                                    checked={tabVisibilitySettings.agenda}
+                                    onChange={(e) => handleTabVisibilityChange('agenda', e.target.checked)}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="admin-info-tab"
+                                    label="Admin Info Tab"
+                                    checked={tabVisibilitySettings.adminInfo}
+                                    onChange={(e) => handleTabVisibilityChange('adminInfo', e.target.checked)}
+                                />
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0 d-flex justify-content-between">
+                    <Button 
+                        variant="danger" 
+                        onClick={() => setShowTabVisibilityModal(false)}
+                        className="px-4"
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        variant="primary" 
+                        onClick={handleUpdateTabVisibility}
+                        disabled={isUpdatingTabVisibility}
+                        className="px-4"
+                    >
+                        {isUpdatingTabVisibility ? (
+                            <>
+                                <i className="fas fa-spinner fa-spin me-2"></i>
+                                Updating...
+                            </>
+                        ) : (
+                            'Save'
+                        )}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </>
     );
 };

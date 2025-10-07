@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY } from '../constants/actionTypes';
 
 export const eventList = (filters = {}) => async (dispatch) => {
     try {
@@ -408,6 +408,33 @@ export const getAllEventsForFilter = () => async (dispatch) => {
     } catch (error) {
         console.error('Error fetching events for filter:', error);
         return [];
+    }
+};
+
+// Update event tab visibility
+export const updateEventTabVisibility = (eventId, tabVisibilitySettings) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.put(`/events/${eventId}/tab-visibility`, tabVisibilitySettings);
+        
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success('Tab visibility updated successfully!');
+            
+            // Dispatch action to update the event data in Redux store
+            dispatch({
+                type: UPDATE_EVENT_TAB_VISIBILITY,
+                payload: {
+                    eventId,
+                    tabVisibility: tabVisibilitySettings
+                }
+            });
+            
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update tab visibility';
+        toast.error(errorMessage);
+        return false;
     }
 };
 
