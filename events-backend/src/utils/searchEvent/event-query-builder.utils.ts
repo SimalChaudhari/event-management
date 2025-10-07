@@ -17,7 +17,11 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
       .leftJoinAndSelect('event.galleries', 'galleries')
-      .leftJoinAndSelect('event.surveys', 'surveys');
+      .leftJoinAndSelect('event.surveys', 'surveys')
+      .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
+      .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
+      .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
+
   }
 
   /**
@@ -246,6 +250,21 @@ export class EventQueryBuilderUtils {
         
         -- Gallery fields
         LOWER(galleries.title) LIKE :searchTerm OR
+        
+        -- Programme Track fields
+        LOWER(programmeTracks.title) LIKE :searchTerm OR 
+        LOWER(programmeTracks.description) LIKE :searchTerm OR
+        
+        -- Programme Session fields
+        LOWER(programmeSessions.title) LIKE :searchTerm OR 
+        LOWER(programmeSessions.description) LIKE :searchTerm OR
+        LOWER(programmeSessions.venue) LIKE :searchTerm OR
+        LOWER(programmeSessions.startTime) LIKE :searchTerm OR
+        LOWER(programmeSessions.endTime) LIKE :searchTerm OR
+        
+        -- Programme Session Speaker fields
+        LOWER(programmeSessionSpeakers.firstName) LIKE :searchTerm OR 
+        LOWER(programmeSessionSpeakers.lastName) LIKE :searchTerm OR
       )`,
       { searchTerm: `%${searchTerm}%` }
     );

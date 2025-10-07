@@ -577,6 +577,71 @@ export class GlobalSearchUtils {
       }
     }
 
+    // Search in programme tracks
+    if (event.programmeTracks && Array.isArray(event.programmeTracks)) {
+      const matchedProgrammeTracks: any[] = [];
+      event.programmeTracks.forEach((track: any, trackIndex: number) => {
+        const trackFields = ['title', 'description'];
+        let trackHasMatch = false;
+        
+        trackFields.forEach(field => {
+          if (track[field] && this.isFieldMatch(track[field], searchKeyword, caseSensitive)) {
+            matchedFields.push(`programmeTracks[${trackIndex}].${field}`);
+            trackHasMatch = true;
+          }
+        });
+        
+        if (trackHasMatch) {
+          // Add complete track data with highlighted matching fields
+          const matchedTrack = { ...track };
+          trackFields.forEach(field => {
+            if (track[field] && this.isFieldMatch(track[field], searchKeyword, caseSensitive)) {
+              matchedTrack[field] = this.highlightMatch(track[field], keyword, caseSensitive);
+            }
+          });
+          
+          // Search in track sessions
+          if (track.sessions && Array.isArray(track.sessions)) {
+            const matchedSessions: any[] = [];
+            track.sessions.forEach((session: any, sessionIndex: number) => {
+              const sessionFields = ['title', 'description', 'venue', 'startTime', 'endTime'];
+              let sessionHasMatch = false;
+              
+              sessionFields.forEach(field => {
+                if (session[field] && this.isFieldMatch(session[field], searchKeyword, caseSensitive)) {
+                  matchedFields.push(`programmeTracks[${trackIndex}].sessions[${sessionIndex}].${field}`);
+                  sessionHasMatch = true;
+                }
+              });
+              
+              if (sessionHasMatch) {
+                // Add complete session data with highlighted matching fields
+                const matchedSession = { ...session };
+                sessionFields.forEach(field => {
+                  if (session[field] && this.isFieldMatch(session[field], searchKeyword, caseSensitive)) {
+                    matchedSession[field] = this.highlightMatch(session[field], keyword, caseSensitive);
+                  }
+                });
+                matchedSessions.push(matchedSession);
+                hasMatch = true;
+              }
+            });
+            
+            if (matchedSessions.length > 0) {
+              matchedTrack.sessions = matchedSessions;
+            }
+          }
+          
+          matchedProgrammeTracks.push(matchedTrack);
+          hasMatch = true;
+        }
+      });
+      
+      if (matchedProgrammeTracks.length > 0) {
+        matchedEvent.programmeTracks = matchedProgrammeTracks;
+      }
+    }
+
     return {
       hasMatch,
       matchedEvent,

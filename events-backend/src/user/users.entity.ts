@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   OneToOne,
+  ManyToMany,
 } from 'typeorm';
 
 export enum UserRole {
@@ -143,6 +144,10 @@ export class UserEntity {
 
   @OneToMany(() => EventAgenda, (agenda) => agenda.user)
   agendas?: EventAgenda[];
+
+  // Programme sessions relationship - speakers can be tagged to sessions
+  @ManyToMany('ProgrammeSession', 'speakers')
+  programmeSessions?: any[];
 
   // Address relationship - one user can have multiple addresses
   @OneToMany(() => AddressEntity, (address) => address.user)

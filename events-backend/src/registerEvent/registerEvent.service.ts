@@ -151,12 +151,18 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
           .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
           .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+      
           .leftJoinAndSelect('event.category', 'category')
           .leftJoinAndSelect('category.category', 'categoryDetails')
           .leftJoinAndSelect('event.galleries', 'galleries')
           .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
           .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
           .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
+          .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
+          .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
+          .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
+          .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo');
 
@@ -185,12 +191,18 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
           .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
           .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+         
           .leftJoinAndSelect('event.category', 'category')
           .leftJoinAndSelect('category.category', 'categoryDetails')
           .leftJoinAndSelect('event.galleries', 'galleries')
           .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
           .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
           .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
+          .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
+          .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
+          .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
+          .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .where('user.id = :userId', { userId });
@@ -271,6 +283,17 @@ export class RegisterEventService {
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
+          // Format programme tracks with basic speaker info
+          const formattedProgrammeTracks = registerEvent.event?.programmeTracks?.map(track => ({
+            ...track,
+            sessions: track.sessions?.map(session => ({
+              ...session,
+              speakers: session.speakers?.map((speaker: any) => 
+                UserUtils.getBasicSpeakerInfo(speaker)
+              ) || []
+            })) || []
+          })) || [];
+
           const {
             eventSpeakers,
             category,
@@ -280,6 +303,7 @@ export class RegisterEventService {
             documents, // Remove original documents
             documentNames, // Remove original documentNames
             eventStampImages,
+            programmeTracks,
             ...restEvent
           } = registerEvent.event || {};
 
@@ -290,6 +314,7 @@ export class RegisterEventService {
             speakers,
             categories,
             documents: formattedDocuments,
+            programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
 
             eventStamps: {
               description: registerEvent.event?.eventStampDescription,
@@ -391,12 +416,18 @@ export class RegisterEventService {
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
           'event.eventSpeakers.speaker.speakerProfile',
+         
           'event.category',
           'event.category.category',
           'event.galleries',
           'event.eventExhibitors',
           'event.eventExhibitors.exhibitor',
           'event.eventExhibitors.exhibitor.promotionalOffers',
+          'event.programmeTracks',
+          'event.programmeTracks.sessions',
+          'event.programmeTracks.sessions.speakers',
+          'event.programmeTracks.sessions.speakers.speakerProfile',
+          'event.programmeTracks.sessions.speakers.addresses',
           'order',
           'adminInfo',
         ],
@@ -482,6 +513,17 @@ export class RegisterEventService {
             };
           }) || [];
 
+      // Format programme tracks with basic speaker info
+      const formattedProgrammeTracks = registerEvent.event?.programmeTracks?.map(track => ({
+        ...track,
+        sessions: track.sessions?.map(session => ({
+          ...session,
+          speakers: session.speakers?.map((speaker: any) => 
+            UserUtils.getBasicSpeakerInfo(speaker)
+          ) || []
+        })) || []
+      })) || [];
+
       // Clean up event object
       const {
         eventSpeakers,
@@ -492,6 +534,7 @@ export class RegisterEventService {
         eventStampImages,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
+        programmeTracks,
         ...restEvent
       } = registerEvent.event || {};
 
@@ -502,6 +545,7 @@ export class RegisterEventService {
         speakers,
         categories,
         documents: formattedDocuments,
+        programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
         eventStamps: {
           description: registerEvent.event?.eventStampDescription,
           images: registerEvent.event?.eventStampImages,

@@ -27,7 +27,8 @@ export class TabVisibilityFilterUtil {
       originalGalleries: event.galleries?.length || 0,
       originalSurveys: event.surveys?.length || 0,
       originalExhibitors: event.exhibitors?.length || 0,
-      originalCategories: event.categories?.length || 0
+      originalCategories: event.categories?.length || 0,
+      originalProgrammeTracks: event.programmeTracks?.length || 0
     });
 
     const filteredEvent = { ...event };
@@ -97,6 +98,12 @@ export class TabVisibilityFilterUtil {
       console.log('🚫 Removing admin info for event:', event.id);
       filteredEvent.adminInfo = null;
       filteredEvent.isCreatedByAdmin = false;
+    }
+    
+    // Remove programme if programme tab is disabled
+    if (event.tabVisibility.programme === false) {
+      console.log('🚫 Removing programme for event:', event.id);
+      filteredEvent.programmeTracks = [];
     }
 
     // Remove categories if categories tab is disabled

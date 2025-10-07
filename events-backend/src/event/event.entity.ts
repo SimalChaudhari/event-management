@@ -19,6 +19,7 @@ import { Gallery } from 'gallery/gallery.entity';
 import { Survey } from '../survey/survey.entity';
 import { EventBooth } from './event-booth.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
+import { ProgrammeTrack } from '../programme/programme-track.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -153,6 +154,13 @@ export class Event {
   @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.event)
   eventAgendas!: EventAgenda[];
   
+  // Programme tracks relationship
+  @OneToMany(() => ProgrammeTrack, (programmeTrack) => programmeTrack.event, {
+    cascade: true,
+    eager: false,
+  })
+  programmeTracks!: ProgrammeTrack[];
+  
   // Tab visibility configuration - JSON object to control which tabs are visible
   @Column({ type: 'json', nullable: true })
   tabVisibility?: {
@@ -166,6 +174,7 @@ export class Event {
     categories?: boolean;
     agenda?: boolean;
     adminInfo?: boolean;
+    programme?: boolean;
   };
 
 }

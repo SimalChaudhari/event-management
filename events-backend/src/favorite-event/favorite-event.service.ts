@@ -106,8 +106,12 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
-
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
+      .leftJoinAndSelect('event.programmeTracks', 'programmeTracks') // Add programme tracks
+      .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions') // Add programme sessions
+      .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers') // Add programme session speakers
+      .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile') // Add programme session speaker profiles
+      .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses') // Add programme session speaker addresses
       .where('favorite.userId = :userId', { userId });
 
     // Apply filters based on filter type
@@ -202,11 +206,23 @@ export class FavoriteEventService {
           eventStampImages,
           category,
           eventExhibitors,
+          programmeTracks,
           ...eventData
         } = favorite.event;
 
         // Extract categories
         const categories = category?.map((ec) => ec.category) || [];
+
+        // Format programme tracks with basic speaker info
+        const formattedProgrammeTracks = favorite.event?.programmeTracks?.map(track => ({
+          ...track,
+          sessions: track.sessions?.map(session => ({
+            ...session,
+            speakers: session.speakers?.map((speaker: any) => 
+              UserUtils.getBasicSpeakerInfo(speaker)
+            ) || []
+          })) || []
+        })) || [];
 
         return {
           id: favorite.id,
@@ -222,6 +238,7 @@ export class FavoriteEventService {
                 speakingEndTime: es.speakingEndTime,
               })) || [],
             categories: categories,
+            programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
             eventStamps: {
               description: favorite.event.eventStampDescription,
               images: favorite.event.eventStampImages,

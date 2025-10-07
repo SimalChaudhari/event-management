@@ -25,6 +25,7 @@ import { EventNotificationService } from '../utils/event-notification.service';
 import { NotificationUtil } from '../utils/notification.util';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
+import { ProgrammeModule } from '../programme/programme.module';
 
 @Module({
     imports: [
@@ -56,6 +57,7 @@ import { PushNotification, UserPermissions, PermissionTemplate } from '../settin
       }),
       OrderModule,
       AgendaModule,
+      ProgrammeModule,
     ],
     providers: [EventService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
     controllers: [EventController],

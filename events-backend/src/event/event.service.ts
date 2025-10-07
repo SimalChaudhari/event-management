@@ -350,8 +350,19 @@ export class EventService {
             registerEventId = registration?.id || null;
           }
 
-          const { exhibitorDescription,surveys, ...eventFilteredData } = eventData;
+          const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
           
+          // Format programme tracks with basic speaker info
+          const formattedProgrammeTracks = event?.programmeTracks?.map(track => ({
+            ...track,
+            sessions: track.sessions?.map(session => ({
+              ...session,
+              speakers: session.speakers?.map((speaker: any) => 
+                UserUtils.getBasicSpeakerInfo(speaker)
+              ) || []
+            })) || []
+          })) || [];
+
           // Build the complete event object
           const completeEvent = {
             ...eventFilteredData,
@@ -369,6 +380,7 @@ export class EventService {
             registerEventId: registerEventId,
             speakersData: speakers,
             categoriesData: category?.map((ec) => ec.category) || [],
+            programmeTracks: formattedProgrammeTracks,
 
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
@@ -588,8 +600,20 @@ export class EventService {
         surveys,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
+        programmeTracks, // Remove original programmeTracks
         ...eventFilteredData
       } = eventData;
+
+      // Format programme tracks with basic speaker info
+      const formattedProgrammeTracks = event?.programmeTracks?.map(track => ({
+        ...track,
+        sessions: track.sessions?.map(session => ({
+          ...session,
+          speakers: session.speakers?.map((speaker: any) => 
+            UserUtils.getBasicSpeakerInfo(speaker)
+          ) || []
+        })) || []
+      })) || [];
 
       const eventResponse = {
         ...eventFilteredData,
@@ -620,6 +644,7 @@ export class EventService {
         isFavorite: isFavorite,
         isRegistered: isRegistered,
         registerEventId: registerEventId,
+        programmeTracks: formattedProgrammeTracks,
       };
 
       // Add Q&A data for admin users
