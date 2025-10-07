@@ -6,11 +6,14 @@ export class EventQueryBuilderUtils {
   /**
    * Build base query with all necessary joins for event search
    */
-  static buildBaseQuery(queryBuilder: SelectQueryBuilder<Event>): SelectQueryBuilder<Event> {
+  static buildBaseQuery(
+    queryBuilder: SelectQueryBuilder<Event>,
+  ): SelectQueryBuilder<Event> {
     return queryBuilder
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeaker')
       .leftJoinAndSelect('eventSpeaker.speaker', 'speaker')
       .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+      .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
       .leftJoinAndSelect('event.category', 'eventCategory')
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
@@ -19,9 +22,19 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('event.galleries', 'galleries')
       .leftJoinAndSelect('event.surveys', 'surveys')
       .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
-      .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
-      .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
-
+      .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions') // Add programme sessions
+      .leftJoinAndSelect(
+        'programmeSessions.speakers',
+        'programmeSessionSpeakers',
+      ) // Add programme session speakers
+      .leftJoinAndSelect(
+        'programmeSessionSpeakers.speakerProfile',
+        'programmeSessionSpeakerProfile',
+      ) // Add programme session speaker profiles
+      .leftJoinAndSelect(
+        'programmeSessionSpeakers.addresses',
+        'programmeSessionSpeakerAddresses',
+      ); // Add
   }
 
   /**
@@ -29,12 +42,12 @@ export class EventQueryBuilderUtils {
    */
   static applyKeywordFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    keyword: string
+    keyword: string,
   ): SelectQueryBuilder<Event> {
     const keywordLower = keyword.toLowerCase();
     return queryBuilder.where(
       'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
-      { keyword: `%${keywordLower}%` }
+      { keyword: `%${keywordLower}%` },
     );
   }
 
@@ -44,11 +57,11 @@ export class EventQueryBuilderUtils {
   static applyDateRangeFilter(
     queryBuilder: SelectQueryBuilder<Event>,
     startDate: string,
-    endDate: string
+    endDate: string,
   ): SelectQueryBuilder<Event> {
     return queryBuilder.andWhere(
       'event.startDate >= :startDate AND event.endDate <= :endDate',
-      { startDate, endDate }
+      { startDate, endDate },
     );
   }
 
@@ -57,7 +70,7 @@ export class EventQueryBuilderUtils {
    */
   static applyEventTypeFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    type: EventType
+    type: EventType,
   ): SelectQueryBuilder<Event> {
     return queryBuilder.andWhere('event.type = :type', { type });
   }
@@ -67,7 +80,7 @@ export class EventQueryBuilderUtils {
    */
   static applyCategoryFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    categoryName: string
+    categoryName: string,
   ): SelectQueryBuilder<Event> {
     const categoryNameLower = categoryName.toLowerCase();
     return queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
@@ -79,7 +92,7 @@ export class EventQueryBuilderUtils {
    * Apply upcoming events filter
    */
   static applyUpcomingFilter(
-    queryBuilder: SelectQueryBuilder<Event>
+    queryBuilder: SelectQueryBuilder<Event>,
   ): SelectQueryBuilder<Event> {
     const today = new Date();
     return queryBuilder.andWhere('event.startDate >= :today', { today });
@@ -90,7 +103,7 @@ export class EventQueryBuilderUtils {
    */
   static applyLocationFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    location: string
+    location: string,
   ): SelectQueryBuilder<Event> {
     const locationLower = location.toLowerCase();
     return queryBuilder.andWhere('LOWER(event.location) LIKE :location', {
@@ -105,7 +118,7 @@ export class EventQueryBuilderUtils {
     queryBuilder: SelectQueryBuilder<Event>,
     minPrice?: number,
     maxPrice?: number,
-    currency?: string
+    currency?: string,
   ): SelectQueryBuilder<Event> {
     if (minPrice !== undefined) {
       queryBuilder.andWhere('event.price >= :minPrice', { minPrice });
@@ -124,7 +137,7 @@ export class EventQueryBuilderUtils {
    */
   static applyCountryFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    country: string
+    country: string,
   ): SelectQueryBuilder<Event> {
     const countryLower = country.toLowerCase();
     return queryBuilder.andWhere('LOWER(event.country) LIKE :country', {
@@ -137,12 +150,12 @@ export class EventQueryBuilderUtils {
    */
   static applySpeakerFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    speakerName: string
+    speakerName: string,
   ): SelectQueryBuilder<Event> {
     const speakerNameLower = speakerName.toLowerCase();
     return queryBuilder.andWhere(
       'LOWER(speaker.firstName) LIKE :speakerName OR LOWER(speaker.lastName) LIKE :speakerName',
-      { speakerName: `%${speakerNameLower}%` }
+      { speakerName: `%${speakerNameLower}%` },
     );
   }
 
@@ -151,13 +164,12 @@ export class EventQueryBuilderUtils {
    */
   static applyExhibitorFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    exhibitorName: string
-  ): SelectQueryBuilder<Event>
-  {
+    exhibitorName: string,
+  ): SelectQueryBuilder<Event> {
     const exhibitorNameLower = exhibitorName.toLowerCase();
     return queryBuilder.andWhere(
       'LOWER(exhibitor.companyName) LIKE :exhibitorName OR LOWER(exhibitor.companyDescription) LIKE :exhibitorName',
-      { exhibitorName: `%${exhibitorNameLower}%` }
+      { exhibitorName: `%${exhibitorNameLower}%` },
     );
   }
 
@@ -167,7 +179,7 @@ export class EventQueryBuilderUtils {
   static applyPagination(
     queryBuilder: SelectQueryBuilder<Event>,
     limit: number,
-    offset: number
+    offset: number,
   ): SelectQueryBuilder<Event> {
     return queryBuilder.limit(limit).offset(offset);
   }
@@ -178,16 +190,21 @@ export class EventQueryBuilderUtils {
   static applySorting(
     queryBuilder: SelectQueryBuilder<Event>,
     sortBy: string = 'startDate',
-    sortOrder: 'ASC' | 'DESC' = 'ASC'
+    sortOrder: 'ASC' | 'DESC' = 'ASC',
   ): SelectQueryBuilder<Event> {
     const validSortFields = [
-      'name', 'startDate', 'endDate', 'price', 'createdAt', 'updatedAt'
+      'name',
+      'startDate',
+      'endDate',
+      'price',
+      'createdAt',
+      'updatedAt',
     ];
-    
+
     if (validSortFields.includes(sortBy)) {
       return queryBuilder.orderBy(`event.${sortBy}`, sortOrder);
     }
-    
+
     // Default sorting by start date
     return queryBuilder.orderBy('event.startDate', 'ASC');
   }
@@ -197,10 +214,10 @@ export class EventQueryBuilderUtils {
    */
   static applyGlobalSearchFilter(
     queryBuilder: SelectQueryBuilder<Event>,
-    globalSearch: string
+    globalSearch: string,
   ): SelectQueryBuilder<Event> {
     const searchTerm = globalSearch.toLowerCase();
-    
+
     return queryBuilder.where(
       `(
         LOWER(event.name) LIKE :searchTerm OR 
@@ -266,7 +283,7 @@ export class EventQueryBuilderUtils {
         LOWER(programmeSessionSpeakers.firstName) LIKE :searchTerm OR 
         LOWER(programmeSessionSpeakers.lastName) LIKE :searchTerm OR
       )`,
-      { searchTerm: `%${searchTerm}%` }
+      { searchTerm: `%${searchTerm}%` },
     );
   }
 
@@ -292,7 +309,7 @@ export class EventQueryBuilderUtils {
       currency?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
-    }
+    },
   ): SelectQueryBuilder<Event> {
     // Apply base query with joins
     this.buildBaseQuery(queryBuilder);
@@ -306,7 +323,11 @@ export class EventQueryBuilderUtils {
     }
 
     if (filters.startDate && filters.endDate) {
-      this.applyDateRangeFilter(queryBuilder, filters.startDate, filters.endDate);
+      this.applyDateRangeFilter(
+        queryBuilder,
+        filters.startDate,
+        filters.endDate,
+      );
     }
 
     if (filters.type) {
@@ -337,12 +358,16 @@ export class EventQueryBuilderUtils {
       this.applyExhibitorFilter(queryBuilder, filters.exhibitor);
     }
 
-    if (filters.minPrice !== undefined || filters.maxPrice !== undefined || filters.currency) {
+    if (
+      filters.minPrice !== undefined ||
+      filters.maxPrice !== undefined ||
+      filters.currency
+    ) {
       this.applyPriceRangeFilter(
         queryBuilder,
         filters.minPrice,
         filters.maxPrice,
-        filters.currency
+        filters.currency,
       );
     }
 
@@ -362,20 +387,24 @@ export class EventQueryBuilderUtils {
       startDate?: string;
       endDate?: string;
       location?: string;
-    } = {}
+    } = {},
   ): SelectQueryBuilder<Event> {
     const keywordLower = keyword.toLowerCase();
-    
+
     queryBuilder
       .leftJoinAndSelect('event.category', 'eventCategory')
       .leftJoinAndSelect('eventCategory.category', 'category')
       .where(
         'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword',
-        { keyword: `%${keywordLower}%` }
+        { keyword: `%${keywordLower}%` },
       );
 
     if (filters.startDate && filters.endDate) {
-      this.applyDateRangeFilter(queryBuilder, filters.startDate, filters.endDate);
+      this.applyDateRangeFilter(
+        queryBuilder,
+        filters.startDate,
+        filters.endDate,
+      );
     }
 
     if (filters.location) {
@@ -392,17 +421,17 @@ export class EventQueryBuilderUtils {
     queryBuilder: SelectQueryBuilder<any>,
     keyword: string,
     limit: number,
-    offset: number
+    offset: number,
   ): SelectQueryBuilder<any> {
     const keywordLower = keyword.toLowerCase();
-    
+
     return queryBuilder
       .leftJoinAndSelect('user.eventSpeakers', 'eventSpeaker')
       .leftJoinAndSelect('eventSpeaker.event', 'event')
       .leftJoinAndSelect('user.speakerProfile', 'speakerProfile')
       .where(
         'user.role = :role AND (LOWER(user.firstName) LIKE :keyword OR LOWER(user.lastName) LIKE :keyword OR LOWER(speakerProfile.companyName) LIKE :keyword OR LOWER(speakerProfile.position) LIKE :keyword)',
-        { role: 'speaker', keyword: `%${keywordLower}%` }
+        { role: 'speaker', keyword: `%${keywordLower}%` },
       )
       .limit(limit)
       .offset(offset);
@@ -415,16 +444,16 @@ export class EventQueryBuilderUtils {
     queryBuilder: SelectQueryBuilder<any>,
     keyword: string,
     limit: number,
-    offset: number
+    offset: number,
   ): SelectQueryBuilder<any> {
     const keywordLower = keyword.toLowerCase();
-    
+
     return queryBuilder
       .leftJoinAndSelect('exhibitor.eventExhibitors', 'eventExhibitor')
       .leftJoinAndSelect('eventExhibitor.event', 'event')
       .where(
         'LOWER(exhibitor.companyName) LIKE :keyword OR LOWER(exhibitor.companyDescription) LIKE :keyword OR LOWER(exhibitor.email) LIKE :keyword',
-        { keyword: `%${keywordLower}%` }
+        { keyword: `%${keywordLower}%` },
       )
       .limit(limit)
       .offset(offset);
@@ -437,16 +466,16 @@ export class EventQueryBuilderUtils {
     queryBuilder: SelectQueryBuilder<any>,
     keyword: string,
     limit: number,
-    offset: number
+    offset: number,
   ): SelectQueryBuilder<any> {
     const keywordLower = keyword.toLowerCase();
-    
+
     return queryBuilder
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('eventCategory.event', 'event')
       .where(
         'LOWER(category.name) LIKE :keyword OR LOWER(category.description) LIKE :keyword',
-        { keyword: `%${keywordLower}%` }
+        { keyword: `%${keywordLower}%` },
       )
       .limit(limit)
       .offset(offset);
@@ -463,19 +492,21 @@ export class EventQueryBuilderUtils {
       endDate?: string;
     } = {},
     limit: number,
-    offset: number
+    offset: number,
   ): SelectQueryBuilder<any> {
     const keywordLower = keyword.toLowerCase();
-    
+
     queryBuilder
       .leftJoinAndSelect('survey.event', 'event')
       .leftJoinAndSelect('event.surveys', 'surveys')
-      .where('LOWER(survey.title) LIKE :keyword', { keyword: `%${keywordLower}%` });
+      .where('LOWER(survey.title) LIKE :keyword', {
+        keyword: `%${keywordLower}%`,
+      });
 
     if (filters.startDate && filters.endDate) {
       queryBuilder.andWhere(
         'survey.startDate >= :startDate AND survey.endDate <= :endDate',
-        { startDate: filters.startDate, endDate: filters.endDate }
+        { startDate: filters.startDate, endDate: filters.endDate },
       );
     }
 

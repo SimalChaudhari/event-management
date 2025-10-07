@@ -151,7 +151,7 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
           .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
           .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
-      
+          .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
           .leftJoinAndSelect('event.category', 'category')
           .leftJoinAndSelect('category.category', 'categoryDetails')
           .leftJoinAndSelect('event.galleries', 'galleries')
@@ -191,7 +191,7 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
           .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
           .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
-         
+          .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
           .leftJoinAndSelect('event.category', 'category')
           .leftJoinAndSelect('category.category', 'categoryDetails')
           .leftJoinAndSelect('event.galleries', 'galleries')
@@ -416,7 +416,7 @@ export class RegisterEventService {
           'event.eventSpeakers',
           'event.eventSpeakers.speaker',
           'event.eventSpeakers.speaker.speakerProfile',
-         
+          'event.eventSpeakers.speaker.addresses',
           'event.category',
           'event.category.category',
           'event.galleries',

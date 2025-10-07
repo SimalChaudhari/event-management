@@ -96,6 +96,7 @@ export class UserUtils {
    * @returns Basic speaker info for event displays
    */
   static getBasicSpeakerInfo(user: Partial<UserEntity> & { speakerProfile?: any; addresses?: AddressEntity[] }) {
+
     const defaultAddress = user.addresses?.find(addr => addr.isDefault) || user.addresses?.[0];
   
     return {

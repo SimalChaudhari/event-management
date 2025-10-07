@@ -102,6 +102,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
       .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
       .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+      .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
       .leftJoinAndSelect('event.category', 'eventCategory')
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors

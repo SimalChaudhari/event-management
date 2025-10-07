@@ -352,6 +352,7 @@ export class EventService {
 
           const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
           
+
           // Format programme tracks with basic speaker info
           const formattedProgrammeTracks = event?.programmeTracks?.map(track => ({
             ...track,
@@ -362,6 +363,7 @@ export class EventService {
               ) || []
             })) || []
           })) || [];
+         
 
           // Build the complete event object
           const completeEvent = {
