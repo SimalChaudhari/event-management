@@ -164,7 +164,8 @@ export class RegisterEventService {
           .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
           .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
-          .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo');
+          .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
+          .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails');
 
         // Apply filters if provided
         if (filters?.userFilter) {
@@ -205,6 +206,7 @@ export class RegisterEventService {
           .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
+          .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
           .where('user.id = :userId', { userId });
 
         // Apply event filter for regular users
@@ -371,6 +373,7 @@ export class RegisterEventService {
             user: cleanedUser,
             isCreatedByAdmin: registerEvent.isCreatedByAdmin,
             adminInfo, // Add admin info
+            billingDetails: registerEvent.billingDetails || [], // Add billing details
             // Add user's personal agenda data
           };
         }),
@@ -430,6 +433,7 @@ export class RegisterEventService {
           'event.programmeTracks.sessions.speakers.addresses',
           'order',
           'adminInfo',
+          'billingDetails',
         ],
       });
 
@@ -595,6 +599,7 @@ export class RegisterEventService {
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
           adminInfo, // Add admin info
+          billingDetails: registerEvent.billingDetails || [], // Add billing details
           // Add user's personal agenda data
         },
       };

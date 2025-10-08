@@ -1,12 +1,14 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity, AuthProvider, UserRole } from '../user/users.entity';
 import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
+import { SSOSyncService } from './sso-sync.service';
 
 @Injectable()
 export class OAuthAuthService {
+  private readonly logger = new Logger(OAuthAuthService.name);
   private readonly salesforceConfig = {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
@@ -24,6 +26,7 @@ export class OAuthAuthService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private jwtService: JwtService,
+    private ssoSyncService: SSOSyncService,
   ) {}
 
   /**
@@ -210,11 +213,23 @@ export class OAuthAuthService {
       const jwtAccessToken = this.generateAccessToken(user);
       const jwtRefreshToken = this.generateRefreshToken(user);
 
+     
       // Store both Salesforce tokens and our JWT tokens with user
       user.refreshToken = jwtRefreshToken;
       user.socialAccessToken = tokens.accessToken;
       user.socialRefreshToken = tokens.refreshToken;
       await this.userRepository.save(user);
+
+      // 🔄 AUTOMATIC SSO SYNC: Fetch and sync user's course registrations
+      this.logger.log(`🚀 Triggering automatic SSO data sync for user: ${user.email}`);
+      try {
+        const syncResult = await this.ssoSyncService.syncSSOUserData(user.id);
+        this.logger.log(`✅ SSO sync completed: ${syncResult.eventsCreated} events created, ${syncResult.registrationsCreated} registrations created`);
+      } catch (syncError: any) {
+        // Don't fail login if sync fails - just log the error
+        this.logger.error(`⚠️ SSO sync failed but login successful: ${syncError.message}`);
+        // Continue with login even if sync fails
+      }
       
       return {
         message: isNewUser ? 'New user created and logged in successfully' : 'Existing user logged in successfully',
