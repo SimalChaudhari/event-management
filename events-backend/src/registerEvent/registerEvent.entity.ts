@@ -8,10 +8,12 @@ import {
   JoinColumn,
   CreateDateColumn,
   OneToOne,
+  OneToMany,
 } from 'typeorm';
 import { UserEntity } from 'user/users.entity';
 import { Status } from './registerEvent.dto';
 import { AdminInfo } from './admin-info.entity';
+import { BillingDetail } from './billing-detail.entity';
 
 @Entity('registerEvents')
 export class RegisterEvent {
@@ -63,6 +65,12 @@ export class RegisterEvent {
   @Column({ type: 'boolean', default: true })
   isRegister?: boolean;
   
+  // External registration ID from SSO API
+  @Column({ nullable: true })
+  externalRegistrationId?: string;
+
+  @Column({ nullable: true })
+  externalRegistrationName?: string;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -70,4 +78,11 @@ export class RegisterEvent {
   // Admin Info relationship
   @OneToOne(() => AdminInfo, (adminInfo) => adminInfo.registerEvent)
   adminInfo?: AdminInfo;
+
+  // Billing details relationship - one registration can have multiple billing details
+  @OneToMany(() => BillingDetail, (billingDetail) => billingDetail.registerEvent, {
+    cascade: true,
+    eager: false,
+  })
+  billingDetails?: BillingDetail[];
 }

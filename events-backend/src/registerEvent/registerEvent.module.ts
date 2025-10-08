@@ -7,6 +7,7 @@ import { RegisterEventController } from './registerEvent.controller';
 import { AdminInfo } from './admin-info.entity';
 import { AdminInfoService } from './admin-info.service';
 import { AdminInfoController } from './admin-info.controller';
+import { BillingDetail } from './billing-detail.entity';
 import { Event, EventExhibitor } from 'event/event.entity';
 import { Order } from 'order/order.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
@@ -22,7 +23,7 @@ import { PushNotification, UserPermissions, PermissionTemplate } from '../settin
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate]), UtilsModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

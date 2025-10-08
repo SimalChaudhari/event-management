@@ -8,12 +8,12 @@ import * as dotenv from 'dotenv';
 import { UserEntity } from './../user/users.entity';
 import { AddressEntity } from './../user/address.entity';
 import { EmailService } from './../service/email.service';
-import { OAuthAuthService } from './oauth-auth.service';
 import { AddressService } from './../user/address.service';
 import { ErrorHandlerService } from './../utils/services/error-handler.service';
 import { CsvUploadLogModule } from '../logs/csv-upload-log.module';
 import { EmailBatchService } from '../utils/email-batch.service';
 import { CsvProcessorService } from '../utils/csv-processor.service';
+import { SSOModule } from './sso.module';
 
 
 dotenv.config(); // Load environment variables
@@ -25,9 +25,10 @@ dotenv.config(); // Load environment variables
       signOptions: { }, // Set your token expiration
     }),
     CsvUploadLogModule,
+    SSOModule, // Import SSOModule to get OAuthAuthService
   ],
-  providers: [AuthService, OAuthAuthService, EmailService, AddressService, ErrorHandlerService, EmailBatchService, CsvProcessorService],
+  providers: [AuthService, EmailService, AddressService, ErrorHandlerService, EmailBatchService, CsvProcessorService],
   controllers: [AuthController],
-  exports: [AuthService, OAuthAuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}

@@ -5,15 +5,22 @@ import {
   Body,
   Query,
   Res,
+  Req,
   HttpStatus,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { OAuthAuthService } from './oauth-auth.service';
+import { SSOSyncService } from './sso-sync.service';
+import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 
 @Controller('api/auth/oauth')
 export class OAuthAuthController {
-  constructor(private readonly oauthAuthService: OAuthAuthService) { }
+  constructor(
+    private readonly oauthAuthService: OAuthAuthService,
+    private readonly ssoSyncService: SSOSyncService,
+  ) { }
 
   /**
    * Step 1: Get Salesforce authorization URL
@@ -154,6 +161,50 @@ export class OAuthAuthController {
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
         message: error.message || 'Failed to refresh token',
+      });
+    }
+  }
+
+  /**
+   * Manual SSO sync - Re-sync user's course registrations from external API
+   * This can be called anytime to refresh events and registrations
+   */
+  @Post('sync')
+  @UseGuards(JwtAuthGuard)
+  async syncSSOData(
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw new BadRequestException('User ID not found in request');
+      }
+
+      console.log(`🔄 Manual SSO sync requested by user: ${userId}`);
+
+      const syncResult = await this.ssoSyncService.manualSync(userId);
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: syncResult.message,
+        data: {
+          eventsCreated: syncResult.eventsCreated,
+          eventsUpdated: syncResult.eventsUpdated,
+          registrationsCreated: syncResult.registrationsCreated,
+          userInfo: syncResult.userInfo,
+          events: syncResult.events,
+          registrations: syncResult.registrations,
+          errors: syncResult.errors,
+        },
+      });
+    } catch (error: any) {
+      console.error('❌ Manual SSO sync error:', error.message);
+      
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to sync SSO data',
       });
     }
   }
