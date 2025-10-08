@@ -1,5 +1,6 @@
  // src/entities/survey.entity.ts
 import { Event } from 'event/event.entity';
+import { SurveyQuestion } from './qa.entity';
 import {
     Entity,
     Column,
@@ -7,6 +8,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     ManyToOne,
+    OneToMany,
   } from 'typeorm';
 
   @Entity('surveys')
@@ -37,6 +39,9 @@ import {
 
     @ManyToOne(() => Event, (event) => event.surveys)
     event?: Event;
+
+    @OneToMany(() => SurveyQuestion, (question) => question.survey)
+    questions?: SurveyQuestion[];
   
     @CreateDateColumn()
     createdAt!: Date;
