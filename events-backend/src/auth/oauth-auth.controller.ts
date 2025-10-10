@@ -33,7 +33,6 @@ export class OAuthAuthController {
   ) {
     try {
       const authUrl = this.oauthAuthService.generateAuthUrl(state);
-      console.log('Generated authorization URL:', authUrl);
 
       return response.status(HttpStatus.OK).json({
         success: true,
@@ -63,13 +62,8 @@ export class OAuthAuthController {
       if (!body.code) {
         throw new BadRequestException('Authorization code is required');
       }
-
-      console.log('Exchanging authorization code for tokens...');
       
       const result = await this.oauthAuthService.processOAuthAuthentication(body.code);
-      
-      console.log('OAuth authentication successful for user:', result.user.email);
-      console.log('User saved to database with ID:', result.user.id);
 
       return response.status(HttpStatus.OK).json({
         success: true,
@@ -80,8 +74,6 @@ export class OAuthAuthController {
         isNewUser: result.isNewUser,
       });
     } catch (error: any) {
-      console.error('OAuth exchange error:', error.message);
-      
       return response.status(HttpStatus.UNAUTHORIZED).json({
         success: false,
         message: error.message || 'Failed to exchange authorization code',
@@ -104,7 +96,6 @@ export class OAuthAuthController {
     try {
       // Handle OAuth errors
       if (error) {
-        console.error('OAuth callback error:', error);
         const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error)}&success=false`;
         return response.redirect(errorUrl);
       }
@@ -114,23 +105,16 @@ export class OAuthAuthController {
         const errorUrl = `iscaevential://auth?error=${encodeURIComponent('Authorization code is missing')}&success=false`;
         return response.redirect(errorUrl);
       }
-
-      console.log('Processing OAuth callback with code:', code);
       
       // Process the OAuth authentication
       const result = await this.oauthAuthService.processOAuthAuthentication(code);
-      
-      console.log('OAuth authentication successful for user:', result.user.email);
 
       // Create mobile app redirect URL with tokens
       const mobileRedirectUrl = this.oauthAuthService.createMobileRedirectUrl(result);
-      console.log('Redirecting to mobile app with URL:', mobileRedirectUrl);
       
       // Redirect to mobile app
       return response.redirect(mobileRedirectUrl);
     } catch (error: any) {
-      console.error('OAuth callback error:', error.message);
-      
       const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error.message || 'Failed to process OAuth callback')}&success=false`;
       return response.redirect(errorUrl);
     }
@@ -182,8 +166,6 @@ export class OAuthAuthController {
         throw new BadRequestException('User ID not found in request');
       }
 
-      console.log(`🔄 Manual SSO sync requested by user: ${userId}`);
-
       const syncResult = await this.ssoSyncService.manualSync(userId);
 
       return response.status(HttpStatus.OK).json({
@@ -200,8 +182,6 @@ export class OAuthAuthController {
         },
       });
     } catch (error: any) {
-      console.error('❌ Manual SSO sync error:', error.message);
-      
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: error.message || 'Failed to sync SSO data',

@@ -35,6 +35,10 @@ export class Event {
   @Column({ type: 'varchar' })
   name!: string;
 
+  // Event code from Salesforce/external system - used for SSO sync
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  eventCode?: string;
+
   @Column({ type: 'text', nullable: true })
   description?: string;
 

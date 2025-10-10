@@ -188,6 +188,7 @@ export class SSOSyncService {
 
   /**
    * Create or update event from course registration data
+   * ✅ Uses eventCode as unique identifier for Salesforce sync
    */
   private async createOrUpdateEvent(
     registration: CourseRegistration
@@ -196,9 +197,9 @@ export class SSOSyncService {
     status: 'created' | 'updated' | 'existing';
   }> {
     try {
-      // Check if event already exists by eventCode (using name field as unique identifier)
+      // ✅ Find event by eventCode (unique identifier from Salesforce)
       let event = await this.eventRepository.findOne({
-        where: { name: `${registration.eventCode} - ${registration.eventName}` },
+        where: { eventCode: registration.eventCode },
       });
 
       const eventData = this.mapCourseToEventData(registration);
@@ -209,8 +210,7 @@ export class SSOSyncService {
         await this.eventRepository.save(event);
         return { event, status: 'created' };
       } else {
-        // Update existing event
-        // Check if any data has changed
+        // Update existing event - compare all fields from Salesforce
         const hasChanges = this.hasEventDataChanged(event, eventData);
         
         if (hasChanges) {
@@ -228,6 +228,7 @@ export class SSOSyncService {
 
   /**
    * Map course registration data to Event entity structure
+   * ✅ Includes eventCode for unique identification
    */
   private mapCourseToEventData(registration: CourseRegistration): Partial<Event> {
     // Build full address from registration data
@@ -249,6 +250,7 @@ export class SSOSyncService {
     }
 
     return {
+      eventCode: registration.eventCode, // ✅ Store eventCode for future updates
       name: `${registration.eventCode} - ${registration.eventName}`,
       description: registration.eventDescription !== 'NA' ? registration.eventDescription : `Event: ${registration.eventName}`,
       startDate: new Date(registration.startDate),
@@ -299,10 +301,11 @@ export class SSOSyncService {
 
   /**
    * Check if event data has changed
+   * ✅ Compares all important fields including name
    */
   private hasEventDataChanged(existingEvent: Event, newData: Partial<Event>): boolean {
     const fieldsToCheck: (keyof Event)[] = [
-      'description', 'startDate', 'startTime', 'endDate', 'endTime',
+      'name', 'description', 'startDate', 'startTime', 'endDate', 'endTime',
       'location', 'venue', 'country', 'type'
     ];
 
