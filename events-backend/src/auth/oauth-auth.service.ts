@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity, AuthProvider, UserRole } from '../user/users.entity';
@@ -8,7 +8,6 @@ import { SSOSyncService } from './sso-sync.service';
 
 @Injectable()
 export class OAuthAuthService {
-  private readonly logger = new Logger(OAuthAuthService.name);
   private readonly salesforceConfig = {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
@@ -45,7 +44,6 @@ export class OAuthAuthService {
     });
 
     const authUrl = `${baseUrl}?${params.toString()}`;
-    console.log('Using exact auth URL:', authUrl);
     
     return authUrl;
   }
@@ -66,8 +64,6 @@ export class OAuthAuthService {
         grant_type: 'authorization_code',
         redirect_uri: this.salesforceConfig.redirectUri,
       };
-      console.log('Token exchange data:', tokenData)
-      console.log('Token URL:', this.salesforceConfig.tokenUrl)
 
       const response = await axios.post(
         this.salesforceConfig.tokenUrl,
@@ -81,8 +77,6 @@ export class OAuthAuthService {
 
       const { access_token, refresh_token, id_token } = response.data;
 
-      console.log('Salesforce token response:', response.data);
-
       if (!access_token) {
         throw new UnauthorizedException('Failed to obtain access token');
       }
@@ -93,18 +87,6 @@ export class OAuthAuthService {
         idToken: id_token,
       };
     } catch (error: any) {
-      console.error('OAuth token exchange error:', error.response?.data || error.message);
-      console.error('Full error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers
-        }
-      });
-      
       // Provide more specific error messages
       if (error.response?.data?.error === 'invalid_grant') {
         throw new UnauthorizedException('Invalid authorization code. The code may have expired or already been used. Please try logging in again.');
@@ -135,8 +117,6 @@ export class OAuthAuthService {
         },
       });
 
-      console.log('Salesforce user info response:', response.data);
-
       const { user_id, email, given_name, family_name, name } = response.data;
 
       if (!email) {
@@ -151,7 +131,6 @@ export class OAuthAuthService {
         displayName: name || '',
       };
     } catch (error: any) {
-      console.error('OAuth user info error:', error.response?.data || error.message);
       throw new UnauthorizedException('Failed to retrieve user information');
     }
   }
@@ -182,7 +161,6 @@ export class OAuthAuthService {
 
       if (!user) {
         // Create new user entry
-        console.log(`Creating new user for email: ${userInfo.email}`);
         user = this.userRepository.create({
           email: userInfo.email,
           firstName: userInfo.firstName || 'OAuth',
@@ -196,17 +174,14 @@ export class OAuthAuthService {
         });
         await this.userRepository.save(user);
         isNewUser = true;
-        console.log(`New user created with ID: ${user.id}`);
       } else {
         // Update existing user
-        console.log(`User exists in database: ${user.email}, updating SSO info`);
         user.authProvider = AuthProvider.OAUTH;
         user.socialId = userInfo.id;
         user.isVerify = true;
         if (userInfo.firstName) user.firstName = userInfo.firstName;
         if (userInfo.lastName) user.lastName = userInfo.lastName;
         await this.userRepository.save(user);
-        console.log(`Existing user updated with ID: ${user.id}`);
       }
 
       // Generate our own JWT tokens
@@ -221,14 +196,10 @@ export class OAuthAuthService {
       await this.userRepository.save(user);
 
       // 🔄 AUTOMATIC SSO SYNC: Fetch and sync user's course registrations
-      this.logger.log(`🚀 Triggering automatic SSO data sync for user: ${user.email}`);
       try {
-        const syncResult = await this.ssoSyncService.syncSSOUserData(user.id);
-        this.logger.log(`✅ SSO sync completed: ${syncResult.eventsCreated} events created, ${syncResult.registrationsCreated} registrations created`);
+        await this.ssoSyncService.syncSSOUserData(user.id);
       } catch (syncError: any) {
-        // Don't fail login if sync fails - just log the error
-        this.logger.error(`⚠️ SSO sync failed but login successful: ${syncError.message}`);
-        // Continue with login even if sync fails
+        // Don't fail login if sync fails - continue with login
       }
       
       return {
@@ -249,7 +220,6 @@ export class OAuthAuthService {
         isNewUser: isNewUser,
       };
     } catch (error: any) {
-      console.error('OAuth authentication error:', error);
       throw new UnauthorizedException('OAuth authentication failed');
     }
   }
@@ -290,7 +260,6 @@ export class OAuthAuthService {
         refreshToken: newRefreshToken,
       };
     } catch (error: any) {
-      console.error('Token refresh error:', error.message);
       throw new UnauthorizedException('Failed to refresh access token');
     }
   }
@@ -350,7 +319,6 @@ export class OAuthAuthService {
     });
 
     const redirectUrl = `${this.salesforceConfig.mobileRedirectUri}?${params.toString()}`;
-    console.log('Created mobile redirect URL:', redirectUrl);
     return redirectUrl;
   }
 }

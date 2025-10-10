@@ -29,6 +29,11 @@ export class EventDto {
   @IsString()
   name!: string;
 
+  // Event code from Salesforce/external system - used for SSO sync
+  @IsOptional()
+  @IsString()
+  eventCode?: string;
+
   @IsOptional()
   @IsString()
   description?: string;
