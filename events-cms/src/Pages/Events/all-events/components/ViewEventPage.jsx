@@ -17,6 +17,7 @@ import EventGalleriesComponent from '../../../../components/events/EventGallerie
 import EventStampsComponent from '../../../../components/events/EventStampsComponent';
 import EventSurveyComponent from '../../../../components/events/EventSurveyComponent';
 import EventExhibitorsComponent from '../../../../components/events/EventExhibitorsComponent';
+import EventProgrammeComponent from '../../../../components/events/EventProgrammeComponent';
 
 const ViewEventPage = () => {
     const { id } = useParams();
@@ -60,6 +61,7 @@ const ViewEventPage = () => {
         exhibitors: true,
         categories: true,
         agenda: true,
+        programme: true,
         adminInfo: true
     });
     const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
@@ -80,6 +82,7 @@ const ViewEventPage = () => {
                     exhibitors: res.data.tabVisibility.exhibitors !== false,
                     categories: res.data.tabVisibility.categories !== false,
                     agenda: res.data.tabVisibility.agenda !== false,
+                    programme: res.data.tabVisibility.programme !== false,
                     adminInfo: res.data.tabVisibility.adminInfo !== false
                 });
             }
@@ -345,6 +348,8 @@ const ViewEventPage = () => {
                 return eventData.categories && eventData.categories.length > 0;
             case 'agenda':
                 return eventData.eventAgendas && eventData.eventAgendas.length > 0;
+            case 'programme':
+                return eventData.programmeTracks && eventData.programmeTracks.length > 0;
             case 'adminInfo':
                 return eventData.adminInfo || eventData.isCreatedByAdmin;
             default:
@@ -397,7 +402,7 @@ const ViewEventPage = () => {
                                 variant="outline-primary"
                                 onClick={() => setShowTabVisibilityModal(true)}
                                 size="sm"
-                                style={{ marginRight: '15px' }}
+                                style={{ marginRight: '10px' }}
                             >
                                 <i className="fas fa-cog" style={{ marginRight: '8px' }}></i>
                                 Manage Tabs
@@ -421,7 +426,7 @@ const ViewEventPage = () => {
                                     {/* Details Tab */}
                                     <Nav.Item>
                                         <Nav.Link eventKey="details">
-                                            <i className="fas fa-info-circle me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            <i className="fas fa-info-circle" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                             Details
                                         </Nav.Link>
                                     </Nav.Item>
@@ -429,7 +434,7 @@ const ViewEventPage = () => {
                                     {/* Location Tab */}
                                     <Nav.Item>
                                         <Nav.Link eventKey="location">
-                                            <i className="fas fa-map-marker-alt me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            <i className="fas fa-map-marker-alt" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                             Location
                                         </Nav.Link>
                                     </Nav.Item>
@@ -437,7 +442,7 @@ const ViewEventPage = () => {
                                     {/* Images Tab */}
                                     <Nav.Item>
                                         <Nav.Link eventKey="images">
-                                            <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                            <i className="fas fa-images" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                             Images
                                         </Nav.Link>
                                     </Nav.Item>
@@ -446,7 +451,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('speakers') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="speakers">
-                                                <i className="fas fa-microphone me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-microphone" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Speakers
                                                 {isAdmin && eventData?.tabVisibility?.speakers === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -461,7 +466,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('documents') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="documents">
-                                                <i className="fas fa-images me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-file-alt" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Documents
                                                 {isAdmin && eventData?.tabVisibility?.documents === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -476,7 +481,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('floorplan') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="floorplan">
-                                                <i className="fas fa-map me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-map" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Floor Plan
                                                 {isAdmin && eventData?.tabVisibility?.floorplan === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -491,7 +496,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('gallery') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="gallery">
-                                                <i className="fas fa-photo-video me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-photo-video" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Gallery
                                                 {isAdmin && eventData?.tabVisibility?.gallery === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -511,7 +516,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('stamps') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="stamps">
-                                                <i className="fas fa-stamp me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-stamp" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Event Stamps
                                                 {isAdmin && eventData?.tabVisibility?.stamps === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -526,7 +531,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('survey') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="survey">
-                                                <i className="fas fa-poll me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-poll" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Survey
                                                 {isAdmin && eventData?.tabVisibility?.survey === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -541,9 +546,24 @@ const ViewEventPage = () => {
                                     {isTabVisible('exhibitors') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="exhibitors">
-                                                <i className="fas fa-store me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-store" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Exhibitors
                                                 {isAdmin && eventData?.tabVisibility?.exhibitors === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
+
+                                    {/* Programme Tab */}
+                                    {isTabVisible('programme') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="programme">
+                                                <i className="fas fa-calendar-check" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                                Programme
+                                                {isAdmin && eventData?.tabVisibility?.programme === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
                                                         Restricted
                                                     </Badge>
@@ -556,7 +576,7 @@ const ViewEventPage = () => {
                                     {/* {isTabVisible('categories') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="categories">
-                                                <i className="fas fa-tags me-2" style={{ color: '#4680ff', marginRight: 6 }}></i>
+                                                <i className="fas fa-tags" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Categories
                                                 {isAdmin && eventData?.tabVisibility?.categories === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
@@ -692,6 +712,18 @@ const ViewEventPage = () => {
                                     </div>
                                 </Tab.Pane>
                             )} */}
+
+                            {/* Programme Tab */}
+                            {isTabVisible('programme') && (
+                                <Tab.Pane eventKey="programme">
+                                    <div className="p-3">
+                                        <EventProgrammeComponent 
+                                            programmeTracks={eventData?.programmeTracks}
+                                            formatTime={formatTime}
+                                        />
+                                    </div>
+                                </Tab.Pane>
+                            )}
                         </Tab.Content>
                     </Tab.Container>
                 </div>
@@ -844,6 +876,16 @@ const ViewEventPage = () => {
                                     onChange={(e) => handleTabVisibilityChange('categories', e.target.checked)}
                                 />
                             </Form.Group> */}
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="programme-tab"
+                                    label="Programme Tab"
+                                    checked={tabVisibilitySettings.programme}
+                                    onChange={(e) => handleTabVisibilityChange('programme', e.target.checked)}
+                                />
+                            </Form.Group>
 
                             <Form.Group className="mb-4">
                                 <Form.Check

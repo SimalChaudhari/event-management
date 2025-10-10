@@ -11,8 +11,6 @@ import ImageModalComponent from './ImageModalComponent';
  * @param {Function} getImageSrc - Function to get image source URL
  */
 const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
-    // console.log("exhibitors",exhibitors);
-    console.log("exhibitors",exhibitors?.exhibitors?.length);
     const navigate = useNavigate();
     const [showModal, setShowModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
