@@ -28,7 +28,6 @@ import { SurveyUtils } from '../utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { EmailService } from '../service/email.service';
-import { EmailTemplateUtils } from '../utils/email-templates.utils';
 import { EmailUtils } from '../utils/email.utils';
 import { EventValidationUtils } from '../utils/validateEvents';
 import {
@@ -113,6 +112,11 @@ export class EventService {
 
       // Validate speaker times
       this.validateSpeakerTimes(eventDto);
+
+      // Set default currency if not provided
+      if (!eventDto.currency) {
+        eventDto.currency = 'SGD';
+      }
 
       // Create and save the event
       const event = await this.eventRepository.create(eventDto);

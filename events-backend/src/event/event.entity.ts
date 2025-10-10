@@ -82,8 +82,8 @@ export class Event {
   @Column({ type: 'decimal', nullable: true })
   price?: number;
 
-  @Column({ type: 'varchar', length: 10, default: 'USD', nullable: true })
-  currency?: string;
+  @Column({ type: 'varchar', length: 10, default: 'SGD' })
+  currency?: string = 'SGD';
 
   // Floor plan - single image
   @Column({ type: 'varchar', nullable: true })
