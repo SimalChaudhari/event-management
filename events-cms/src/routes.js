@@ -428,6 +428,12 @@ const eventRoutes = [
 
 const MediaManagerRoutes = [
     {
+        path: MEDIA_MANAGER_PATHS.GALLERY,
+        exact: true,
+        name: 'Gallery',
+        component: eventComponents.Gallery
+    },
+    {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,
         exact: true,
         name: 'Banner Management',

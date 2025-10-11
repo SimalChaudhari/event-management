@@ -39,7 +39,12 @@ export const galleryByEvent =
 export const getAllGalleries = () => async (dispatch) => {
     try {
         const response = await axiosInstance.get('/gallery/get-all');
-
+        
+        dispatch({
+            type: ALL_GALLERIES,
+            payload: response.data
+        });
+        
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;

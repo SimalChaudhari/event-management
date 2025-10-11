@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Container, Nav, Tab, Modal, Alert } from 'react-bootstrap';
-import { useDispatch, useSelector } from 'react-redux';
-import { getAllGalleries, getGalleryById } from '../../../store/actions/galleryActions';
-import { EVENT_PATHS } from '../../../utils/constants';
+import { Button, Row, Col, Card, Container, Modal, Alert, Badge } from 'react-bootstrap';
+import { useDispatch } from 'react-redux';
+import { getGalleryById } from '../../../store/actions/galleryActions';
+import { MEDIA_MANAGER_PATHS } from '../../../utils/constants';
 
 const ViewGalleryPage = () => {
     const { id } = useParams();
@@ -11,7 +11,6 @@ const ViewGalleryPage = () => {
     const navigate = useNavigate();
     const [galleryData, setGalleryData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('images');
     // For image modal
     const [showImageModal, setShowImageModal] = useState(false);
     const [currentImage, setCurrentImage] = useState('');
@@ -36,33 +35,84 @@ const ViewGalleryPage = () => {
 
     if (loading) return <div>Loading...</div>;
     if (!galleryData) {
-        navigate(EVENT_PATHS.ADD_GALLERY);
+        navigate(MEDIA_MANAGER_PATHS.GALLERY);
         return null;
     }
+    
     // Image zoom function
     const handleImageClick = (imagePath) => {
         setCurrentImage(imagePath);
         setShowImageModal(true);
     };
 
-    const tabStyle = {
-        border: 'none',
-        backgroundColor: 'transparent',
-        color: '#6c757d',
-        fontWeight: '500',
-        padding: '12px 20px',
-        borderRadius: '8px 8px 0 0',
-        marginRight: '5px',
-        transition: 'all 0.3s ease',
-        fontSize: '14px'
+    // Get colorful icons
+    const getIconColor = (iconClass) => {
+        const colorMap = {
+            'fas fa-image': '#007bff',
+            'fas fa-calendar': '#28a745',
+            'fas fa-calendar-alt': '#dc3545',
+            'fas fa-images': '#17a2b8',
+            'fas fa-map-marker-alt': '#e74c3c',
+            'fas fa-building': '#6f42c1',
+            'fas fa-globe': '#17a2b8'
+        };
+        return colorMap[iconClass] || '#495057';
     };
 
-    const activeTabStyle = {
-        ...tabStyle,
-        backgroundColor: '#4680ff',
-        color: 'white',
-        fontWeight: '600'
-    };
+    // InfoCard component for consistent styling
+    const InfoCard = ({ title, iconClass, children, borderColor = '#4680ff' }) => (
+        <div
+            className="mb-4"
+            style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                border: '1px solid #e9ecef',
+                borderLeft: `4px solid ${borderColor}`
+            }}
+        >
+            <div style={{ padding: '24px' }}>
+                <h5
+                    style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#2c3e50',
+                        marginBottom: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderBottom: `2px solid ${borderColor}`,
+                        paddingBottom: '8px'
+                    }}
+                >
+                    <i className={iconClass} style={{ fontSize: '20px', color: getIconColor(iconClass) }}></i>
+                    {title}
+                </h5>
+                {children}
+            </div>
+        </div>
+    );
+
+    const InfoField = ({ label, value, iconClass = null }) => (
+        <div
+            className="info-field-container mb-2 py-2"
+            style={{
+                borderBottom: '1px solid #f1f1f1',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}
+        >
+            <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', minWidth: '140px' }}>
+                {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
+                {label}:
+            </span>
+            <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px', textAlign: 'right', flex: 1 }}>
+                {value}
+            </span>
+        </div>
+    );
 
     return (
         <>
@@ -73,192 +123,125 @@ const ViewGalleryPage = () => {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View Gallery</h4>
-                        <Button variant="secondary" onClick={() => navigate('/media-manager/gallery')}>
+                        <Button variant="secondary" onClick={() => navigate(MEDIA_MANAGER_PATHS.GALLERY)}>
                             <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                             Back
                         </Button>
                     </div>
                 </div>
 
-                <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                    {/* Gallery Basic Info */}
-                    <Card className="mb-4">
-                        <Card.Body>
-                            <Card.Title>
-                                <i className="feather icon-image mr-2"></i>
-                                Gallery Information
-                            </Card.Title>
-                            <hr />
+                <div className="p-2 bg-light">
+                    {/* Gallery Information Section */}
+                    <InfoCard title="Gallery Information" iconClass="fas fa-image" borderColor="#3498db">
+                        <Row>
+                            <Col lg={6} md={12}>
+                                <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                    <InfoField 
+                                        label="Gallery Title" 
+                                        value={galleryData.title} 
+                                        iconClass="fas fa-image" 
+                                    />
+                                    <InfoField 
+                                        label="Event Name" 
+                                        value={galleryData.event?.name || 'Unknown Event'} 
+                                        iconClass="fas fa-calendar-alt" 
+                                    />
+                                    <InfoField 
+                                        label="Total Images" 
+                                        value={
+                                            <Badge bg="info" className="px-3 py-1">
+                                                {galleryData.galleryImages?.length || 0} images
+                                            </Badge>
+                                        } 
+                                        iconClass="fas fa-images" 
+                                    />
+                                </div>
+                            </Col>
+                            <Col lg={6} md={12}>
+                                <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                    <InfoField 
+                                        label="Location" 
+                                        value={galleryData.event?.location || 'N/A'} 
+                                        iconClass="fas fa-map-marker-alt" 
+                                    />
+                                    <InfoField 
+                                        label="Venue" 
+                                        value={galleryData.event?.venue || 'N/A'} 
+                                        iconClass="fas fa-building" 
+                                    />
+                                    <InfoField 
+                                        label="Created Date" 
+                                        value={new Date(galleryData.createdAt).toLocaleDateString('en-GB', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric'
+                                        })} 
+                                        iconClass="fas fa-calendar" 
+                                    />
+                                </div>
+                            </Col>
+                        </Row>
+                    </InfoCard> 
+
+                    {/* Gallery Images Section */}
+                    <InfoCard title="Gallery Images" iconClass="fas fa-images" borderColor="#28a745">
+                        {galleryData.galleryImages && galleryData.galleryImages.length > 0 ? (
                             <Row>
-                                <Col xs={12} md={6} className="mb-3">
-                                    <strong>Gallery Title:</strong><br />
-                                    <span className="text-muted">{galleryData.title}</span>
-                                </Col>
-                             
-                                <Col xs={12} md={6} className="mb-3">
-                                    <strong>Total Images:</strong><br />
-                                    <span className="badge badge-light-info">
-                                        {galleryData.galleryImages?.length || 0} images
-                                    </span>
-                                </Col>
-                                <Col xs={12} md={6} className="mb-3">
-                                    <strong>Created Date:</strong><br />
-                                    <span className="text-muted">
-                                        {new Date(galleryData.createdAt).toLocaleDateString()}
-                                    </span>
-                                </Col>
+                                {galleryData.galleryImages.map((imagePath, index) => (
+                                    <Col lg={3} md={4} sm={6} xs={12} key={index} className="mb-3">
+                                        <div style={{ position: 'relative' }}>
+                                            <img 
+                                                src={`${process.env.REACT_APP_API_URL}/${imagePath}`} 
+                                                alt="Gallery" 
+                                                style={{
+                                                    width: '100%',
+                                                    height: '200px',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '8px',
+                                                    border: '2px solid #28a745',
+                                                    cursor: 'pointer',
+                                                    transition: 'transform 0.2s',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                                }}
+                                                onClick={() => handleImageClick(imagePath)}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.transform = 'scale(1.05)';
+                                                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.transform = 'scale(1)';
+                                                    e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '10px',
+                                                    right: '10px',
+                                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                                    color: 'white',
+                                                    padding: '8px 10px',
+                                                    borderRadius: '50%',
+                                                    fontSize: '14px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                onClick={() => handleImageClick(imagePath)}
+                                            >
+                                                <i className="fas fa-search-plus"></i>
+                                            </div>
+                                        </div>
+                                    </Col>
+                                ))}
                             </Row>
-                            <hr />
-                            <div className="d-flex gap-2">
-                                <Button 
-                                    variant="warning" 
-                                    size="sm"
-                                    onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?eventId=${galleryData.eventId}&galleryId=${galleryData.id}`)}
-                                >
-                                    <i className="feather icon-edit mr-1"></i>
-                                    Edit Gallery
-                                </Button>
-                            </div>
-                        </Card.Body>
-                    </Card> 
-
-                    {/* Tab Navigation */}
-                    <div className="mb-4">
-                        <Nav 
-                            variant="tabs" 
-                            className="flex-column flex-sm-row"
-                            style={{
-                                borderBottom: '2px solid #e9ecef',
-                                gap: '5px'
-                            }}
-                        >
-                            <Nav.Item>
-                                <Nav.Link
-                                    active={activeTab === 'images'}
-                                    onClick={() => setActiveTab('images')}
-                                    style={activeTab === 'images' ? activeTabStyle : tabStyle}
-                                    className="text-center"
-                                >
-                                    <i className="feather icon-image mr-2"></i>
-                                    <span>Gallery Images ({galleryData.galleryImages?.length || 0})</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            <Nav.Item>
-                                <Nav.Link
-                                    active={activeTab === 'details'}
-                                    onClick={() => setActiveTab('details')}
-                                    style={activeTab === 'details' ? activeTabStyle : tabStyle}
-                                    className="text-center"
-                                >
-                                    <i className="feather icon-info mr-2"></i>
-                                    <span>Details</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                        </Nav>
-                    </div>
-
-                    {/* Tab Content */}
-                    <Tab.Content>
-                        {/* Images Tab */}
-                        {activeTab === 'images' && (
-                            <Tab.Pane active>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <i className="feather icon-image mr-2"></i>
-                                            Gallery Images
-                                        </Card.Title>
-                                        <hr />
-                                        {galleryData.galleryImages && galleryData.galleryImages.length > 0 ? (
-                                            <Row>
-                                                {galleryData.galleryImages.map((imagePath, index) => (
-                                                    <Col lg={3} md={4} sm={6} xs={12} key={index} className="mb-3">
-                                                        <div style={{ position: 'relative' }}>
-                                                            <img 
-                                                                src={`${process.env.REACT_APP_API_URL}/${imagePath}`} 
-                                                                alt="Gallery" 
-                                                                style={{
-                                                                    width: '100%',
-                                                                    height: '200px',
-                                                                    objectFit: 'cover',
-                                                                    borderRadius: '8px',
-                                                                    border: '2px solid #4680ff',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'transform 0.2s'
-                                                                }}
-                                                                onClick={() => handleImageClick(imagePath)}
-                                                                onMouseEnter={(e) => (e.target.style.transform = 'scale(1.02)')}
-                                                                onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-                                                            />
-                                                            <div
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    top: '10px',
-                                                                    right: '10px',
-                                                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                                                    color: 'white',
-                                                                    padding: '5px 8px',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '12px',
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                                onClick={() => handleImageClick(imagePath)}
-                                                            >
-                                                                <i className="fas fa-search-plus"></i>
-                                                            </div>
-                                                        </div>
-                                                    </Col>
-                                                ))}
-                                            </Row>
-                                        ) : (
-                                            <Alert variant="info" className="text-center">
-                                                <i className="fas fa-info-circle fa-2x mb-3"></i>
-                                                <h5>No images in this gallery</h5>
-                                                <p>Edit the gallery to add some images</p>
-                                            </Alert>
-                                        )}
-                                    </Card.Body>
-                                </Card>
-                            </Tab.Pane>
+                        ) : (
+                            <Alert variant="info" className="text-center">
+                                <i className="fas fa-info-circle fa-2x mb-3"></i>
+                                <h5>No images in this gallery</h5>
+                                <p className="text-muted">This gallery doesn't have any images yet</p>
+                            </Alert>
                         )}
-
-                        {/* Details Tab */}
-                        {activeTab === 'details' && (
-                            <Tab.Pane active>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <i className="feather icon-info mr-2"></i>
-                                            Gallery Details
-                                        </Card.Title>
-                                        <hr />
-                                        <Row>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Gallery ID:</strong><br />
-                                                <span className="text-muted">{galleryData.id}</span>
-                                            </Col>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Event ID:</strong><br />
-                                                <span className="text-muted">{galleryData.eventId}</span>
-                                            </Col>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Created:</strong><br />
-                                                <span className="text-muted">
-                                                    {new Date(galleryData.createdAt).toLocaleString()}
-                                                </span>
-                                            </Col>
-                                            <Col xs={12} md={6} className="mb-3">
-                                                <strong>Last Updated:</strong><br />
-                                                <span className="text-muted">
-                                                    {new Date(galleryData.updatedAt).toLocaleString()}
-                                                </span>
-                                            </Col>
-                                        </Row>
-                                    </Card.Body>
-                                </Card>
-                            </Tab.Pane>
-                        )}
-                    </Tab.Content>
+                    </InfoCard>
                 </div>
             </Container>
 

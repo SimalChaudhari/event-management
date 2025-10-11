@@ -73,6 +73,7 @@ export const EVENT_PATHS = {
 };  
 
 export const MEDIA_MANAGER_PATHS = {
+    GALLERY: '/media-manager/gallery',
     BANNER_MANAGEMENT: '/media-manager/banner-management',
     LOGO_MANAGEMENT: '/media-manager/logo-management'
 };

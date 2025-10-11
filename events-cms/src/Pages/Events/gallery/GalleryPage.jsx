@@ -8,19 +8,15 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { useNavigate } from 'react-router-dom';
-import { 
-    getAllGalleries, 
-    deleteGallery 
-} from '../../../store/actions/galleryActions';
+import { getAllGalleries } from '../../../store/actions/galleryActions';
 import { eventList } from '../../../store/actions/eventActions';
 import '../../../assets/css/event.css';
-import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { EVENT_PATHS } from '../../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, events, handleAddGallery, handleEdit, handleDelete, handleView) {
+function atable(data, events, handleView) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -43,7 +39,7 @@ function atable(data, events, handleAddGallery, handleEdit, handleDelete, handle
         ],
         pagingType: 'full_numbers',
         dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-gallery-button ml-2'>>>" +
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
@@ -96,62 +92,26 @@ function atable(data, events, handleAddGallery, handleEdit, handleDelete, handle
                 orderable: false,
                 render: function (data, type, row) {
                     return `
-                        <div class="btn-group" role="group" aria-label="Actions">
-                            <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View" 
-                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather icon-eye"></i>
-                            </button>
-                            <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
-                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather icon-edit"></i>
-                            </button>
-                            <button type="button" class="btn btn-danger btn-circle btn-sm delete-btn" data-id="${row.id}" title="Delete" 
-                                style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather icon-trash-2"></i>
-                            </button>
-                        </div>
+                        <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View" 
+                            style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
+                            <i class="feather icon-eye"></i>
+                        </button>
                     `;
                 }
             }
-        ],
-        initComplete: function (settings, json) {
-            // Add button initialization
-            if (!$('#addGalleryBtn').length) {
-                $('.add-gallery-button').html(`
-                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addGalleryBtn">
-                        <i class="feather icon-plus mr-1"></i>
-                        Add Gallery
-                    </button>
-                `);
-
-                $('#addGalleryBtn').on('click', handleAddGallery);
-            }
-        }
+        ]
     });
 
     // Restore the page
     $(tableZero).DataTable().page(currentPage).draw(false);
 
     // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
+    $(document).off('click', '.view-btn').on('click', '.view-btn', function () {
         const galleryId = $(this).data('id');
         const dataGallery = data.find((gallery) => gallery.id === galleryId);
         if (dataGallery) {
             handleView(dataGallery);
         }
-    });
-
-    $(document).on('click', '.edit-btn', function () {
-        const galleryId = $(this).data('id');
-        const dataGallery = data.find((gallery) => gallery.id === galleryId);
-        if (dataGallery) {
-            handleEdit(dataGallery);
-        }
-    });
-
-    $(document).on('click', '.delete-btn', function () {
-        const galleryId = $(this).data('id');
-        handleDelete(galleryId);
     });
 }
 
@@ -162,16 +122,17 @@ const GalleryPage = () => {
     const navigate = useNavigate();
 
     const [currentTable, setCurrentTable] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
-    const galleries = allGalleries?.data || [];
+    // Access the data correctly from Redux state
+    const galleries = Array.isArray(allGalleries?.data) ? allGalleries.data : [];
     const events = event?.events || [];
+    
+    console.log('Gallery data from Redux:', allGalleries);
+    console.log('Galleries array:', galleries);
 
     const destroyTable = () => {
         if (currentTable) {
-            $('#data-table-zero').off('click', '.delete-btn');
+            $('#data-table-zero').off('click', '.view-btn');
             currentTable.destroy();
             setCurrentTable(null);
         }
@@ -180,7 +141,7 @@ const GalleryPage = () => {
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(galleries) && galleries.length >= 0) {
-            const table = atable(galleries, events, handleAddGallery, handleEdit, handleDelete, handleView);
+            const table = atable(galleries, events, handleView);
             setCurrentTable(table);
         }
     };
@@ -196,74 +157,29 @@ const GalleryPage = () => {
         return () => destroyTable();
     }, [galleries, events]);
 
-    const handleAddGallery = () => {
-        navigate(EVENT_PATHS.ADD_GALLERY);
-    };
-
-    const handleEdit = (data) => {
-        navigate(EVENT_PATHS.EDIT_GALLERY);
-    };
-
     const handleView = (data) => {
         navigate(`${EVENT_PATHS.VIEW_GALLERY}/${data.id}`);
     };
 
-    const handleDelete = (galleryId) => {
-        setItemToDelete({ id: galleryId });
-        setShowDeleteModal(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!itemToDelete) return;
-
-        setIsDeleting(true);
-        try {
-            await dispatch(deleteGallery(itemToDelete.id));
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-            destroyTable();
-            await dispatch(getAllGalleries());
-        } catch (error) {
-            console.error('Delete failed:', error);
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const handleClose = () => {
-        if (!isDeleting) {
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-        }
-    };
-
     return (
-        <>
-            <DeleteConfirmationModal 
-                show={showDeleteModal} 
-                onHide={handleClose} 
-                onConfirm={handleConfirmDelete} 
-                isLoading={isDeleting} 
-            />
-            <Row>
-                <Col sm={12} className="btn-page">
-                    <Card className="gallery-list">
-                        <Card.Body>
-                            <Table striped hover responsive id="data-table-zero">
-                                <thead>
-                                    <tr>
-                                        <th>Gallery Name</th>                                     
-                                        <th>Images</th>
-                                        <th>Created Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                            </Table>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
-        </>
+        <Row>
+            <Col sm={12} className="btn-page">
+                <Card className="gallery-list">
+                    <Card.Body>
+                        <Table striped hover responsive id="data-table-zero">
+                            <thead>
+                                <tr>
+                                    <th>Gallery Name</th>                                     
+                                    <th>Images</th>
+                                    <th>Created Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                        </Table>
+                    </Card.Body>
+                </Card>
+            </Col>
+        </Row>
     );
 };
 
