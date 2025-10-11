@@ -1,11 +1,13 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import useWindowSize from '../../../../hooks/useWindowSize';
 import NavLeft from './NavLeft';
 import NavRight from './NavRight';
 import DEMO from '../../../../store/constant';
 import * as actionTypes from '../../../../store/actions';
+import { getLogo } from '../../../../store/actions/settingsActions';
+import { API_URL } from '../../../../configs/env';
 import logo from '../../../../assets/images/logo.png';
 // import { useSelector } from '../../../../store/reducer';
 const NavBar = () => {
@@ -17,8 +19,14 @@ const NavBar = () => {
     const collapseMenu = useSelector((state) => state.able.collapseMenu);
     const layout = useSelector((state) => state.able.layout);
     const subLayout = useSelector((state) => state.able.subLayout);
+    const logoData = useSelector((state) => state.settings.logo);
     const onToggleNavigation = () => dispatch({ type: actionTypes.COLLAPSE_MENU });
     const [rightToggle, setRightToggle] = useState(false);
+
+    // Fetch logo on component mount
+    useEffect(() => {
+        dispatch(getLogo());
+    }, [dispatch]);
     let headerClass = ['navbar', 'pcoded-header', 'navbar-expand-lg', 'header-blue'];
     document.body.classList.remove('background-blue');
     document.body.classList.remove('background-red');
@@ -46,7 +54,13 @@ const NavBar = () => {
     if (collapseMenu) {
         toggleClass = [...toggleClass, 'on'];
     }
-    let mainLogo = logo;
+    
+    // Use dynamic logo from API if available, otherwise use static fallback
+    let mainLogo = logo; // Default fallback
+    if (logoData && logoData.imageUrl) {
+        mainLogo = `${API_URL}/${logoData.imageUrl}`;
+    }
+    
     let navHtml;
     if (!rightToggle && windowWidth < 992) {
         navHtml = '';
@@ -57,13 +71,18 @@ const NavBar = () => {
                 <NavRight rtlLayout={rtlLayout}/>
             </div>);
     }
+    // Determine logo link - use hyperlink if available, otherwise use blank link
+    const logoHref = (logoData && logoData.hyperlink) ? logoData.hyperlink : DEMO.BLANK_LINK;
+    const logoTarget = (logoData && logoData.hyperlink) ? "_blank" : "_self";
+    const logoRel = (logoData && logoData.hyperlink) ? "noopener noreferrer" : undefined;
+    
     let navBar = (<>
             <div className="m-header">
                 <a className={toggleClass.join(' ')} id="mobile-collapse1" href={DEMO.BLANK_LINK} onClick={onToggleNavigation}>
                     <span />
                 </a>
-                <a href={DEMO.BLANK_LINK} className="b-brand">
-                    <img id="main-logo" src={mainLogo} alt="" className="logo"/>
+                <a href={logoHref} target={logoTarget} rel={logoRel} className="b-brand">
+                    <img id="main-logo" src={mainLogo} alt="Logo" className="logo" style={{ maxWidth: '120px', maxHeight: '40px', objectFit: 'contain' }}/>
                 </a>
                 <a className="mob-toggler" href={DEMO.BLANK_LINK} onClick={() => setRightToggle(!rightToggle)}>
                     <i className="feather icon-more-vertical"/>

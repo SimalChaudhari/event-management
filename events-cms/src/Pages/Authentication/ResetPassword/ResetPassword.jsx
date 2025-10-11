@@ -1,10 +1,12 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, useField } from 'formik';
 import { toast } from 'react-toastify';
 import { forgetPassword, resetPassword } from '../../../store/actions/authActions';
+import { getLogo } from '../../../store/actions/settingsActions';
+import { API_URL } from '../../../configs/env';
 import { forgotPasswordSchema, resetPasswordSchema } from '../../../utils/validation';
 import './../../../assets/scss/style.scss';
 import Breadcrumb from '../../../App/layout/AdminLayout/Breadcrumb/index';
@@ -131,6 +133,15 @@ const ResetPassword = () => {
     const [step, setStep] = useState('forgot'); // 'forgot' or 'reset'
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const logoData = useSelector((state) => state.settings.logo);
+
+    // Fetch logo on component mount
+    useEffect(() => {
+        dispatch(getLogo());
+    }, [dispatch]);
+
+    // Use dynamic logo from API if available, otherwise use static fallback
+    const displayLogo = (logoData && logoData.imageUrl) ? `${API_URL}/${logoData.imageUrl}` : logoDark;
 
     const handleForgotPassword = async (values, { setSubmitting }) => {
         try {
@@ -195,10 +206,10 @@ const ResetPassword = () => {
                             {/* Logo Section */}
                             <div className="text-center mb-4">
                                 <img 
-                                    src={logoDark} 
+                                    src={displayLogo} 
                                     alt="Logo" 
                                     className="img-fluid mb-3" 
-                                    style={{ maxHeight: '60px' }}
+                                    style={{ maxWidth: '180px', maxHeight: '60px', objectFit: 'contain' }}
                                 />
                                 <h3 className="mb-1" style={{ 
                                     color: '#5a5c69',

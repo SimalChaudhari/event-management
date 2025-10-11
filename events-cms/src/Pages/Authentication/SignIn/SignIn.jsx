@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, useField } from 'formik';
 import * as Yup from 'yup';
@@ -7,6 +7,8 @@ import './../../../assets/scss/style.scss';
 import Breadcrumb from '../../../App/layout/AdminLayout/Breadcrumb/index';
 import logoDark from '../../../assets/images/logo-dark.png';
 import { login } from '../../../store/actions/authActions';
+import { getLogo } from '../../../store/actions/settingsActions';
+import { API_URL } from '../../../configs/env';
 import { signInSchema } from '../../../utils/validation';
 
 // Custom Password Field Component
@@ -82,6 +84,15 @@ const SignIn = () => {
     const [showPassword, setShowPassword] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const logoData = useSelector((state) => state.settings.logo);
+
+    // Fetch logo on component mount
+    useEffect(() => {
+        dispatch(getLogo());
+    }, [dispatch]);
+
+    // Use dynamic logo from API if available, otherwise use static fallback
+    const displayLogo = (logoData && logoData.imageUrl) ? `${API_URL}/${logoData.imageUrl}` : logoDark;
 
     // Using centralized validation schema
 
@@ -128,10 +139,10 @@ const SignIn = () => {
                             {/* Logo Section */}
                             <div className="text-center mb-4">
                                 <img 
-                                    src={logoDark} 
+                                    src={displayLogo} 
                                     alt="Logo" 
                                     className="img-fluid mb-3" 
-                                    style={{ maxHeight: '60px' }}
+                                    style={{ maxWidth: '180px', maxHeight: '60px', objectFit: 'contain' }}
                                 />
                                 <h3 className="mb-1" style={{ 
                                     color: '#5a5c69',
