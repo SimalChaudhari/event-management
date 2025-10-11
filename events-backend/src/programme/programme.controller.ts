@@ -88,6 +88,31 @@ export class ProgrammeController {
     }
   }
 
+  @Get('tracks')
+  async getAllTracks(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const tracks = await this.programmeService.getAllTracks();
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'All programme tracks retrieved successfully',
+        data: tracks,
+        metadata: {
+          total: tracks.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get All Programme Tracks', req.user?.id);
+      throw error;
+    }
+  }
+
   @Put('tracks/:trackId')
   @Roles(UserRole.Admin)
   async updateTrack(
@@ -216,6 +241,31 @@ export class ProgrammeController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Get Programme Sessions by Event', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get('sessions')
+  async getAllSessions(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const sessions = await this.programmeService.getAllSessions();
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'All programme sessions retrieved successfully',
+        data: sessions,
+        metadata: {
+          total: sessions.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get All Programme Sessions', req.user?.id);
       throw error;
     }
   }

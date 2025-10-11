@@ -1,6 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Row, Col } from 'react-bootstrap';
 import { API_URL } from '../../configs/env';
+
+/**
+ * ReadMoreComponent - Component to handle read more/less functionality
+ */
+const ReadMoreComponent = ({ text, maxLength = 100, className = "" }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    if (!text) return null;
+    
+    const shouldTruncate = text.length > maxLength;
+    const displayText = isExpanded || !shouldTruncate ? text : text.substring(0, maxLength) + '...';
+    
+    return (
+        <p className={`mb-2 ${className}`} style={{ fontSize: '14px' }}>
+            {displayText}
+            {shouldTruncate && (
+                <button
+                    type="button"
+                    className="btn btn-link p-0 ml-1"
+                    style={{ fontSize: '12px', textDecoration: 'none' }}
+                    onClick={() => setIsExpanded(!isExpanded)}
+                >
+                    {isExpanded ? 'Read Less' : 'Read More'}
+                </button>
+            )}
+        </p>
+    );
+};
 
 /**
  * EventProgrammeComponent - Reusable component to display event programme tracks
@@ -30,9 +58,13 @@ const EventProgrammeComponent = ({ programmeTracks, formatTime }) => {
                                 {track.title}
                             </h6>
                             {track.description && (
-                                <p className="mb-0 mt-2 text-muted" style={{ fontSize: '14px' }}>
-                                    {track.description}
-                                </p>
+                                <div className="mt-2">
+                                    <ReadMoreComponent 
+                                        text={track.description} 
+                                        maxLength={120} 
+                                        className="text-muted mb-0" 
+                                    />
+                                </div>
                             )}
                         </Card.Header>
                         <Card.Body>
@@ -46,9 +78,11 @@ const EventProgrammeComponent = ({ programmeTracks, formatTime }) => {
                                                     {session.title}
                                                 </h6>
                                                 {session.description && (
-                                                    <p className="text-muted mb-2" style={{ fontSize: '14px' }}>
-                                                        {session.description}
-                                                    </p>
+                                                    <ReadMoreComponent 
+                                                        text={session.description} 
+                                                        maxLength={150} 
+                                                        className="text-muted mb-2" 
+                                                    />
                                                 )}
                                             </div>
                                         </div>

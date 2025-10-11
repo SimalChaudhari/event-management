@@ -24,9 +24,6 @@ export class ProgrammeTrack {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'int', default: 0 })
-  order!: number; // For ordering tracks
-
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 

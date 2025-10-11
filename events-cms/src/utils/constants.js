@@ -103,6 +103,23 @@ export const POLLING_PATHS = {
     POLL_RESULTS: '/polls/results'
 };
 
+export const PROGRAMME_PATHS = {
+    LIST_PROGRAMMES: '/programme',
+    
+    // Track paths
+    ADD_TRACK: '/programme/add-track',
+    EDIT_TRACK: '/programme/edit-track',
+    VIEW_TRACK: '/programme/view-track',
+    TRACK_SESSIONS: '/programme/track-sessions',
+    
+    // Session paths  
+    ADD_SESSION: '/programme/add-session',
+    EDIT_SESSION: '/programme/edit-session',
+    VIEW_SESSION: '/programme/view-session',
+    
+    LIST: '/programme'
+};
+
 export const LOGS_PATHS = {
     LIST_LOGS: '/logs',
     LOG_DETAILS: '/logs/:sessionId'

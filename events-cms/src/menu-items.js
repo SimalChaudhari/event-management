@@ -137,17 +137,24 @@ const chartData = {
                                 type: 'badge-info'
                             }
                         },
-                        {
-                            id: 'order ',
-                            title: 'Orders ',
-                            type: 'item',
-                            // icon: 'feather icon-shopping-cart',
-                            badge: {
-                                title: 'New',
-                                type: 'badge-success'
-                            },
-                            url: '/order'
-                        }
+                {
+                    id: 'order ',
+                    title: 'Orders ',
+                    type: 'item',
+                    // icon: 'feather icon-shopping-cart',
+                    badge: {
+                        title: 'New',
+                        type: 'badge-success'
+                    },
+                    url: '/order'
+                },
+                {
+                    id: 'programme',
+                    title: 'Programme',
+                    type: 'item',
+                    // icon: 'feather icon-list',
+                    url: '/programme'
+                }
                     ]
                 }
             ]

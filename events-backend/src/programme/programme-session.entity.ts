@@ -38,9 +38,6 @@ export class ProgrammeSession {
   @Column({ type: 'varchar', length: 255, nullable: true })
   venue?: string;
 
-  @Column({ type: 'int', default: 0 })
-  order!: number; // For ordering sessions within a track
-
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 

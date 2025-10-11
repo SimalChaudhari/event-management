@@ -42,7 +42,6 @@ export class ProgrammeService {
       const track = this.programmeTrackRepository.create({
         eventId,
         ...createTrackDto,
-        order: createTrackDto.order || 0,
         isActive: createTrackDto.isActive !== undefined ? createTrackDto.isActive : true,
       });
 
@@ -104,12 +103,26 @@ export class ProgrammeService {
       const tracks = await this.programmeTrackRepository.find({
         where: { eventId },
         relations: ['sessions', 'sessions.speakers'],
-        order: { order: 'ASC', createdAt: 'ASC' },
+        order: { createdAt: 'ASC' },
       });
 
       return tracks.map(track => this.mapTrackToResponseDto(track));
     } catch (error) {
       this.errorHandler.logError(error, 'Get Programme Tracks', eventId);
+      throw error;
+    }
+  }
+
+  async getAllTracks(): Promise<ProgrammeTrackResponseDto[]> {
+    try {
+      const tracks = await this.programmeTrackRepository.find({
+        relations: ['event', 'sessions', 'sessions.speakers'],
+        order: { createdAt: 'ASC' },
+      });
+
+      return tracks.map(track => this.mapTrackToResponseDto(track));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get All Programme Tracks', '');
       throw error;
     }
   }
@@ -141,7 +154,6 @@ export class ProgrammeService {
       const session = this.programmeSessionRepository.create({
         ...createSessionDto,
         sessionDate: new Date(createSessionDto.sessionDate),
-        order: createSessionDto.order || 0,
         isActive: createSessionDto.isActive !== undefined ? createSessionDto.isActive : true,
         speakers,
       });
@@ -218,7 +230,7 @@ export class ProgrammeService {
       const sessions = await this.programmeSessionRepository.find({
         where: { trackId },
         relations: ['speakers'],
-        order: { order: 'ASC', startTime: 'ASC' },
+        order: { sessionDate: 'ASC', startTime: 'ASC' },
       });
 
       return sessions.map(session => this.mapSessionToResponseDto(session));
@@ -246,6 +258,24 @@ export class ProgrammeService {
     }
   }
 
+  async getAllSessions(): Promise<ProgrammeSessionResponseDto[]> {
+    try {
+      const sessions = await this.programmeSessionRepository
+        .createQueryBuilder('session')
+        .leftJoinAndSelect('session.track', 'track')
+        .leftJoinAndSelect('track.event', 'event')
+        .leftJoinAndSelect('session.speakers', 'speakers')
+        .orderBy('session.sessionDate', 'ASC')
+        .addOrderBy('session.startTime', 'ASC')
+        .getMany();
+
+      return sessions.map(session => this.mapSessionToResponseDto(session));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get All Programme Sessions', '');
+      throw error;
+    }
+  }
+
   // Helper methods
   private mapTrackToResponseDto(track: ProgrammeTrack): ProgrammeTrackResponseDto {
     return {
@@ -253,11 +283,14 @@ export class ProgrammeService {
       eventId: track.eventId,
       title: track.title,
       description: track.description,
-      order: track.order,
       isActive: track.isActive,
       createdAt: track.createdAt,
       updatedAt: track.updatedAt,
       sessions: track.sessions ? track.sessions.map(session => this.mapSessionToResponseDto(session)) : undefined,
+      event: track.event ? {
+        id: track.event.id,
+        name: track.event.name,
+      } : undefined,
     };
   }
 
@@ -271,13 +304,20 @@ export class ProgrammeService {
       startTime: session.startTime,
       endTime: session.endTime,
       venue: session.venue,
-      order: session.order,
       isActive: session.isActive,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       speakers: session.speakers ? session.speakers.map(speaker => 
         UserUtils.getBasicSpeakerInfo(speaker)
       ) : undefined,
+      track: session.track ? {
+        id: session.track.id,
+        title: session.track.title,
+        event: session.track.event ? {
+          id: session.track.event.id,
+          name: session.track.event.name,
+        } : undefined,
+      } : undefined,
     };
   }
 }

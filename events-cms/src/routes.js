@@ -10,7 +10,8 @@ import {
     TRANSACTION_PATHS,
     USER_PATHS,
     POLLING_PATHS,
-    LOGS_PATHS
+    LOGS_PATHS,
+    PROGRAMME_PATHS
 } from './utils/constants.js';
 
 /**
@@ -121,6 +122,19 @@ const pollingComponents = {
     AddPoll: React.lazy(() => import('./Pages/Polling/AddPollPage.jsx')),
     ViewPoll: React.lazy(() => import('./Pages/Polling/ViewPollPage.jsx')),
     Results: React.lazy(() => import('./Pages/Polling/PollResultsPage.jsx'))
+};
+
+/**
+ * Programme related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const programmeComponents = {
+    List: React.lazy(() => import('./Pages/Programme/ProgrammeList.jsx')),
+    AddTrack: React.lazy(() => import('./Pages/Programme/AddTrackPage.jsx')),
+    ViewTrack: React.lazy(() => import('./Pages/Programme/ViewTrackPage.jsx')),
+    TrackSessions: React.lazy(() => import('./Pages/Programme/TrackSessionsPage.jsx')),
+    AddSession: React.lazy(() => import('./Pages/Programme/AddSessionPage.jsx')),
+    ViewSession: React.lazy(() => import('./Pages/Programme/ViewSessionPage.jsx'))
 };
 
 /**
@@ -568,6 +582,63 @@ const pollingRoutes = [
 ];
 
 /**
+ * Programme routes configuration
+ * @type {RouteConfig[]}
+ */
+const programmeRoutes = [
+    {
+        path: PROGRAMME_PATHS.LIST_PROGRAMMES,
+        exact: true,
+        name: 'Programme Management',
+        component: programmeComponents.List
+    },
+    // Track routes
+    {
+        path: PROGRAMME_PATHS.ADD_TRACK,
+        exact: true,
+        name: 'Add Track',
+        component: programmeComponents.AddTrack
+    },
+    {
+        path: PROGRAMME_PATHS.EDIT_TRACK + '/:id',
+        exact: true,
+        name: 'Edit Track',
+        component: programmeComponents.AddTrack
+    },
+    {
+        path: PROGRAMME_PATHS.VIEW_TRACK + '/:id',
+        exact: true,
+        name: 'View Track',
+        component: programmeComponents.ViewTrack
+    },
+    {
+        path: PROGRAMME_PATHS.TRACK_SESSIONS + '/:trackId',
+        exact: true,
+        name: 'Track Sessions',
+        component: programmeComponents.TrackSessions
+    },
+    // Session routes
+    {
+        path: PROGRAMME_PATHS.ADD_SESSION,
+        exact: true,
+        name: 'Add Session',
+        component: programmeComponents.AddSession
+    },
+    {
+        path: PROGRAMME_PATHS.EDIT_SESSION + '/:id',
+        exact: true,
+        name: 'Edit Session',
+        component: programmeComponents.AddSession
+    },
+    {
+        path: PROGRAMME_PATHS.VIEW_SESSION + '/:id',
+        exact: true,
+        name: 'View Session',
+        component: programmeComponents.ViewSession
+    }
+];
+
+/**
  * Combined routes configuration
  * @type {RouteConfig[]}
  */
@@ -580,6 +651,7 @@ const routes = [
     ...speakerRoutes,
     ...surveyRoutes,
     ...pollingRoutes,
+    ...programmeRoutes,
     ...settingsRoutes,
     ...logsRoutes,
     ...transactionRoutes,

@@ -11,10 +11,6 @@ export class CreateProgrammeTrackDto {
   description?: string;
 
   @IsOptional()
-  @IsNumber()
-  order?: number;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
@@ -29,10 +25,6 @@ export class UpdateProgrammeTrackDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @IsOptional()
-  @IsNumber()
-  order?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -65,10 +57,6 @@ export class CreateProgrammeSessionDto {
   @IsString()
   @MaxLength(255)
   venue?: string;
-
-  @IsOptional()
-  @IsNumber()
-  order?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -109,10 +97,6 @@ export class UpdateProgrammeSessionDto {
   venue?: string;
 
   @IsOptional()
-  @IsNumber()
-  order?: number;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
@@ -127,11 +111,14 @@ export class ProgrammeTrackResponseDto {
   eventId!: string;
   title!: string;
   description?: string;
-  order!: number;
   isActive!: boolean;
   createdAt!: Date;
   updatedAt!: Date;
   sessions?: ProgrammeSessionResponseDto[];
+  event?: {
+    id: string;
+    name: string;
+  };
 }
 
 export class ProgrammeSessionResponseDto {
@@ -143,7 +130,6 @@ export class ProgrammeSessionResponseDto {
   startTime!: string;
   endTime!: string;
   venue?: string;
-  order!: number;
   isActive!: boolean;
   createdAt!: Date;
   updatedAt!: Date;
@@ -161,4 +147,12 @@ export class ProgrammeSessionResponseDto {
     speakingStartTime: string;
     speakingEndTime: string;
   }[];
+  track?: {
+    id: string;
+    title: string;
+    event?: {
+      id: string;
+      name: string;
+    };
+  };
 }
