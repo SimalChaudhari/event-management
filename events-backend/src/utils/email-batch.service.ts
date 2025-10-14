@@ -38,7 +38,7 @@ export class EmailBatchService {
   private readonly defaultConfig: EmailBatchConfig = {
     batchSize: 15,
     delayBetweenEmails: 1000, // 1 second
-    delayBetweenBatches: 30000, // 30 seconds
+    delayBetweenBatches: 5000, // 5 seconds (changed from 30)
     retryDelay: 120000, // 2 minutes
     maxRetries: 1
   };
@@ -336,7 +336,7 @@ export class EmailBatchService {
       gmail: {
         batchSize: 15,
         delayBetweenEmails: 1000,
-        delayBetweenBatches: 30000,
+        delayBetweenBatches: 5000, // 5 seconds (changed from 30)
         retryDelay: 120000,
         maxRetries: 1
       },

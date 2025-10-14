@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Form, Button, Col, Row } from 'react-bootstrap';
+import SingaporePhoneInput from '../../../../components/SingaporePhoneInput';
 
 const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData, isLoading = false }) => {
     return (
@@ -73,17 +74,12 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData, isLoadi
 
                     <Col sm={6}>
                         <div className="form-group fill">
-                            <label className="floating-label" htmlFor="mobile">
-                                Mobile <span style={{ color: '#dc3545' }}>*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                className="form-control"
+                            <SingaporePhoneInput
                                 name="mobile"
                                 value={formData.mobile}
                                 onChange={onChange}
-                                placeholder="Enter mobile number"
-                                required
+                                label="Mobile"
+                                required={true}
                             />
                         </div>
                     </Col>

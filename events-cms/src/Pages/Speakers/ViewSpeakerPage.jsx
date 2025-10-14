@@ -5,6 +5,7 @@ import { useDispatch } from 'react-redux';
 import { speakerById } from '../../store/actions/speakerActions';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { SPEAKER_PATHS } from '../../utils/constants';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 const ViewSpeakerPage = () => {
     const { id } = useParams();
@@ -178,7 +179,7 @@ const ViewSpeakerPage = () => {
                                     </div>
                                     <div className="mb-2">
                                         <i className="fa fa-address-card mr-2" style={{ color: '#4680ff' }}></i>
-                                        <span style={{ color: '#666' }}>{speakerData.mobile || 'N/A'}</span>
+                                        <span style={{ color: '#666' }}>{formatPhoneDisplay(speakerData.mobile)}</span>
                                     </div>
                                     {speakerData.location && (
                                         <div className="mb-2">

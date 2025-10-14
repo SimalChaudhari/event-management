@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { createUser, editUser, userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
 import { USER_PATHS } from '../../utils/constants';
+import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 
 const AddUserPage = () => {
     const dispatch = useDispatch();
@@ -265,16 +266,12 @@ const AddUserPage = () => {
                                     
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="mobile">
-                                                Mobile
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
+                                            <SingaporePhoneInput
                                                 name="mobile"
                                                 value={formData.mobile}
                                                 onChange={handleChange}
-                                                placeholder="Mobile"
+                                                label="Mobile"
+                                                required={false}
                                             />
                                         </div>
                                     </Col>

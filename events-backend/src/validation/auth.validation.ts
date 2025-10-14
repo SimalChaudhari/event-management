@@ -1,6 +1,7 @@
 import { IsEmail, IsString, IsOptional, IsBoolean, MinLength, MaxLength, Matches, IsEnum, ValidateIf } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { applyDecorators } from '@nestjs/common';
+import { SingaporePhoneUtils } from '../utils/singapore-phone.utils';
 
 export enum UserRole {
   User = 'user',
@@ -33,7 +34,7 @@ const VALIDATION_MESSAGES = {
   },
   MOBILE: {
     REQUIRED: 'Mobile number is required',
-    INVALID: 'Please provide a valid mobile number'
+    INVALID: 'Please provide a valid Singapore mobile number (8 digits starting with 8 or 9)'
   },
   OTP: {
     REQUIRED: 'OTP is required',
@@ -45,7 +46,7 @@ const VALIDATION_MESSAGES = {
 // Validation Patterns
 const VALIDATION_PATTERNS = {
   PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-  MOBILE: /^[0-9]{10,15}$/,
+  MOBILE: /^(\+?65)?[-\s]?[89]\d{7}$/, // Singapore format: +65-XXXX-XXXX or 8XXXXXXX/9XXXXXXX
   OTP: /^[0-9]{6}$/
 };
 
@@ -87,6 +88,15 @@ export function IsValidLastName() {
 export function IsValidMobile() {
   return applyDecorators(
     IsString({ message: VALIDATION_MESSAGES.MOBILE.REQUIRED }),
+    Transform(({ value }) => {
+      if (!value) return value;
+      try {
+        // Format the phone number for database storage (without hyphens)
+        return SingaporePhoneUtils.formatPhoneForDatabase(value);
+      } catch {
+        return value;
+      }
+    }),
     Matches(VALIDATION_PATTERNS.MOBILE, { message: VALIDATION_MESSAGES.MOBILE.INVALID })
   );
 }

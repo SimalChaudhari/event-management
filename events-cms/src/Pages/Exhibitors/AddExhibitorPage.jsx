@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { createExhibitor, updateExhibitor, exhibitorById } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
+import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 
 // DocumentNameInput component main component के बाहर define करें (Events जैसा ही)
 const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
@@ -849,17 +850,12 @@ function AddExhibitorPage() {
                                     {/* Mobile */}
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="mobile">
-                                                Mobile
-                                            </label>
-                                            <input
-                                                type="tel"
-                                                className="form-control"
+                                            <SingaporePhoneInput
                                                 name="mobile"
                                                 value={formData.mobile}
                                                 onChange={handleChange}
-                                                placeholder="Mobile Number"
-                                                required
+                                                label="Mobile"
+                                                required={true}
                                             />
                                         </div>
                                     </Col>

@@ -14,6 +14,7 @@ import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { getAllPromotionalOffers } from '../../store/actions/promotionalOfferActions';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -87,14 +88,14 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
                 data: 'email',
                 title: 'Contact Information',
                 render: function (data, type, row) {
-         
+                    const formattedPhone = row.mobile ? formatPhoneDisplay(row.mobile) : 'N/A';
                     return `
                         <div class="d-inline-block align-middle">
                             <h6 class="m-b-5">${row.email || 'N/A'}</h6>
                             <p class="m-b-0">
                                 <span class="badge badge-success">
                                     <i class="feather icon-phone mr-1"></i>
-                                    ${row.mobile || 'N/A'}
+                                    ${formattedPhone}
                                 </span>
                             </p>
                             <p class="m-b-0 text-muted small">UEN: ${row.uen || 'N/A'}</p>

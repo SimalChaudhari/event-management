@@ -802,47 +802,98 @@ export class AuthService {
       // Step 1: Process users (create/update)
       const userProcessingResult = await this.processUsersFromCsv(csvData);
       
-      // Step 2: Send emails using professional batch service
-      let emailResult = null;
+      // Step 2: Send emails in BACKGROUND (don't wait for them)
+      let emailsToSendCount = 0;
       if (csvUploadConfig.isEmailSendingEnabled() && userProcessingResult.emailsToSend.length > 0) {
-        console.log(`📧 Starting professional email batch processing for ${userProcessingResult.emailsToSend.length} emails...`);
+        emailsToSendCount = userProcessingResult.emailsToSend.length;
+        console.log(`📧 Scheduling ${emailsToSendCount} emails to be sent in background...`);
         
         // Get email configuration based on provider
         const emailConfig = csvUploadConfig.getEmailBatchConfig();
-        console.log(`📧 Using ${csvUploadConfig.getConfig().emailProvider} configuration:`, emailConfig);
         
-        // Start professional email sending
-        emailResult = await this.emailBatchService.sendEmailsInBatches(
+        // Send emails asynchronously in background (NO AWAIT - don't wait for completion)
+        this.sendEmailsInBackground(
           userProcessingResult.emailsToSend,
           sessionId,
           emailConfig
-        );
+        ).then(() => {
+          console.log(`✅ Background email sending completed for session ${sessionId}`);
+        }).catch((error) => {
+          console.error(`❌ Background email sending failed for session ${sessionId}:`, error);
+        });
         
-        console.log(`🎉 PROFESSIONAL EMAIL BATCH COMPLETED: ${emailResult.message}`);
+        console.log(`✅ Emails scheduled for background processing, continuing with response...`);
       }
 
       const processingTime = Date.now() - startTime;
       const existingUsersSkipped = userProcessingResult.existingUsersCount - userProcessingResult.usersToUpdate.length;
 
-      console.log(`✅ PROFESSIONAL CSV UPLOAD COMPLETED: ${processingTime}ms - ${userProcessingResult.newUsersCreated} created, ${userProcessingResult.usersToUpdate.length} updated`);
+      // ==========================================
+      // 📊 COMPLETE UPLOAD SUMMARY LOGS
+      // ==========================================
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`📊 CSV UPLOAD COMPLETE SUMMARY - Session: ${sessionId}`);
+      console.log(`${'='.repeat(80)}`);
+      console.log(`⏱️  Processing Time: ${processingTime}ms (${(processingTime/1000).toFixed(2)}s)`);
+      console.log(`📁 File: ${fileName}`);
+      console.log(`📝 Total Records in CSV: ${csvData.length}`);
+      console.log(`\n--- USER CREATION STATISTICS ---`);
+      console.log(`✅ New Users Created: ${userProcessingResult.newUsersCreated}`);
+      console.log(`🔄 Existing Users Updated: ${userProcessingResult.usersToUpdate.length}`);
+      console.log(`⏭️  Existing Users Skipped: ${existingUsersSkipped}`);
+      console.log(`🔐 Passwords Generated: ${userProcessingResult.passwordsGenerated}`);
+      console.log(`\n--- EMAIL STATISTICS ---`);
+      console.log(`📧 Total Emails to Send: ${emailsToSendCount}`);
+      console.log(`📮 Email Status: ${emailsToSendCount > 0 ? 'Sending in Background' : 'Disabled'}`);
+      if (userProcessingResult.skippedUsers.length > 0) {
+        console.log(`\n--- SKIPPED USERS ---`);
+        userProcessingResult.skippedUsers.forEach(skipped => {
+          console.log(`  ⚠️  ${skipped}`);
+        });
+      }
+      console.log(`${'='.repeat(80)}\n`);
 
-      // Prepare final response
+      // Update CSV upload log entry with user creation completion
+      // Status: 'users_created' if emails pending, 'completed' if no emails to send
+      const uploadStatus = emailsToSendCount > 0 ? 'processing' : 'completed';
+      
+      await this.csvUploadLogService.updateLogEntry(sessionId, {
+        status: uploadStatus,
+        recordsProcessed: csvData.length,
+        newUsersCreated: userProcessingResult.newUsersCreated,
+        existingUsersUpdated: userProcessingResult.usersToUpdate.length,
+        recordsSkipped: existingUsersSkipped,
+        passwordsGenerated: userProcessingResult.passwordsGenerated,
+        emailsTotal: emailsToSendCount,
+        emailsPending: emailsToSendCount,
+        emailsSent: 0, // Will be updated by background process
+        emailsFailed: 0,
+        processingTimeMs: processingTime,
+        skippedRecords: userProcessingResult.skippedUsers,
+        summary: emailsToSendCount > 0 
+          ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (processing in background)` 
+          : `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | No emails to send`
+      });
+
+      console.log(`📊 Status: ${uploadStatus} ${emailsToSendCount > 0 ? '(Emails sending in background)' : '(Complete)'}\n`);
+
+      // Prepare final response - return immediately without waiting for emails
       const response: CsvUploadResponseDto = {
-        message: `Professional CSV upload completed in ${processingTime}ms (${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated${emailResult ? ', emails processed' : ', emails disabled'})`,
+        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} credential emails are being sent in background.` : ''}`,
         totalProcessed: csvData.length.toString(),
         newUsersCreated: userProcessingResult.newUsersCreated.toString(),
         existingUsersSkipped: existingUsersSkipped.toString(),
         passwordsGenerated: userProcessingResult.passwordsGenerated.toString(),
-        emailsSent: emailResult ? emailResult.emailsSent.toString() : '0',
-        emailsFailed: emailResult ? emailResult.emailsFailed.toString() : '0',
-        details: `Professional processing: ${processingTime}ms`,
+        emailsSent: '0', // Emails are being sent in background
+        emailsFailed: '0',
+        details: `Processing time: ${processingTime}ms`,
         skippedUsers: userProcessingResult.skippedUsers,
-        emailStatus: emailResult ? {
-          totalEmails: emailResult.totalEmails,
-          emailsSent: emailResult.emailsSent,
-          emailsFailed: emailResult.emailsFailed,
-          emailsProcessing: 0,
-          status: emailResult.success ? 'completed' : 'completed'
+        emailStatus: emailsToSendCount > 0 ? {
+          totalEmails: emailsToSendCount,
+          emailsSent: 0,
+          emailsFailed: 0,
+          emailsProcessing: emailsToSendCount,
+          status: 'background_processing'
         } : {
           totalEmails: 0,
           emailsSent: 0,
@@ -858,6 +909,66 @@ export class AuthService {
     } catch (error) {
       console.error('❌ Professional CSV upload failed:', error);
       throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Send emails in background without blocking the response
+   */
+  private async sendEmailsInBackground(
+    emailsToSend: UserCredentialsData[],
+    sessionId: string,
+    emailConfig: any
+  ): Promise<void> {
+    try {
+      console.log(`📧 Starting email batch processing for ${emailsToSend.length} emails...`);
+      
+      const emailResult = await this.emailBatchService.sendEmailsInBatches(
+        emailsToSend,
+        sessionId,
+        emailConfig
+      );
+      
+      console.log(`\n📧 Email Sending Complete - ${emailResult.emailsSent}/${emailResult.totalEmails} sent (${((emailResult.emailsSent / emailResult.totalEmails) * 100).toFixed(1)}% success)`);
+      
+      // Update CSV upload log entry with email completion status - NOW STATUS BECOMES 'COMPLETED'
+      const finalStatus = emailResult.success ? 'completed' : 'partial';
+      
+      await this.csvUploadLogService.updateLogEntry(sessionId, {
+        emailsSent: emailResult.emailsSent,
+        emailsFailed: emailResult.emailsFailed,
+        emailsPending: 0, // All emails processed
+        status: finalStatus, // NOW COMPLETED!
+        emailDetails: {
+          sent: emailResult.emailsSent,
+          failed: emailResult.emailsFailed,
+          retried: emailResult.emailsRetried || 0,
+          processingTimeMs: emailResult.processingTimeMs,
+          successRate: ((emailResult.emailsSent / emailResult.totalEmails) * 100).toFixed(1) + '%',
+          completedAt: new Date().toISOString()
+        }
+      });
+      
+      console.log(`🎉 Status: ${finalStatus.toUpperCase()} - Background processing finished\n`);
+      
+    } catch (error) {
+      console.error(`❌ Email sending failed:`, error instanceof Error ? error.message : error);
+      
+      // Update log entry with error status
+      try {
+        await this.csvUploadLogService.updateLogEntry(sessionId, {
+          status: 'failed',
+          emailsFailed: emailsToSend.length,
+          emailsPending: 0,
+          errorDetails: {
+            type: 'email_sending_failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            failedAt: new Date().toISOString()
+          }
+        });
+      } catch (updateError) {
+        console.error(`❌ Failed to update error status:`, updateError);
+      }
     }
   }
 
@@ -946,16 +1057,17 @@ export class AuthService {
       try {
         await this.userRepository.insert(usersToCreate);
         newUsersCreated = usersToCreate.length;
-      } catch (createError) {
-        console.error('❌ Bulk creation failed, using fallback');
+      } catch (createError: any) {
+        console.error('❌ Bulk creation failed, using fallback:', createError?.message);
+        
         // Fallback to individual creation
         for (const userData of usersToCreate) {
           try {
             const newUser = this.userRepository.create(userData);
             await this.userRepository.save(newUser);
             newUsersCreated++;
-          } catch (error) {
-            console.error(`Failed to create user ${userData.email}:`, error);
+          } catch (error: any) {
+            console.error(`❌ Failed to create user ${userData.email}:`, error?.message);
           }
         }
       }

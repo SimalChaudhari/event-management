@@ -3,6 +3,7 @@ import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createSpeaker, updateSpeaker, speakerById } from '../../store/actions/speakerActions';
+import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 
 const AddSpeakerPage = () => {
@@ -206,17 +207,12 @@ const AddSpeakerPage = () => {
 
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="mobile">
-                                                Mobile *
-                                            </label>
-                                            <input
-                                                type="tel"
-                                                className="form-control"
+                                            <SingaporePhoneInput
                                                 name="mobile"
                                                 value={formData.mobile}
                                                 onChange={handleInputChange}
-                                                placeholder="Enter mobile number"
-                                                required
+                                                label="Mobile"
+                                                required={true}
                                             />
                                         </div>
                                     </Col>

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { csvUploadConfig, CsvUploadConfig } from './csv-upload.config';
 import { CsvUserDto } from '../validation/auth.validation';
+import { SingaporePhoneUtils } from './singapore-phone.utils';
 
 export interface CsvProcessingResult {
   success: boolean;
@@ -261,12 +262,12 @@ export class CsvProcessorService {
       }
     }
 
-    // Validate mobile format (basic check)
+    // Validate mobile format using Singapore validation
     const mobileFieldIndex = Object.keys(fieldMappings).findIndex(header => fieldMappings[header] === 'mobile');
     if (mobileFieldIndex >= 0 && mobileFieldIndex < row.length) {
       const mobile = row[mobileFieldIndex].trim();
       if (mobile && !this.isValidMobile(mobile)) {
-        warnings.push(`Row ${rowNumber}: Mobile number '${mobile}' may be invalid`);
+        errors.push(`Row ${rowNumber}: Invalid Singapore mobile number '${mobile}'. Must be 8 digits starting with 8 or 9`);
       }
     }
 
@@ -351,7 +352,7 @@ export class CsvProcessorService {
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
-        mobile: userData.mobile
+        mobile: this.formatMobileForDatabase(userData.mobile)
       };
 
     } catch (error: any) {
@@ -369,12 +370,23 @@ export class CsvProcessorService {
   }
 
   /**
-   * Validate mobile format (basic check)
+   * Validate mobile format using Singapore phone validation
    */
   private isValidMobile(mobile: string): boolean {
-    // Basic mobile validation - at least 10 digits
-    const mobileRegex = /^\+?[\d\s\-\(\)]{10,}$/;
-    return mobileRegex.test(mobile);
+    // Use Singapore phone validation
+    return SingaporePhoneUtils.isValidSingaporePhone(mobile);
+  }
+
+  /**
+   * Format mobile number for database storage
+   */
+  private formatMobileForDatabase(mobile: string): string {
+    if (!mobile) return '';
+    try {
+      return SingaporePhoneUtils.formatPhoneForDatabase(mobile);
+    } catch {
+      return mobile; // Return original if formatting fails
+    }
   }
 
   /**

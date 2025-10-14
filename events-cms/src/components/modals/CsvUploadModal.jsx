@@ -6,6 +6,7 @@ import { Alert, ProgressBar, Table, Badge } from 'react-bootstrap';
 import { uploadCsvUsers, downloadSampleCsv } from '../../store/actions/userActions';
 import { useDispatch } from 'react-redux';
 import '../../styles/csv-upload.css';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
     const dispatch = useDispatch();
@@ -92,9 +93,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                 rowErrors.push('Invalid email format');
             }
 
-            // Validate mobile format
+            // Validate mobile format using Singapore validation
             if (row.mobile && !isValidMobile(row.mobile)) {
-                rowErrors.push('Invalid mobile format');
+                rowErrors.push('Invalid Singapore mobile number. Must be 8 digits starting with 8 or 9');
             }
 
             if (rowErrors.length === 0) {
@@ -122,8 +123,19 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
 
     // Mobile validation
     const isValidMobile = (mobile) => {
-        const mobileRegex = /^\+?[\d\s\-\(\)]{10,}$/;
-        return mobileRegex.test(mobile);
+        if (!mobile) return false;
+        
+        // Clean the phone number
+        const cleaned = mobile.replace(/\D/g, '');
+        let phoneDigits = cleaned;
+        
+        // Remove country code if present
+        if (cleaned.startsWith('65')) {
+            phoneDigits = cleaned.substring(2);
+        }
+        
+        // Check if 8 digits and starts with 8 or 9
+        return phoneDigits.length === 8 && (phoneDigits.startsWith('8') || phoneDigits.startsWith('9'));
     };
 
     const displayConfirmModal = (title, message, onConfirm) => {
@@ -388,6 +400,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                     <div className="alert alert-info">
                         <p className="mb-2">
                             <strong>Required Columns:</strong> firstName, lastName, email, mobile
+                        </p>
+                        <p className="mb-2">
+                            <strong>Mobile Format:</strong> Singapore mobile numbers (8 digits starting with 8 or 9)
                         </p>
                         <p className="mb-0">
                             <strong>File Size:</strong> Maximum 10MB
@@ -752,7 +767,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.firstName || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.lastName || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.email || <span className="text-muted">N/A</span>}</td>
-                                            <td style={{ padding: '12px' }} className="fw-medium">{row.mobile || <span className="text-muted">N/A</span>}</td>
+                                            <td style={{ padding: '12px' }} className="fw-medium">
+                                                {row.mobile ? formatPhoneDisplay(row.mobile) : <span className="text-muted">N/A</span>}
+                                            </td>
                                             <td style={{ padding: '12px' }} className="text-center">
                                                 {isValid ? (
                                                     <Badge 

@@ -210,23 +210,60 @@ const validationHelpers = {
     };
   },
 
-  // Format phone number
+  // Format phone number to Singapore format: +65-XXXX-XXXX
   formatPhoneNumber: (phoneNumber) => {
+    if (!phoneNumber) return '';
+    
     const cleaned = phoneNumber.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
-    if (match) {
-      return `(${match[1]}) ${match[2]}-${match[3]}`;
+    let phoneDigits = cleaned;
+    
+    // Remove country code if present
+    if (cleaned.startsWith('65')) {
+      phoneDigits = cleaned.substring(2);
     }
+    
+    // Format: +65-XXXX-XXXX
+    if (phoneDigits.length === 8) {
+      return `+65-${phoneDigits.substring(0, 4)}-${phoneDigits.substring(4, 8)}`;
+    }
+    
     return phoneNumber;
   },
 
-  // Validate and format phone number
+  // Validate and format Singapore phone number
   validateAndFormatPhone: (phoneNumber) => {
+    if (!phoneNumber) return '';
+    
     const cleaned = phoneNumber.replace(/\D/g, '');
-    if (cleaned.length === 10) {
-      return validationHelpers.formatPhoneNumber(cleaned);
+    let phoneDigits = cleaned;
+    
+    // Remove country code if present
+    if (cleaned.startsWith('65')) {
+      phoneDigits = cleaned.substring(2);
     }
+    
+    // Check if valid Singapore mobile (8 digits starting with 8 or 9)
+    if (phoneDigits.length === 8 && (phoneDigits.startsWith('8') || phoneDigits.startsWith('9'))) {
+      return validationHelpers.formatPhoneNumber(phoneNumber);
+    }
+    
     return phoneNumber;
+  },
+
+  // Validate Singapore phone number
+  isValidSingaporePhone: (phoneNumber) => {
+    if (!phoneNumber) return false;
+    
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    let phoneDigits = cleaned;
+    
+    // Remove country code if present
+    if (cleaned.startsWith('65')) {
+      phoneDigits = cleaned.substring(2);
+    }
+    
+    // Check if 8 digits and starts with 8 or 9
+    return phoneDigits.length === 8 && (phoneDigits.startsWith('8') || phoneDigits.startsWith('9'));
   }
 };
 

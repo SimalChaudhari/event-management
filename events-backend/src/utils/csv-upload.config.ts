@@ -86,7 +86,7 @@ export class CsvUploadConfigService {
     gmail: {
       batchSize: 15,
       delayBetweenEmails: 1000, // 1 second
-      delayBetweenBatches: 30000, // 30 seconds
+      delayBetweenBatches: 5000, // 5 seconds (changed from 30)
       retryDelay: 120000, // 2 minutes
       maxRetries: 1,
       enableProgressTracking: true
@@ -206,19 +206,19 @@ export class CsvUploadConfigService {
       return {
         ...baseConfig,
         batchSize: Math.min(baseConfig.batchSize, emailCount),
-        delayBetweenBatches: 10000 // 10 seconds for small batches
+        delayBetweenBatches: 5000 // 5 seconds for small batches
       };
     } else if (emailCount <= 200) {
       return {
         ...baseConfig,
         batchSize: Math.min(baseConfig.batchSize, 20),
-        delayBetweenBatches: 30000 // 30 seconds for medium batches
+        delayBetweenBatches: 5000 // 5 seconds for medium batches
       };
     } else {
       return {
         ...baseConfig,
         batchSize: Math.min(baseConfig.batchSize, 15),
-        delayBetweenBatches: 60000 // 60 seconds for large batches
+        delayBetweenBatches: 5000 // 5 seconds for large batches
       };
     }
   }

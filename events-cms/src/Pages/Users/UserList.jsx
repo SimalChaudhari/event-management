@@ -15,6 +15,7 @@ import CsvUploadModal from '../../components/modals/CsvUploadModal';
 import { useNavigate } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
 import UserFilterComponent from '../../components/common/UserFilterComponent';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -87,12 +88,13 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
                 data: 'mobile',
                 title: 'Mobile',
                 render: function (data, type, row) {
+                    const formattedPhone = row.mobile ? formatPhoneDisplay(row.mobile) : 'N/A';
                     return `
                         <div class="d-inline-block align-middle">
                               <p class="m-b-0">
                                 <span class="badge badge-success">
                                     <i class="feather icon-phone mr-1"></i>
-                                    ${row.mobile || 'N/A'}
+                                    ${formattedPhone}
                                 </span>
                             </p>
                         </div>

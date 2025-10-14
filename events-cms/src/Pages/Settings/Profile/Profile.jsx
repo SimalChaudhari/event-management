@@ -12,6 +12,8 @@ import { changePassword } from '../../../store/actions/authActions';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { toast } from 'react-toastify';
+import SingaporePhoneInput from '../../../components/SingaporePhoneInput';
+import { formatPhoneDisplay } from '../../../utils/phoneFormatter';
 
 const Profile = () => {
     const dispatch = useDispatch();
@@ -285,7 +287,7 @@ const Profile = () => {
                                         <div className="clearfix" />
                                         <a href={`tel:${user.mobile}`} className="mb-1 text-muted d-flex align-items-end text-h-primary">
                                             <i className="feather icon-phone mr-2 f-18" />
-                                            {user.mobile}
+                                            {formatPhoneDisplay(user.mobile)}
                                         </a>
                                     </Col>
                                     <Col>
@@ -498,7 +500,7 @@ const Profile = () => {
                                 >
                                     <Row className="form-group">
                                         <label className="col-sm-3 col-form-label font-weight-bolder">Mobile Number</label>
-                                        <Col sm={9}>{user.mobile}</Col>
+                                        <Col sm={9}>{formatPhoneDisplay(user.mobile)}</Col>
                                     </Row>
                                     <Row className="form-group">
                                         <label className="col-sm-3 col-form-label font-weight-bolder">Email Address</label>
@@ -519,12 +521,17 @@ const Profile = () => {
                                     <Row className="form-group">
                                         <label className="col-sm-3 col-form-label font-weight-bolder">Mobile Number</label>
                                         <Col sm={9}>
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                placeholder="Mobile Number"
-                                                defaultValue={user.mobile}
-                                                ref={mobileRef}
+                                            <SingaporePhoneInput
+                                                name="mobile"
+                                                value={mobileRef.current?.value || user.mobile || ''}
+                                                onChange={(e) => {
+                                                    if (mobileRef.current) {
+                                                        mobileRef.current.value = e.target.value;
+                                                    }
+                                                }}
+                                                placeholder="+65-XXXX-XXXX"
+                                                required={false}
+                                                showError={true}
                                             />
                                         </Col>
                                     </Row>

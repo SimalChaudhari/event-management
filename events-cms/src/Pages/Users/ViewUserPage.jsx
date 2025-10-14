@@ -6,6 +6,7 @@ import { userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
 import { USER_PATHS } from '../../utils/constants';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 const ViewUserPage = () => {
     const { id } = useParams();
@@ -228,7 +229,7 @@ const ViewUserPage = () => {
                             />
                             <InfoField 
                                 label="Mobile Number" 
-                                value={userData.mobile}
+                                value={formatPhoneDisplay(userData.mobile)}
                                 icon="feather icon-phone"
                             />
                         </InfoCard>

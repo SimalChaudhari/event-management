@@ -12,6 +12,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH, DUMMY_PATH_USER } from '../../configs/env';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -79,12 +80,13 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
                 data: 'mobile',
                 title: 'Mobile',
                 render: function (data, type, row) {
+                    const formattedPhone = row.mobile ? formatPhoneDisplay(row.mobile) : 'N/A';
                     return `
                         <div class="d-inline-block align-middle">
                               <p class="m-b-0">
                                 <span class="badge badge-success">
                                     <i class="feather icon-phone mr-1"></i>
-                                    ${row.mobile || 'N/A'}
+                                    ${formattedPhone}
                                 </span>
                             </p>
                         </div>

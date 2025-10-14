@@ -6,6 +6,7 @@ import { exhibitorById } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
+import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
@@ -825,7 +826,7 @@ const ViewExhibitorPage = () => {
                                 borderBottom: '1px solid #f1f1f1'
                             }}>
                                 <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Mobile:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.mobile}</span>
+                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{formatPhoneDisplay(exhibitor.mobile)}</span>
                             </div>
                             
                             <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{

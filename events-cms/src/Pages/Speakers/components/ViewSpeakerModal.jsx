@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Row, Col, Card, Container, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import { formatPhoneDisplay } from '../../../utils/phoneFormatter';
 
 const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
@@ -123,7 +124,7 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                                 <strong>Email:</strong> {speakerData.email || 'N/A'}
                                             </div>
                                             <div className="col-12 mb-2">
-                                                <strong>Mobile:</strong> {speakerData.mobile || 'N/A'}
+                                                <strong>Mobile:</strong> {formatPhoneDisplay(speakerData.mobile)}
                                             </div>
                                         </div>
                                     </Col>

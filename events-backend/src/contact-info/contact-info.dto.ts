@@ -6,8 +6,11 @@ import {
   IsBoolean, 
   IsDateString,
   Length,
-  IsPhoneNumber
+  IsPhoneNumber,
+  Matches
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { SingaporePhoneUtils } from '../utils/singapore-phone.utils';
 
 export class CreateContactInfoDto {
   @IsString()
@@ -23,7 +26,17 @@ export class CreateContactInfoDto {
 
   @IsOptional()
   @IsString()
-  @Length(10, 20)
+  @Transform(({ value }) => {
+    if (!value) return value;
+    try {
+      return SingaporePhoneUtils.formatPhoneForDatabase(value);
+    } catch {
+      return value;
+    }
+  })
+  @Matches(/^(\+?65)?[-\s]?[89]\d{7}$/, { 
+    message: 'Please provide a valid Singapore mobile number (8 digits starting with 8 or 9)' 
+  })
   phone?: string;
 
   @IsOptional()
@@ -49,7 +62,17 @@ export class UpdateContactInfoDto {
 
   @IsOptional()
   @IsString()
-  @Length(10, 20)
+  @Transform(({ value }) => {
+    if (!value) return value;
+    try {
+      return SingaporePhoneUtils.formatPhoneForDatabase(value);
+    } catch {
+      return value;
+    }
+  })
+  @Matches(/^(\+?65)?[-\s]?[89]\d{7}$/, { 
+    message: 'Please provide a valid Singapore mobile number (8 digits starting with 8 or 9)' 
+  })
   phone?: string;
 
   @IsOptional()
@@ -60,6 +83,10 @@ export class UpdateContactInfoDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isSyncedToPhone?: boolean;
 }
 
 export class StoreScannedContactDto {

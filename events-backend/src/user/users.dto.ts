@@ -9,9 +9,12 @@ import {
   IsEnum,
   MinLength,
   IsObject,
+  Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { AuthProvider, UserRole } from './users.entity';
 import { UserEntity } from './users.entity';
+import { SingaporePhoneUtils } from '../utils/singapore-phone.utils';
 
 
 export class UserDto {
@@ -38,7 +41,18 @@ export class UserDto {
 
   @IsOptional()
   @IsString()
-  mobile?: string; // Updated field
+  @Transform(({ value }) => {
+    if (!value) return value;
+    try {
+      return SingaporePhoneUtils.formatPhoneForDatabase(value);
+    } catch {
+      return value;
+    }
+  })
+  @Matches(/^(\+?65)?[-\s]?[89]\d{7}$/, { 
+    message: 'Please provide a valid Singapore mobile number (8 digits starting with 8 or 9)' 
+  })
+  mobile?: string; // Updated field - Singapore format: +6589532476 (database format)
 
   @IsOptional()
   @IsString()

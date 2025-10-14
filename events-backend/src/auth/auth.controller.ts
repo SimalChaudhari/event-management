@@ -390,6 +390,7 @@ export class AuthController {
           await this.authService.cleanupTempFile(file.path);
           
         } catch (parseError: any) {
+          console.error('❌ Failed to parse CSV file:', parseError);
           return response.status(HttpStatus.BAD_REQUEST).json({
             success: false,
             message: 'Failed to parse CSV file',
@@ -449,9 +450,12 @@ export class AuthController {
           emailsFailed: result.emailsFailed,
           details: result.details,
           skippedUsers: skippedUsers.length > 0 ? skippedUsers : undefined,
+          emailStatus: result.emailStatus,
+          sessionId: result.sessionId
         },
       });
     } catch (error: any) {
+      console.error('❌ Failed to process CSV upload:', error);
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
         message: error.message || 'Failed to process CSV upload',

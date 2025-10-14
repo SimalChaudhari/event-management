@@ -3,6 +3,7 @@ import { Modal, Button, Row, Col, Alert } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { createSpeaker, updateSpeaker } from '../../../store/actions/speakerActions';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import SingaporePhoneInput from '../../../components/SingaporePhoneInput';
 
 const AddSpeakerModal = ({ show, handleClose, editData }) => {
     const dispatch = useDispatch();
@@ -153,17 +154,12 @@ const AddSpeakerModal = ({ show, handleClose, editData }) => {
 
                         <Col sm={6}>
                             <div className="form-group fill">
-                                <label className="floating-label" htmlFor="mobile">
-                                    Mobile *
-                                </label>
-                                <input
-                                    type="tel"
-                                    className="form-control"
+                                <SingaporePhoneInput
                                     name="mobile"
                                     value={formData.mobile}
                                     onChange={handleInputChange}
-                                    placeholder="Enter mobile number"
-                                    required
+                                    label="Mobile"
+                                    required={true}
                                 />
                             </div>
                         </Col>
