@@ -204,17 +204,6 @@ const BannerManagement = () => {
         </Col>
     );
 
-    if (loading) {
-        return (
-            <div className="text-center py-5">
-                <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mt-3">Loading banners...</p>
-            </div>
-        );
-    }
-
     return (
         <div style={{ background: '#fff', borderRadius: 10, padding: 24 }}>
             {error && (
@@ -241,7 +230,7 @@ const BannerManagement = () => {
                         </div>
                     </div>
                 </Card.Header>
-                <Card.Body className="p-4">
+                <Card.Body className="p-4"> 
                     <Row className="g-4">
                         {/* Banner Type Selection */}
                         <Col lg={4}>

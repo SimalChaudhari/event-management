@@ -321,4 +321,41 @@ export class OAuthAuthService {
     const redirectUrl = `${this.salesforceConfig.mobileRedirectUri}?${params.toString()}`;
     return redirectUrl;
   }
+
+  /**
+   * Revoke Salesforce access token (SSO logout)
+   * This logs the user out from Salesforce SSO
+   */
+  async revokeSalesforceToken(accessToken: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      const revokeUrl = `${this.salesforceConfig.instanceUrl}/services/oauth2/revoke`;
+      
+      await axios.post(
+        revokeUrl,
+        new URLSearchParams({
+          token: accessToken,
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+
+      return {
+        success: true,
+        message: 'SSO session revoked successfully',
+      };
+    } catch (error: any) {
+      console.error('Failed to revoke Salesforce token:', error.response?.data || error.message);
+      // Don't throw error - even if revocation fails, we want to continue with local logout
+      return {
+        success: false,
+        message: 'Failed to revoke SSO session, but local logout will proceed',
+      };
+    }
+  }
 }

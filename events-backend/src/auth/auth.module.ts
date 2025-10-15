@@ -14,6 +14,7 @@ import { CsvUploadLogModule } from '../logs/csv-upload-log.module';
 import { EmailBatchService } from '../utils/email-batch.service';
 import { CsvProcessorService } from '../utils/csv-processor.service';
 import { SSOModule } from './sso.module';
+import { OAuthAuthService } from './oauth-auth.service';
 
 
 dotenv.config(); // Load environment variables
@@ -27,7 +28,23 @@ dotenv.config(); // Load environment variables
     CsvUploadLogModule,
     SSOModule, // Import SSOModule to get OAuthAuthService
   ],
-  providers: [AuthService, EmailService, AddressService, ErrorHandlerService, EmailBatchService, CsvProcessorService],
+  providers: [
+    AuthService, 
+    EmailService, 
+    AddressService, 
+    ErrorHandlerService, 
+    EmailBatchService, 
+    CsvProcessorService,
+    // Factory provider to inject OAuthAuthService into AuthService after both are created
+    {
+      provide: 'AUTH_SERVICE_INITIALIZER',
+      useFactory: (authService: AuthService, oauthAuthService: OAuthAuthService) => {
+        authService.setOAuthAuthService(oauthAuthService);
+        return authService;
+      },
+      inject: [AuthService, OAuthAuthService],
+    },
+  ],
   controllers: [AuthController],
   exports: [AuthService],
 })

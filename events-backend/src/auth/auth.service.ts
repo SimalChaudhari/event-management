@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
   Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -34,6 +35,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
+  private oauthAuthService: any; // Will be injected via setter to avoid circular dependency
+
   constructor(
     @InjectRepository(UserEntity)
     public userRepository: Repository<UserEntity>,
@@ -46,6 +49,11 @@ export class AuthService {
     private readonly emailBatchService: EmailBatchService,
     private readonly csvProcessorService: CsvProcessorService,
   ) {}
+
+  // Setter for OAuthAuthService to avoid circular dependency
+  setOAuthAuthService(oauthAuthService: any) {
+    this.oauthAuthService = oauthAuthService;
+  }
 
   private handleError(error: any): never {
     if (
@@ -508,6 +516,30 @@ export class AuthService {
         throw new BadRequestException('User not found');
       }
 
+      // 🔄 AUTO SSO LOGOUT: If user logged in via OAuth/SSO, revoke their Salesforce token
+      if (user.authProvider === AuthProvider.OAUTH && user.socialAccessToken) {
+        console.log(`🔐 SSO User detected - Revoking Salesforce token for: ${user.email}`);
+        
+        try {
+          if (this.oauthAuthService) {
+            const revokeResult = await this.oauthAuthService.revokeSalesforceToken(user.socialAccessToken);
+            
+            if (revokeResult.success) {
+              console.log(`✅ SSO token revoked successfully for: ${user.email}`);
+            } else {
+              console.log(`⚠️ SSO token revocation failed for: ${user.email}, proceeding with local logout`);
+            }
+          }
+          
+          // Clear SSO tokens from database
+          user.socialAccessToken = null as any;
+          user.socialRefreshToken = null as any;
+        } catch (ssoError) {
+          console.error('SSO logout error:', ssoError);
+          // Don't fail the entire logout if SSO revocation fails
+        }
+      }
+
       // Extract token info to get expiration time
       const decodedToken = this.jwtService.decode(token);
       if (decodedToken && typeof decodedToken === 'object') {
@@ -559,9 +591,13 @@ export class AuthService {
       user.refreshToken = null as any;
       await this.userRepository.save(user);
 
+      const logoutMessage = user.authProvider === AuthProvider.OAUTH 
+        ? 'Logged out successfully from both app and SSO'
+        : 'Logged out successfully';
+
       return {
         success: true,
-        message: 'Logged out successfully',
+        message: logoutMessage,
       };
     } catch (error) {
       this.handleError(error);
