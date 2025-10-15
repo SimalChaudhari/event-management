@@ -178,6 +178,45 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Speaking Time */}
+                        {(speaker.speakingStartTime || speaker.speakingEndTime) && (
+                            <div className="mb-3">
+                                <div className="d-flex align-items-center mb-2">
+                                    <i className="fas fa-clock text-primary" style={{ marginRight: '8px', flexShrink: 0 }}></i>
+                                    <span className="fw-bold text-dark fs-6" style={{ flexShrink: 0 }}>Speaking Time:</span>
+                                </div>
+                                <div style={{ marginLeft: '24px' }}>
+                                    <div className="d-flex align-items-center flex-wrap gap-2">
+                                        {speaker.speakingStartTime && (
+                                            <div className="badge bg-light text-dark border" style={{ 
+                                                fontSize: '13px',
+                                                fontWeight: '500',
+                                                padding: '6px 12px',
+                                                borderRadius: '8px'
+                                            }}>
+                                                <i className="fas fa-play-circle text-success me-1"></i>
+                                                {speaker.speakingStartTime}
+                                            </div>
+                                        )}
+                                        {speaker.speakingStartTime && speaker.speakingEndTime && (
+                                            <span className="text-muted">→</span>
+                                        )}
+                                        {speaker.speakingEndTime && (
+                                            <div className="badge bg-light text-dark border" style={{ 
+                                                fontSize: '13px',
+                                                fontWeight: '500',
+                                                padding: '6px 12px',
+                                                borderRadius: '8px'
+                                            }}>
+                                                <i className="fas fa-stop-circle text-danger me-1"></i>
+                                                {speaker.speakingEndTime}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Description Section with View More Button */}
@@ -229,10 +268,17 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
         </div>
     );
 
+    // Sort speakers alphabetically by name
+    const sortedSpeakers = [...speakers].sort((a, b) => {
+        const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+        const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+
     return (
         <div className="speakers-section p-md-2">
             <div className="row g-4">
-                {speakers.map(renderSpeakerCard)}
+                {sortedSpeakers.map(renderSpeakerCard)}
             </div>
         </div>
     );
