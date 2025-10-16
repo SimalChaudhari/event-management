@@ -106,6 +106,12 @@ export class TabVisibilityFilterUtil {
       filteredEvent.programmeTracks = [];
     }
 
+    // Remove engagement data if engagement tab is disabled
+    if (event.tabVisibility.engagement === false) {
+      console.log('🚫 Removing engagement data for event:', event.id);
+      filteredEvent.programmeTracks = [];
+    }
+
     // Remove categories if categories tab is disabled
     if (event.tabVisibility.categories === false) {
       console.log('🚫 Removing categories for event:', event.id);

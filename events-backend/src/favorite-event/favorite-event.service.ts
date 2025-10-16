@@ -13,6 +13,7 @@ import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils } from '../utils/agenda.utils';
+import { Engagement } from '../engagement/engagement.entity';
 
 @Injectable()
 export class FavoriteEventService {
@@ -27,6 +28,8 @@ export class FavoriteEventService {
     private registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(EventAgenda)
     private agendaRepository: Repository<EventAgenda>,
+    @InjectRepository(Engagement)
+    private engagementRepository: Repository<Engagement>,
 
     private readonly surveyUtils: SurveyUtils,
   ) {}
@@ -214,16 +217,11 @@ export class FavoriteEventService {
         // Extract categories
         const categories = category?.map((ec) => ec.category) || [];
 
-        // Format programme tracks with basic speaker info
-        const formattedProgrammeTracks = favorite.event?.programmeTracks?.map(track => ({
-          ...track,
-          sessions: track.sessions?.map(session => ({
-            ...session,
-            speakers: session.speakers?.map((speaker: any) => 
-              UserUtils.getBasicSpeakerInfo(speaker)
-            ) || []
-          })) || []
-        })) || [];
+        // Format programme tracks with basic speaker info using utility
+        const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(favorite.event?.programmeTracks || []);
+
+        // Get engagements for this event
+        const engagements = await UserUtils.getEngagementsByEventId(favorite.eventId, this.eventRepository, this.engagementRepository);
 
         return {
           id: favorite.id,
@@ -240,6 +238,7 @@ export class FavoriteEventService {
               })) || [],
             categories: categories,
             programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
+            engagements: engagements,
             eventStamps: {
               description: favorite.event.eventStampDescription,
               images: favorite.event.eventStampImages,
@@ -280,4 +279,5 @@ export class FavoriteEventService {
     });
     return count;
   }
+
 }

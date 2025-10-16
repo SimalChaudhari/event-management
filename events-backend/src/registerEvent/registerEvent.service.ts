@@ -28,6 +28,7 @@ import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
 import { AdminInfo } from './admin-info.entity';
+import { Engagement } from '../engagement/engagement.entity';
 
 @Injectable()
 export class RegisterEventService {
@@ -49,6 +50,9 @@ export class RegisterEventService {
 
     @InjectRepository(AdminInfo)
     private readonly adminInfoRepository: Repository<AdminInfo>,
+
+    @InjectRepository(Engagement)
+    private readonly engagementRepository: Repository<Engagement>,
 
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
@@ -285,16 +289,13 @@ export class RegisterEventService {
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
-          // Format programme tracks with basic speaker info
-          const formattedProgrammeTracks = registerEvent.event?.programmeTracks?.map(track => ({
-            ...track,
-            sessions: track.sessions?.map(session => ({
-              ...session,
-              speakers: session.speakers?.map((speaker: any) => 
-                UserUtils.getBasicSpeakerInfo(speaker)
-              ) || []
-            })) || []
-          })) || [];
+          // Format programme tracks with basic speaker info using utility
+          const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
+
+          // Get engagements for this event
+          const engagements = registerEvent.eventId 
+            ? await UserUtils.getEngagementsByEventId(registerEvent.eventId, this.eventRepository, this.engagementRepository) 
+            : [];
 
           const {
             eventSpeakers,
@@ -316,6 +317,7 @@ export class RegisterEventService {
             speakers,
             categories,
             documents: formattedDocuments,
+            engagements: engagements,
             programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
 
             eventStamps: {
@@ -517,16 +519,13 @@ export class RegisterEventService {
             };
           }) || [];
 
-      // Format programme tracks with basic speaker info
-      const formattedProgrammeTracks = registerEvent.event?.programmeTracks?.map(track => ({
-        ...track,
-        sessions: track.sessions?.map(session => ({
-          ...session,
-          speakers: session.speakers?.map((speaker: any) => 
-            UserUtils.getBasicSpeakerInfo(speaker)
-          ) || []
-        })) || []
-      })) || [];
+      // Format programme tracks with basic speaker info using utility
+      const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
+
+      // Get engagements for this event
+      const engagements = registerEvent.eventId 
+        ? await UserUtils.getEngagementsByEventId(registerEvent.eventId, this.eventRepository, this.engagementRepository) 
+        : [];
 
       // Clean up event object
       const {
@@ -550,6 +549,7 @@ export class RegisterEventService {
         categories,
         documents: formattedDocuments,
         programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
+        engagements: engagements,
         eventStamps: {
           description: registerEvent.event?.eventStampDescription,
           images: registerEvent.event?.eventStampImages,
@@ -711,4 +711,5 @@ export class RegisterEventService {
       this.errorHandler.handleDatabaseError(error, 'Register Event deletion');
     }
   }
+
 }

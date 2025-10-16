@@ -255,4 +255,111 @@ export class UserUtils {
         return this.getBasicSpeakerInfo(user);
     }
   }
+
+  /**
+   * Format programme tracks with basic speaker information
+   * @param programmeTracks Programme tracks array with sessions and speakers
+   * @returns Formatted programme tracks with sanitized speaker data
+   */
+  static formatProgrammeTracks(programmeTracks: any[]): any[] {
+    if (!programmeTracks || !Array.isArray(programmeTracks)) {
+      return [];
+    }
+
+    return programmeTracks.map(track => ({
+      ...track,
+      sessions: track.sessions?.map((session: any) => ({
+        ...session,
+        speakers: session.speakers?.map((speaker: any) => 
+          this.getBasicSpeakerInfo(speaker)
+        ) || []
+      })) || []
+    }));
+  }
+
+  /**
+   * Format engagements with minimal essential data
+   * @param engagements Engagements array with track relations
+   * @returns Formatted engagements with only required fields
+   */
+  static formatEngagements(engagements: any[]): any[] {
+    if (!engagements || !Array.isArray(engagements)) {
+      return [];
+    }
+
+    return engagements.map(engagement => ({
+      id: engagement.id,
+      trackId: engagement.trackId,
+      
+      // Event info
+      event: {
+        id: engagement.track?.event?.id,
+        name: engagement.track?.event?.name,
+        startDate: engagement.track?.event?.startDate,
+        endDate: engagement.track?.event?.endDate,
+        startTime: engagement.track?.event?.startTime,
+        endTime: engagement.track?.event?.endTime,
+      },
+      
+      // Track info
+      programmeTrack: {
+        id: engagement.track?.id,
+        title: engagement.track?.title,
+      },
+      
+      // Sessions with speakers
+      sessions: engagement.track?.sessions?.map((session: any) => ({
+        title: session.title,
+        startDate: session.startDate,
+        startTime: session.startTime,
+        endDate: session.endDate,
+        endTime: session.endTime,
+        speakers: session.speakers?.map((speaker: any) => ({
+          name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim() || 'Unknown Speaker',
+          startTime: session.startTime,
+          endTime: session.endTime
+        })) || []
+      })) || []
+    }));
+  }
+
+  /**
+   * Get engagements for an event by fetching all engagements linked to event's programme tracks
+   * @param eventId Event ID
+   * @param eventRepository Event repository instance
+   * @param engagementRepository Engagement repository instance
+   * @returns Formatted engagements array
+   */
+  static async getEngagementsByEventId(
+    eventId: string,
+    eventRepository: any,
+    engagementRepository: any
+  ): Promise<any[]> {
+    try {
+      // Get all programme tracks for this event
+      const event = await eventRepository.findOne({
+        where: { id: eventId },
+        relations: ['programmeTracks'],
+      });
+
+      if (!event || !event.programmeTracks || event.programmeTracks.length === 0) {
+        return [];
+      }
+
+      // Get all track IDs
+      const trackIds = event.programmeTracks.map((track: any) => track.id);
+
+      // Fetch all engagements for these tracks
+      const engagements = await engagementRepository.find({
+        where: trackIds.map((trackId: string) => ({ trackId, isActive: true })),
+        relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
+      });
+
+      // Format and return engagements
+      return this.formatEngagements(engagements);
+    } catch (error) {
+      console.error(`Error fetching engagements for event ${eventId}:`, error);
+      return [];
+    }
+  }
 }

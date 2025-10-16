@@ -38,6 +38,7 @@ import { OrderModule } from './order/order.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { CsvUploadLogModule } from './logs/csv-upload-log.module';
 import { ProgrammeModule } from './programme/programme.module';
+import { EngagementModule } from './engagement/engagement.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { ProgrammeModule } from './programme/programme.module';
     ChatModule, AttendanceModule, ContactInfoModule, OrderModule, CheckoutModule,
     CsvUploadLogModule,
     ProgrammeModule,
+    EngagementModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

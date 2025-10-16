@@ -180,6 +180,7 @@ export class EventController {
       categories?: boolean;
       agenda?: boolean;
       adminInfo?: boolean;
+      engagement?: boolean;
     },
     @Res() response: Response,
   ) {

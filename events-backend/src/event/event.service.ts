@@ -17,6 +17,7 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { Survey } from '../survey/survey.entity';
+import { Engagement } from '../engagement/engagement.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
   ResourceNotFoundException,
@@ -64,6 +65,8 @@ export class EventService {
     private surveyRepository: Repository<Survey>,
     @InjectRepository(EventAgenda)
     private eventAgendaRepository: Repository<EventAgenda>,
+    @InjectRepository(Engagement)
+    private engagementRepository: Repository<Engagement>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
@@ -357,17 +360,11 @@ export class EventService {
           const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
           
 
-          // Format programme tracks with basic speaker info
-          const formattedProgrammeTracks = event?.programmeTracks?.map(track => ({
-            ...track,
-            sessions: track.sessions?.map(session => ({
-              ...session,
-              speakers: session.speakers?.map((speaker: any) => 
-                UserUtils.getBasicSpeakerInfo(speaker)
-              ) || []
-            })) || []
-          })) || [];
+          // Format programme tracks with basic speaker info using utility
+          const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
          
+          // Get engagements for this event
+          const engagements = await UserUtils.getEngagementsByEventId(event.id, this.eventRepository, this.engagementRepository);
 
           // Build the complete event object
           const completeEvent = {
@@ -387,6 +384,7 @@ export class EventService {
             speakersData: speakers,
             categoriesData: category?.map((ec) => ec.category) || [],
             programmeTracks: formattedProgrammeTracks,
+            engagements: engagements,
 
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
@@ -610,16 +608,11 @@ export class EventService {
         ...eventFilteredData
       } = eventData;
 
-      // Format programme tracks with basic speaker info
-      const formattedProgrammeTracks = event?.programmeTracks?.map(track => ({
-        ...track,
-        sessions: track.sessions?.map(session => ({
-          ...session,
-          speakers: session.speakers?.map((speaker: any) => 
-            UserUtils.getBasicSpeakerInfo(speaker)
-          ) || []
-        })) || []
-      })) || [];
+      // Format programme tracks with basic speaker info using utility
+      const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
+
+      // Get engagements for this event
+      const engagements = await UserUtils.getEngagementsByEventId(id, this.eventRepository, this.engagementRepository);
 
       const eventResponse = {
         ...eventFilteredData,
@@ -651,6 +644,7 @@ export class EventService {
         isRegistered: isRegistered,
         registerEventId: registerEventId,
         programmeTracks: formattedProgrammeTracks,
+        engagements: engagements,
       };
 
       // Add Q&A data for admin users
@@ -831,6 +825,7 @@ export class EventService {
       exhibitors?: boolean;
       categories?: boolean;
       documents?: boolean;
+      engagement?: boolean;
     },
   ): Promise<Partial<Event>> {
     try {

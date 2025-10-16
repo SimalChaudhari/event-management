@@ -26,6 +26,7 @@ import { NotificationUtil } from '../utils/notification.util';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 import { ProgrammeModule } from '../programme/programme.module';
+import { Engagement } from '../engagement/engagement.entity';
 
 @Module({
     imports: [
@@ -45,6 +46,7 @@ import { ProgrammeModule } from '../programme/programme.module';
         Survey,
         SurveySession,
         EventNotification,
+        Engagement,
         EventNotificationRead,
         PushNotification,
         UserPermissions,

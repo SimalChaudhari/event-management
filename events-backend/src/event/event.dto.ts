@@ -156,6 +156,7 @@ export class EventDto {
     categories?: boolean;
     agenda?: boolean;
     adminInfo?: boolean;
+    engagement?: boolean;
   };
 
   originalImages: any;

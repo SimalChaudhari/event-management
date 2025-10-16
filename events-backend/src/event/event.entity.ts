@@ -178,6 +178,7 @@ export class Event {
     categories?: boolean;
     agenda?: boolean;
     adminInfo?: boolean;
+    engagement?: boolean;
     programme?: boolean;
   };
 
