@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { Row, Col, Card, Dropdown, Carousel } from 'react-bootstrap';
+import { Row, Col, Card, Dropdown } from 'react-bootstrap';
 import DEMO from '../../../store/constant';
-import avatar5 from '../../../assets/images/user/avatar-5.jpg';
+import avatar from '../../../assets/images/user/default.jpg';
 import { API_URL } from '../../../configs/env';
 import { useSelector, useDispatch } from 'react-redux';
-import { editUser } from '../../../store/actions/userActions';
+import { editUser, removeProfilePicture } from '../../../store/actions/userActions';
 import { AUTH_DATA } from '../../../store/constants/actionTypes';
 import { useLocation } from 'react-router-dom';
 import { changePassword } from '../../../store/actions/authActions';
@@ -14,6 +14,7 @@ import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import SingaporePhoneInput from '../../../components/SingaporePhoneInput';
 import { formatPhoneDisplay } from '../../../utils/phoneFormatter';
+import RemoveProfilePictureModal from './RemoveProfilePictureModal';
 
 const Profile = () => {
     const dispatch = useDispatch();
@@ -41,13 +42,16 @@ const Profile = () => {
         isPasswordEdit: false
     });
 
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const profileTabClass = 'nav-link text-reset';
     const profileTabActiveClass = 'nav-link text-reset active';
     const profilePanClass = 'tab-pane fade';
     const profilePanActiveClass = 'tab-pane fade show active';
 
     const fullName = `${user.firstName} ${user.lastName}`;
-    const profilePicPath = user.profilePicture ? `${API_URL}/${user.profilePicture}` : avatar5;
+    const profilePicPath = user.profilePicture ? `${API_URL}/${user.profilePicture}` : avatar;
 
     const location = useLocation();
 
@@ -169,12 +173,55 @@ const Profile = () => {
     const handleFileChange = async (event) => {
         const file = event.target.files[0];
         if (file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                toast.error('Only image files (JPEG, PNG, GIF) are allowed');
+                return;
+            }
+
+            // Validate file size (5MB)
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) {
+                toast.error('File size must be less than 5MB');
+                return;
+            }
+
             const formData = new FormData();
             formData.append('profilePicture', file);
             const success = await dispatch(editUser(user.id, formData));
             if (success) {
                 updateUserState({ profilePicture: success.data.profilePicture });
             }
+        }
+        // Reset the file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveProfilePictureClick = () => {
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmRemoveProfilePicture = async () => {
+        setIsDeleting(true);
+        try {
+            const success = await dispatch(removeProfilePicture());
+            if (success) {
+                updateUserState({ profilePicture: '' });
+                setShowDeleteModal(false);
+            }
+        } catch (error) {
+            console.error('Remove profile picture failed:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleCloseDeleteModal = () => {
+        if (!isDeleting) {
+            setShowDeleteModal(false);
         }
     };
 
@@ -196,6 +243,13 @@ const Profile = () => {
 
     return (
         <>
+            <RemoveProfilePictureModal 
+                show={showDeleteModal} 
+                onHide={handleCloseDeleteModal} 
+                onConfirm={handleConfirmRemoveProfilePicture}
+                isLoading={isDeleting}
+            />
+            
             <div className="user-profile user-card mb-4">
                 <Card.Header className="border-0 p-0 pb-0 pt-10">
                     <div className="cover-img-block">
@@ -206,11 +260,15 @@ const Profile = () => {
                                     <i className="feather icon-camera" />
                                 </Dropdown.Toggle>
                                 <Dropdown.Menu>
-                                    <Dropdown.Item href={DEMO.BLANK_LINK}>
+                                    <Dropdown.Item onClick={handleUploadClick}>
                                         <i className="feather icon-upload-cloud mr-2" />
                                         upload new
                                     </Dropdown.Item>
-                                    <Dropdown.Item href={DEMO.BLANK_LINK}>
+                                    <Dropdown.Item 
+                                        onClick={handleRemoveProfilePictureClick}
+                                        disabled={!user.profilePicture}
+                                        className={!user.profilePicture ? 'text-muted' : ''}
+                                    >
                                         <i className="feather icon-trash-2 mr-2" />
                                         remove
                                     </Dropdown.Item>
@@ -246,7 +304,11 @@ const Profile = () => {
                                                 upload new
                                             </Dropdown.Item>
 
-                                            <Dropdown.Item href={DEMO.BLANK_LINK}>
+                                            <Dropdown.Item 
+                                                onClick={handleRemoveProfilePictureClick}
+                                                disabled={!user.profilePicture}
+                                                className={!user.profilePicture ? 'text-muted' : ''}
+                                            >
                                                 <i className="feather icon-trash-2 mr-2" />
                                                 remove
                                             </Dropdown.Item>

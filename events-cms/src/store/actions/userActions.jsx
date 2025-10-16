@@ -78,9 +78,25 @@ export const editUser = (id, userData) => async (dispatch) => {
             payload: response.data?.data
         });
         toast.success('User updated successfully');
-        return true;
+        return response?.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update user';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+export const removeProfilePicture = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete('/users/profile/picture');
+        dispatch({
+            type: UPDATE_USER,
+            payload: response.data?.data
+        });
+        toast.success('Profile picture removed successfully');
+        return response?.data;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to remove profile picture';
         toast.error(errorMessage);
         return false;
     }

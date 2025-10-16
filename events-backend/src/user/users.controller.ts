@@ -504,6 +504,52 @@ export class UserController {
     }
   }
 
+  // Remove current user's profile picture
+  @Delete('profile/picture')
+  @UseGuards(JwtAuthGuard)
+  async removeCurrentUserProfilePicture(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      // Get existing user first
+      const existingUser = await this.userService.getById(userId);
+
+      // Delete profile picture file if it exists
+      if (existingUser.profilePicture) {
+        const oldPath = path.join(__dirname, '..', '..', existingUser.profilePicture);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+
+      // Update user with empty profile picture
+      const result = await this.userService.update(userId, { profilePicture: '' });
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Profile picture removed successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Profile picture removal', req.user?.id);
+      throw error;
+    }
+  }
+
   // Role Switch Endpoint
   /**
    * Switch user role directly
