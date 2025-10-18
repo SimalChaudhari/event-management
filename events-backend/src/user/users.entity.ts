@@ -18,6 +18,7 @@ export enum UserRole {
   User = 'user',
   Speaker = 'speaker',
   Exhibitor = 'exhibitor',
+  Moderator = 'moderator',
 }
 export enum AuthProvider {
   LOCAL = 'local',

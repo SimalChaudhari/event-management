@@ -154,6 +154,28 @@ const chartData = {
                     type: 'item',
                     // icon: 'feather icon-list',
                     url: '/programme'
+                },
+                {
+                    id: 'engagement',
+                    title: 'Engagement',
+                    type: 'item',
+                    // icon: 'feather icon-users',
+                    url: '/engagements',
+                    badge: {
+                        title: 'NEW',
+                        type: 'badge-success'
+                    }
+                },
+                {
+                    id: 'moderators',
+                    title: 'Moderators',
+                    type: 'item',
+                    // icon: 'feather icon-shield',
+                    url: '/moderators',
+                    badge: {
+                        title: 'NEW',
+                        type: 'badge-info'
+                    }
                 }
                     ]
                 }

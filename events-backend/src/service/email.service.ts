@@ -13,6 +13,68 @@ export class EmailService {
       },
     });
   }
+  async sendModeratorAssignmentEmail(
+    email: string,
+    moderatorName: string,
+    events: any[],
+    landingUrl: string,
+    accessToken: string
+  ): Promise<void> {
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: 'Event Assignment - Moderator Access',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
+            <h2 style="color: #333; text-align: center;">Event Assignment Notification</h2>
+            <p style="color: #555; font-size: 16px;">
+                Dear ${moderatorName},
+            </p>
+            <p style="color: #555; font-size: 16px;">
+                You have been assigned as a moderator for the following events:
+            </p>
+            <ul style="color: #555; font-size: 16px;">
+                ${events.map(event => `<li><strong>${event.title}</strong> - ${event.startDate ? new Date(event.startDate).toLocaleDateString() : 'Date TBD'}</li>`).join('')}
+            </ul>
+            <p style="color: #555; font-size: 16px;">
+                <strong>Access Your Moderator Dashboard:</strong>
+            </p>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="${landingUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
+                    <i class="fas fa-tachometer-alt" style="margin-right: 8px;"></i>
+                    Access Moderator Dashboard
+                </a>
+            </div>
+            <p style="color: #555; font-size: 16px;">
+                Click the button above to access your moderator dashboard where you can manage Q&A sessions for all your assigned events. You can answer questions, interact with participants, and manage the sessions in real-time.
+            </p>
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="color: #333; margin-bottom: 15px;">Access Token</h4>
+                <p style="color: #555; font-size: 16px; margin-bottom: 10px;">
+                    <strong>Your Access Token:</strong>
+                </p>
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; word-break: break-all; font-family: monospace; font-size: 12px;">
+                    ${accessToken}
+                </div>
+                <p style="color: #555; font-size: 14px; font-style: italic; margin-top: 10px;">
+                    Use this token in API calls to access all event details, engagement data, and Q&A information. Include it in the Authorization header as "Bearer [token]".
+                </p>
+            </div>
+            <p style="color: #555; font-size: 16px;">
+                <strong>Note:</strong> Direct access - No login required. Use the token for full API access.
+            </p>
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #888; font-size: 14px;">
+                    If you have any questions, please contact the event administrator.
+                </p>
+            </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+  }
+
   async sendOTP(email: string,firstName: string, lastName: string, otp: string): Promise<string> {
     const mailOptions = {
       from: process.env.SMTP_USER,

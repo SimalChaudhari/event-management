@@ -290,7 +290,9 @@ export class UserUtils {
     return engagements.map(engagement => ({
       id: engagement.id,
       trackId: engagement.trackId,
-      
+      isActive: engagement.isActive,
+      createdAt: engagement.createdAt,
+      updatedAt: engagement.updatedAt,
       // Event info
       event: {
         id: engagement.track?.event?.id,
@@ -309,15 +311,19 @@ export class UserUtils {
       
       // Sessions with speakers
       sessions: engagement.track?.sessions?.map((session: any) => ({
+       id: session.id,
         title: session.title,
         startDate: session.startDate,
         startTime: session.startTime,
         endDate: session.endDate,
         endTime: session.endTime,
         speakers: session.speakers?.map((speaker: any) => ({
+          id: speaker.id,
+          firstName: speaker.firstName || '',
+          lastName: speaker.lastName || '',
           name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim() || 'Unknown Speaker',
-          startTime: session.startTime,
-          endTime: session.endTime
+          profilePicture: speaker.profilePicture || '',
+          description: speaker.speakerProfile?.description || ''
         })) || []
       })) || []
     }));

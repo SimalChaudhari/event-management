@@ -18,6 +18,7 @@ import { UserRole } from '../user/users.entity';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
 import { Roles } from 'jwt/roles.decorator';
+import { Public } from 'jwt/public.decorator';
 
 @Controller('api/engagements')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -84,6 +85,30 @@ export class EngagementController {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
         message: error.message || 'Failed to fetch active engagements',
+      });
+    }
+  }
+
+  /**
+   * Get all engagements for a specific event (Public - for moderator access)
+   */
+  @Public()
+  @Get('event/:eventId')
+  async getEngagementsByEvent(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const engagements = await this.engagementService.getEngagementsByEvent(eventId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        data: engagements,
+        total: engagements.length,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: error.message || 'Failed to fetch engagements for event',
       });
     }
   }

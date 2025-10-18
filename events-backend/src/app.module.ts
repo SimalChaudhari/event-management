@@ -39,6 +39,8 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { CsvUploadLogModule } from './logs/csv-upload-log.module';
 import { ProgrammeModule } from './programme/programme.module';
 import { EngagementModule } from './engagement/engagement.module';
+import { EngagementQnaModule } from './engagement-qna/engagement-qna.module';
+import { ModeratorModule } from './moderator/moderator.module';
 
 @Module({
   imports: [
@@ -72,6 +74,8 @@ import { EngagementModule } from './engagement/engagement.module';
     CsvUploadLogModule,
     ProgrammeModule,
     EngagementModule,
+    EngagementQnaModule,
+    ModeratorModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

@@ -18,6 +18,7 @@ import EventStampsComponent from '../../../../components/events/EventStampsCompo
 import EventSurveyComponent from '../../../../components/events/EventSurveyComponent';
 import EventExhibitorsComponent from '../../../../components/events/EventExhibitorsComponent';
 import EventProgrammeComponent from '../../../../components/events/EventProgrammeComponent';
+import EventEngagementComponent from '../../../../components/events/EventEngagementComponent';
 
 const ViewEventPage = () => {
     const { id } = useParams();
@@ -62,6 +63,7 @@ const ViewEventPage = () => {
         categories: true,
         agenda: true,
         programme: true,
+        engagement: true,
         adminInfo: true
     });
     const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
@@ -83,6 +85,7 @@ const ViewEventPage = () => {
                     categories: res.data.tabVisibility.categories !== false,
                     agenda: res.data.tabVisibility.agenda !== false,
                     programme: res.data.tabVisibility.programme !== false,
+                    engagement: res.data.tabVisibility.engagement !== false,
                     adminInfo: res.data.tabVisibility.adminInfo !== false
                 });
             }
@@ -572,6 +575,21 @@ const ViewEventPage = () => {
                                         </Nav.Item>
                                     )}
 
+                                    {/* Engagement Tab */}
+                                    {isTabVisible('engagement') && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="engagement">
+                                                <i className="fas fa-users" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                                Engagement
+                                                {isAdmin && eventData?.tabVisibility?.engagement === false && (
+                                                    <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
+                                                        Restricted
+                                                    </Badge>
+                                                )}
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
+
                                     {/* Categories Tab */}
                                     {/* {isTabVisible('categories') && (
                                         <Nav.Item>
@@ -719,6 +737,18 @@ const ViewEventPage = () => {
                                     <div className="p-3">
                                         <EventProgrammeComponent 
                                             programmeTracks={eventData?.programmeTracks}
+                                            formatTime={formatTime}
+                                        />
+                                    </div>
+                                </Tab.Pane>
+                            )}
+
+                            {/* Engagement Tab */}
+                            {isTabVisible('engagement') && (
+                                <Tab.Pane eventKey="engagement">
+                                    <div className="p-3">
+                                        <EventEngagementComponent 
+                                            engagements={eventData?.engagements}
                                             formatTime={formatTime}
                                         />
                                     </div>
@@ -884,6 +914,16 @@ const ViewEventPage = () => {
                                     label="Programme Tab"
                                     checked={tabVisibilitySettings.programme}
                                     onChange={(e) => handleTabVisibilityChange('programme', e.target.checked)}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="engagement-tab"
+                                    label="Engagement Tab"
+                                    checked={tabVisibilitySettings.engagement}
+                                    onChange={(e) => handleTabVisibilityChange('engagement', e.target.checked)}
                                 />
                             </Form.Group>
 

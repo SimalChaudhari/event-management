@@ -1,0 +1,73 @@
+.moderator-qa {
+    font-family: "Arial", sans-serif;
+    color: #000;
+  }
+  
+  /* Top Section */
+  .top-section {
+    background-color: #4d9b9b;
+  }
+  
+  .cancel-btn {
+    background-color: #ffffff;
+    color: #000 !important;
+    border: none;
+  }
+  
+  .mark-btn {
+    background-color: #5e7587;
+    color: #fff !important;
+    border: none;
+  }
+  
+  /* Legend */
+  .legend-box {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #ccc;
+  }
+  
+  .legend-box.not-answered {
+    background-color: #ffffff;
+  }
+  
+  .legend-box.answered {
+    background-color: #c9e3e3;
+  }
+  
+  .legend-box.answering {
+    background-color: #7ea8a8;
+  }
+  
+  /* Table */
+  .qa-table th {
+    background-color: #000;
+    color: #fff;
+    text-align: center;
+  }
+  
+  .status-not-answered td {
+    background-color: #ffffff;
+  }
+  
+  .status-answered td {
+    background-color: #c9e3e3;
+  }
+  
+  .status-answering td {
+    background-color: #7ea8a8;
+  }
+  
+  .qa-table td {
+    vertical-align: middle;
+  }
+  
+  .qa-table button {
+    border: none;
+    background: transparent;
+  }
+  
+  .qa-table button:hover {
+    opacity: 0.7;
+  }
+  

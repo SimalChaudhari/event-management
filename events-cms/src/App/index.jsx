@@ -5,7 +5,7 @@ import Loader from './layout/Loader';
 import GlobalLoader from '../components/GlobalLoader';
 import GlobalError from '../components/GlobalError';
 import routesOnePage from '../route';
-import routes from '../routes';
+import routes, { publicModeratorRoutes } from '../routes';
 import Config from '../config';
 import { checkAuthStatus } from '../store/actions/authActions';
 
@@ -42,6 +42,17 @@ const App = () => {
                                         <route.component />
                                     )
                                 }
+                            />
+                        )
+                    )}
+                    
+                    {/* Public Moderator Routes (No Login Required) */}
+                    {publicModeratorRoutes.map((route, index) =>
+                        route.component && (
+                            <Route
+                                key={`moderator-${index}`}
+                                path={route.path}
+                                element={<route.component />}
                             />
                         )
                     )}

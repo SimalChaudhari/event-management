@@ -238,7 +238,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                                     wordBreak: 'break-word',
                                     overflowWrap: 'break-word'
                                 }}>
-                                    {speaker.description || 'Experienced professional speaker with expertise in various topics. Known for delivering engaging presentations and sharing valuable insights with diverse audiences.'}
+                                    {speaker.description || 'No description available'}
                                 </p>
                             </div>
                         </div>

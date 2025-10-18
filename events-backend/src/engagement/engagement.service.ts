@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Engagement } from './engagement.entity';
@@ -22,10 +22,22 @@ export class EngagementService {
     // Verify that the programme track exists
     const track = await this.programmeTrackRepository.findOne({
       where: { id: createEngagementDto.trackId },
+      relations: ['event'],
     });
 
     if (!track) {
       throw new NotFoundException(`Programme track with ID ${createEngagementDto.trackId} not found`);
+    }
+
+    // Check if an engagement already exists for this track
+    const existingEngagement = await this.engagementRepository.findOne({
+      where: { trackId: createEngagementDto.trackId },
+    });
+
+    if (existingEngagement) {
+      throw new ConflictException(
+        `Engagement already exists for this track.`
+      );
     }
 
     const engagement = this.engagementRepository.create(createEngagementDto);
@@ -37,6 +49,23 @@ export class EngagementService {
    */
   async getAllEngagements(): Promise<any[]> {
     const engagements = await this.engagementRepository.find({
+      relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return UserUtils.formatEngagements(engagements);
+  }
+
+  /**
+   * Get all engagements for a specific event
+   */
+  async getEngagementsByEvent(eventId: string): Promise<any[]> {
+    const engagements = await this.engagementRepository.find({
+      where: { 
+        track: { 
+          event: { id: eventId } 
+        } 
+      },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
       order: { createdAt: 'DESC' },
     });
@@ -78,16 +107,34 @@ export class EngagementService {
    * Update an engagement
    */
   async updateEngagement(id: string, updateEngagementDto: UpdateEngagementDto): Promise<Engagement> {
-    const engagement = await this.getEngagementById(id);
+    const engagement = await this.engagementRepository.findOne({
+      where: { id },
+    });
 
-    // If trackId is being updated, verify the new track exists
-    if (updateEngagementDto.trackId) {
+    if (!engagement) {
+      throw new NotFoundException(`Engagement with ID ${id} not found`);
+    }
+
+    // If trackId is being updated, verify the new track exists and no duplicate exists
+    if (updateEngagementDto.trackId && updateEngagementDto.trackId !== engagement.trackId) {
       const track = await this.programmeTrackRepository.findOne({
         where: { id: updateEngagementDto.trackId },
+        relations: ['event'],
       });
 
       if (!track) {
         throw new NotFoundException(`Programme track with ID ${updateEngagementDto.trackId} not found`);
+      }
+
+      // Check if another engagement already exists for this new track
+      const existingEngagement = await this.engagementRepository.findOne({
+        where: { trackId: updateEngagementDto.trackId },
+      });
+
+      if (existingEngagement) {
+        throw new ConflictException(
+          `Engagement already exists for this track.`
+        );
       }
     }
 

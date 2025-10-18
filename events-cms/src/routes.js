@@ -11,7 +11,8 @@ import {
     USER_PATHS,
     POLLING_PATHS,
     LOGS_PATHS,
-    PROGRAMME_PATHS
+    PROGRAMME_PATHS,
+    ENGAGEMENT_PATHS
 } from './utils/constants.js';
 
 /**
@@ -135,6 +136,31 @@ const programmeComponents = {
     TrackSessions: React.lazy(() => import('./Pages/Programme/TrackSessionsPage.jsx')),
     AddSession: React.lazy(() => import('./Pages/Programme/AddSessionPage.jsx')),
     ViewSession: React.lazy(() => import('./Pages/Programme/ViewSessionPage.jsx'))
+};
+
+/**
+ * Engagement related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const engagementComponents = {
+    List: React.lazy(() => import('./Pages/Engagement/EngagementList.jsx')),
+    AddEngagement: React.lazy(() => import('./Pages/Engagement/AddEngagementPage.jsx')),
+    ViewEngagement: React.lazy(() => import('./Pages/Engagement/ViewEngagementPage.jsx')),
+    EngagementQA: React.lazy(() => import('./Pages/Engagement/EngagementQAPage.jsx')),
+    ViewEngagementQuestion: React.lazy(() => import('./Pages/Engagement/ViewEngagementQuestionPage.jsx'))
+};
+
+/**
+ * Moderator related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const moderatorComponents = {
+    List: React.lazy(() => import('./Pages/Moderators/ModeratorList.jsx')),
+    AddModerator: React.lazy(() => import('./Pages/Moderators/AddModeratorPage.jsx')),
+    ViewModerator: React.lazy(() => import('./Pages/Moderators/ViewModeratorPage.jsx')),
+    AssignEvents: React.lazy(() => import('./Pages/Moderators/AssignEventsPage.jsx')),
+    Landing: React.lazy(() => import('./Pages/Moderators/ModeratorLandingPage.jsx')),
+    QA: React.lazy(() => import('./Pages/Moderators/ModeratorQAPage.jsx'))
 };
 
 /**
@@ -645,6 +671,105 @@ const programmeRoutes = [
 ];
 
 /**
+ * Engagement routes configuration
+ * @type {RouteConfig[]}
+ */
+const engagementRoutes = [
+    {
+        path: ENGAGEMENT_PATHS.LIST_ENGAGEMENTS,
+        exact: true,
+        name: 'Engagement Management',
+        component: engagementComponents.List
+    },
+    {
+        path: ENGAGEMENT_PATHS.ADD_ENGAGEMENT,
+        exact: true,
+        name: 'Add Engagement',
+        component: engagementComponents.AddEngagement
+    },
+    {
+        path: ENGAGEMENT_PATHS.EDIT_ENGAGEMENT + '/:id',
+        exact: true,
+        name: 'Edit Engagement',
+        component: engagementComponents.AddEngagement
+    },
+    {
+        path: ENGAGEMENT_PATHS.VIEW_ENGAGEMENT + '/:id',
+        exact: true,
+        name: 'View Engagement',
+        component: engagementComponents.ViewEngagement
+    },
+    {
+        path: '/engagement/qa/:engagementId/view/:questionId',
+        exact: true,
+        name: 'View Engagement Question',
+        component: engagementComponents.ViewEngagementQuestion
+    },
+    {
+        path: '/engagement/qa/:engagementId',
+        exact: true,
+        name: 'Engagement Q&A',
+        component: engagementComponents.EngagementQA
+    }
+];
+
+/**
+ * Moderator routes configuration
+ * @type {RouteConfig[]}
+ */
+const moderatorRoutes = [
+    {
+        path: '/moderators',
+        exact: true,
+        name: 'Moderator Management',
+        component: moderatorComponents.List
+    },
+    {
+        path: '/moderators/add',
+        exact: true,
+        name: 'Add Moderator',
+        component: moderatorComponents.AddModerator
+    },
+    {
+        path: '/moderators/edit/:id',
+        exact: true,
+        name: 'Edit Moderator',
+        component: moderatorComponents.AddModerator
+    },
+    {
+        path: '/moderators/view/:id',
+        exact: true,
+        name: 'View Moderator',
+        component: moderatorComponents.ViewModerator
+    },
+    {
+        path: '/moderators/assign-events/:id',
+        exact: true,
+        name: 'Assign Events',
+        component: moderatorComponents.AssignEvents
+    }
+];
+
+/**
+ * Public moderator routes (no login required)
+ * @type {RouteConfig[]}
+ */
+const publicModeratorRoutes = [
+    {
+        path: '/moderator/:moderatorId',
+        exact: true,
+        name: 'Moderator Landing',
+        component: moderatorComponents.Landing
+    },
+    {
+        path: '/moderator/qa/:moderatorId/:eventId',
+        exact: true,
+        name: 'Moderator QA',
+        component: moderatorComponents.QA
+    }
+];
+
+/**
  * Combined routes configuration
  * @type {RouteConfig[]}
  */
@@ -658,6 +783,8 @@ const routes = [
     ...surveyRoutes,
     ...pollingRoutes,
     ...programmeRoutes,
+    ...engagementRoutes,
+    ...moderatorRoutes,
     ...settingsRoutes,
     ...logsRoutes,
     ...transactionRoutes,
@@ -665,3 +792,4 @@ const routes = [
 ];
 
 export default routes;
+export { publicModeratorRoutes };

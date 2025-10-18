@@ -121,6 +121,17 @@ export const PROGRAMME_PATHS = {
     LIST: '/programme'
 };
 
+export const ENGAGEMENT_PATHS = {
+    LIST_ENGAGEMENTS: '/engagements',
+    ADD_ENGAGEMENT: '/engagements/add',
+    EDIT_ENGAGEMENT: '/engagements/edit',
+    VIEW_ENGAGEMENT: '/engagements/view',
+    
+    // Q&A paths
+    QA: '/engagement/qa',
+    VIEW_QA_QUESTION: '/engagement/qa/:engagementId/view/:questionId'
+};
+
 export const LOGS_PATHS = {
     LIST_LOGS: '/logs',
     LOG_DETAILS: '/logs/:sessionId'

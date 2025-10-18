@@ -49,13 +49,13 @@ const EventProgrammeComponent = ({ programmeTracks, formatTime }) => {
     return (
         <>
             <h5 className="mb-4">Event Programme</h5>
-            {programmeTracks.map((track) => (
+            {programmeTracks.map((track, trackIndex) => (
                 <div key={track.id} className="mb-4">
                     <Card className="border-0 shadow-sm">
                         <Card.Header style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #4680ff' }}>
                             <h6 className="mb-0 text-primary">
                                 <i className="fas fa-layer-group" style={{ marginRight: '8px' }}></i>
-                                {track.title}
+                                <strong className="text-primary">Programme (Title/Name) {trackIndex + 1}:</strong> {track.title}
                             </h6>
                             {track.description && (
                                 <div className="mt-2">
@@ -69,13 +69,12 @@ const EventProgrammeComponent = ({ programmeTracks, formatTime }) => {
                         </Card.Header>
                         <Card.Body>
                             {track.sessions && track.sessions.length > 0 ? (
-                                track.sessions.map((session, index) => (
-                                    <div key={session.id} className={`${index > 0 ? 'mt-4 pt-4 border-top' : ''}`}>
+                                track.sessions.map((session, sessionIndex) => (
+                                    <div key={session.id} className={`${sessionIndex > 0 ? 'mt-4 pt-4 border-top' : ''}`}>
                                         <div className="d-flex justify-content-between align-items-start mb-3">
                                             <div>
-                                                <h6 className="text-dark mb-2">
-                                                    <i className="fas fa-presentation" style={{ marginRight: '8px', color: '#28a745' }}></i>
-                                                    {session.title}
+                                                <h6 className="mb-2">
+                                                   <strong className="text-primary" style={{ textDecoration: 'underline' }}>Session (Title/Name)</strong> : <span className="text-dark font-weight-bold">{session.title}</span>
                                                 </h6>
                                                 {session.description && (
                                                     <ReadMoreComponent 
@@ -90,19 +89,19 @@ const EventProgrammeComponent = ({ programmeTracks, formatTime }) => {
                                             <Col md={4}>
                                                 <div className="d-flex align-items-center text-muted" style={{ fontSize: '14px' }}>
                                                     <i className="fas fa-calendar" style={{ marginRight: '8px', color: '#4680ff' }}></i>
-                                                    <span>{new Date(session.sessionDate).toLocaleDateString()}</span>
+                                                    <span><strong>Date:</strong> {new Date(session.sessionDate).toLocaleDateString()}</span>
                                                 </div>
                                             </Col>
                                             <Col md={4}>
                                                 <div className="d-flex align-items-center text-muted" style={{ fontSize: '14px' }}>
                                                     <i className="fas fa-clock" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                    <span>{formatTime(session.startTime)} - {formatTime(session.endTime)}</span>
+                                                    <span><strong>Time:</strong> {formatTime(session.startTime)} - {formatTime(session.endTime)}</span>
                                                 </div>
                                             </Col>
                                             <Col md={4}>
                                                 <div className="d-flex align-items-center text-muted" style={{ fontSize: '14px' }}>
                                                     <i className="fas fa-map-marker-alt" style={{ marginRight: '8px', color: '#dc3545' }}></i>
-                                                    <span>{session.venue}</span>
+                                                    <span><strong>Venue:</strong> {session.venue}</span>
                                                 </div>
                                             </Col>
                                         </Row>

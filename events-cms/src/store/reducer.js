@@ -15,6 +15,9 @@ import qaReducer from './reducer/qaReducer';
 import pollingReducer from './reducer/pollingReducer';
 import logsReducer from './reducer/logsReducer';
 import programmeReducer from './reducer/programmeReducer';
+import engagementReducer from './reducer/engagementReducer';
+import engagementQnaReducer from './reducer/engagementQnaReducer';
+import moderatorReducer from './reducer/moderatorReducer';
 import loadingReducer from './reducer/loadingReducer';
 import errorReducer from './reducer/errorReducer';
 import ableReducer from './ableReducer';
@@ -40,6 +43,9 @@ const reducer = combineReducers({
     polling: pollingReducer,
     logs: logsReducer,
     programme: programmeReducer,
+    engagement: engagementReducer,
+    engagementQna: engagementQnaReducer,
+    moderator: moderatorReducer,
     loading: loadingReducer,
     error: errorReducer
 });
