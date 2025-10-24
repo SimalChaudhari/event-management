@@ -42,11 +42,17 @@ export class EngagementQnaService {
       // Validate engagement exists
       const engagement = await this.engagementRepository.findOne({
         where: { id: createDto.engagementId },
-        relations: ['track', 'track.event'],
+        relations: ['track', 'track.event', 'track.sessions'],
       });
 
       if (!engagement) {
         throw new ResourceNotFoundException('Engagement', createDto.engagementId);
+      }
+
+      // Validate session exists and belongs to this engagement's track
+      const session = engagement.track?.sessions?.find(s => s.id === createDto.sessionId);
+      if (!session) {
+        throw new ValidationException(`Session with ID ${createDto.sessionId} not found or does not belong to this engagement's track`);
       }
 
       // Check if user is registered for this event
@@ -70,12 +76,13 @@ export class EngagementQnaService {
       const question = new EngagementQnaQuestion();
       question.question = createDto.question;
       question.engagementId = createDto.engagementId;
+      question.sessionId = createDto.sessionId;
       question.askedById = askedById;
       question.isAnonymous = false; // Removed anonymous support
       question.likesCount = 0;
       question.isPinned = false;
       question.isActive = true;
-      question.status = undefined;
+      question.status = 'answering'; // Default status is answering
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 
@@ -127,6 +134,11 @@ export class EngagementQnaService {
         isActive: true,
         engagementId: getDto.engagementId,
       };
+
+      // Add sessionId filter if provided
+      if (getDto.sessionId) {
+        whereConditions.sessionId = getDto.sessionId;
+      }
 
       // Handle status filter
       if (getDto.status === QuestionStatus.ANSWERED) {
@@ -490,6 +502,7 @@ export class EngagementQnaService {
     updateDto: UpdateEngagementQuestionDto,
     userId: string,
     isAdmin: boolean = false,
+    isModerator: boolean = false,
   ) {
     try {
       const question = await this.engagementQnaQuestionRepository.findOne({
@@ -501,7 +514,7 @@ export class EngagementQnaService {
       }
 
       // Only the question creator or admin can update
-      if (!isAdmin && question.askedById !== userId) {
+      if (!isAdmin && !isModerator && question.askedById !== userId) {
         throw new ValidationException('You can only update your own questions');
       }
 
@@ -526,7 +539,7 @@ export class EngagementQnaService {
   }
 
   // 5. Delete Question (Own question OR Admin)
-  async deleteQuestion(id: string, userId: string, isAdmin: boolean = false) {
+  async deleteQuestion(id: string, userId: string, isAdmin: boolean = false, isModerator: boolean = false) {
     try {
       const question = await this.engagementQnaQuestionRepository.findOne({
         where: { id },
@@ -537,7 +550,7 @@ export class EngagementQnaService {
       }
 
       // Only the question creator or admin can delete
-      if (!isAdmin && question.askedById !== userId) {
+      if (!isAdmin && !isModerator && question.askedById !== userId) {
         throw new ValidationException('You can only delete your own questions');
       }
 

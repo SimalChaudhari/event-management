@@ -47,8 +47,9 @@ export class EngagementQnaController {
   ) {}
 
   // 3. Like/Unlike Question (Registered users only)
-  @Public()
+  // @Public()
   @Post('like')
+  @Roles(UserRole.Admin, UserRole.Moderator,UserRole.User)
   async toggleLike(
     @Body() likeDto: LikeEngagementQuestionDto,
     @Res() response: Response,
@@ -175,7 +176,7 @@ export class EngagementQnaController {
     }
   }
 
-  // 6. Update Question (Own question by user OR Admin can update any)
+  // 6. Update Question (Own question by user OR Admin/Moderator can update any)
   @Put(':id')
   async updateQuestion(
     @Param('id') id: string,
@@ -185,11 +186,13 @@ export class EngagementQnaController {
   ) {
     try {
       const isAdmin = req.user?.role === UserRole.Admin;
+      const isModerator = req.user?.role === UserRole.Moderator;
       const result = await this.engagementQnaService.updateQuestion(
         id,
         updateDto,
         req.user?.id,
         isAdmin,
+        isModerator,
       );
 
       const successResponse: SuccessResponse = {
@@ -200,6 +203,7 @@ export class EngagementQnaController {
           timestamp: new Date().toISOString(),
           updatedBy: req.user?.id,
           isAdmin: isAdmin,
+          isModerator: isModerator,
         },
       };
 
@@ -210,8 +214,7 @@ export class EngagementQnaController {
     }
   }
 
-  // 5. Delete Question (Own question by user OR Admin can delete any)
-  @Public()
+  // 5. Delete Question (Own question by user OR Admin/Moderator can delete any)
   @Delete(':id')
   async deleteQuestion(
     @Param('id') id: string,
@@ -220,7 +223,9 @@ export class EngagementQnaController {
   ) {
     try {
       const isAdmin = req.user?.role === UserRole.Admin;
-      const result = await this.engagementQnaService.deleteQuestion(id, req.user?.id, isAdmin);
+      const isModerator = req.user?.role === UserRole.Moderator;
+  
+      const result = await this.engagementQnaService.deleteQuestion(id, req.user?.id, isAdmin, isModerator);
 
       const successResponse: SuccessResponse = {
         success: result.success,
@@ -229,6 +234,7 @@ export class EngagementQnaController {
           timestamp: new Date().toISOString(),
           deletedBy: req.user?.id,
           isAdmin: isAdmin,
+          isModerator: isModerator,
         },
       };
 
@@ -239,10 +245,9 @@ export class EngagementQnaController {
     }
   }
 
-  // 2. Answer Question (Admin only)
-  @Public()
+  // 2. Answer Question (Admin/Moderator only)
   @Put(':id/answer')
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.Moderator)
   async answerQuestion(
     @Param('id') id: string,
     @Body() answerDto: AnswerEngagementQuestionDto,

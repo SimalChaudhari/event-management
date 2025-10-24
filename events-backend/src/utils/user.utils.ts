@@ -309,9 +309,9 @@ export class UserUtils {
         title: engagement.track?.title,
       },
       
-      // Sessions with speakers
+      // Sessions with speakers, questions, and polls
       sessions: engagement.track?.sessions?.map((session: any) => ({
-       id: session.id,
+        id: session.id,
         title: session.title,
         startDate: session.startDate,
         startTime: session.startTime,
@@ -324,8 +324,32 @@ export class UserUtils {
           name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim() || 'Unknown Speaker',
           profilePicture: speaker.profilePicture || '',
           description: speaker.speakerProfile?.description || ''
-        })) || []
-      })) || []
+        })) || [],
+        // Session-specific statistics
+        statistics: session.statistics || {
+          questionsCount: 0,
+          answeredQuestionsCount: 0,
+          unansweredQuestionsCount: 0,
+          pollsCount: 0,
+          totalVotesCount: 0
+        },
+        // Questions for this session (from engagement)
+        questions: session.questions || [],
+        // Polls for this session (linked through speakers)
+        polls: session.polls || []
+      })) || [],
+
+      // Statistics
+      statistics: engagement.statistics || {
+        questionsCount: 0,
+        answeredQuestionsCount: 0,
+        unansweredQuestionsCount: 0,
+        pollsCount: 0,
+        totalVotesCount: 0
+      },
+
+      // Session count
+      sessionsCount: engagement.track?.sessions?.length || 0
     }));
   }
 

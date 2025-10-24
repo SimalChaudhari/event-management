@@ -16,7 +16,7 @@ export class EmailService {
   async sendModeratorAssignmentEmail(
     email: string,
     moderatorName: string,
-    events: any[],
+    assignments: any[],
     landingUrl: string,
     accessToken: string
   ): Promise<void> {
@@ -26,32 +26,63 @@ export class EmailService {
       subject: 'Event Assignment - Moderator Access',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
-            <h2 style="color: #333; text-align: center;">Event Assignment Notification</h2>
+            <h2 style="color: #333; text-align: center;">🎯 Event Assignment Notification</h2>
             <p style="color: #555; font-size: 16px;">
-                Dear ${moderatorName},
+                Dear <strong>${moderatorName}</strong>,
             </p>
             <p style="color: #555; font-size: 16px;">
-                You have been assigned as a moderator for the following events:
+                You have been assigned as a moderator for the following events and sessions:
             </p>
-            <ul style="color: #555; font-size: 16px;">
-                ${events.map(event => `<li><strong>${event.title}</strong> - ${event.startDate ? new Date(event.startDate).toLocaleDateString() : 'Date TBD'}</li>`).join('')}
-            </ul>
+            
+            <div style="background-color: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e9ecef;">
+                ${assignments.map(assignment => `
+                    <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;">
+                        <h3 style="color: #007bff; margin: 0 0 10px 0;">
+                            📅 ${assignment.event?.name || 'Unknown Event'}
+                        </h3>
+                        ${assignment.track ? `
+                            <p style="color: #6c757d; margin: 5px 0;">
+                                <strong>Track:</strong> ${assignment.track.title} (ID: ${assignment.trackId})
+                            </p>
+                        ` : ''}
+                        ${assignment.sessions && assignment.sessions.length > 0 ? `
+                            <div style="margin: 10px 0;">
+                                <strong style="color: #495057;">Sessions (${assignment.sessions.length}):</strong>
+                                <ul style="margin: 5px 0; padding-left: 20px;">
+                                    ${assignment.sessions.map((sessionItem: any) => `
+                                        <li style="color: #6c757d; margin: 3px 0;">
+                                            <strong>${sessionItem.session?.title || 'Unknown Session'}</strong> (ID: ${sessionItem.id})
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            
             <p style="color: #555; font-size: 16px;">
-                <strong>Access Your Moderator Dashboard:</strong>
+                <strong>🚀 Access Your Moderator Dashboard:</strong>
             </p>
             <div style="text-align: center; margin: 20px 0;">
-                <a href="${landingUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
-                    <i class="fas fa-tachometer-alt" style="margin-right: 8px;"></i>
-                    Access Moderator Dashboard
+                <a href="${landingUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    🎛️ Access Moderator Dashboard
                 </a>
             </div>
             <p style="color: #555; font-size: 16px;">
-                Click the button above to access your moderator dashboard where you can manage Q&A sessions for all your assigned events. You can answer questions, interact with participants, and manage the sessions in real-time.
+                Click the button above to access your moderator dashboard where you can:
             </p>
+            <ul style="color: #555; font-size: 16px; padding-left: 20px;">
+                <li>View and answer questions from participants</li>
+                <li>Manage Q&A sessions in real-time</li>
+                <li>Monitor engagement and participation</li>
+                <li>Access session-specific data and statistics</li>
+            </ul>
+            
             <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h4 style="color: #333; margin-bottom: 15px;">Access Token</h4>
+                <h4 style="color: #333; margin-bottom: 15px;">🔑 Your Access Token</h4>
                 <p style="color: #555; font-size: 16px; margin-bottom: 10px;">
-                    <strong>Your Access Token:</strong>
+                    <strong>Token:</strong>
                 </p>
                 <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; word-break: break-all; font-family: monospace; font-size: 12px;">
                     ${accessToken}
@@ -60,9 +91,88 @@ export class EmailService {
                     Use this token in API calls to access all event details, engagement data, and Q&A information. Include it in the Authorization header as "Bearer [token]".
                 </p>
             </div>
+            
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border: 1px solid #c3e6cb;">
+                <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Direct Access</h4>
+                <p style="color: #155724; margin: 0; font-size: 14px;">
+                    No login required! Use the button above or the token for immediate access to your moderator dashboard.
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #888; font-size: 14px;">
+                    If you have any questions, please contact the event administrator.
+                </p>
+            </div>
+        </div>
+      `,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  async sendModeratorSessionAssignmentEmail(
+    email: string,
+    moderatorName: string,
+    assignmentData: any,
+    landingUrl: string,
+    accessToken: string
+  ): Promise<void> {
+    const { moderator, event, track, session, questions } = assignmentData;
+    
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: `Session Assignment - ${session.title}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
+            <h2 style="color: #333; text-align: center;">🎯 Session Assignment Notification</h2>
             <p style="color: #555; font-size: 16px;">
-                <strong>Note:</strong> Direct access - No login required. Use the token for full API access.
+                Dear <strong>${moderatorName}</strong>,
             </p>
+            <p style="color: #555; font-size: 16px;">
+                You have been assigned as a moderator for the session
+            </p>
+                        
+            <p style="color: #555; font-size: 16px;">
+                <strong>🚀 Access Your Session Dashboard:</strong>
+            </p>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="${landingUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    🎛️ Access Session Dashboard
+                </a>
+            </div>
+            <p style="color: #555; font-size: 16px;">
+                Click the button above to access your session dashboard where you can:
+            </p>
+            <ul style="color: #555; font-size: 16px; padding-left: 20px;">
+                <li>View and answer questions from participants</li>
+                <li>Manage Q&A sessions in real-time</li>
+                <li>Pin important questions</li>
+                <li>Monitor engagement and participation</li>
+                <li>Access session-specific data and statistics</li>
+            </ul>
+            
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="color: #333; margin-bottom: 15px;">🔑 Your Access Token</h4>
+                <p style="color: #555; font-size: 16px; margin-bottom: 10px;">
+                    <strong>Token:</strong>
+                </p>
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #dee2e6; word-break: break-all; font-family: monospace; font-size: 12px;">
+                    ${accessToken}
+                </div>
+                <p style="color: #555; font-size: 14px; font-style: italic; margin-top: 10px;">
+                    Use this token in API calls to access session details, questions, and Q&A management. Include it in the Authorization header as "Bearer [token]".
+                </p>
+            </div>
+            
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border: 1px solid #c3e6cb;">
+                <h4 style="color: #155724; margin: 0 0 10px 0;">✅ Direct Access</h4>
+                <p style="color: #155724; margin: 0; font-size: 14px;">
+                    No login required! Use the button above or the token for immediate access to your session dashboard.
+                </p>
+            </div>
+            
             <div style="text-align: center; margin-top: 30px;">
                 <p style="color: #888; font-size: 14px;">
                     If you have any questions, please contact the event administrator.

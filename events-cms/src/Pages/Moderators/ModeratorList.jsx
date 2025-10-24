@@ -47,7 +47,7 @@ function moderatorsTable(data, handleAdd, handleEdit, handleDelete, handleView, 
                 render: function (data, type, row) {
                     return `
                         <div class="d-inline-block align-middle">
-                            <h6 class="m-b-0">${row.name || 'N/A'}</h6>
+                            <h6 class="m-b-0">${row.firstName} ${row.lastName} </h6>
                         </div>
                     `;
                 }
@@ -75,14 +75,32 @@ function moderatorsTable(data, handleAdd, handleEdit, handleDelete, handleView, 
                 }
             },
             {
-                data: 'moderatorEvents',
+                data: 'assignments',
                 title: 'Assigned Events',
                 render: function (data, type, row) {
-                    const eventCount = row.moderatorEvents?.length || 0;
+                    const assignmentCount = row.assignments?.length || 0;
+                    const totalSessions = row.assignments?.reduce((total, assignment) => {
+                        return total + (assignment.sessions?.length || 0);
+                    }, 0) || 0;
+                    
+                    let badgeText = `${assignmentCount} Assignment${assignmentCount !== 1 ? 's' : ''}`;
+                    if (totalSessions > 0) {
+                        badgeText += ` (${totalSessions} Session${totalSessions !== 1 ? 's' : ''})`;
+                    }
+                    
                     return `
-                        <span class="badge badge-light-info" style="font-size: 13px; padding: 6px 12px;">
-                            <i class="feather icon-calendar" style="margin-right: 4px;"></i>${eventCount}
-                        </span>
+                        <div class="d-flex flex-column">
+                            <span class="badge badge-light-info mb-1" style="font-size: 12px; padding: 4px 8px;">
+                                <i class="feather icon-calendar" style="margin-right: 4px;"></i>${badgeText}
+                            </span>
+                            ${assignmentCount > 0 ? `
+                                <small class="text-muted" style="font-size: 10px;">
+                                    ${row.assignments.map(assignment => 
+                                        assignment.event?.name || 'Unknown Event'
+                                    ).join(', ')}
+                                </small>
+                            ` : ''}
+                        </div>
                     `;
                 }
             },
@@ -93,15 +111,7 @@ function moderatorsTable(data, handleAdd, handleEdit, handleDelete, handleView, 
                     return formatDateTimeForTable(row.createdAt);
                 }
             },
-            {
-                data: 'isActive',
-                title: 'Status',
-                render: function (data, type, row) {
-                    const badgeClass = row.isActive ? 'badge-success' : 'badge-secondary';
-                    const statusText = row.isActive ? 'Active' : 'Inactive';
-                    return `<span class="badge ${badgeClass}">${statusText}</span>`;
-                }
-            },
+          
             {
                 data: null,
                 title: 'Actions',
@@ -294,7 +304,6 @@ const ModeratorList = () => {
                                         <th>Mobile</th>
                                         <th>Assigned Events</th>
                                         <th>Created Date</th>
-                                        <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -312,7 +321,7 @@ const ModeratorList = () => {
                 title="Delete Moderator"
                 message={
                     moderatorToDelete
-                        ? `Are you sure you want to delete moderator "${moderatorToDelete.name}"? This will also remove all event assignments.`
+                        ? `Are you sure you want to delete moderator "${moderatorToDelete.firstName} ${moderatorToDelete.lastName}"? This will also remove all event assignments.`
                         : ''
                 }
                 isDeleting={isDeleting}

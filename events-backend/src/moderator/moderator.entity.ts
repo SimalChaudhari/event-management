@@ -13,7 +13,10 @@ export class Moderator {
   id!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  name!: string;
+  firstName!: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  lastName!: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
@@ -35,4 +38,3 @@ export class Moderator {
   })
   moderatorEvents!: any[];
 }
-

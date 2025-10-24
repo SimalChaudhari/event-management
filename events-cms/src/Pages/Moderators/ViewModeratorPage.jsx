@@ -126,7 +126,7 @@ const ViewModeratorPage = () => {
                                     <i className="feather icon-user text-primary mr-2"></i>
                                     <label className="text-muted small mb-0">Name</label>
                                 </div>
-                                <h5 className="text-dark font-weight-bold mb-0">{selectedModerator.name || 'N/A'}</h5>
+                                <h5 className="text-dark font-weight-bold mb-0">{selectedModerator.firstName} {selectedModerator.lastName}</h5>
                             </div>
                         </Col>
                         <Col md={6}>
@@ -151,21 +151,7 @@ const ViewModeratorPage = () => {
                                 </div>
                             </div>
                         </Col>
-                        <Col md={6}>
-                            <div className="mb-4">
-                                <div className="d-flex align-items-center mb-2">
-                                    <i className="feather icon-check-circle text-success mr-2"></i>
-                                    <label className="text-muted small mb-0">Status</label>
-                                </div>
-                                <Badge 
-                                    bg={selectedModerator.isActive ? 'success' : 'secondary'}
-                                    style={{ fontSize: '14px', padding: '6px 12px', fontWeight: 'bold' }}
-                                >
-                                    <i className={`feather ${selectedModerator.isActive ? 'icon-check' : 'icon-x'} mr-1`}></i>
-                                    {selectedModerator.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </div>
-                        </Col>
+                      
                         <Col md={6}>
                             <div className="mb-4">
                                 <div className="d-flex align-items-center mb-2">
@@ -179,25 +165,13 @@ const ViewModeratorPage = () => {
                                 </div>
                             </div>
                         </Col>
-                        <Col md={6}>
-                            <div className="mb-4">
-                                <div className="d-flex align-items-center mb-2">
-                                    <i className="feather icon-calendar text-info mr-2"></i>
-                                    <label className="text-muted small mb-0">Assigned Events</label>
-                                </div>
-                                <div className="bg-light p-2 rounded">
-                                    <span className="text-dark font-weight-medium">
-                                        {selectedModerator.moderatorEvents?.length || 0} Events
-                                    </span>
-                                </div>
-                            </div>
-                        </Col>
+            
                     </Row>
                 </div>
             </InfoCard>
 
             {/* Assigned Events Card */}
-            {selectedModerator.moderatorEvents && selectedModerator.moderatorEvents.length > 0 && (
+            {selectedModerator.assignments && selectedModerator.assignments.length > 0 && (
                 <InfoCard title="Assigned Events" icon="📅" borderColor="#28a745">
                     <div style={{
                         backgroundColor: '#fff',
@@ -206,13 +180,34 @@ const ViewModeratorPage = () => {
                         border: '1px solid #e9ecef',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                     }}>
-                        {selectedModerator.moderatorEvents.map((assignment, index) => (
-                            <div key={assignment.id} className={`mb-3 pb-3 ${index < selectedModerator.moderatorEvents.length - 1 ? 'border-bottom' : ''}`}>
+                        {selectedModerator.assignments.map((assignment, index) => (
+                            <div key={assignment.id} className={`mb-3 pb-3 ${index < selectedModerator.assignments.length - 1 ? 'border-bottom' : ''}`}>
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h6 className="text-primary font-weight-bold mb-1">
                                             {assignment.event?.name || 'Unknown Event'}
                                         </h6>
+                                        {assignment.track && (
+                                            <p className="text-info mb-1">
+                                                <i className="feather icon-layers mr-1"></i>
+                                                Track: {assignment.track.title}
+                                            </p>
+                                        )}
+                                        {assignment.sessions && assignment.sessions.length > 0 && (
+                                            <div className="mb-2">
+                                                <small className="text-muted d-block mb-1">
+                                                    <i className="feather icon-play mr-1"></i>
+                                                    Sessions ({assignment.sessions.length}):
+                                                </small>
+                                                <div className="d-flex flex-wrap gap-1">
+                                                    {assignment.sessions.map((sessionItem, sessionIndex) => (
+                                                        <Badge key={sessionIndex} variant="secondary" className="mr-1 mb-1">
+                                                            {sessionItem.session?.title || 'Unknown Session'}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         <small className="text-muted">
                                             <i className="feather icon-calendar mr-1"></i>
                                             Assigned on: <DateTimeFormatter date={assignment.createdAt} />

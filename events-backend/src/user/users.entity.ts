@@ -153,5 +153,9 @@ export class UserEntity {
   // Address relationship - one user can have multiple addresses
   @OneToMany(() => AddressEntity, (address) => address.user)
   addresses?: AddressEntity[];
+
+  // Moderator relationship - when user has Moderator role
+  @OneToMany('ModeratorEvent', 'moderator')
+  moderatorEvents?: any[];
   
 }

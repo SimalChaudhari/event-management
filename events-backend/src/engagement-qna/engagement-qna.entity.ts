@@ -29,6 +29,9 @@ export class EngagementQnaQuestion {
   engagement?: Engagement;
 
   @Column()
+  sessionId!: string;
+
+  @Column()
   askedById!: string;
 
   @ManyToOne(() => UserEntity, { eager: false })
@@ -51,7 +54,7 @@ export class EngagementQnaQuestion {
     type: 'enum', 
     enum: ['not_answered', 'answering', 'answered'], 
     nullable: true,
-    default: null
+    default: 'answering'
   })
   status?: string;
 

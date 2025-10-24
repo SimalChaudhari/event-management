@@ -9,10 +9,11 @@ import {
   HttpStatus,
   Res,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ModeratorService } from './moderator.service';
-import { CreateModeratorDto, UpdateModeratorDto, AssignModeratorToEventDto, AssignMultipleEventsDto } from './moderator.dto';
+import { CreateModeratorDto, UpdateModeratorDto, AssignModeratorToEventDto, AssignModeratorToSessionDto, AssignMultipleEventsDto } from './moderator.dto';
 import { UserRole } from '../user/users.entity';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -145,6 +146,27 @@ export class ModeratorController {
     }
   }
 
+  // Assign moderator to specific session
+  @Post('assign-session')
+  async assignModeratorToSession(
+    @Body() assignDto: AssignModeratorToSessionDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const assignment = await this.moderatorService.assignModeratorToSession(assignDto);
+      return response.status(HttpStatus.CREATED).json({
+        success: true,
+        message: 'Moderator assigned to session successfully',
+        data: assignment,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to assign moderator to session',
+      });
+    }
+  }
+
   // Assign moderator to multiple events
   @Post('assign-multiple-events')
   async assignModeratorToMultipleEvents(
@@ -229,6 +251,168 @@ export class ModeratorController {
       return response.status(statusCode).json({
         success: false,
         message: error.message || 'Failed to fetch event moderators',
+      });
+    }
+  }
+
+  // Get session questions for moderator assignment
+  @Get('session/:sessionId/questions')
+  async getSessionQuestions(
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const questions = await this.moderatorService.getSessionQuestions(sessionId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Session questions retrieved successfully',
+        data: questions,
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to fetch session questions',
+      });
+    }
+  }
+
+  // Get session-specific moderator landing page data
+  @Public()
+  @Get('session/:sessionId/landing')
+  async getSessionLandingData(
+    @Param('sessionId') sessionId: string,
+    @Query('token') token: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const data = await this.moderatorService.getSessionModeratorData(sessionId, token);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Session moderator data retrieved successfully',
+        data: data,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to fetch session moderator data',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // Get comprehensive session dashboard data
+  @Public()
+  @Get('session/:sessionId/dashboard')
+  async getSessionDashboardData(
+    @Param('sessionId') sessionId: string,
+    @Query('token') token: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const data = await this.moderatorService.getSessionModeratorData(sessionId, token);
+      
+      // Add additional dashboard-specific data
+      const dashboardData = {
+        ...data,
+        dashboard: {
+          quickStats: {
+            questionsPending: data.statistics.unansweredQuestions,
+            questionsAnswered: data.statistics.answeredQuestions,
+            totalModerators: data.statistics.totalModerators,
+            sessionActive: data.sessionDetails.isActive,
+          },
+          recentActivity: data.questions.questions?.slice(0, 10) || [],
+          upcomingTasks: [
+            ...(data.statistics.unansweredQuestions > 0 ? [{
+              type: 'answer_questions',
+              count: data.statistics.unansweredQuestions,
+              priority: 'high',
+              description: `${data.statistics.unansweredQuestions} questions need answers`
+            }] : []),
+            ...(data.statistics.pinnedQuestions > 0 ? [{
+              type: 'review_pinned',
+              count: data.statistics.pinnedQuestions,
+              priority: 'medium',
+              description: `${data.statistics.pinnedQuestions} pinned questions to review`
+            }] : []),
+          ],
+          sessionTimeline: {
+            startTime: data.sessionDetails.startTime,
+            endTime: data.sessionDetails.endTime,
+            duration: this.calculateDuration(data.sessionDetails.startTime, data.sessionDetails.endTime),
+            status: this.getSessionStatus(data.sessionDetails.sessionDate, data.sessionDetails.startTime, data.sessionDetails.endTime),
+          },
+        },
+      };
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Session dashboard data retrieved successfully',
+        data: dashboardData,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to fetch session dashboard data',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  private calculateDuration(startTime: string, endTime: string): string {
+    try {
+      const start = new Date(`2000-01-01T${startTime}`);
+      const end = new Date(`2000-01-01T${endTime}`);
+      const diffMs = end.getTime() - start.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours}h ${minutes}m`;
+    } catch {
+      return 'Unknown';
+    }
+  }
+
+  private getSessionStatus(sessionDate: Date, startTime: string, endTime: string): string {
+    try {
+      const now = new Date();
+      const sessionStart = new Date(`${sessionDate.toISOString().split('T')[0]}T${startTime}`);
+      const sessionEnd = new Date(`${sessionDate.toISOString().split('T')[0]}T${endTime}`);
+      
+      if (now < sessionStart) return 'upcoming';
+      if (now >= sessionStart && now <= sessionEnd) return 'live';
+      return 'completed';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  // Update question status (Public - for moderator actions)
+  @Public()
+  @Put('question/:questionId/status')
+  async updateQuestionStatus(
+    @Param('questionId') questionId: string,
+    @Body() body: { action: 'cancel' | 'answer'; answer?: string },
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.moderatorService.updateQuestionStatus(questionId, body.action, body.answer);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: `Question ${body.action === 'cancel' ? 'cancelled' : 'answered'} successfully`,
+        data: result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to update question status',
+        timestamp: new Date().toISOString(),
       });
     }
   }

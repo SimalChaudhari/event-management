@@ -21,6 +21,10 @@ export class CreateEngagementQuestionDto {
   @IsNotEmpty()
   @IsUUID()
   engagementId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  sessionId!: string;
 }
 
 export class UpdateEngagementQuestionDto {
@@ -49,6 +53,10 @@ export class GetEngagementQuestionsDto {
   @IsNotEmpty()
   @IsUUID()
   engagementId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
 
   @IsOptional()
   @IsEnum(QuestionStatus)

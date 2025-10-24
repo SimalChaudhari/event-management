@@ -14,10 +14,10 @@ const AddModeratorPage = () => {
     const { selectedModerator, loading } = useSelector((state) => state.moderator);
 
     const [formData, setFormData] = useState({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         mobile: '',
-        isActive: true
     });
 
     const [errors, setErrors] = useState({});
@@ -32,10 +32,10 @@ const AddModeratorPage = () => {
     useEffect(() => {
         if (isEditing && selectedModerator) {
             setFormData({
-                name: selectedModerator.name || '',
+                firstName: selectedModerator.firstName || '',
+                lastName: selectedModerator.lastName || '',
                 email: selectedModerator.email || '',
-                mobile: selectedModerator.mobile || '',
-                isActive: selectedModerator.isActive !== undefined ? selectedModerator.isActive : true
+                mobile: selectedModerator.mobile || ''
             });
         }
     }, [isEditing, selectedModerator]);
@@ -58,8 +58,12 @@ const AddModeratorPage = () => {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!formData.name?.trim()) {
-            newErrors.name = 'Name is required';
+        if (!formData.firstName?.trim()) {
+            newErrors.firstName = 'First name is required';
+        }
+
+        if (!formData.lastName?.trim()) {
+            newErrors.lastName = 'Last name is required';
         }
 
         if (!formData.email?.trim()) {
@@ -88,10 +92,10 @@ const AddModeratorPage = () => {
 
         try {
             const payload = {
-                name: formData.name.trim(),
+                firstName: formData.firstName.trim(),
+                lastName: formData.lastName.trim(),
                 email: formData.email.trim(),
                 mobile: formData.mobile?.trim() || undefined,
-                isActive: formData.isActive
             };
 
             let result;
@@ -134,22 +138,42 @@ const AddModeratorPage = () => {
                         <div className="card-body">
                             <form onSubmit={handleSubmit}>
                                 <Row>
-                                    <Col sm={12}>
+                                    <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="name">
-                                                Name <span className="text-danger">*</span>
+                                            <label className="floating-label" htmlFor="firstName">
+                                                First Name <span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
-                                                className={`form-control ${errors.name ? 'is-invalid' : ''}`}
-                                                id="name"
-                                                name="name"
-                                                placeholder="Enter name"
-                                                value={formData.name}
+                                                className={`form-control ${errors.firstName ? 'is-invalid' : ''}`}
+                                                id="firstName"
+                                                name="firstName"
+                                                placeholder="Enter first name"
+                                                value={formData.firstName}
                                                 onChange={handleInputChange}
                                             />
-                                            {errors.name && (
-                                                <small className="text-danger">{errors.name}</small>
+                                            {errors.firstName && (
+                                                <small className="text-danger">{errors.firstName}</small>
+                                            )}
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="lastName">
+                                                Last Name <span className="text-danger">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className={`form-control ${errors.lastName ? 'is-invalid' : ''}`}
+                                                id="lastName"
+                                                name="lastName"
+                                                placeholder="Enter last name"
+                                                value={formData.lastName}
+                                                onChange={handleInputChange}
+                                            />
+                                            {errors.lastName && (
+                                                <small className="text-danger">{errors.lastName}</small>
                                             )}
                                         </div>
                                     </Col>
@@ -194,26 +218,6 @@ const AddModeratorPage = () => {
                                         </div>
                                     </Col>
 
-                                    <Col sm={12}>
-                                        <div className="form-group">
-                                            <div className="checkbox d-inline">
-                                                <input
-                                                    type="checkbox"
-                                                    name="isActive"
-                                                    id="isActive"
-                                                    checked={formData.isActive}
-                                                    onChange={handleInputChange}
-                                                    style={{ marginRight: '8px' }}
-                                                />
-                                                <label htmlFor="isActive" className="cr">
-                                                    Active
-                                                </label>
-                                            </div>
-                                            <small className="form-text text-muted d-block mt-2">
-                                                Check this to make the moderator active
-                                            </small>
-                                        </div>
-                                    </Col>
                                 </Row>
 
                                 <Row>

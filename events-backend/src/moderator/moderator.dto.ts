@@ -3,7 +3,11 @@ import { IsNotEmpty, IsEmail, IsOptional, IsString, IsBoolean, IsUUID, IsArray }
 export class CreateModeratorDto {
   @IsNotEmpty()
   @IsString()
-  name!: string;
+  firstName!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  lastName!: string;
 
   @IsNotEmpty()
   @IsEmail()
@@ -21,7 +25,11 @@ export class CreateModeratorDto {
 export class UpdateModeratorDto {
   @IsOptional()
   @IsString()
-  name?: string;
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @IsOptional()
   @IsEmail()
@@ -44,6 +52,32 @@ export class AssignModeratorToEventDto {
   @IsNotEmpty()
   @IsUUID()
   eventId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  trackId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
+}
+
+export class AssignModeratorToSessionDto {
+  @IsNotEmpty()
+  @IsUUID()
+  moderatorId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  eventId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  trackId!: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  sessionId!: string;
 }
 
 export class AssignMultipleEventsDto {

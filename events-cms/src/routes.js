@@ -762,6 +762,12 @@ const publicModeratorRoutes = [
         component: moderatorComponents.Landing
     },
     {
+        path: '/moderator/session/:sessionId',
+        exact: true,
+        name: 'Moderator Session Landing',
+        component: moderatorComponents.Landing
+    },
+    {
         path: '/moderator/qa/:moderatorId/:eventId',
         exact: true,
         name: 'Moderator QA',

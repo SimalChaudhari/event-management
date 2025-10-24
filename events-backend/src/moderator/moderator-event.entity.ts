@@ -9,9 +9,11 @@ import {
 } from 'typeorm';
 import { Moderator } from './moderator.entity';
 import { Event } from '../event/event.entity';
+import { ProgrammeTrack } from '../programme/programme-track.entity';
+import { ProgrammeSession } from '../programme/programme-session.entity';
 
 @Entity('moderator_events')
-@Index(['moderatorId', 'eventId'], { unique: true })
+@Index(['moderatorId', 'eventId', 'trackId', 'sessionId'], { unique: true })
 export class ModeratorEvent {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -21,6 +23,12 @@ export class ModeratorEvent {
 
   @Column({ type: 'uuid' })
   eventId!: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  trackId?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  sessionId?: string;
 
   @ManyToOne(() => Moderator, (moderator) => moderator.moderatorEvents, {
     onDelete: 'CASCADE',
@@ -33,6 +41,18 @@ export class ModeratorEvent {
   })
   @JoinColumn({ name: 'eventId' })
   event!: Event;
+
+  @ManyToOne(() => ProgrammeTrack, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'trackId' })
+  track?: ProgrammeTrack;
+
+  @ManyToOne(() => ProgrammeSession, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'sessionId' })
+  session?: ProgrammeSession;
 
   @CreateDateColumn()
   createdAt!: Date;

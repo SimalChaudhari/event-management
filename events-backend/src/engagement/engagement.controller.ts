@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Res,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { EngagementService } from './engagement.service';
@@ -53,6 +54,7 @@ export class EngagementController {
    * Get all engagements
    */
   @Get()
+  @Roles(UserRole.Admin, UserRole.Moderator)
   async getAllEngagements(@Res() response: Response) {
     try {
       const engagements = await this.engagementService.getAllEngagements();
@@ -114,9 +116,35 @@ export class EngagementController {
   }
 
   /**
+   * Get engagement data for moderator with sessionId filter (Moderator and Admin access only)
+   */
+  @Get('moderator/:engagementId')
+  @Roles(UserRole.Admin, UserRole.Moderator)
+  async getEngagementForModerator(
+    @Param('engagementId') engagementId: string,
+    @Query('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const engagementData = await this.engagementService.getEngagementForModerator(engagementId, sessionId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        data: engagementData,
+      });
+    } catch (error: any) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: error.message || 'Failed to fetch engagement data for moderator',
+      });
+    }
+  }
+
+
+  /**
    * Get engagement by ID
    */
   @Get(':id')
+  @Roles(UserRole.Admin, UserRole.Moderator)
   async getEngagementById(@Param('id') id: string, @Res() response: Response) {
     try {
       const engagement = await this.engagementService.getEngagementById(id);
@@ -137,6 +165,7 @@ export class EngagementController {
    * Get engagements by track ID
    */
   @Get('track/:trackId')
+  @Roles(UserRole.Admin, UserRole.Moderator)
   async getEngagementsByTrackId(
     @Param('trackId') trackId: string,
     @Res() response: Response,
