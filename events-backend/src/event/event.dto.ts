@@ -130,19 +130,6 @@ export class EventDto {
   @IsOptional()
   speakerIds?: string;
 
-  // Speaker time information
-  @IsOptional()
-  @Matches(/^(\d{2}:\d{2}(,\d{2}:\d{2})*)?$/, {
-    message: 'Speaker start times must be in HH:MM format, comma-separated (e.g., "09:30,11:00,14:00")',
-  })
-  speakerStartTimes?: string; // Comma-separated start times for speakers
-
-  @IsOptional()
-  @Matches(/^(\d{2}:\d{2}(,\d{2}:\d{2})*)?$/, {
-    message: 'Speaker end times must be in HH:MM format, comma-separated (e.g., "09:30,11:00,14:00")',
-  })
-  speakerEndTimes?: string; // Comma-separated end times for speakers
-
   // Tab visibility configuration
   @IsOptional()
   tabVisibility?: {

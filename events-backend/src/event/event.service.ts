@@ -35,7 +35,6 @@ import {
   EventQueryBuilderUtils,
   GlobalSearchUtils,
 } from '../utils/searchEvent';
-import { SpeakerTimeUtils } from '../utils';
 import { QnaUtils } from '../utils/qna.utils';
 
 @Injectable()
@@ -113,9 +112,6 @@ export class EventService {
       // Validate coordinates
       this.validateCoordinates(eventDto);
 
-      // Validate speaker times
-      this.validateSpeakerTimes(eventDto);
-
       // Set default currency if not provided
       if (!eventDto.currency) {
         eventDto.currency = 'SGD';
@@ -141,24 +137,12 @@ export class EventService {
       // Create speaker associations if speakerIds are provided
       if (eventDto.speakerIds) {
         const speakerIdsArray = eventDto.speakerIds.split(',');
-        
-        // Parse speaker time information
-        const speakerStartTimes = eventDto.speakerStartTimes ? eventDto.speakerStartTimes.split(',') : [];
-        const speakerEndTimes = eventDto.speakerEndTimes ? eventDto.speakerEndTimes.split(',') : [];
 
         await Promise.all(
-          speakerIdsArray.map(async (speakerId, index) => {
+          speakerIdsArray.map(async (speakerId) => {
             const eventSpeaker = new EventSpeaker();
             eventSpeaker.eventId = savedEvent.id;
             eventSpeaker.speakerId = speakerId.trim();
-            
-            // Set speaker time information if available
-            if (speakerStartTimes[index]) {
-              eventSpeaker.speakingStartTime = speakerStartTimes[index].trim();
-            }
-            if (speakerEndTimes[index]) {
-              eventSpeaker.speakingEndTime = speakerEndTimes[index].trim();
-            }
             
             await this.eventSpeakerRepository.save(eventSpeaker);
           }),
@@ -708,9 +692,6 @@ export class EventService {
       // Coordinate validations
       this.validateCoordinates(eventDto);
 
-      // Validate speaker times
-      this.validateSpeakerTimes(eventDto, event);
-
       Object.assign(event, eventDto);
       const updatedEvent = await this.eventRepository.save(event);
 
@@ -920,42 +901,15 @@ export class EventService {
 
     // Update speaker associations if provided
     if (eventDto.speakerIds !== undefined) {
-      // Validate speaker times before updating
-      if (eventDto.speakerIds && eventDto.speakerStartTimes && eventDto.speakerEndTimes) {
-        // Get current event for time validation
-        const currentEvent = await this.eventRepository.findOne({ where: { id: eventId } });
-        if (currentEvent) {
-          // Create a temporary DTO with event times for validation
-          const tempDto = {
-            ...eventDto,
-            startTime: currentEvent.startTime,
-            endTime: currentEvent.endTime,
-          };
-          this.validateSpeakerTimes(tempDto, currentEvent);
-        }
-      }
-
       await this.eventSpeakerRepository.delete({ eventId });
       if (eventDto.speakerIds) {
         const speakerIdsArray = eventDto.speakerIds.split(',');
-        
-        // Parse speaker time information
-        const speakerStartTimes = eventDto.speakerStartTimes ? eventDto.speakerStartTimes.split(',') : [];
-        const speakerEndTimes = eventDto.speakerEndTimes ? eventDto.speakerEndTimes.split(',') : [];
 
         await Promise.all(
-          speakerIdsArray.map(async (speakerId, index) => {
+          speakerIdsArray.map(async (speakerId) => {
             const eventSpeaker = new EventSpeaker();
             eventSpeaker.eventId = eventId;
             eventSpeaker.speakerId = speakerId.trim();
-            
-            // Set speaker time information if available
-            if (speakerStartTimes[index]) {
-              eventSpeaker.speakingStartTime = speakerStartTimes[index].trim();
-            }
-            if (speakerEndTimes[index]) {
-              eventSpeaker.speakingEndTime = speakerEndTimes[index].trim();
-            }
             
             await this.eventSpeakerRepository.save(eventSpeaker);
           }),
@@ -1179,26 +1133,6 @@ export class EventService {
     EventValidationUtils.validateCoordinates(eventDto);
   }
 
-  // Validate speaker times against event times and check for overlaps
-  private validateSpeakerTimes(
-    eventDto: Partial<EventDto>,
-    existingEvent?: Event,
-  ) {
-    if (!eventDto.speakerIds || !eventDto.speakerStartTimes || !eventDto.speakerEndTimes) {
-      return; // No speaker times to validate
-    }
-
-    const speakerIds = eventDto.speakerIds.split(',');
-    const speakerStartTimes = eventDto.speakerStartTimes.split(',');
-    const speakerEndTimes = eventDto.speakerEndTimes.split(',');
-
-    // Use the utility for validation
-    SpeakerTimeUtils.validateSpeakerTimes(
-      { speakerIds, speakerStartTimes, speakerEndTimes },
-      { startTime: eventDto.startTime || '', endTime: eventDto.endTime || '' },
-      existingEvent ? { startTime: existingEvent.startTime, endTime: existingEvent.endTime } : undefined,
-    );
-  }
 
   // Get event booths by event ID
   async getEventBooths(eventId: string): Promise<any[]> {

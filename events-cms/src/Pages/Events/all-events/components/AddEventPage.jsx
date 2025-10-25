@@ -130,8 +130,6 @@ function AddEventPage() {
         price: '',
         currency: '',
         speakerIds: [],
-        speakerStartTimes: [], // Speaker start times array
-        speakerEndTimes: [], // Speaker end times array
         categoryIds: [],
         latitude: '',
         longitude: '',
@@ -226,16 +224,10 @@ function AddEventPage() {
 
                         // Handle speakers data
                         let speakerIds = [];
-                        let speakerStartTimes = [];
-                        let speakerEndTimes = [];
                         if (editData.speakers) {
                             speakerIds = editData.speakers.map((speaker) => speaker.id);
-                            speakerStartTimes = editData.speakers.map((speaker) => speaker.speakingStartTime || '');
-                            speakerEndTimes = editData.speakers.map((speaker) => speaker.speakingEndTime || '');
                         } else if (editData.speakersData) {
                             speakerIds = editData.speakersData.map((speaker) => speaker.id);
-                            speakerStartTimes = editData.speakersData.map((speaker) => speaker.speakingStartTime || '');
-                            speakerEndTimes = editData.speakersData.map((speaker) => speaker.speakingEndTime || '');
                         }
 
                         // Handle categories data
@@ -361,8 +353,6 @@ function AddEventPage() {
                             price: editData.price || '',
                             currency: editData.currency || '',
                             speakerIds: speakerIds,
-                            speakerStartTimes: speakerStartTimes,
-                            speakerEndTimes: speakerEndTimes,
                             categoryIds: categoryIds,
                             floorPlan: floorPlanData,
                             exhibitorIds: exhibitorIds,
@@ -580,8 +570,6 @@ function AddEventPage() {
             price: '',
             currency: '',
             speakerIds: [],
-            speakerStartTimes: [],
-            speakerEndTimes: [],
             categoryIds: [],
             latitude: '',
             longitude: '',
@@ -644,26 +632,9 @@ function AddEventPage() {
     const handleSpeakerSelect = (selectedOptions) => {
         const selectedIds = selectedOptions.map((option) => option.value);
         
-        // Initialize timing arrays with empty strings for each speaker
-        const currentStartTimes = formData.speakerStartTimes || [];
-        const currentEndTimes = formData.speakerEndTimes || [];
-        
-        // Preserve existing times for speakers that are still selected
-        const newStartTimes = selectedIds.map((id, index) => {
-            const oldIndex = formData.speakerIds.indexOf(id);
-            return oldIndex >= 0 ? currentStartTimes[oldIndex] || '' : '';
-        });
-        
-        const newEndTimes = selectedIds.map((id, index) => {
-            const oldIndex = formData.speakerIds.indexOf(id);
-            return oldIndex >= 0 ? currentEndTimes[oldIndex] || '' : '';
-        });
-        
         setFormData((prev) => ({
             ...prev,
-            speakerIds: selectedIds,
-            speakerStartTimes: newStartTimes,
-            speakerEndTimes: newEndTimes
+            speakerIds: selectedIds
         }));
     };
 
@@ -673,19 +644,6 @@ function AddEventPage() {
             ...prev,
             categoryIds: selectedIds
         }));
-    };
-
-    // Handle speaker timing updates
-    const handleSpeakerTimingChange = (index, field, value) => {
-        setFormData((prev) => {
-            const newTimes = field === 'startTime' ? [...prev.speakerStartTimes] : [...prev.speakerEndTimes];
-            newTimes[index] = value;
-            
-            return {
-                ...prev,
-                [field === 'startTime' ? 'speakerStartTimes' : 'speakerEndTimes']: newTimes
-            };
-        });
     };
 
     // Handle form submission - Updated to handle event stamps correctly
@@ -731,12 +689,6 @@ function AddEventPage() {
             if (key === 'speakerIds') {
                 const speakersArray = Array.isArray(dataToSend.speakerIds) ? dataToSend.speakerIds : [];
                 formDataToSend.append('speakerIds', speakersArray.join(','));
-            } else if (key === 'speakerStartTimes') {
-                const startTimesArray = Array.isArray(dataToSend.speakerStartTimes) ? dataToSend.speakerStartTimes : [];
-                formDataToSend.append('speakerStartTimes', startTimesArray.join(','));
-            } else if (key === 'speakerEndTimes') {
-                const endTimesArray = Array.isArray(dataToSend.speakerEndTimes) ? dataToSend.speakerEndTimes : [];
-                formDataToSend.append('speakerEndTimes', endTimesArray.join(','));
             } else if (key === 'categoryIds') {
                 const categoriesArray = Array.isArray(dataToSend.categoryIds) ? dataToSend.categoryIds : [];
                 formDataToSend.append('categoryIds', categoriesArray.join(','));
@@ -1418,49 +1370,6 @@ function AddEventPage() {
                                                 </Button>
                                             )}
                                         </div>
-
-                                        {/* Speaker Timing Fields */}
-                                        {formData.speakerIds && formData.speakerIds.length > 0 && (
-                                            <div className="mt-4 p-3 border rounded bg-light">
-                                                <h6 className="mb-3">Speaker Timings</h6>
-                                                {formData.speakerIds.map((speakerId, index) => {
-                                                    const speaker = speakerList.find(s => s.id === speakerId);
-                                                    return (
-                                                        <div key={speakerId} className="mb-3 p-3 border rounded bg-white">
-                                                            <div className="mb-2">
-                                                                <strong>
-                                                                    {speaker ? `${speaker.firstName} ${speaker.lastName}` : 'Speaker'}
-                                                                </strong>
-                                                            </div>
-                                                            <Row>
-                                                                <Col md={6}>
-                                                                    <Form.Group>
-                                                                        <Form.Label>Speaking Start Time</Form.Label>
-                                                                        <Form.Control
-                                                                            type="time"
-                                                                            value={formData.speakerStartTimes?.[index] || ''}
-                                                                            onChange={(e) => handleSpeakerTimingChange(index, 'startTime', e.target.value)}
-                                                                            placeholder="HH:MM"
-                                                                        />
-                                                                    </Form.Group>
-                                                                </Col>
-                                                                <Col md={6}>
-                                                                    <Form.Group>
-                                                                        <Form.Label>Speaking End Time</Form.Label>
-                                                                        <Form.Control
-                                                                            type="time"
-                                                                            value={formData.speakerEndTimes?.[index] || ''}
-                                                                            onChange={(e) => handleSpeakerTimingChange(index, 'endTime', e.target.value)}
-                                                                            placeholder="HH:MM"
-                                                                        />
-                                                                    </Form.Group>
-                                                                </Col>
-                                                            </Row>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
 
                                         <SpeakerFormModal
                                             show={showSidebar}

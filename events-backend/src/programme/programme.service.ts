@@ -5,6 +5,7 @@ import { ProgrammeTrack } from './programme-track.entity';
 import { ProgrammeSession } from './programme-session.entity';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
+import { EventSpeaker } from '../event/event-speaker.entity';
 import {
   CreateProgrammeTrackDto,
   UpdateProgrammeTrackDto,
@@ -27,6 +28,8 @@ export class ProgrammeService {
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+    @InjectRepository(EventSpeaker)
+    private eventSpeakerRepository: Repository<EventSpeaker>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -159,6 +162,10 @@ export class ProgrammeService {
       });
 
       const savedSession = await this.programmeSessionRepository.save(session);
+      
+      // Sync speaker timing with event speakers
+      await this.syncSpeakerTimingWithEvent(savedSession);
+      
       return this.mapSessionToResponseDto(savedSession);
     } catch (error) {
       this.errorHandler.logError(error, 'Create Programme Session', createSessionDto.trackId);
@@ -201,6 +208,10 @@ export class ProgrammeService {
       delete (session as any).speakerIds; // Remove from assignment
 
       const savedSession = await this.programmeSessionRepository.save(session);
+      
+      // Sync speaker timing with event speakers
+      await this.syncSpeakerTimingWithEvent(savedSession);
+      
       return this.mapSessionToResponseDto(savedSession);
     } catch (error) {
       this.errorHandler.logError(error, 'Update Programme Session', sessionId);
@@ -277,6 +288,53 @@ export class ProgrammeService {
   }
 
   // Helper methods
+  private async syncSpeakerTimingWithEvent(session: ProgrammeSession): Promise<void> {
+    try {
+      // Get the track to find the event
+      const track = await this.programmeTrackRepository.findOne({
+        where: { id: session.trackId },
+      });
+
+      if (!track) {
+        return;
+      }
+
+      // Get all speakers currently assigned to this event
+      const allEventSpeakers = await this.eventSpeakerRepository.find({
+        where: { eventId: track.eventId },
+      });
+
+      // Update or create event speaker timing for each speaker in this session
+      if (session.speakers && session.speakers.length > 0) {
+        for (const speaker of session.speakers) {
+          const eventSpeaker = allEventSpeakers.find(es => es.speakerId === speaker.id);
+
+          if (eventSpeaker) {
+            // Update the speaker's timing in the event to match the programme session
+            eventSpeaker.speakingStartTime = session.startTime;
+            eventSpeaker.speakingEndTime = session.endTime;
+            await this.eventSpeakerRepository.save(eventSpeaker);
+          } else {
+            // Create new event speaker record if it doesn't exist
+            const newEventSpeaker = this.eventSpeakerRepository.create({
+              eventId: track.eventId,
+              speakerId: speaker.id,
+              speakingStartTime: session.startTime,
+              speakingEndTime: session.endTime,
+            });
+            await this.eventSpeakerRepository.save(newEventSpeaker);
+          }
+        }
+      }
+
+      // If session has no speakers, we don't remove event speakers as they might be assigned to other sessions
+      // This maintains the existing behavior where event speakers can exist independently
+    } catch (error) {
+      this.errorHandler.logError(error, 'Sync Speaker Timing with Event', session.id);
+      // Don't throw error to avoid breaking the main operation
+    }
+  }
+
   private mapTrackToResponseDto(track: ProgrammeTrack): ProgrammeTrackResponseDto {
     return {
       id: track.id,
