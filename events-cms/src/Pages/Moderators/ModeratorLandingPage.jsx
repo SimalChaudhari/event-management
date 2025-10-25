@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Table, Form, Spinner, Alert } from "react-bootstrap";
+import { Container, Row, Col, Table, Form, Spinner, Alert, Button, Modal } from "react-bootstrap";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { fetchModeratorLandingData, processModeratorResponseData, processSessionResponseData, updateQuestionStatus, updateQuestion, deleteQuestion } from "./APis/moderatorLandingApi";
+import { BASE_URL } from "../../configs/env";
 
 const ModeratorLandingPage = () => {
   const { moderatorId, sessionId: urlSessionId } = useParams();
@@ -20,6 +21,15 @@ const ModeratorLandingPage = () => {
   const [loading, setLoading] = useState(true);
   const [answeringQuestion, setAnsweringQuestion] = useState(null);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const [selectedQuestionForAnswer, setSelectedQuestionForAnswer] = useState(null);
+  const [answerText, setAnswerText] = useState('');
+  const [submittingAnswerText, setSubmittingAnswerText] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedQuestionForEdit, setSelectedQuestionForEdit] = useState(null);
+  const [editQuestionText, setEditQuestionText] = useState('');
+  const [editQuestionStatus, setEditQuestionStatus] = useState('');
+  const [submittingEdit, setSubmittingEdit] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -83,6 +93,162 @@ const ModeratorLandingPage = () => {
     }
   };
 
+
+  // Handle answer question modal
+  const handleAnswerQuestion = (question) => {
+    setSelectedQuestionForAnswer(question);
+    // Show existing answer if available, otherwise empty
+    setAnswerText(question.answer || '');
+    setShowAnswerModal(true);
+  };
+
+  // Handle answer submission
+  const handleSubmitAnswer = async () => {
+    if (!answerText.trim()) {
+      toast.error('Please enter an answer');
+      return;
+    }
+
+    setSubmittingAnswerText(true);
+    try {
+      const response = await updateQuestionStatus(selectedQuestionForAnswer.id, 'answer', answerText.trim());
+      
+      if (response.success) {
+        toast.success(selectedQuestionForAnswer?.answer ? 'Answer updated successfully' : 'Answer submitted successfully');
+        
+        // Close modal
+        setShowAnswerModal(false);
+        setAnswerText('');
+        setSelectedQuestionForAnswer(null);
+        
+        // Update question status in the list
+        const updatedQuestions = questions.map(q => 
+          q.id === selectedQuestionForAnswer.id 
+            ? { ...q, status: 'answered', answer: answerText.trim() }
+            : q
+        );
+        setQuestions(updatedQuestions);
+        
+        // Remove from answering questions if it was there
+        const updatedAnsweringQuestions = answeringQuestions.filter(q => q.id !== selectedQuestionForAnswer.id);
+        setAnsweringQuestions(updatedAnsweringQuestions);
+        
+        // If the answered question was the current answering question, clear it
+        if (answeringQuestion && answeringQuestion.id === selectedQuestionForAnswer.id) {
+          setAnsweringQuestion(null);
+          setCurrentAnsweringIndex(0);
+        }
+      } else {
+        toast.error(response.message || 'Failed to submit answer');
+      }
+    } catch (error) {
+      console.error('Error submitting answer:', error);
+      toast.error('Failed to submit answer');
+    } finally {
+      setSubmittingAnswerText(false);
+    }
+  };
+
+  // Handle modal close
+  const handleCloseAnswerModal = () => {
+    setShowAnswerModal(false);
+    setAnswerText('');
+    setSelectedQuestionForAnswer(null);
+  };
+
+  // Handle edit question modal
+  const handleEditQuestion = (question) => {
+    setSelectedQuestionForEdit(question);
+    setEditQuestionText(question.question);
+    setEditQuestionStatus(question.status);
+    setShowEditModal(true);
+  };
+
+  // Handle edit question submission
+  const handleSubmitEdit = async () => {
+    if (!editQuestionText.trim()) {
+      toast.error('Please enter question text');
+      return;
+    }
+
+    setSubmittingEdit(true);
+    try {
+      const response = await updateQuestion(selectedQuestionForEdit.id, {
+        question: editQuestionText.trim(),
+        status: editQuestionStatus
+      });
+      
+      if (response.success) {
+        toast.success('Question updated successfully');
+        
+        // Close modal
+        setShowEditModal(false);
+        setEditQuestionText('');
+        setEditQuestionStatus('');
+        setSelectedQuestionForEdit(null);
+        
+        // Update question in the list
+        const updatedQuestions = questions.map(q => 
+          q.id === selectedQuestionForEdit.id 
+            ? { 
+                ...q, 
+                question: editQuestionText.trim(),
+                status: editQuestionStatus
+              }
+            : q
+        );
+        setQuestions(updatedQuestions);
+        
+        // Update answering questions if status changed
+        if (editQuestionStatus === 'answering') {
+          const updatedAnsweringQuestions = [...answeringQuestions];
+          if (!updatedAnsweringQuestions.find(q => q.id === selectedQuestionForEdit.id)) {
+            updatedAnsweringQuestions.push({ ...selectedQuestionForEdit, question: editQuestionText.trim(), status: editQuestionStatus });
+          }
+          setAnsweringQuestions(updatedAnsweringQuestions);
+          
+          // Set as current answering question if none is currently being answered
+          if (!answeringQuestion) {
+            setAnsweringQuestion({ ...selectedQuestionForEdit, question: editQuestionText.trim(), status: editQuestionStatus });
+            setCurrentAnsweringIndex(0);
+          }
+        } else {
+          const updatedAnsweringQuestions = answeringQuestions.filter(q => q.id !== selectedQuestionForEdit.id);
+          setAnsweringQuestions(updatedAnsweringQuestions);
+          
+          // Clear current answering question if it was the one being edited
+          if (answeringQuestion && answeringQuestion.id === selectedQuestionForEdit.id) {
+            setAnsweringQuestion(null);
+            setCurrentAnsweringIndex(0);
+          }
+        }
+      } else {
+        toast.error(response.message || 'Failed to update question');
+      }
+    } catch (error) {
+      console.error('Error updating question:', error);
+      toast.error('Failed to update question');
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  // Handle edit modal close
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditQuestionText('');
+    setEditQuestionStatus('');
+    setSelectedQuestionForEdit(null);
+  };
+
+  // Handle answer now action
+  const handleAnswerNow = (question) => {
+    if (question.status === 'answering') {
+      toast.warning('This question is already being answered');
+      return;
+    }
+    handleAnswerQuestion(question);
+  };
 
   // Handle question status update
   const handleQuestionStatusUpdate = async (action) => {
@@ -168,16 +334,6 @@ const ModeratorLandingPage = () => {
     );
   }
 
-  // Handle edit question
-  const handleEditQuestion = async (questionId) => {
-    try {
-      // For now, just show a toast - you can implement edit modal later
-      toast.info("Edit functionality - implement edit modal");
-    } catch (error) {
-      console.error('Error editing question:', error);
-      toast.error('Failed to edit question');
-    }
-  };
 
   // Handle delete question
   const handleDeleteQuestion = async (questionId) => {
@@ -186,6 +342,15 @@ const ModeratorLandingPage = () => {
       
       if (response.success) {
         toast.success('Question deleted successfully');
+        
+        // Close any open modals
+        setShowAnswerModal(false);
+        setShowEditModal(false);
+        setAnswerText('');
+        setEditQuestionText('');
+        setEditQuestionStatus('');
+        setSelectedQuestionForAnswer(null);
+        setSelectedQuestionForEdit(null);
         
         // Remove question from the list
         const updatedQuestions = questions.filter(q => q.id !== questionId);
@@ -483,6 +648,7 @@ const ModeratorLandingPage = () => {
                       verticalAlign: "top"
                     }}>
                       <div className="d-flex gap-2 justify-content-center flex-wrap">
+                        {/* Answer Now Button */}
                         <button
                           className="btn btn-icon"
                           style={{
@@ -491,19 +657,23 @@ const ModeratorLandingPage = () => {
                             borderRadius: "50%",
                             border: "none",
                             backgroundColor: "transparent",
-                            cursor: "pointer",
+                            cursor: q.status === "answering" ? "not-allowed" : "pointer",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                             padding: 0,
-                            color: q.status === "answering" ? "#71C0BB" : "#D4D6DD"
+                            color: q.status === "answering" ? "#D4D6DD" : q.answer ? "#28a745" : "#71C0BB",
+                            opacity: q.status === "answering" ? 0.5 : 1
                           }}
-                          onClick={() => setAnsweringQuestion(q)}
-                          title="Answer Question"
+                          onClick={() => handleAnswerNow(q)}
+                          disabled={q.status === "answering"}
+                          title={q.status === "answering" ? "Currently Being Answered" : q.answer ? "Edit Answer" : "Answer Now"}
                         >
                           <i className="feather icon-message-circle" style={{ fontSize: "24px" }}></i>
                         </button>
+                        
+                        {/* Edit Question Button */}
                         <button
                           className="btn btn-icon"
                           style={{
@@ -521,10 +691,12 @@ const ModeratorLandingPage = () => {
                             color: "#71C0BB"
                           }}
                           title="Edit Question"
-                          onClick={() => handleEditQuestion(q.id)}
+                          onClick={() => handleEditQuestion(q)}
                         >
                           <i className="feather icon-edit" style={{ fontSize: "24px" }}></i>
                         </button>
+                        
+                        {/* Delete Question Button */}
                         <button
                           className="btn btn-icon"
                           style={{
@@ -565,6 +737,334 @@ const ModeratorLandingPage = () => {
           </Col>
         </Row>
       </Container>
+
+      {/* Answer Submission Modal */}
+      <Modal show={showAnswerModal} onHide={handleCloseAnswerModal} size="lg" centered>
+        <Modal.Header  style={{ borderBottom: '1px solid #e0e0e0', padding: '20px', position: 'relative' }}>
+          <Modal.Title style={{ color: '#333', fontWeight: '600', fontSize: '18px' }}>
+            <i className="feather icon-message-circle mr-2" style={{ color: '#71C0BB' }}></i>
+            {selectedQuestionForAnswer?.answer ? 'Edit Answer' : 'Answer Question'}
+          </Modal.Title>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={handleCloseAnswerModal}
+            style={{
+              position: 'absolute',
+              top: '15px',
+              right: '15px',
+              width: '30px',
+              height: '30px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              fontSize: '18px',
+              color: '#666',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f5f5f5';
+              e.target.style.color = '#333';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = '#666';
+            }}
+          >
+            <i className="feather icon-x" style={{ fontSize: '16px' }}></i>
+          </button>
+        </Modal.Header>
+        <Modal.Body style={{ padding: '20px' }}>
+          {selectedQuestionForAnswer && (
+            <div>
+              <div className="mb-3">
+                <h6 style={{ color: '#333', fontWeight: '600' }}>Question:</h6>
+                <div 
+                  style={{ 
+                    backgroundColor: '#f8f9fa', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    fontStyle: 'italic',
+                    color: '#495057'
+                  }}
+                >
+                  {selectedQuestionForAnswer.question}
+                </div>
+              </div>
+              
+              {/* Show existing answer if available */}
+              {selectedQuestionForAnswer.answer && (
+                <div className="mb-3">
+                  <h6 style={{ color: '#333', fontWeight: '600' }}>
+                    <i className="feather icon-check-circle mr-2" style={{ color: '#28a745' }}></i>
+                    Previous Answer:
+                  </h6>
+                  <div 
+                    style={{ 
+                      backgroundColor: '#d4edda', 
+                      padding: '15px', 
+                      borderRadius: '8px',
+                      border: '1px solid #c3e6cb',
+                      color: '#155724',
+                      fontSize: '14px',
+                      lineHeight: '1.5'
+                    }}
+                  >
+                    {selectedQuestionForAnswer.answer}
+                  </div>
+                  <small className="text-muted">
+                    <i className="feather icon-edit mr-1"></i>
+                    You can edit this answer below
+                  </small>
+                </div>
+              )}
+              
+              <div className="mb-3">
+                <h6 style={{ color: '#333', fontWeight: '600' }}>Your Answer:</h6>
+                <Form.Control
+                  as="textarea"
+                  rows={6}
+                  value={answerText}
+                  onChange={(e) => setAnswerText(e.target.value)}
+                  placeholder={selectedQuestionForAnswer?.answer ? "Edit your answer here..." : "Enter your answer here..."}
+                  style={{
+                    border: '1px solid #ced4da',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    lineHeight: '1.5'
+                  }}
+                />
+                <small className="text-muted">
+                  Character count: {answerText.length}
+                </small>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer style={{ borderTop: '1px solid #e0e0e0', padding: '20px', justifyContent: 'flex-end', gap: '12px' }}>
+          <Button 
+            variant="secondary" 
+            onClick={handleCloseAnswerModal}
+            disabled={submittingAnswerText}
+            style={{ 
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSubmitAnswer}
+            disabled={submittingAnswerText || !answerText.trim()}
+            style={{ 
+              backgroundColor: '#71C0BB', 
+              borderColor: '#71C0BB',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            {submittingAnswerText ? (
+              <>
+                <Spinner size="sm" className="mr-2" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <i className="feather icon-check mr-2"></i>
+                {selectedQuestionForAnswer?.answer ? 'Update Answer' : 'Submit Answer'}
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Edit Question Modal */}
+      <Modal show={showEditModal} onHide={handleCloseEditModal} size="lg" centered>
+        <Modal.Header  style={{ borderBottom: '1px solid #e0e0e0', padding: '20px', position: 'relative' }}>
+          <Modal.Title style={{ color: '#333', fontWeight: '600', fontSize: '18px' }}>
+            <i className="feather icon-edit mr-2" style={{ color: '#71C0BB' }}></i>
+            Edit Question
+          </Modal.Title>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={handleCloseEditModal}
+            style={{
+              position: 'absolute',
+              top: '15px',
+              right: '15px',
+              width: '30px',
+              height: '30px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              fontSize: '18px',
+              color: '#666',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#f5f5f5';
+              e.target.style.color = '#333';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+              e.target.style.color = '#666';
+            }}
+          >
+            <i className="feather icon-x" style={{ fontSize: '16px' }}></i>
+          </button>
+        </Modal.Header>
+        <Modal.Body style={{ padding: '20px' }}>
+          {selectedQuestionForEdit && (
+            <div>
+              <div className="mb-3">
+                <h6 style={{ color: '#333', fontWeight: '600', marginBottom: '8px' }}>Question Text:</h6>
+                <Form.Control
+                  as="textarea"
+                  rows={4}
+                  value={editQuestionText}
+                  onChange={(e) => setEditQuestionText(e.target.value)}
+                  placeholder="Enter question text..."
+                  style={{
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    padding: '12px',
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    boxShadow: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+                <small className="text-muted" style={{ fontSize: '12px', color: '#666' }}>
+                  Character count: {editQuestionText.length}
+                </small>
+              </div>
+              
+              <div className="mb-3">
+                <h6 style={{ color: '#333', fontWeight: '600', marginBottom: '8px' }}>Question Status:</h6>
+                <Form.Select
+                  value={editQuestionStatus}
+                  onChange={(e) => setEditQuestionStatus(e.target.value)}
+                  style={{
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    padding: '8px 12px',
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    minWidth: '200px',
+                    boxShadow: 'none'
+                  }}
+                >
+                  <option value="not_answered">Not Answered</option>
+                  <option value="answering">Answering</option>
+                  <option value="answered">Answered</option>
+                </Form.Select>
+                <small className="text-muted" style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '4px' }}>
+                  Change the status of this question
+                </small>
+              </div>
+
+              <div className="mb-3">
+                <h6 style={{ color: '#333', fontWeight: '600', marginBottom: '8px' }}>Votes:</h6>
+                <div 
+                  style={{ 
+                    backgroundColor: '#f8f9fa', 
+                    padding: '12px', 
+                    borderRadius: '6px',
+                    border: '1px solid #e0e0e0',
+                    color: '#666',
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <i className="feather icon-thumbs-up mr-2" style={{ color: '#71C0BB' }}></i>
+                    <span>{selectedQuestionForEdit.likesCount || 0} votes</span>
+                  </div>
+                  <small className="text-muted" style={{ fontSize: '12px' }}>
+                    (Cannot be changed)
+                  </small>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer style={{ borderTop: '1px solid #e0e0e0', padding: '20px', justifyContent: 'space-between' }}>
+          <Button 
+            variant="secondary" 
+            onClick={handleCloseEditModal}
+            disabled={submittingEdit}
+            style={{ 
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Cancel
+          </Button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button 
+              variant="danger" 
+              onClick={() => handleDeleteQuestion(selectedQuestionForEdit?.id)}
+              disabled={submittingEdit}
+              style={{ 
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              <i className="feather icon-trash-2 mr-2"></i>
+              Delete Question
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleSubmitEdit}
+              disabled={submittingEdit || !editQuestionText.trim()}
+              style={{ 
+                backgroundColor: '#71C0BB', 
+                borderColor: '#71C0BB',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              {submittingEdit ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <i className="feather icon-save mr-2"></i>
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
