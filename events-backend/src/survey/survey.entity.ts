@@ -37,6 +37,9 @@ import {
     @Column({ type: 'boolean', default: true })
     isActive!: boolean;
 
+    @Column({ type: 'json', nullable: true })
+    surveyUrls!: Array<{ title: string; url: string }>;
+
     @ManyToOne(() => Event, (event) => event.surveys)
     event?: Event;
 

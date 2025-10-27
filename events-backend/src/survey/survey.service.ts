@@ -844,6 +844,7 @@ export class SurveyService {
       survey.endDate = new Date(surveyData.endDate);
       survey.endTime = surveyData.endTime;
       survey.isActive = surveyData.isActive ?? true;
+      survey.surveyUrls = surveyData.surveyUrls || [];
 
       const savedSurvey = await this.surveyRepository.save(survey);
 
@@ -1686,6 +1687,9 @@ export class SurveyService {
       }
       if (updateSurveyDto.isActive !== undefined) {
         survey.isActive = updateSurveyDto.isActive;
+      }
+      if (updateSurveyDto.surveyUrls !== undefined) {
+        survey.surveyUrls = updateSurveyDto.surveyUrls;
       }
 
       const updatedSurvey = await this.surveyRepository.save(survey);

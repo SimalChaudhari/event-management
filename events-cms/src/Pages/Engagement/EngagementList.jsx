@@ -14,6 +14,7 @@ import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
+import FilterComponent from '../../components/common/FilterComponent';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -21,6 +22,32 @@ $.DataTable = require('datatables.net-bs');
 function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleQA, handleToggleStatus) {
     let tableZero = '#engagements-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
+
+    // Flatten grouped data to show events with their tracks
+    const flattenedData = [];
+    data.forEach(eventGroup => {
+        if (eventGroup.event && eventGroup.programmeTracks && eventGroup.programmeTracks.length > 0) {
+            eventGroup.programmeTracks.forEach((track, index) => {
+                flattenedData.push({
+                    eventId: eventGroup.event.id,
+                    eventName: eventGroup.event.name,
+                    eventDate: eventGroup.event.startDate,
+                    eventTime: `${eventGroup.event.startTime} - ${eventGroup.event.endTime}`,
+                    trackId: track.id,
+                    trackTitle: track.title,
+                    engagementId: track.engagementId,
+                    trackId: track.trackId,
+                    isActive: track.isActive,
+                    createdAt: track.createdAt,
+                    updatedAt: track.updatedAt,
+                    sessionsCount: track.sessionsCount || track.sessions?.length || 0,
+                    isFirstTrack: index === 0,
+                    totalSessionsCount: eventGroup.totalSessionsCount,
+                    statistics: eventGroup.statistics
+                });
+            });
+        }
+    });
 
     // Preserve the current page
     let currentPage = 0;
@@ -30,8 +57,8 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
     }
 
     $(tableZero).DataTable({
-        data: data || [],
-        order: [[3, 'desc']], // Sort by created date descending
+        data: flattenedData || [],
+        order: [[1, 'desc']], // Sort by created date descending
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -48,37 +75,42 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             {
                 data: null,
                 title: 'Track',
-                width: '40%',
+                width: '30%',
                 render: function (data, type, row) {
-                    // Backend sends 'programmeTrack' instead of 'track'
-                    const track = row.programmeTrack || row.track || {};
-                    const event = row.event || {};
-                    const trackTitle = track.title || 'Unknown Track';
-                    const eventName = event.name || 'No Event';
-                    
                     return `
                         <div class="d-inline-block align-middle" style="max-width: 100%;">
-                            <h6 class="m-b-0" style="font-size: 14px; font-weight: 600;">${trackTitle}</h6>
+                            <h6 class="m-b-0" style="font-size: 14px; font-weight: 600;">${row.trackTitle || 'Unknown Track'}</h6>
                             <p class="m-b-0 text-muted" style="font-size: 12px; margin-top: 4px;">
-                                <i class="feather icon-calendar" style="color: #17a2b8;"></i> <span style="font-weight: 500;">${eventName}</span>
+                                <i class="feather icon-calendar" style="color: #17a2b8;"></i> <span style="font-weight: 500;">${row.eventName}</span>
                             </p>
                         </div>
                     `;
                 }
             },
             {
-                data: 'isActive',
+                data: null,
+                title: 'Created Date',
+                width: '15%',
+                render: function (data, type, row) {
+                    if (row.createdAt) {
+                        return formatDateTimeForTable(row.createdAt);
+                    }
+                    return 'N/A';
+                }
+            },
+            {
+                data: null,
                 title: 'Status',
                 width: '15%',
                 className: 'text-center',
                 render: function (data, type, row) {
-                    const isActive = data || false;
+                    const isActive = row.isActive || false;
                     const badgeClass = isActive ? 'badge-light-success' : 'badge-light-secondary';
                     const statusText = isActive ? 'Active' : 'Inactive';
                     const iconClass = isActive ? 'icon-check-circle' : 'icon-x-circle';
 
                     return `
-                        <span class="badge ${badgeClass} toggle-status-badge" data-id="${row.id}" 
+                        <span class="badge ${badgeClass} toggle-status-badge" data-id="${row.engagementId}" 
                               style="cursor: pointer; font-size: 13px; padding: 6px 16px; min-width: 90px;" 
                               title="Click to toggle">
                             <i class="feather ${iconClass}" style="margin-right: 4px;"></i>${statusText}
@@ -88,24 +120,11 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             },
             {
                 data: null,
-                title: 'Event Date',
-                width: '15%',
-                render: function (data, type, row) {
-                    const event = row.event || {};
-                    if (event.startDate) {
-                        return formatDateTimeForTable(event.startDate);
-                    }
-                    return 'N/A';
-                }
-            },
-            {
-                data: null,
                 title: 'Sessions',
                 width: '15%',
                 className: 'text-center',
                 render: function (data, type, row) {
-                    const sessions = row.sessions || [];
-                    const sessionCount = sessions.length;
+                    const sessionCount = row.sessionsCount || 0;
                     return `
                         <span class="badge badge-light-info" style="font-size: 13px; padding: 6px 12px;">
                             <i class="feather icon-list" style="margin-right: 4px;"></i>${sessionCount}
@@ -116,25 +135,25 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             {
                 data: null,
                 title: 'Actions',
-                width: '20%',
+                width: '25%',
                 orderable: false,
                 className: 'text-center',
                 render: function (data, type, row) {
                     return `
                         <div class="btn-group" role="group" aria-label="Actions">
-                            <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.id}" title="View Details" 
+                            <button type="button" class="btn btn-icon btn-success view-btn" data-id="${row.engagementId}" title="View Details" 
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
-                            <button type="button" class="btn btn-icon btn-info qa-btn" data-id="${row.id}" title="Q&A" 
+                            <button type="button" class="btn btn-icon btn-info qa-btn" data-id="${row.engagementId}" title="Q&A" 
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-message-circle"></i>
                             </button>
-                            <button type="button" class="btn btn-icon btn-warning edit-btn" data-id="${row.id}" title="Edit Engagement" 
+                            <button type="button" class="btn btn-icon btn-warning edit-btn" data-id="${row.engagementId}" title="Edit Engagement" 
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-edit"></i>
                             </button>
-                            <button type="button" class="btn btn-icon btn-danger delete-btn" data-id="${row.id}" title="Delete Engagement" 
+                            <button type="button" class="btn btn-icon btn-danger delete-btn" data-id="${row.engagementId}" title="Delete Engagement" 
                                 style="border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-trash-2"></i>
                             </button>
@@ -214,6 +233,8 @@ const EngagementList = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [engagementToDelete, setEngagementToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [selectedEventId, setSelectedEventId] = useState('');
+    const [filteredEngagements, setFilteredEngagements] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -224,10 +245,27 @@ const EngagementList = () => {
         return () => destroyTable();
     }, [dispatch]);
 
+    // Filter engagements by event
+    useEffect(() => {
+        if (!engagements || engagements.length === 0) {
+            setFilteredEngagements([]);
+            return;
+        }
+        
+        if (selectedEventId) {
+            const filtered = engagements.filter(engagement => {
+                return engagement.event && engagement.event.id === selectedEventId;
+            });
+            setFilteredEngagements(filtered);
+        } else {
+            setFilteredEngagements(engagements);
+        }
+    }, [engagements, selectedEventId]);
+
     useEffect(() => {
         initializeTable();
         return () => destroyTable();
-    }, [engagements]);
+    }, [filteredEngagements]);
 
     const destroyTable = () => {
         if (currentTable) {
@@ -243,9 +281,9 @@ const EngagementList = () => {
 
     const initializeTable = () => {
         destroyTable();
-        if (Array.isArray(engagements) && engagements.length >= 0) {
+        if (Array.isArray(filteredEngagements) && filteredEngagements.length >= 0) {
             const table = engagementsTable(
-                engagements,
+                filteredEngagements,
                 handleAdd,
                 handleEdit,
                 handleDelete,
@@ -307,8 +345,47 @@ const EngagementList = () => {
         setEngagementToDelete(null);
     };
 
+    // Get unique events from engagements
+    const getAvailableEvents = () => {
+        if (!engagements || engagements.length === 0) return [];
+        const eventsMap = new Map();
+        engagements.forEach(engagement => {
+            if (engagement.event && !eventsMap.has(engagement.event.id)) {
+                eventsMap.set(engagement.event.id, engagement.event);
+            }
+        });
+        return Array.from(eventsMap.values());
+    };
+
+    const handleEventChange = (eventId) => {
+        setSelectedEventId(eventId);
+    };
+
+    const activeFilters = selectedEventId ? { eventId: selectedEventId } : {};
+
+    const applyFilters = () => {
+        // Filters are already applied via selectedEventId state
+    };
+
+    const clearFilters = () => {
+        setSelectedEventId('');
+    };
+
     return (
         <React.Fragment>
+            {/* Filter Component */}
+            <FilterComponent
+                events={getAvailableEvents()}
+                loadingDropdowns={false}
+                selectedEventId={selectedEventId}
+                onEventChange={handleEventChange}
+                onApplyFilters={applyFilters}
+                onClearFilters={clearFilters}
+                activeFilters={activeFilters}
+                showUserFilter={false}
+                showEventFilter={true}
+            />
+
             <Row>
                 <Col>
                     <Card>

@@ -189,6 +189,36 @@ const SurveyBasicComponent = ({ surveyData }) => {
                 </Row>
             </InfoCard>
 
+            {/* Survey URLs Section */}
+            {surveyData.surveyUrls && Array.isArray(surveyData.surveyUrls) && surveyData.surveyUrls.length > 0 && (
+                <InfoCard title="Survey URLs" iconClass="fas fa-link" borderColor="#fd7e14">
+                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                        {surveyData.surveyUrls.map((urlItem, index) => (
+                            <div key={index} className="mb-3 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
+                                <div style={{ fontWeight: '600', color: '#212529', marginBottom: '8px' }}>
+                                    <i className="fas fa-link" style={{ marginRight: '8px', color: getIconColor('fas fa-link') }}></i>
+                                    {urlItem.title}
+                                </div>
+                                <a 
+                                    href={urlItem.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ 
+                                        color: '#007bff', 
+                                        textDecoration: 'none',
+                                        wordBreak: 'break-all',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    <i className="fas fa-external-link-alt me-2"></i>
+                                    {urlItem.url}
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                </InfoCard>
+            )}
+
             {/* Event Information Section */}
             <InfoCard title="Event Information" iconClass="fas fa-calendar-alt" borderColor="#28a745">
                 <Row>

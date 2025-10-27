@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Button, Row, Col, Badge, Modal } from 'react-bootstrap';
+import { Button, Row, Col, Badge, Modal, Tab, Nav } from 'react-bootstrap';
 import { getEngagementById } from '../../store/actions/engagementActions';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
+import { API_URL } from '../../configs/env';
 
 import EventSpeakersComponent from '../../components/events/EventSpeakersComponent';
 
@@ -100,10 +101,13 @@ const ViewEngagementPage = () => {
         );
     }
 
-    // Backend sends 'programmeTrack' instead of 'track'
-    const track = selectedEngagement.programmeTrack || selectedEngagement.track || {};
+    // Backend sends 'programmeTracks' array
+    const programmeTracks = selectedEngagement.programmeTracks || [];
     const event = selectedEngagement.event || {};
     const isActive = selectedEngagement.isActive !== undefined ? selectedEngagement.isActive : true;
+    
+    // Calculate total sessions across all tracks
+    const totalSessions = programmeTracks.reduce((total, track) => total + (track.sessions?.length || 0), 0);
 
     return (
         <div className="p-2 bg-light">
@@ -161,16 +165,25 @@ const ViewEngagementPage = () => {
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}>
                     <Row>
-                        <Col md={6}>
-                            <div className="mb-4">
-                                <div className="d-flex align-items-center mb-2">
-                                    <i className="feather icon-folder text-primary mr-2"></i>
-                                    <label className="text-muted small mb-0">Programme Track</label>
+                        {programmeTracks.length > 0 && (
+                            <Col md={6}>
+                                <div className="mb-4">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <i className="feather icon-folder text-primary mr-2"></i>
+                                        <label className="text-muted small mb-0">Programme Tracks</label>
+                                    </div>
+                                    <h5 className="text-dark font-weight-bold mb-0">
+                                        {programmeTracks.map((track, idx) => (
+                                            <span key={track.id || idx}>
+                                                {track.title}
+                                                {idx < programmeTracks.length - 1 && ', '}
+                                            </span>
+                                        ))}
+                                    </h5>
                                 </div>
-                                <h5 className="text-dark font-weight-bold mb-0">{track.title || 'Unknown Track'}</h5>
-                            </div>
-                        </Col>
-                        <Col md={6}>
+                            </Col>
+                        )}
+                        <Col md={programmeTracks.length > 0 ? 6 : 12}>
                             <div className="mb-4">
                                 <div className="d-flex align-items-center mb-2">
                                     <i className="feather icon-check-circle text-success mr-2"></i>
@@ -230,7 +243,7 @@ const ViewEngagementPage = () => {
                                 </div>
                             </Col>
                         )}
-                        {selectedEngagement.sessions && selectedEngagement.sessions.length > 0 && (
+                        {totalSessions > 0 && (
                             <Col md={6}>
                                 <div className="mb-3">
                                     <div className="d-flex align-items-center mb-2">
@@ -239,7 +252,7 @@ const ViewEngagementPage = () => {
                                     </div>
                                     <div className="bg-light p-2 rounded">
                                         <span className="text-dark font-weight-medium">
-                                            {selectedEngagement.sessions.length} {selectedEngagement.sessions.length === 1 ? 'Session' : 'Sessions'}
+                                            {totalSessions} {totalSessions === 1 ? 'Session' : 'Sessions'}
                                         </span>
                                     </div>
                                 </div>
@@ -249,9 +262,123 @@ const ViewEngagementPage = () => {
                 </div>
             </InfoCard>
 
-            {/* Sessions Information (if available) */}
-            {selectedEngagement.sessions && selectedEngagement.sessions.length > 0 && (
-                <InfoCard title="Sessions" icon="📅" borderColor="#17a2b8">
+            {/* Programme Tracks with Sessions */}
+            {programmeTracks.length > 0 && programmeTracks.map((track, trackIndex) => 
+                track.sessions && track.sessions.length > 0 ? track.sessions.map((session, sessionIndex) => (
+                    <InfoCard 
+                        key={`${track.id || trackIndex}-${session.id || sessionIndex}`}
+                        title={`Session ${sessionIndex + 1}: ${session.title}`} 
+                        icon="📅" 
+                        borderColor="#17a2b8"
+                    >
+                        <Tab.Container defaultActiveKey={`details-${sessionIndex}`}>
+                            <Nav variant="pills" className="mb-4" style={{ 
+                                borderBottom: '2px solid #17a2b8',
+                                paddingBottom: '12px',
+                                gap: '15px'
+                            }}>
+                                <Nav.Item>
+                                    <Nav.Link 
+                                        eventKey={`details-${sessionIndex}`}
+                                        style={{
+                                            borderRadius: '8px',
+                                            fontWeight: '500',
+                                            border: '1px solid #dee2e6',
+                                            fontSize: '14px',
+                                            padding: '8px 16px'
+                                        }}
+                                    >
+                                        📋 Session Details
+                                    </Nav.Link>
+                                </Nav.Item>
+                                <Nav.Item>
+                                    <Nav.Link 
+                                        eventKey={`timing-${sessionIndex}`}
+                                        style={{
+                                            borderRadius: '8px',
+                                            fontWeight: '500',
+                                            border: '1px solid #dee2e6',
+                                            fontSize: '14px',
+                                            padding: '8px 16px'
+                                        }}
+                                    >
+                                        ⏰ Timing Information
+                                    </Nav.Link>
+                                </Nav.Item>
+                                {session.speakers && session.speakers.length > 0 && (
+                                    <Nav.Item>
+                                        <Nav.Link 
+                                            eventKey={`speakers-${sessionIndex}`}
+                                            style={{
+                                                borderRadius: '8px',
+                                                fontWeight: '500',
+                                                border: '1px solid #dee2e6',
+                                                fontSize: '14px',
+                                                padding: '8px 16px'
+                                            }}
+                                        >
+                                            🎤 Speakers ({session.speakers.length})
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                )}
+                            </Nav>
+
+                            <Tab.Content style={{ marginTop: '20px' }}>
+                                {/* Session Details Tab */}
+                                <Tab.Pane eventKey={`details-${sessionIndex}`}>
+                                    <div style={{
+                                        backgroundColor: '#fff',
+                                        padding: '20px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e9ecef',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}>
+                                        <Row>
+                                            <Col md={12}>
+                                                <div className="mb-4">
+                                                    <div className="d-flex align-items-center mb-2">
+                                                        <i className="feather icon-file-text text-primary mr-2"></i>
+                                                        <label className="text-muted small mb-0">Session Title</label>
+                                                    </div>
+                                                    <h5 className="text-dark font-weight-bold mb-0">{session.title}</h5>
+                                                </div>
+                                            </Col>
+                                            {session.venue && (
+                                                <Col md={6}>
+                                                    <div className="mb-4">
+                                                        <div className="d-flex align-items-center mb-2">
+                                                            <i className="feather icon-map-pin text-warning mr-2"></i>
+                                                            <label className="text-muted small mb-0">Venue</label>
+                                                        </div>
+                                                        <h5 className="text-dark font-weight-bold mb-0">{session.venue || 'TBA'}</h5>
+                                                    </div>
+                                                </Col>
+                                            )}
+                                            {session.description && (
+                                                <Col md={12}>
+                                                    <div className="mb-3">
+                                                        <div className="d-flex align-items-center mb-2">
+                                                            <i className="feather icon-file-text text-info mr-2"></i>
+                                                            <label className="text-muted small mb-0">Description</label>
+                                                        </div>
+                                                        <div className="bg-light p-3 rounded">
+                                                            <p className="text-dark mb-0" style={{
+                                                                fontSize: '14px',
+                                                                lineHeight: '1.6',
+                                                                textAlign: 'justify'
+                                                            }}>
+                                                                {session.description}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            )}
+                                        </Row>
+                                    </div>
+                                </Tab.Pane>
+
+                                {/* Timing Information Tab */}
+                                <Tab.Pane eventKey={`timing-${sessionIndex}`}>
                     <div style={{
                         backgroundColor: '#fff',
                         padding: '20px',
@@ -259,65 +386,139 @@ const ViewEngagementPage = () => {
                         border: '1px solid #e9ecef',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                     }}>
-                        {selectedEngagement.sessions.map((session, index) => (
-                            <div key={index} className={`mb-3 pb-3 ${index < selectedEngagement.sessions.length - 1 ? 'border-bottom' : ''}`}>
-                                <h6 className="text-primary font-weight-bold mb-2">{session.title}</h6>
-                                <div className="d-flex flex-wrap gap-3">
+                                        <Row>
                                     {session.startDate && (
-                                        <div className="text-muted" style={{ fontSize: '13px' }}>
-                                            <i className="feather icon-calendar mr-1"></i>
-                                            {new Date(session.startDate).toLocaleDateString()}
+                                                <Col md={6}>
+                                                    <div className="mb-4">
+                                                        <div className="d-flex align-items-center mb-2">
+                                                            <i className="feather icon-calendar text-primary mr-2"></i>
+                                                            <label className="text-muted small mb-0">Session Date</label>
+                                                        </div>
+                                                        <div className="bg-light p-3 rounded">
+                                                            <h5 className="text-dark font-weight-bold mb-0">
+                                                                {session.startDate ? new Date(session.startDate).toLocaleDateString('en-US', {
+                                                                    year: 'numeric',
+                                                                    month: 'long',
+                                                                    day: 'numeric'
+                                                                }) : 'N/A'}
+                                                            </h5>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            )}
+                                            {session.startTime && (
+                                                <Col md={6}>
+                                                    <div className="mb-4">
+                                                        <div className="d-flex align-items-center mb-2">
+                                                            <i className="feather icon-play-circle text-success mr-2"></i>
+                                                            <label className="text-muted small mb-0">Start Time</label>
+                                                        </div>
+                                                        <div className="bg-light p-3 rounded">
+                                                            <h5 className="text-dark font-weight-bold mb-0">
+                                                                {session.startTime || 'N/A'}
+                                                            </h5>
+                                                        </div>
                                         </div>
-                                    )}
-                                    {session.startTime && session.endTime && (
-                                        <div className="text-muted" style={{ fontSize: '13px' }}>
-                                            <i className="feather icon-clock mr-1"></i>
-                                            {session.startTime} - {session.endTime}
+                                                </Col>
+                                            )}
+                                            {session.endTime && (
+                                                <Col md={6}>
+                                                    <div className="mb-4">
+                                                        <div className="d-flex align-items-center mb-2">
+                                                            <i className="feather icon-stop-circle text-danger mr-2"></i>
+                                                            <label className="text-muted small mb-0">End Time</label>
+                                                        </div>
+                                                        <div className="bg-light p-3 rounded">
+                                                            <h5 className="text-dark font-weight-bold mb-0">
+                                                                {session.endTime || 'N/A'}
+                                                            </h5>
+                                                        </div>
                                         </div>
+                                                </Col>
                                     )}
+                                        </Row>
                                 </div>
+                                </Tab.Pane>
+
+                                {/* Speakers Tab */}
                                 {session.speakers && session.speakers.length > 0 && (
-                                    <div className="mt-3">
-                                        <h6 className="text-muted mb-2" style={{ fontSize: '14px', fontWeight: '600' }}>
-                                            <i className="feather icon-users mr-1"></i>
-                                            Speakers ({session.speakers.length})
-                                        </h6>
+                                    <Tab.Pane eventKey={`speakers-${sessionIndex}`}>
+                                        <div style={{
+                                            backgroundColor: '#fff',
+                                            padding: '20px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e9ecef',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}>
                                         <EventSpeakersComponent 
                                             speakers={session.speakers} 
                                             handleSpeakerImageClick={handleSpeakerImageClick}
                                             handleSpeakerProfileClick={handleSpeakerProfileClick}
                                         />
                                     </div>
+                                    </Tab.Pane>
                                 )}
-                            </div>
-                        ))}
-                    </div>
-                </InfoCard>
+                            </Tab.Content>
+                        </Tab.Container>
+                    </InfoCard>
+                )) : null
             )}
 
             {/* Speaker Image Modal */}
             <Modal 
                 show={showSpeakerImageModal} 
                 onHide={() => setShowSpeakerImageModal(false)}
-                centered
                 size="lg"
+                centered
+                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
             >
-                <Modal.Header closeButton>
-                    <Modal.Title>Speaker Profile</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="text-center">
-                    {currentSpeakerImage && (
-                        <img 
-                            src={currentSpeakerImage} 
+                <Modal.Body>
+                    {/* Close button */}
+                    <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => setShowSpeakerImageModal(false)}
+                        style={{
+                            position: 'fixed',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            border: 'none',
+                            color: 'white'
+                        }}
+                    >
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Image container */}
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '70vh',
+                            padding: '60px 40px 40px 40px'
+                        }}
+                    >
+                        <img
+                            src={`${API_URL}/${currentSpeakerImage}`}
                             alt="Speaker Profile" 
                             style={{ 
                                 maxWidth: '100%', 
-                                maxHeight: '500px', 
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                                maxHeight: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                                console.error('Speaker image failed to load:', currentSpeakerImage);
+                                e.target.style.display = 'none';
                             }}
                         />
-                    )}
+                    </div>
                 </Modal.Body>
             </Modal>
         </div>

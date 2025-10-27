@@ -34,6 +34,10 @@ export class CreateSurveyDto {
 
   @IsArray()
   @IsOptional()
+  surveyUrls?: Array<{ title: string; url: string }>;
+
+  @IsArray()
+  @IsOptional()
   sessions?: CreateSessionDto[];
 }
 
@@ -105,6 +109,10 @@ export class UpdateSurveyDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsArray()
+  @IsOptional()
+  surveyUrls?: Array<{ title: string; url: string }>;
 
   @IsArray()
   @IsOptional()

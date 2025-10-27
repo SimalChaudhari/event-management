@@ -163,6 +163,58 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
         </div>
     );
 
+    // Render survey URLs section
+    const renderSurveyUrls = () => {
+        if (!surveyDetails.surveyUrls?.length) {
+            return null;
+        }
+
+        return (
+            <div>
+                <div className="d-flex align-items-center mb-3 mt-4">
+                    <h5 className="mb-0 fw-bold">
+                      
+                        Survey URLs
+                    </h5>
+                </div>
+                <div className="row">
+                    {surveyDetails.surveyUrls.map((urlItem, index) => (
+                        <div key={index} className="col-md-6 mb-3">
+                            <div className="card border-0 shadow-sm">
+                                <div className="card-body">
+                                    <div className="info-field-container mb-2 py-2">
+                                        <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                            <i className="fas fa-link" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                            {urlItem.title}:
+                                        </span>
+                                        <div className="field-value" style={{ marginTop: '8px' }}>
+                                            <a 
+                                                href={urlItem.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                style={{ 
+                                                    color: '#007bff', 
+                                                    textDecoration: 'none',
+                                                    wordBreak: 'break-all',
+                                                    fontSize: '14px',
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <i className="fas fa-external-link-alt me-2"></i>
+                                                {urlItem.url}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     // Render survey sessions section
     const renderSurveySessions = () => {
         if (!surveyDetails.sessions?.length) {
@@ -191,6 +243,7 @@ const EventSurveyComponent = ({ surveyDetails, formatTime }) => {
         >
             <div className="survey-section">
                 {renderSurveyOverview()}
+                {renderSurveyUrls()}
                 {renderSurveySessions()}
             </div>
         </StandardComponentTemplate>

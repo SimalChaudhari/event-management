@@ -25,8 +25,13 @@ const AddSurveyPage = () => {
         startTime: '',
         endTime: '',
         isActive: true,
+        surveyUrls: [],
         sessions: []
     });
+
+    const [surveyUrlsList, setSurveyUrlsList] = useState([
+        { title: '', url: '' }
+    ]);
 
     const [errors, setErrors] = useState({});
     const [suggestions, setSuggestions] = useState(null);
@@ -60,8 +65,18 @@ const AddSurveyPage = () => {
                 startTime: selectedSurvey.startTime || '',
                 endTime: selectedSurvey.endTime || '',
                 isActive: selectedSurvey.isActive !== undefined ? selectedSurvey.isActive : true,
+                surveyUrls: selectedSurvey.surveyUrls || [],
                 sessions: selectedSurvey.sessions || []
             });
+
+            // Load surveyUrls into surveyUrlsList
+            if (selectedSurvey.surveyUrls && Array.isArray(selectedSurvey.surveyUrls) && selectedSurvey.surveyUrls.length > 0) {
+                setSurveyUrlsList(selectedSurvey.surveyUrls.map((url, index) => ({
+                    id: index,
+                    title: url.title || '',
+                    url: url.url || ''
+                })));
+            }
 
             // Load sessions into sessionsList
             if (selectedSurvey.sessions && Array.isArray(selectedSurvey.sessions)) {
@@ -169,6 +184,12 @@ const AddSurveyPage = () => {
                 ...formData,
                 startTime: formatTime(formData.startTime),
                 endTime: formatTime(formData.endTime),
+                surveyUrls: surveyUrlsList
+                    .filter(url => url.title && url.url) // Only include valid URLs
+                    .map(url => ({
+                        title: url.title,
+                        url: url.url
+                    })),
                 sessions: sessionsList.map(session => ({
                     ...(session.id && { id: session.id }), // Include ID if it exists (for updates)
                     name: session.name,
@@ -224,6 +245,25 @@ const AddSurveyPage = () => {
     const updateSession = (sessionId, field, value) => {
         setSessionsList(sessionsList.map(session => 
             session.id === sessionId ? { ...session, [field]: value } : session
+        ));
+    };
+
+    const addSurveyUrl = () => {
+        const newUrl = {
+            id: Date.now(),
+            title: '',
+            url: ''
+        };
+        setSurveyUrlsList([...surveyUrlsList, newUrl]);
+    };
+
+    const removeSurveyUrl = (urlId) => {
+        setSurveyUrlsList(surveyUrlsList.filter(url => url.id !== urlId));
+    };
+
+    const updateSurveyUrl = (urlId, field, value) => {
+        setSurveyUrlsList(surveyUrlsList.map(url => 
+            url.id === urlId ? { ...url, [field]: value } : url
         ));
     };
 
@@ -488,6 +528,70 @@ const AddSurveyPage = () => {
                                                 Add survey sessions (optional)
                                             </small>
                                         </div>
+                                    </Col>
+                                </Row>
+
+                                {/* Survey URLs Management */}
+                                <Row>
+                                    <Col sm={12}>
+                                        <Card className="mb-3">
+                                            <Card.Header className="d-flex justify-content-between align-items-center">
+                                                <h6 className="mb-0">
+                                                    <i className="fas fa-link mr-2"></i>
+                                                    Survey URLs ({surveyUrlsList.length})
+                                                </h6>
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    onClick={addSurveyUrl}
+                                                >
+                                                    <i className="feather icon-plus mr-1"></i>
+                                                    Add URL
+                                                </Button>
+                                            </Card.Header>
+                                            <Card.Body>
+                                                {surveyUrlsList.map((urlItem, index) => (
+                                                    <div key={urlItem.id} className="border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <h6 className="mb-0">Survey URL {index + 1}</h6>
+                                                            <Button
+                                                                variant="danger"
+                                                                size="sm"
+                                                                onClick={() => removeSurveyUrl(urlItem.id)}
+                                                            >
+                                                                <i className="feather icon-trash-2"></i>
+                                                            </Button>
+                                                        </div>
+                                                        <Row>
+                                                            <Col sm={4}>
+                                                                <div className="form-group fill">
+                                                                    <label className="floating-label">Title</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="form-control"
+                                                                        value={urlItem.title}
+                                                                        onChange={(e) => updateSurveyUrl(urlItem.id, 'title', e.target.value)}
+                                                                        placeholder="e.g., Pre-event Survey"
+                                                                    />
+                                                                </div>
+                                                            </Col>
+                                                            <Col sm={8}>
+                                                                <div className="form-group fill">
+                                                                    <label className="floating-label">URL</label>
+                                                                    <input
+                                                                        type="url"
+                                                                        className="form-control"
+                                                                        value={urlItem.url}
+                                                                        onChange={(e) => updateSurveyUrl(urlItem.id, 'url', e.target.value)}
+                                                                        placeholder="https://example.com/survey"
+                                                                    />
+                                                                </div>
+                                                            </Col>
+                                                        </Row>
+                                                    </div>
+                                                ))}
+                                            </Card.Body>
+                                        </Card>
                                     </Col>
                                 </Row>
 
