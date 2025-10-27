@@ -287,69 +287,93 @@ export class UserUtils {
       return [];
     }
 
-    return engagements.map(engagement => ({
-      id: engagement.id,
-      trackId: engagement.trackId,
-      isActive: engagement.isActive,
-      createdAt: engagement.createdAt,
-      updatedAt: engagement.updatedAt,
-      // Event info
-      event: {
-        id: engagement.track?.event?.id,
-        name: engagement.track?.event?.name,
-        startDate: engagement.track?.event?.startDate,
-        endDate: engagement.track?.event?.endDate,
-        startTime: engagement.track?.event?.startTime,
-        endTime: engagement.track?.event?.endTime,
-      },
+    // Group engagements by event
+    const eventsMap = new Map();
+
+    engagements.forEach(engagement => {
+      const eventId = engagement.track?.event?.id;
+      if (!eventId) return;
+
+      if (!eventsMap.has(eventId)) {
+        eventsMap.set(eventId, {
+          event: {
+            id: engagement.track?.event?.id,
+            name: engagement.track?.event?.name,
+            startDate: engagement.track?.event?.startDate,
+            endDate: engagement.track?.event?.endDate,
+            startTime: engagement.track?.event?.startTime,
+            endTime: engagement.track?.event?.endTime,
+          },
+          programmeTracks: [],
+          allStatistics: {
+            questionsCount: 0,
+            answeredQuestionsCount: 0,
+            unansweredQuestionsCount: 0,
+            pollsCount: 0,
+            totalVotesCount: 0
+          },
+          totalSessionsCount: 0
+        });
+      }
+
+      const eventData = eventsMap.get(eventId);
       
-      // Track info
-      programmeTrack: {
+      // Track with sessions
+      const track = {
         id: engagement.track?.id,
         title: engagement.track?.title,
-      },
-      
-      // Sessions with speakers, questions, and polls
-      sessions: engagement.track?.sessions?.map((session: any) => ({
-        id: session.id,
-        title: session.title,
-        startDate: session.startDate,
-        startTime: session.startTime,
-        endDate: session.endDate,
-        endTime: session.endTime,
-        speakers: session.speakers?.map((speaker: any) => ({
-          id: speaker.id,
-          firstName: speaker.firstName || '',
-          lastName: speaker.lastName || '',
-          name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim() || 'Unknown Speaker',
-          profilePicture: speaker.profilePicture || '',
-          description: speaker.speakerProfile?.description || ''
+        engagementId: engagement.id,
+        trackId: engagement.trackId,
+        isActive: engagement.isActive,
+        createdAt: engagement.createdAt,
+        updatedAt: engagement.updatedAt,
+        sessions: engagement.track?.sessions?.map((session: any) => ({
+          id: session.id,
+          title: session.title,
+          startDate: session.startDate,
+          startTime: session.startTime,
+          endDate: session.endDate,
+          endTime: session.endTime,
+          speakers: session.speakers?.map((speaker: any) => ({
+            id: speaker.id,
+            firstName: speaker.firstName || '',
+            lastName: speaker.lastName || '',
+            name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim() || 'Unknown Speaker',
+            profilePicture: speaker.profilePicture || '',
+            description: speaker.speakerProfile?.description || ''
+          })) || [],
+          statistics: session.statistics || {
+            questionsCount: 0,
+            answeredQuestionsCount: 0,
+            unansweredQuestionsCount: 0,
+            pollsCount: 0,
+            totalVotesCount: 0
+          },
+          questions: session.questions || [],
+          polls: session.polls || []
         })) || [],
-        // Session-specific statistics
-        statistics: session.statistics || {
-          questionsCount: 0,
-          answeredQuestionsCount: 0,
-          unansweredQuestionsCount: 0,
-          pollsCount: 0,
-          totalVotesCount: 0
-        },
-        // Questions for this session (from engagement)
-        questions: session.questions || [],
-        // Polls for this session (linked through speakers)
-        polls: session.polls || []
-      })) || [],
+        sessionsCount: engagement.track?.sessions?.length || 0
+      };
 
-      // Statistics
-      statistics: engagement.statistics || {
-        questionsCount: 0,
-        answeredQuestionsCount: 0,
-        unansweredQuestionsCount: 0,
-        pollsCount: 0,
-        totalVotesCount: 0
-      },
+      eventData.programmeTracks.push(track);
+      eventData.totalSessionsCount += track.sessionsCount;
 
-      // Session count
-      sessionsCount: engagement.track?.sessions?.length || 0
+      // Merge statistics
+      if (engagement.statistics) {
+        eventData.allStatistics.questionsCount += engagement.statistics.questionsCount || 0;
+        eventData.allStatistics.answeredQuestionsCount += engagement.statistics.answeredQuestionsCount || 0;
+        eventData.allStatistics.unansweredQuestionsCount += engagement.statistics.unansweredQuestionsCount || 0;
+        eventData.allStatistics.pollsCount += engagement.statistics.pollsCount || 0;
+        eventData.allStatistics.totalVotesCount += engagement.statistics.totalVotesCount || 0;
+      }
+    });
+
+    // Convert map to array
+    return Array.from(eventsMap.values()).map(eventData => ({
+      event: eventData.event,
+      programmeTracks: eventData.programmeTracks,
+      statistics: eventData.allStatistics,
+      totalSessionsCount: eventData.totalSessionsCount
     }));
   }
 
