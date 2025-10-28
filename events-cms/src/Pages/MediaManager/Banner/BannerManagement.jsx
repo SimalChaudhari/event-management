@@ -473,7 +473,7 @@ const BannerManagement = () => {
                         </div>
                     ) : (
                         <Row>
-                            {bannerEvents.imageUrls.map((imageUrl, index) => 
+                            {bannerEvents.imageUrls?.map((imageUrl, index) => 
                                 renderBannerCard({ 
                                     id: index, 
                                     imageUrl, 

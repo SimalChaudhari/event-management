@@ -1,6 +1,7 @@
 {
     "watch": ["src"],
     "ignore": ["dist", "node_modules"],
-    "exec": "nest start --watch"
+    "exec": "nest start",
+    "ext": "ts"
   }
   

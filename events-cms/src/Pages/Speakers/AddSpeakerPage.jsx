@@ -157,7 +157,7 @@ const AddSpeakerPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="firstName">
-                                                First Name *
+                                                First Name  <span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -174,7 +174,7 @@ const AddSpeakerPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="lastName">
-                                                Last Name *
+                                                Last Name  <span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -191,7 +191,7 @@ const AddSpeakerPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="email">
-                                                Email *
+                                                Email  <span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="email"
@@ -220,7 +220,7 @@ const AddSpeakerPage = () => {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="position">
-                                                Position *
+                                                Position  <span className="text-danger">*</span>
                                             </label>
                                             <input
                                                 type="text"
