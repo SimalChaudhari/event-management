@@ -936,6 +936,16 @@ const ViewEventPage = () => {
                                     onChange={(e) => handleTabVisibilityChange('adminInfo', e.target.checked)}
                                 />
                             </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="agenda-tab"
+                                    label="Agenda Tab"
+                                    checked={tabVisibilitySettings.agenda}
+                                    onChange={(e) => handleTabVisibilityChange('agenda', e.target.checked)}
+                                />
+                            </Form.Group>
                         </Col>
                     </Row>
                 </Modal.Body>
