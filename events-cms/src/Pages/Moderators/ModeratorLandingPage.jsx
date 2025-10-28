@@ -30,10 +30,22 @@ const ModeratorLandingPage = () => {
   const [editQuestionText, setEditQuestionText] = useState('');
   const [editQuestionStatus, setEditQuestionStatus] = useState('');
   const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [moderatorId, token, sessionId]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 425);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -389,11 +401,12 @@ const ModeratorLandingPage = () => {
     <div style={{ backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
       {/* Top banner when answering - Only show if there are questions with answering status */}
       {answeringQuestions.length > 0 && answeringQuestion && answeringQuestions.find(q => q.id === answeringQuestion.id) && (
-        <div
+        <div className="py-4"
           style={{
             backgroundColor: "#71C0BB",
             color: "black",
-            padding: "20px",
+
+            // padding: "20px",
             width: "100%",
           }}
         >
@@ -428,7 +441,7 @@ const ModeratorLandingPage = () => {
                     </div>
                   </Col>
                   <Col xs={12} md={4} className="text-md-end mt-3 mt-md-0">
-                    <div className="d-flex flex-row gap-2 justify-content-center justify-content-md-end">
+                    <div className="d-flex flex-row justify-content-center justify-content-md-end" style={{ gap: isMobile ? "16px" : "70px" }}>
                       <button
                         style={{
                           backgroundColor: "white",
@@ -439,8 +452,7 @@ const ModeratorLandingPage = () => {
                           cursor: "pointer",
                           whiteSpace: "nowrap",
                           fontSize: "14px",
-                          fontWeight: "500",
-                          margin: "0 6px 0 0"
+                          fontWeight: "500"
                         }}
                         onClick={() => handleQuestionStatusUpdate('cancel')}
                         disabled={submittingAnswer}
@@ -476,137 +488,138 @@ const ModeratorLandingPage = () => {
       <Container fluid className="py-4 px-3">
         <Row className="justify-content-center">
           <Col xl={10} lg={11} md={12}>
-        {/* Event info - Exact match to image */}
-        <Row className="mb-3">
-          <Col xs={12} md={6}>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>Event Title:</strong> {event?.title || 'ISCA Conference 2025'}
-            </p>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>Track Title:</strong> {engagement?.trackTitle || 'CFO'}
-            </p>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>Session Title:</strong> {selectedSession?.title || 'Happy birthday to you'}
-            </p>
-          </Col>
-          <Col xs={12} md={6}>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>Start Date:</strong> {event?.startDate ? (() => {
-                try {
-                  const date = new Date(event.startDate);
-                  const day = date.getDate();
-                  const month = date.toLocaleString('en-US', { month: 'short' });
-                  const year = date.getFullYear();
-                  return `${day} ${month} ${year}`;
-                } catch {
-                  return event.startDate;
-                }
-              })() : 'Not set'}
-            </p>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>End Date:</strong> {event?.endDate ? (() => {
-                try {
-                  const date = new Date(event.endDate);
-                  const day = date.getDate();
-                  const month = date.toLocaleString('en-US', { month: 'short' });
-                  const year = date.getFullYear();
-                  return `${day} ${month} ${year}`;
-                } catch {
-                  return event.endDate;
-                }
-              })() : 'Not set'}
-            </p>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>Time:</strong> {selectedSession?.startTime ? (() => {
-                try {
-                  const time = new Date(`2000-01-01T${selectedSession.startTime}`);
-                  return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                } catch {
-                  return selectedSession.startTime;
-                }
-              })() : 'Not set'} - {selectedSession?.endTime ? (() => {
-                try {
-                  const time = new Date(`2000-01-01T${selectedSession.endTime}`);
-                  return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                } catch {
-                  return selectedSession.endTime;
-                }
-              })() : 'Not set'}
-            </p>
-          </Col>
-        </Row>
-
-
-        {/* URL Field - Exact match to image */}
-        <Row className="mb-3">
-          <Col>
-            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-              <strong>URL to display answering question:</strong>
-            </p>
-            <Form.Control
-              readOnly
-              onClick={handleCopyUrl}
-              value={selectedSession?.id ? `${BASE_URL}/moderator/session/${selectedSession.id}` : 'Display URL'}
-              style={{
-                backgroundColor: "#D9D9D9",
-                border: "1px solid #ccc",
-                color: "#666",
-                cursor: "pointer",
-                fontSize: "12px",
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-              }}
-            />
-          
-          </Col>
-        </Row>
-
-
-        {/* Legend - Exact match to image */}
-        <Row className="mb-3">
-          <Col>
-            <div className="d-flex align-items-center flex-wrap" style={{ gap: "12px" }}>
-              <div className="d-flex align-items-center" style={{ marginRight: "12px" }}>
-                <div
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    border: "1px solid #ccc",
-                    marginRight: "6px",
-                    backgroundColor: "white",
-                    flexShrink: 0
-                  }}
-                ></div>
-                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Not Answered</span>
-              </div>
-              <div className="d-flex align-items-center" style={{ marginRight: "12px" }}>
-                <div
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    backgroundColor: "#4E6688",
-                    marginRight: "6px",
-                    flexShrink: 0
-                  }}
-                ></div>
-                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Answered</span>
-              </div>
-              <div className="d-flex align-items-center">
-                <div
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    backgroundColor: "#71C0BB",
-                    marginRight: "6px",
-                    flexShrink: 0
-                  }}
-                ></div>
-                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Answering</span>
-              </div>
+        {/* Event info - 3 items on left, 3 items on right */}
+        <div className="mb-3">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "1", minWidth: "200px" }}>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>Event Title:</strong> {event?.title || 'ISCA Conference 2025'}
+              </p>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>Track Title:</strong> {engagement?.trackTitle || 'CFO'}
+              </p>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>Session Title:</strong> {selectedSession?.title || 'Happy birthday to you'}
+              </p>
             </div>
-          </Col>
-        </Row>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "1", minWidth: "200px" }}>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>Start Date:</strong> {event?.startDate ? (() => {
+                  try {
+                    const date = new Date(event.startDate);
+                    const day = date.getDate();
+                    const month = date.toLocaleString('en-US', { month: 'short' });
+                    const year = date.getFullYear();
+                    return `${day} ${month} ${year}`;
+                  } catch {
+                    return event.startDate;
+                  }
+                })() : 'Not set'}
+              </p>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>End Date:</strong> {event?.endDate ? (() => {
+                  try {
+                    const date = new Date(event.endDate);
+                    const day = date.getDate();
+                    const month = date.toLocaleString('en-US', { month: 'short' });
+                    const year = date.getFullYear();
+                    return `${day} ${month} ${year}`;
+                  } catch {
+                    return event.endDate;
+                  }
+                })() : 'Not set'}
+              </p>
+              <p style={{ margin: 0, fontSize: "14px" }}>
+                <strong>Time:</strong> {selectedSession?.startTime ? (() => {
+                  try {
+                    const time = new Date(`2000-01-01T${selectedSession.startTime}`);
+                    return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  } catch {
+                    return selectedSession.startTime;
+                  }
+                })() : 'Not set'} - {selectedSession?.endTime ? (() => {
+                  try {
+                    const time = new Date(`2000-01-01T${selectedSession.endTime}`);
+                    return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  } catch {
+                    return selectedSession.endTime;
+                  }
+                })() : 'Not set'}
+              </p>
+            </div>
+          </div>
+        </div>
 
+
+        {/* URL Field and Legend */}
+        <Container fluid>
+        <div className="mb-3">
+          <p style={{ marginBottom: "8px", fontSize: "14px" }}>
+            <strong>URL to display answering question:</strong>
+          </p>
+          <Form.Control
+            readOnly
+            onClick={handleCopyUrl}
+            value={selectedSession?.id ? `${BASE_URL}/moderator/session/${selectedSession.id}` : 'Display URL'}
+            style={{
+              backgroundColor: "#D9D9D9",
+              border: "1px solid #ccc",
+              color: "#FFFFF",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "600",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              padding: "0px",
+              paddingLeft: "4px",
+              borderRadius: "2px",
+              height: "20px",
+              lineHeight: "20px"
+            }}
+          />
+          
+          {/* Legend */}
+          <div className="d-flex align-items-center flex-wrap" style={{ gap: "16px", marginTop: "32px" }}>
+            <div className="d-flex align-items-center">
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  border: "1px solid #ccc",
+                  marginRight: "8px",
+                  backgroundColor: "white",
+                  flexShrink: 0
+                }}
+              ></div>
+              <span style={{ fontSize: "14px", whiteSpace: "nowrap" }}>Not Answered</span>
+            </div>
+            <div className="d-flex align-items-center">
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  backgroundColor: "#4E6688",
+                  marginRight: "8px",
+                  flexShrink: 0
+                }}
+              ></div>
+              <span style={{ fontSize: "14px", whiteSpace: "nowrap" }}>Answered</span>
+            </div>
+            <div className="d-flex align-items-center">
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  backgroundColor: "#71C0BB",
+                  marginRight: "8px",
+                  flexShrink: 0
+                }}
+              ></div>
+              <span style={{ fontSize: "14px", whiteSpace: "nowrap" }}>Answering</span>
+            </div>
+          </div>
+        </div>
+        </Container>
         {/* Table - Fully responsive with all columns wrapping */}
         <div className="table-responsive" style={{ marginTop: "20px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <Table bordered style={{ 
@@ -630,7 +643,7 @@ const ModeratorLandingPage = () => {
                   width: "52%",
                   minWidth: "100px",
                   fontSize: "clamp(11px, 2vw, 14px)",
-                  textAlign: "left"
+                  textAlign: "center"
                 }}>Questions</th>
                 <th style={{ 
                   borderRight: "1px solid #D4D6DD",
@@ -691,13 +704,14 @@ const ModeratorLandingPage = () => {
                       borderTop: "1px solid #D4D6DD",
                       borderBottom: "1px solid #D4D6DD",
                       borderLeft: "none",
-                      padding: "6px 3px",
+                      padding: "6px 12px",
                       wordBreak: "break-word",
                       wordWrap: "break-word",
                       whiteSpace: "normal",
                       lineHeight: "1.2",
                       verticalAlign: "middle",
-                      fontSize: "clamp(10px, 2vw, 13px)"
+                      fontSize: "clamp(10px, 2vw, 13px)",
+                      textAlign: "start"
                     }}>
                       {q.question}
                     </td>
@@ -834,6 +848,7 @@ const ModeratorLandingPage = () => {
             </tbody>
           </Table>
         </div>
+       
           </Col>
         </Row>
       </Container>
