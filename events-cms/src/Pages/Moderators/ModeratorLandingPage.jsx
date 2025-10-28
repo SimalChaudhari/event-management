@@ -400,15 +400,15 @@ const ModeratorLandingPage = () => {
           <Container fluid className="px-3">
             <Row className="justify-content-center">
               <Col xl={10} lg={11} md={12}>
-                <Row>
-                  <Col md={8}>
+                <Row className="align-items-center">
+                  <Col xs={12} md={8}>
                     <div style={{ 
                       fontFamily: "Arial",
                       fontWeight: "400",
                       fontStyle: "italic",
-                      // fontSize: "12px",
-                      lineHeight: "32px",
-                      marginBottom: "10px"
+                      fontSize: "12px",
+                      lineHeight: "18px",
+                      marginBottom: "8px"
                     }}>
                       This question is now being answered:
                     </div>
@@ -417,9 +417,9 @@ const ModeratorLandingPage = () => {
                         fontFamily: "Arial",
                         fontWeight: "700",
                         fontStyle: "italic",
-                        fontSize: "16px",
-                        lineHeight: "20px",
-                        letterSpacing: "2%",
+                        fontSize: "14px",
+                        lineHeight: "18px",
+                        letterSpacing: "0.5px",
                         color: "black",
                         wordBreak: "break-word"
                       }}
@@ -427,36 +427,44 @@ const ModeratorLandingPage = () => {
                       {answeringQuestion.question}
                     </div>
                   </Col>
-                  <Col md={4} className="text-end">
-                    <button
-                      style={{
-                        backgroundColor: "white",
-                        color: "#000",
-                        border: "1px solid #ccc",
-                        marginRight: "10px",
-                        borderRadius: "5px",
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleQuestionStatusUpdate('cancel')}
-                      disabled={submittingAnswer}
-                    >
-                      Cancel Answering
-                    </button>
-                    <button
-                      style={{
-                        backgroundColor: "#505c8c",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "5px",
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleQuestionStatusUpdate('answer')}
-                      disabled={submittingAnswer}
-                    >
-                      Mark as Answered
-                    </button>
+                  <Col xs={12} md={4} className="text-md-end mt-3 mt-md-0">
+                    <div className="d-flex flex-row gap-2 justify-content-center justify-content-md-end">
+                      <button
+                        style={{
+                          backgroundColor: "white",
+                          color: "#000",
+                          border: "1px solid #ccc",
+                          borderRadius: "5px",
+                          padding: "8px 16px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          fontSize: "14px",
+                          fontWeight: "500",
+                          margin: "0 6px 0 0"
+                        }}
+                        onClick={() => handleQuestionStatusUpdate('cancel')}
+                        disabled={submittingAnswer}
+                      >
+                        Cancel Answering
+                      </button>
+                      <button
+                        style={{
+                          backgroundColor: "#505c8c",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "5px",
+                          padding: "8px 16px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          fontSize: "14px",
+                          fontWeight: "500"
+                        }}
+                        onClick={() => handleQuestionStatusUpdate('answer')}
+                        disabled={submittingAnswer}
+                      >
+                        Mark as Answered
+                      </button>
+                    </div>
                   </Col>
                 </Row>
               </Col>
@@ -469,27 +477,61 @@ const ModeratorLandingPage = () => {
         <Row className="justify-content-center">
           <Col xl={10} lg={11} md={12}>
         {/* Event info - Exact match to image */}
-        <Row>
-          <Col md={6}>
-            <p style={{ marginBottom: "8px" }}>
+        <Row className="mb-3">
+          <Col xs={12} md={6}>
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
               <strong>Event Title:</strong> {event?.title || 'ISCA Conference 2025'}
             </p>
-            <p style={{ marginBottom: "8px" }}>
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
               <strong>Track Title:</strong> {engagement?.trackTitle || 'CFO'}
             </p>
-            <p style={{ marginBottom: "8px" }}>
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
               <strong>Session Title:</strong> {selectedSession?.title || 'Happy birthday to you'}
             </p>
           </Col>
-          <Col md={6}>
-            <p style={{ marginBottom: "8px" }}>
-              <strong>Start Date:</strong> 10/15/2025
+          <Col xs={12} md={6}>
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
+              <strong>Start Date:</strong> {event?.startDate ? (() => {
+                try {
+                  const date = new Date(event.startDate);
+                  const day = date.getDate();
+                  const month = date.toLocaleString('en-US', { month: 'short' });
+                  const year = date.getFullYear();
+                  return `${day} ${month} ${year}`;
+                } catch {
+                  return event.startDate;
+                }
+              })() : 'Not set'}
             </p>
-            <p style={{ marginBottom: "8px" }}>
-              <strong>End Date:</strong> 10/15/2025
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
+              <strong>End Date:</strong> {event?.endDate ? (() => {
+                try {
+                  const date = new Date(event.endDate);
+                  const day = date.getDate();
+                  const month = date.toLocaleString('en-US', { month: 'short' });
+                  const year = date.getFullYear();
+                  return `${day} ${month} ${year}`;
+                } catch {
+                  return event.endDate;
+                }
+              })() : 'Not set'}
             </p>
-            <p style={{ marginBottom: "8px" }}>
-              <strong>Time:</strong> 1:30 PM - 2:30 PM
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
+              <strong>Time:</strong> {selectedSession?.startTime ? (() => {
+                try {
+                  const time = new Date(`2000-01-01T${selectedSession.startTime}`);
+                  return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                } catch {
+                  return selectedSession.startTime;
+                }
+              })() : 'Not set'} - {selectedSession?.endTime ? (() => {
+                try {
+                  const time = new Date(`2000-01-01T${selectedSession.endTime}`);
+                  return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                } catch {
+                  return selectedSession.endTime;
+                }
+              })() : 'Not set'}
             </p>
           </Col>
         </Row>
@@ -498,7 +540,7 @@ const ModeratorLandingPage = () => {
         {/* URL Field - Exact match to image */}
         <Row className="mb-3">
           <Col>
-            <p style={{ marginBottom: "8px" }}>
+            <p style={{ marginBottom: "8px", fontSize: "14px" }}>
               <strong>URL to display answering question:</strong>
             </p>
             <Form.Control
@@ -510,6 +552,9 @@ const ModeratorLandingPage = () => {
                 border: "1px solid #ccc",
                 color: "#666",
                 cursor: "pointer",
+                fontSize: "12px",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}
             />
           
@@ -520,87 +565,113 @@ const ModeratorLandingPage = () => {
         {/* Legend - Exact match to image */}
         <Row className="mb-3">
           <Col>
-            <div className="d-flex align-items-center">
-              <div
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  border: "1px solid #ccc",
-                  marginRight: "8px",
-                  backgroundColor: "white",
-                }}
-              ></div>
-              <span style={{ marginRight: "24px" }}>Not Answered</span>
-              <div
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  backgroundColor: "#4E6688",
-                  marginRight: "8px",
-                }}
-              ></div>
-              <span style={{ marginRight: "24px" }}>Answered</span>
-              <div
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  backgroundColor: "#71C0BB",
-                  marginRight: "8px",
-                }}
-              ></div>
-              <span>Answering</span>
+            <div className="d-flex align-items-center flex-wrap" style={{ gap: "12px" }}>
+              <div className="d-flex align-items-center" style={{ marginRight: "12px" }}>
+                <div
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    border: "1px solid #ccc",
+                    marginRight: "6px",
+                    backgroundColor: "white",
+                    flexShrink: 0
+                  }}
+                ></div>
+                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Not Answered</span>
+              </div>
+              <div className="d-flex align-items-center" style={{ marginRight: "12px" }}>
+                <div
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    backgroundColor: "#4E6688",
+                    marginRight: "6px",
+                    flexShrink: 0
+                  }}
+                ></div>
+                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Answered</span>
+              </div>
+              <div className="d-flex align-items-center">
+                <div
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    backgroundColor: "#71C0BB",
+                    marginRight: "6px",
+                    flexShrink: 0
+                  }}
+                ></div>
+                <span style={{ fontSize: "13px", whiteSpace: "nowrap" }}>Answering</span>
+              </div>
             </div>
           </Col>
         </Row>
 
         {/* Table - Fully responsive with all columns wrapping */}
-        <div className="table-responsive" style={{ marginTop: "20px" }}>
+        <div className="table-responsive" style={{ marginTop: "20px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <Table bordered style={{ 
-            borderCollapse: 'collapse', 
+            borderCollapse: 'separate', 
+            borderSpacing: '0',
             width: '100%', 
-            minWidth: '500px',
-            border: "3px solid #D4D6DD"
+            minWidth: '320px',
+            border: "1px solid #D4D6DD",
+            fontSize: "clamp(10px, 2vw, 14px)"
           }}>
             <thead style={{ backgroundColor: "#000", color: "white" }}>
               <tr>
                 <th style={{ 
-                  border: "3px solid #D4D6DD", 
-                  padding: "8px", 
+                  borderRight: "1px solid #D4D6DD",
+                  borderTop: "none",
+                  borderBottom: "1px solid #D4D6DD",
+                  borderLeft: "none",
+                  padding: "8px 4px", 
                   backgroundColor: "#000", 
                   color: "white",
-                  width: "45%",
-                  minWidth: "150px",
-                  fontSize: "14px",
-                  textAlign: "center"
+                  width: "52%",
+                  minWidth: "100px",
+                  fontSize: "clamp(11px, 2vw, 14px)",
+                  textAlign: "left"
                 }}>Questions</th>
                 <th style={{ 
-                  border: "3px solid #D4D6DD", 
-                  padding: "8px", 
+                  borderRight: "1px solid #D4D6DD",
+                  borderTop: "none",
+                  borderBottom: "1px solid #D4D6DD",
+                  borderLeft: "1px solid #D4D6DD",
+                  padding: "4px 2px", 
                   backgroundColor: "#000", 
                   color: "white",
-                  width: "15%",
-                  minWidth: "60px",
-                  fontSize: "14px",
+                  width: "8%",
+                  minWidth: "35px",
+                  maxWidth: "50px",
+                  fontSize: "clamp(10px, 2vw, 14px)",
                   textAlign: "center"
                 }}>Votes</th>
                 <th style={{ 
-                  border: "3px solid #D4D6DD", 
-                  padding: "8px", 
+                  borderRight: "1px solid #D4D6DD",
+                  borderTop: "none",
+                  borderBottom: "1px solid #D4D6DD",
+                  borderLeft: "1px solid #D4D6DD",
+                  padding: "4px 2px", 
                   backgroundColor: "#000", 
                   color: "white",
-                  width: "20%",
-                  minWidth: "80px",
-                  fontSize: "14px",
+                  width: "15%",
+                  minWidth: "55px",
+                  maxWidth: "80px",
+                  fontSize: "clamp(10px, 2vw, 14px)",
                   textAlign: "center"
                 }}>Status</th>
                 <th style={{ 
-                  border: "3px solid #D4D6DD", 
-                  padding: "8px", 
+                  borderRight: "none",
+                  borderTop: "none",
+                  borderBottom: "1px solid #D4D6DD",
+                  borderLeft: "1px solid #D4D6DD",
+                  padding: "4px 1px", 
                   backgroundColor: "#000", 
                   color: "white",
-                  width: "20%",
-                  minWidth: "100px",
-                  fontSize: "14px",
+                  width: "18%",
+                  minWidth: "70px",
+                  maxWidth: "110px",
+                  fontSize: "clamp(10px, 2vw, 14px)",
                   textAlign: "center"
                 }}>Actions</th>
               </tr>
@@ -616,67 +687,80 @@ const ModeratorLandingPage = () => {
                       color: "black",
                       fontWeight: "bold",
                       fontStyle: "italic",
-                      border: q.status === "answered" ? "3px solid #4E6688" : q.status === "answering" ? "3px solid #71C0BB" : "3px solid #D4D6DD", 
-                      padding: "8px",
-                      // textAlign: "center",
+                      borderRight: "1px solid #D4D6DD",
+                      borderTop: "1px solid #D4D6DD",
+                      borderBottom: "1px solid #D4D6DD",
+                      borderLeft: "none",
+                      padding: "6px 3px",
                       wordBreak: "break-word",
                       wordWrap: "break-word",
                       whiteSpace: "normal",
-                      lineHeight: "1.3",
+                      lineHeight: "1.2",
                       verticalAlign: "middle",
-                      fontSize: "13px"
+                      fontSize: "clamp(10px, 2vw, 13px)"
                     }}>
                       {q.question}
                     </td>
                     <td style={{ 
                       backgroundColor: "#ffffff",
                       color: "black",
-                      border: "3px solid #D4D6DD", 
-                      padding: "8px", 
+                      borderRight: "1px solid #D4D6DD",
+                      borderTop: "1px solid #D4D6DD",
+                      borderBottom: "1px solid #D4D6DD",
+                      borderLeft: "1px solid #D4D6DD",
+                      padding: "4px 1px", 
                       textAlign: "center",
                       verticalAlign: "middle",
-                      fontSize: "13px"
+                      fontSize: "clamp(10px, 2vw, 13px)",
+                      whiteSpace: "nowrap"
                     }}>
                       {q.likesCount}
                     </td>
                     <td style={{ 
                       backgroundColor: "#ffffff",
                       color: "black",
-                      border: "3px solid #D4D6DD", 
-                      padding: "8px",
+                      borderRight: "1px solid #D4D6DD",
+                      borderTop: "1px solid #D4D6DD",
+                      borderBottom: "1px solid #D4D6DD",
+                      borderLeft: "1px solid #D4D6DD",
+                      padding: "4px 1px",
                       textAlign: "center",
                       verticalAlign: "middle",
                       wordBreak: "break-word",
                       wordWrap: "break-word",
                       whiteSpace: "normal",
-                      fontSize: "13px"
+                      fontSize: "clamp(10px, 2vw, 13px)"
                     }}>
                       {getStatusText(q.status)}
                     </td>
                     <td style={{ 
                       backgroundColor: "#ffffff",
                       color: "black",
-                      border: "3px solid #D4D6DD", 
-                      padding: "6px", 
+                      borderRight: "none",
+                      borderTop: "1px solid #D4D6DD",
+                      borderBottom: "1px solid #D4D6DD",
+                      borderLeft: "1px solid #D4D6DD",
+                      padding: "4px 1px", 
                       textAlign: "center",
-                      verticalAlign: "top"
+                      verticalAlign: "middle"
                     }}>
-                      <div className="d-flex gap-2 justify-content-center flex-wrap">
+                      <div style={{ display: "flex", justifyContent: "center", gap: "0" }}>
                         {/* Answer Now Button */}
                         <button
                           className="btn btn-icon"
                           style={{
-                            width: "48px",
-                            height: "48px",
+                            width: "38px",
+                            height: "38px",
                             borderRadius: "50%",
                             border: "none",
                             backgroundColor: "transparent",
                             cursor: q.status === "answering" ? "not-allowed" : "pointer",
-                            display: "flex",
+                            display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                             padding: 0,
+                            margin: "0 -2px",
                             color: q.status === "answering" ? "#D4D6DD" : q.answer ? "#28a745" : "#71C0BB",
                             opacity: q.status === "answering" ? 0.5 : 1
                           }}
@@ -684,53 +768,55 @@ const ModeratorLandingPage = () => {
                           disabled={q.status === "answering"}
                           title={q.status === "answering" ? "Currently Being Answered" : q.answer ? "Edit Answer" : "Answer Now"}
                         >
-                          <i className="feather icon-message-circle" style={{ fontSize: "24px" }}></i>
+                          <i className="feather icon-message-circle" style={{ fontSize: "20px" }}></i>
                         </button>
                         
                         {/* Edit Question Button */}
                         <button
                           className="btn btn-icon"
                           style={{
-                            width: "48px",
-                            height: "48px",
+                            width: "38px",
+                            height: "38px",
                             borderRadius: "50%",
                             border: "none",
                             backgroundColor: "transparent",
                             cursor: "pointer",
-                            display: "flex",
+                            display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                             padding: 0,
+                            margin: "0 -2px",
                             color: "#71C0BB"
                           }}
                           title="Edit Question"
                           onClick={() => handleEditQuestion(q)}
                         >
-                          <i className="feather icon-edit" style={{ fontSize: "24px" }}></i>
+                          <i className="feather icon-edit" style={{ fontSize: "20px" }}></i>
                         </button>
                         
                         {/* Delete Question Button */}
                         <button
                           className="btn btn-icon"
                           style={{
-                            width: "48px",
-                            height: "48px",
+                            width: "38px",
+                            height: "38px",
                             borderRadius: "50%",
                             border: "none",
                             backgroundColor: "transparent",
                             cursor: "pointer",
-                            display: "flex",
+                            display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                             padding: 0,
+                            margin: "0 -2px",
                             color: "#71C0BB"
                           }}
                           onClick={() => handleDeleteQuestion(q.id)}
                           title="Delete Question"
                         >
-                          <i className="feather icon-trash-2" style={{ fontSize: "24px" }}></i>
+                          <i className="feather icon-trash-2" style={{ fontSize: "20px" }}></i>
                         </button>
                       </div>
                     </td>
