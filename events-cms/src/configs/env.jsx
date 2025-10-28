@@ -59,3 +59,8 @@ export const FEATURES = {
 // Dummy Data
 export const DUMMY_PATH = "https://img.freepik.com/free-vector/party-invitation-design-with-crowd_23-2147737844.jpg";
 export const DUMMY_PATH_USER = "https://thumbs.dreamstime.com/b/missing-data-icon-303229866.jpg";
+
+// Frontend Public URL
+export const BASE_URL = typeof window !== 'undefined' 
+  ? window.location.origin 
+  : (process.env.REACT_APP_PUBLIC_URL || 'https://evential.org.sg');

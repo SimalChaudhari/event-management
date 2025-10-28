@@ -250,6 +250,17 @@ const ModeratorLandingPage = () => {
     handleAnswerQuestion(question);
   };
 
+  // Handle copy URL to clipboard
+  const handleCopyUrl = () => {
+    // Copy the full URL with token even though display shows short URL
+    const fullUrl = selectedSession?.id ? `${BASE_URL}/moderator/session/${selectedSession.id}?token=${token}` : window.location.href;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      toast.success('URL copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy URL');
+    });
+  };
+
   // Handle question status update
   const handleQuestionStatusUpdate = async (action) => {
     if (!answeringQuestion) return;
@@ -492,13 +503,16 @@ const ModeratorLandingPage = () => {
             </p>
             <Form.Control
               readOnly
-              value={selectedSession?.title ? `https://evential.org.sg/q&a/answering/session-title-${selectedSession.title.toLowerCase().replace(/\s+/g, '-')}` : `https://evential.org.sg/q&a/answering/session-title-happy-birthday-to-you`}
+              onClick={handleCopyUrl}
+              value={selectedSession?.id ? `${BASE_URL}/moderator/session/${selectedSession.id}` : 'Display URL'}
               style={{
                 backgroundColor: "#D9D9D9",
                 border: "1px solid #ccc",
                 color: "#666",
+                cursor: "pointer",
               }}
             />
+          
           </Col>
         </Row>
 

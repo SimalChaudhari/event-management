@@ -331,7 +331,8 @@ export class OAuthAuthService {
     message: string;
   }> {
     try {
-      const revokeUrl = `${this.salesforceConfig.instanceUrl}/services/oauth2/revoke`;
+      // Use the custom clearsession endpoint for SSO logout
+      const revokeUrl = `${this.salesforceConfig.instanceUrl}/services/apexrest/v1/bodmobileapp/clearsession`;
       
       await axios.post(
         revokeUrl,
