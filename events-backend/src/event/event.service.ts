@@ -279,8 +279,26 @@ export class EventService {
 
       const events = await queryBuilder.getMany();
 
+      // Filter out past events (only exclude events where endDate < today)
+      // Include all events that are today or upcoming
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const filteredEvents = events.filter((event) => {
+        const eventEndDate = new Date(event.endDate);
+        eventEndDate.setHours(0, 0, 0, 0);
+        
+        // Only exclude events where endDate < today (past events)
+        // Include all events from today onwards (today's events should be shown)
+        if (eventEndDate < today) {
+          return false; // Past event - exclude
+        }
+        
+        return true; // Include today's events and upcoming events
+      });
+
       const eventsWithAttendance = await Promise.all(
-        events.map(async (event) => {
+        filteredEvents.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
           const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
