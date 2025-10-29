@@ -22,6 +22,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import * as fs from 'fs';
 import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from './create-withdrawal.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -37,7 +38,14 @@ export class WithdrawalController {
   @UseInterceptors(
     FileInterceptor('document', {
       storage: diskStorage({
-        destination: './uploads/withdrawals',
+        destination: (_req, file, cb) => {
+          const destinationPath = './uploads/withdrawals';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (_req, file, cb) => {
           const uniqueSuffix = `${uuidv4()}${path.extname(file.originalname)}`;
           cb(null, uniqueSuffix);

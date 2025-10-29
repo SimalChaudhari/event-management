@@ -64,7 +64,14 @@ export class AuthController {
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/images';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -342,7 +349,14 @@ export class AuthController {
   @UseInterceptors(
     FileInterceptor('csvFile', {
       storage: diskStorage({
-        destination: './uploads/temp',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/temp';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);

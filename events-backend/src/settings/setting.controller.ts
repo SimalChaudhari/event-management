@@ -54,6 +54,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import * as fs from 'fs';
 import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { GetUser } from '../jwt/get-user.decorator';
@@ -124,7 +125,14 @@ export class BannerController {
   @UseInterceptors(
     FileInterceptor('image', { // Single image for banners
       storage: diskStorage({
-        destination: './uploads/banners',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/banners';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -176,7 +184,14 @@ export class BannerEventController {
   @UseInterceptors(
     FilesInterceptor('images', 10, { // Multiple images for banner events
       storage: diskStorage({
-        destination: './uploads/banner-events',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/banner-events';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -232,7 +247,14 @@ export class LogoController {
   @UseInterceptors(
     FileInterceptor('image', { // Single image for logo
       storage: diskStorage({
-        destination: './uploads/logos',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/logos';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);

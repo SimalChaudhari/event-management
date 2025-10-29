@@ -2,6 +2,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import * as fs from 'fs';
 
 export interface FileUploadConfig {
   images?: Express.Multer.File[];
@@ -50,23 +51,31 @@ export class FileUploadUtils {
     return diskStorage({
       destination: (req, file, cb) => {
         const fieldName = file.fieldname;
+        let destinationPath = '';
         
         switch (fieldName) {
           case 'images':
-            cb(null, './uploads/event/images');
+            destinationPath = './uploads/event/images';
             break;
           case 'documents':
-            cb(null, './uploads/event/documents');
+            destinationPath = './uploads/event/documents';
             break;
           case 'floorPlan':
-            cb(null, './uploads/event/floorPlan');
+            destinationPath = './uploads/event/floorPlan';
             break;
           case 'eventStampImages':
-            cb(null, './uploads/eventStamps/images');
+            destinationPath = './uploads/eventStamps/images';
             break;
           default:
-            cb(null, './uploads/event/images'); // Default fallback
+            destinationPath = './uploads/event/images'; // Default fallback
         }
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(destinationPath)) {
+          fs.mkdirSync(destinationPath, { recursive: true });
+        }
+        
+        cb(null, destinationPath);
       },
       filename: (req, file, cb) => {
         const uniqueSuffix = uuidv4() + path.extname(file.originalname);
@@ -371,7 +380,14 @@ export class FileUploadUtils {
   static getAdvertStorageConfig() {
     return diskStorage({
       destination: (req, file, cb) => {
-        cb(null, './uploads/advert-notifications');
+        const destinationPath = './uploads/advert-notifications';
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(destinationPath)) {
+          fs.mkdirSync(destinationPath, { recursive: true });
+        }
+        
+        cb(null, destinationPath);
       },
       filename: (req, file, cb) => {
         const uniqueSuffix = uuidv4() + path.extname(file.originalname);

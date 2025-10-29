@@ -119,7 +119,14 @@ export class UserController {
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/images';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -224,7 +231,14 @@ export class UserController {
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/images';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -315,7 +329,14 @@ export class UserController {
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/images';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);
@@ -420,7 +441,14 @@ export class UserController {
   @UseInterceptors(
     FileInterceptor('profilePicture', {
       storage: diskStorage({
-        destination: './uploads/images',
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/images';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = uuidv4() + path.extname(file.originalname);
           cb(null, uniqueSuffix);

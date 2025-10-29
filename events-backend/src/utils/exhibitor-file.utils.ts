@@ -58,23 +58,31 @@ export class ExhibitorFileUtils {
     return diskStorage({
       destination: (req, file, cb) => {
         const fieldName = file.fieldname;
+        let destinationPath = '';
 
         switch (fieldName) {
           case 'flyers':
-            cb(null, './uploads/exhibitor/flyers');
+            destinationPath = './uploads/exhibitor/flyers';
             break;
           case 'documents':
-            cb(null, './uploads/exhibitor/documents');
+            destinationPath = './uploads/exhibitor/documents';
             break;
           case 'eventImages':
-            cb(null, './uploads/exhibitor/eventImages');
+            destinationPath = './uploads/exhibitor/eventImages';
             break;
           case 'logo':
-            cb(null, './uploads/exhibitor/logos');
+            destinationPath = './uploads/exhibitor/logos';
             break;
           default:
-            cb(null, './uploads/exhibitor/flyers'); // Default fallback
+            destinationPath = './uploads/exhibitor/flyers'; // Default fallback
         }
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(destinationPath)) {
+          fs.mkdirSync(destinationPath, { recursive: true });
+        }
+        
+        cb(null, destinationPath);
       },
       filename: (req, file, cb) => {
         const uniqueSuffix = uuidv4() + path.extname(file.originalname);

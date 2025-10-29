@@ -12,6 +12,7 @@ import { setupDateFilter, resetFilters } from '../../utils/dateFilter';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
+import '../../assets/css/event.css';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -357,8 +358,7 @@ const SurveyView = () => {
                                 <thead>
                                     <tr>
                                         <th>Survey Details</th>
-                                        <th>Event Details</th>
-                                     
+                                        <th>Event Details</th>                                     
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>

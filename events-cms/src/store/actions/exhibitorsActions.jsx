@@ -31,7 +31,7 @@ export const exhibitorList = () => async (dispatch) => {
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitors';
-       
+
         toast.error(errorMessage);
         return false;
     } finally {
@@ -51,7 +51,7 @@ export const exhibitorById = (id) => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitor';
-       
+
         toast.error(errorMessage);
         return false;
     } finally {
@@ -134,7 +134,7 @@ export const fetchPromotional = () => async (dispatch) => {
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch promotional offers';
-       
+
         toast.error(errorMessage);
         return false;
     } finally {

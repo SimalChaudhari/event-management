@@ -1,9 +1,18 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING } from '../constants/actionTypes';
+
+// Helper function to dispatch loading state
+const setEventLoading = (dispatch, loading) => {
+    dispatch({
+        type: EVENT_LOADING,
+        payload: loading
+    });
+};
 
 export const eventList = (filters = {}) => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         // Build query parameters
         const queryParams = new URLSearchParams();
         
@@ -52,12 +61,15 @@ export const eventList = (filters = {}) => async (dispatch) => {
         // Check if error response exists and handle error message
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
     return false; // Return false for any errors
 };
 
 export const eventById = (id) => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get(`/events/${id}`);
         dispatch({
             type: EVENT_BY_ID,
@@ -67,11 +79,14 @@ export const eventById = (id) => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 
 export const upcomingEventList = (filters = {}) => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         // Build query parameters, always include upcoming=true
         const queryParams = new URLSearchParams();
         queryParams.append('upcoming', 'true');
@@ -121,6 +136,8 @@ export const upcomingEventList = (filters = {}) => async (dispatch) => {
         // Check if error response exists and handle error message
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
     return false; // Return false for any errors
 };
@@ -161,6 +178,7 @@ export const editEvent = (id, data) => async (dispatch) => {
 
 export const participatedEvents = (filters = {}) => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         // Build query parameters
         const queryParams = new URLSearchParams();
         
@@ -189,18 +207,23 @@ export const participatedEvents = (filters = {}) => async (dispatch) => {
         // Check if error response exists and handle error message
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
     return false; // Return false for any errors
 };
 
 export const registerEventById = (id) => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get(`/register-events/${id}`);
         return response.data;
     } catch (error) {
         // Handle errors appropriately
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
     return false; // Return false for any errors or unsuccessful attempts
 
@@ -288,6 +311,7 @@ export const removeEventDocument = (eventId, documentPath) => async (dispatch) =
 
 export const galleryList = () => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/gallery');
         dispatch({
             type: GALLERY_LIST,
@@ -297,17 +321,22 @@ export const galleryList = () => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
     return false;
 };
 
 export const exhibitorGet = () => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/exhibitors');
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 
@@ -323,11 +352,14 @@ export const createEventStamp = (data) => async (dispatch) => {
 
 export const eventGetStamp = () => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/events/event-stamps');
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 
@@ -392,22 +424,28 @@ export const adminDeleteRegisterEvent = (id) => async (dispatch) => {
 // Get all users for dropdown filter
 export const getAllUsersForFilter = () => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/users');
         return response.data?.data || [];
     } catch (error) {
         console.error('Error fetching users for filter:', error);
         return [];
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 
 // Get all events for dropdown filter
 export const getAllEventsForFilter = () => async (dispatch) => {
     try {
+        setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/events');
         return response.data?.events || [];
     } catch (error) {
         console.error('Error fetching events for filter:', error);
         return [];
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 

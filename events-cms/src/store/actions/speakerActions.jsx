@@ -1,10 +1,19 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER } from "../constants/actionTypes";
+import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER, SPEAKER_LOADING } from "../constants/actionTypes";
+
+// Helper function to dispatch loading state
+const setSpeakerLoading = (dispatch, loading) => {
+    dispatch({
+        type: SPEAKER_LOADING,
+        payload: loading
+    });
+};
 
 // Get all speakers
 export const speakerList = () => async (dispatch) => {
     try {
+        setSpeakerLoading(dispatch, true);
         const response = await axiosInstance.get('/users/speakers/get');
         dispatch({
             type: SPEAKER_LIST,
@@ -14,22 +23,30 @@ export const speakerList = () => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch speakers';
         toast.error(errorMessage);
+    } finally {
+        setSpeakerLoading(dispatch, false);
     }
     return false;
 };
 
 export const speakerById = (id) => async (dispatch) => {
     try {
+        setSpeakerLoading(dispatch, true);
         const response = await axiosInstance.get(`/users/speakers/${id}`);
         return response.data;
     } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch speaker details';
+        toast.error(errorMessage);
         throw error;
+    } finally {
+        setSpeakerLoading(dispatch, false);
     }
 }
 
 // Create new speaker
 export const createSpeaker = (data) => async (dispatch) => {
     try {
+        
         const response = await axiosInstance.post('/users/speakers/create', data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Speaker created successfully!');
@@ -41,7 +58,7 @@ export const createSpeaker = (data) => async (dispatch) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to create speaker';
         toast.error(errorMessage);
-    }
+    } 
     return false;
 };
 

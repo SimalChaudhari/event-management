@@ -1,10 +1,19 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import { CATEGORY_LIST, CREATE_CATEGORY, UPDATE_CATEGORY, DELETE_CATEGORY } from "../constants/actionTypes";
+import { CATEGORY_LIST, CREATE_CATEGORY, UPDATE_CATEGORY, DELETE_CATEGORY, CATEGORY_LOADING } from "../constants/actionTypes";
+
+// Helper function to dispatch loading state
+const setCategoryLoading = (dispatch, loading) => {
+    dispatch({
+        type: CATEGORY_LOADING,
+        payload: loading
+    });
+};
 
 // Get all categories
 export const categoryList = () => async (dispatch) => {
     try {
+        setCategoryLoading(dispatch, true);
         const response = await axiosInstance.get('/categories/get');
         dispatch({
             type: CATEGORY_LIST,
@@ -15,16 +24,23 @@ export const categoryList = () => async (dispatch) => {
         
         const errorMessage = error?.response?.data?.message || 'Failed to fetch categories';
         toast.error(errorMessage);
+    } finally {
+        setCategoryLoading(dispatch, false);
     }
     return false;
 };
 
 export const categoryById = (id) => async (dispatch) => {
     try {
+        setCategoryLoading(dispatch, true);
         const response = await axiosInstance.get(`/categories/${id}`);
         return response.data;
     } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch category details';
+        toast.error(errorMessage);
         throw error;
+    } finally {
+        setCategoryLoading(dispatch, false);
     }
 }
 

@@ -14,10 +14,10 @@ export class OAuthAuthService {
     redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
     mobileRedirectUri: 'iscaevential://auth',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
-    instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com',
-    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/authorize`,
-    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/token`,
-    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices-isca--fuat.sandbox.my.site.com'}/services/oauth2/userinfo`,
+    instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg',
+    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/authorize`,
+    tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/token`,
+    userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/userinfo`,
   };
 
 
@@ -33,10 +33,10 @@ export class OAuthAuthService {
    */
   generateAuthUrl(state?: string): string {
     // Use the exact URL provided by the user
-    // const baseUrl = 'https://eservices-isca--fuat.sandbox.my.site.com/services/oauth2/authorize';
-    const baseUrl = 'https://eservices-isca--fuat.sandbox.my.site.com/event/services/oauth2/authorize';
+    // const baseUrl = 'https://eservices.isca.org.sg/services/oauth2/authorize';
+    const baseUrl = 'https://eservices.isca.org.sg/event/services/oauth2/authorize';
     const params = new URLSearchParams({
-      client_id: '3MVG9yj3UGaUlj7luLykaRo9nVJl.l_EnrdUAU2iNLQuRwfFhLcJ5jZ9XbU6KSg7gc6wDDYZ.YGe6W7aesNCZ',
+      client_id: '3MVG9ZL0ppGP5UrCyrkLz3zQB4lFun889sQnml2YIC1Oyg7gV3.W1KATpMrUFagKigUNqinHK5EOd7pFzC.gc',
       response_type: 'code',
       redirect_uri: 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
       scope: 'openid profile email api refresh_token',
