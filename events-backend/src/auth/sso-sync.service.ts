@@ -15,7 +15,7 @@ import {
 
 @Injectable()
 export class SSOSyncService {
-  private readonly externalApiUrl = 'https://eservices-isca--fuat.sandbox.my.site.com/services/apexrest/userInfo';
+  private readonly externalApiUrl = 'https://eservices.isca.org.sg/services/apexrest/userInfo';
 
   constructor(
     @InjectRepository(UserEntity)

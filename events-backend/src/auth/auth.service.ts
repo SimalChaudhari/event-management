@@ -32,10 +32,11 @@ import { csvUploadConfig } from '../utils/csv-upload.config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { OAuthAuthService } from './oauth-auth.service';
 
 @Injectable()
 export class AuthService {
-  private oauthAuthService: any; // Will be injected via setter to avoid circular dependency
+  private oauthAuthService: OAuthAuthService | null = null; // Will be injected via setter to avoid circular dependency
 
   constructor(
     @InjectRepository(UserEntity)
