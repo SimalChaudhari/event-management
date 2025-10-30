@@ -113,7 +113,7 @@ export class SpeakerProfileService {
       const speakers = await this.userRepository.find({
         where: { role: UserRole.Speaker },
         relations: ['speakerProfile', 'addresses'],
-        order: { updatedAt: 'DESC' },
+        order: { firstName: 'ASC', lastName: 'ASC' },
         select: [
           'id', 'firstName', 'lastName', 'email', 'mobile', 'countryCurrency', 'profilePicture', 
           'linkedinProfile', 'isVerify', 'role', 'createdAt', 'updatedAt'

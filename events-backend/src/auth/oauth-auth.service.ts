@@ -15,7 +15,7 @@ export class OAuthAuthService {
     mobileRedirectUri: 'iscaevential://auth',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg',
-    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/authorize`,
+    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/event/services/oauth2/authorize`,
     tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/token`,
     userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/userinfo`,
   };
