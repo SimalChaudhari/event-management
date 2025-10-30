@@ -15,7 +15,7 @@ export class OAuthAuthService {
     mobileRedirectUri: 'iscaevential://auth',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg',
-    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/event/services/oauth2/authorize`,
+    authorizationUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/authorize`,
     tokenUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/token`,
     userInfoUrl: `${process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg'}/services/oauth2/userinfo`,
   };
@@ -32,16 +32,18 @@ export class OAuthAuthService {
    * Generate OAuth 2.0 authorization URL
    */
   generateAuthUrl(state?: string): string {
-    const baseUrl = this.salesforceConfig.authorizationUrl; // e.g. https://eservices.isca.org.sg/services/oauth2/authorize
+    const baseUrl = 'https://eservices.isca.org.sg/event/services/oauth2/authorize'
     const params = new URLSearchParams({
       client_id: this.salesforceConfig.clientId,
       response_type: 'code',
       redirect_uri: this.salesforceConfig.redirectUri,
-      scope: this.salesforceConfig.scope,
-      state: state || this.generateState(),
+      // scope: this.salesforceConfig.scope,
+      // state: state || this.generateState(),
     });
 
     const authUrl = `${baseUrl}?${params.toString()}`;
+
+    console.log('authUrl:', authUrl);
     
     return authUrl;
   }
@@ -62,7 +64,7 @@ export class OAuthAuthService {
         grant_type: 'authorization_code',
         redirect_uri: this.salesforceConfig.redirectUri,
       };
-
+console.log('tokenData:', tokenData);
       const response = await axios.post(
         this.salesforceConfig.tokenUrl,
         new URLSearchParams(tokenData),
