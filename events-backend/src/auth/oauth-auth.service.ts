@@ -32,14 +32,12 @@ export class OAuthAuthService {
    * Generate OAuth 2.0 authorization URL
    */
   generateAuthUrl(state?: string): string {
-    // Use the exact URL provided by the user
-    // const baseUrl = 'https://eservices.isca.org.sg/services/oauth2/authorize';
-    const baseUrl = 'https://eservices.isca.org.sg/event/services/oauth2/authorize';
+    const baseUrl = this.salesforceConfig.authorizationUrl; // e.g. https://eservices.isca.org.sg/services/oauth2/authorize
     const params = new URLSearchParams({
-      client_id: '3MVG9ZL0ppGP5UrCyrkLz3zQB4lFun889sQnml2YIC1Oyg7gV3.W1KATpMrUFagKigUNqinHK5EOd7pFzC.gc',
+      client_id: this.salesforceConfig.clientId,
       response_type: 'code',
-      redirect_uri: 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
-      scope: 'openid profile email api refresh_token',
+      redirect_uri: this.salesforceConfig.redirectUri,
+      scope: this.salesforceConfig.scope,
       state: state || this.generateState(),
     });
 
@@ -87,6 +85,11 @@ export class OAuthAuthService {
         idToken: id_token,
       };
     } catch (error: any) {
+      console.error('[OAuth Service] exchangeCodeForToken failed:', {
+        message: error?.message,
+        responseError: error?.response?.data,
+        status: error?.response?.status,
+      });
       // Provide more specific error messages
       if (error.response?.data?.error === 'invalid_grant') {
         throw new UnauthorizedException('Invalid authorization code. The code may have expired or already been used. Please try logging in again.');
@@ -131,6 +134,11 @@ export class OAuthAuthService {
         displayName: name || '',
       };
     } catch (error: any) {
+      console.error('[OAuth Service] getUserInfo failed:', {
+        message: error?.message,
+        responseError: error?.response?.data,
+        status: error?.response?.status,
+      });
       throw new UnauthorizedException('Failed to retrieve user information');
     }
   }
@@ -220,6 +228,7 @@ export class OAuthAuthService {
         isNewUser: isNewUser,
       };
     } catch (error: any) {
+      console.error('[OAuth Service] processOAuthAuthentication failed:', error?.message, error?.stack);
       throw new UnauthorizedException('OAuth authentication failed');
     }
   }
@@ -260,6 +269,7 @@ export class OAuthAuthService {
         refreshToken: newRefreshToken,
       };
     } catch (error: any) {
+      console.error('[OAuth Service] refreshAccessToken failed:', error?.message, error?.stack);
       throw new UnauthorizedException('Failed to refresh access token');
     }
   }

@@ -94,29 +94,50 @@ export class OAuthAuthController {
     @Res() response: Response,
   ) {
     try {
+      console.log('[OAuth Callback] Received params:', { hasCode: !!code, hasState: !!state, hasError: !!error });
       // Handle OAuth errors
       if (error) {
         const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error)}&success=false`;
-        return response.redirect(errorUrl);
+        console.warn('[OAuth Callback] OAuth error from provider:', error);
+        console.log('[OAuth Callback] Redirecting to deep link (error):', errorUrl);
+        const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='${errorUrl}'" /><title>Redirecting…</title><script>location.href='${errorUrl}';</script></head><body>
+        <p>Redirecting to app… If nothing happens, <a href="${errorUrl}">tap here</a>.</p>
+        </body></html>`;
+        return response.status(HttpStatus.OK).type('text/html').send(html);
       }
 
       // Check if authorization code is present
       if (!code) {
         const errorUrl = `iscaevential://auth?error=${encodeURIComponent('Authorization code is missing')}&success=false`;
-        return response.redirect(errorUrl);
+        console.warn('[OAuth Callback] Missing authorization code');
+        console.log('[OAuth Callback] Redirecting to deep link (missing code):', errorUrl);
+        const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='${errorUrl}'" /><title>Redirecting…</title><script>location.href='${errorUrl}';</script></head><body>
+        <p>Redirecting to app… If nothing happens, <a href="${errorUrl}">tap here</a>.</p>
+        </body></html>`;
+        return response.status(HttpStatus.OK).type('text/html').send(html);
       }
       
       // Process the OAuth authentication
+      console.log('[OAuth Callback] Processing OAuth authentication with code');
       const result = await this.oauthAuthService.processOAuthAuthentication(code);
 
       // Create mobile app redirect URL with tokens
       const mobileRedirectUrl = this.oauthAuthService.createMobileRedirectUrl(result);
       
-      // Redirect to mobile app
-      return response.redirect(mobileRedirectUrl);
+      // Return HTML that triggers deep link instead of HTTP redirect (prevents clients from following non-HTTP protocols)
+      console.log('[OAuth Callback] Redirecting to deep link (success):', mobileRedirectUrl);
+      const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='${mobileRedirectUrl}'" /><title>Redirecting…</title><script>location.href='${mobileRedirectUrl}';</script></head><body>
+      <p>Redirecting to app… If nothing happens, <a href="${mobileRedirectUrl}">tap here</a>.</p>
+      </body></html>`;
+      return response.status(HttpStatus.OK).type('text/html').send(html);
     } catch (error: any) {
       const errorUrl = `iscaevential://auth?error=${encodeURIComponent(error.message || 'Failed to process OAuth callback')}&success=false`;
-      return response.redirect(errorUrl);
+      console.error('[OAuth Callback] Exception while handling callback:', error?.message, error?.stack);
+      console.log('[OAuth Callback] Redirecting to deep link (exception):', errorUrl);
+      const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='${errorUrl}'" /><title>Redirecting…</title><script>location.href='${errorUrl}';</script></head><body>
+      <p>Redirecting to app… If nothing happens, <a href="${errorUrl}">tap here</a>.</p>
+      </body></html>`;
+      return response.status(HttpStatus.OK).type('text/html').send(html);
     }
   }
 
