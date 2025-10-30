@@ -50,9 +50,9 @@ export class LikeEngagementQuestionDto {
 }
 
 export class GetEngagementQuestionsDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  engagementId!: string;
+  engagementId?: string;
 
   @IsOptional()
   @IsUUID()

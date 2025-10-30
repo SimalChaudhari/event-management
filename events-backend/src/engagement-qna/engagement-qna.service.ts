@@ -126,14 +126,15 @@ export class EngagementQnaService {
   // Get Questions
   async getQuestions(getDto: GetEngagementQuestionsDto, userId?: string) {
     try {
-      if (!getDto.engagementId) {
-        throw new ValidationException('Engagement ID is required to retrieve Q&A questions');
+      if (!getDto.engagementId && !getDto.sessionId) {
+        throw new ValidationException('Engagement ID or Session ID is required to retrieve Q&A questions');
       }
 
-      const whereConditions: any = {
-        isActive: true,
-        engagementId: getDto.engagementId,
-      };
+      const whereConditions: any = { isActive: true };
+
+      if (getDto.engagementId) {
+        whereConditions.engagementId = getDto.engagementId;
+      }
 
       // Add sessionId filter if provided
       if (getDto.sessionId) {
@@ -168,13 +169,16 @@ export class EngagementQnaService {
       }
 
       // Get engagement details
-      const engagement = await this.engagementRepository.findOne({
-        where: { id: getDto.engagementId },
-        relations: ['track', 'track.event'],
-      });
+      let engagement: Engagement | null = null;
+      if (getDto.engagementId) {
+        engagement = await this.engagementRepository.findOne({
+          where: { id: getDto.engagementId },
+          relations: ['track', 'track.event'],
+        });
 
-      if (!engagement) {
-        throw new ResourceNotFoundException('Engagement', getDto.engagementId);
+        if (!engagement) {
+          throw new ResourceNotFoundException('Engagement', getDto.engagementId);
+        }
       }
 
       // Process questions
@@ -231,14 +235,19 @@ export class EngagementQnaService {
       });
 
       // Return structured response
-      const data = {
-        engagement: {
-          id: engagement.id,
-          trackTitle: engagement.track?.title || 'Unknown Track',
-          eventName: engagement.track?.event?.name || 'Unknown Event',
-        },
-        questions: sortedQuestions,
-      };
+      const data = engagement
+        ? {
+            engagement: {
+              id: engagement.id,
+              trackTitle: engagement.track?.title || 'Unknown Track',
+              eventName: engagement.track?.event?.name || 'Unknown Event',
+            },
+            questions: sortedQuestions,
+          }
+        : {
+            // For session-only queries, do not include engagement details at all
+            questions: sortedQuestions,
+          };
 
       // Calculate summary statistics
       const totalQuestions = questions.length;
@@ -258,6 +267,7 @@ export class EngagementQnaService {
           unanswered: unansweredQuestions,
           pinned: pinnedQuestions,
           engagementId: getDto.engagementId,
+          sessionId: getDto.sessionId,
           status: getDto.status,
           sortBy: getDto.sortBy,
           timestamp: new Date().toISOString(),

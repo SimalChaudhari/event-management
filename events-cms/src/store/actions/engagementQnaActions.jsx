@@ -109,17 +109,20 @@ export const toggleEngagementQuestionLike = (questionId) => async (dispatch) => 
 };
 
 // 4. Get All Questions for Engagement
-export const getEngagementQAQuestions = (engagementId, status = 'all', sortBy = 'likes') => async (dispatch) => {
+export const getEngagementQAQuestions = (engagementId, status = 'all', sortBy = 'likes', sessionId = null) => async (dispatch) => {
     try {
         dispatch(setLoading(true));
 
-        const response = await axiosInstance.get('/engagements/qna/questions', {
-            params: {
-                engagementId,
-                status,
-                sortBy
-            }
-        });
+        let params;
+        if (sessionId) {
+            // Only pass sessionId as requested
+            params = { sessionId };
+        } else {
+            params = { status, sortBy };
+            if (engagementId) params.engagementId = engagementId;
+        }
+
+        const response = await axiosInstance.get('/engagements/qna/questions', { params });
 
         if (response && response.status >= 200 && response.status < 300) {
             dispatch({

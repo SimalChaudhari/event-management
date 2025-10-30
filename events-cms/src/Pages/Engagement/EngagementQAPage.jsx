@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Table, Row, Col, Badge, Button, Alert, Form } from 'react-bootstrap';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
@@ -195,6 +195,7 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
 
 const EngagementQAPage = () => {
     const { engagementId } = useParams();
+    const location = useLocation();
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
@@ -212,13 +213,26 @@ const EngagementQAPage = () => {
     // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-    // Load engagement and questions on mount
+    // Read sessionId from query
+    const [sessionFilterId, setSessionFilterId] = useState(null);
     useEffect(() => {
-        if (engagementId) {
+        const params = new URLSearchParams(location.search);
+        const sId = params.get('sessionId');
+        setSessionFilterId(sId || null);
+    }, [location.search]);
+
+    // Load engagement (if valid) and fetch questions (by sessionId if present)
+    useEffect(() => {
+        const hasValidEngagement = engagementId && engagementId !== 'unknown';
+        if (hasValidEngagement) {
             dispatch(getEngagementById(engagementId));
+        }
+        if (sessionFilterId) {
+            dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
+        } else if (hasValidEngagement) {
             dispatch(getEngagementQAQuestions(engagementId));
         }
-    }, [dispatch, engagementId]);
+    }, [dispatch, engagementId, sessionFilterId]);
 
     // Filter questions based on status filter
     useEffect(() => {
@@ -237,7 +251,7 @@ const EngagementQAPage = () => {
     }, [engagementQuestions, statusFilter]);
 
     const handleBack = useCallback(() => {
-        navigate('/engagement/list');
+        navigate(-1);
     }, [navigate]);
 
     const handleAnswer = useCallback((question) => {
@@ -272,17 +286,23 @@ const EngagementQAPage = () => {
 
     const handleAnswerSubmit = useCallback(async () => {
         // Reload questions after answer
-        if (engagementId) {
-            await dispatch(getEngagementQAQuestions(engagementId));
+        const hasValidEngagement = engagementId && engagementId !== 'unknown';
+        if (sessionFilterId) {
+            await dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
+        } else if (hasValidEngagement) {
+            await dispatch(getEngagementQAQuestions(hasValidEngagement ? engagementId : null));
         }
-    }, [dispatch, engagementId]);
+    }, [dispatch, engagementId, sessionFilterId]);
 
     const handleDeleteSubmit = useCallback(async () => {
         // Reload questions after delete
-        if (engagementId) {
-            await dispatch(getEngagementQAQuestions(engagementId));
+        const hasValidEngagement = engagementId && engagementId !== 'unknown';
+        if (sessionFilterId) {
+            await dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
+        } else if (hasValidEngagement) {
+            await dispatch(getEngagementQAQuestions(hasValidEngagement ? engagementId : null));
         }
-    }, [dispatch, engagementId]);
+    }, [dispatch, engagementId, sessionFilterId]);
 
     useEffect(() => {
         if (filteredQaData) {
@@ -291,21 +311,7 @@ const EngagementQAPage = () => {
         return destroyTable;
     }, [filteredQaData, initializeTable, destroyTable]);
 
-    if (!selectedEngagement) {
-        return (
-            <Row>
-                <Col sm={12}>
-                    <Alert variant="warning">
-                        <Alert.Heading>No Engagement Data</Alert.Heading>
-                        <p>Loading engagement information...</p>
-                        <Button variant="outline-warning" onClick={handleBack}>
-                            Back
-                        </Button>
-                    </Alert>
-                </Col>
-            </Row>
-        );
-    }
+    // Don't block UI if engagement is unknown; table can render with questions only
 
     return (
         <div className="engagement-qa-page">

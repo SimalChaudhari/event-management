@@ -13,13 +13,13 @@ import { useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
-import { ENGAGEMENT_PATHS } from '../../utils/constants';
+import { ENGAGEMENT_PATHS, PROGRAMME_PATHS } from '../../utils/constants';
 import FilterComponent from '../../components/common/FilterComponent';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleQA, handleToggleStatus) {
+function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleToggleStatus, handleSessions) {
     let tableZero = '#engagements-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -145,9 +145,9 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
-                            <button type="button" class="btn btn-icon btn-info qa-btn" data-id="${row.engagementId}" title="Q&A" 
+                            <button type="button" class="btn btn-icon btn-secondary sessions-btn" data-trackid="${row.trackId}" title="Sessions" 
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather icon-message-circle"></i>
+                                <i class="feather icon-list"></i>
                             </button>
                             <button type="button" class="btn btn-icon btn-warning edit-btn" data-id="${row.engagementId}" title="Edit Engagement" 
                                 style="margin-right: 8px;border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
@@ -189,11 +189,12 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
                     handleView(id);
                 });
 
-            $('.qa-btn')
+
+            $('.sessions-btn')
                 .off('click')
                 .on('click', function () {
-                    const id = $(this).data('id');
-                    handleQA(id);
+                    const trackId = $(this).data('trackid');
+                    handleSessions(trackId);
                 });
 
             $('.edit-btn')
@@ -272,7 +273,7 @@ const EngagementList = () => {
             $('#engagements-data-table').off('click', '.delete-btn');
             $('#engagements-data-table').off('click', '.edit-btn');
             $('#engagements-data-table').off('click', '.view-btn');
-            $('#engagements-data-table').off('click', '.qa-btn');
+            $('#engagements-data-table').off('click', '.sessions-btn');
             $('#engagements-data-table').off('click', '.toggle-status-badge');
             currentTable.destroy();
             setCurrentTable(null);
@@ -288,8 +289,8 @@ const EngagementList = () => {
                 handleEdit,
                 handleDelete,
                 handleView,
-                handleQA,
-                handleToggleStatus
+                handleToggleStatus,
+                handleSessions
             );
             setCurrentTable(table);
         }
@@ -309,6 +310,11 @@ const EngagementList = () => {
 
     const handleQA = (id) => {
         navigate(`/engagement/qa/${id}`);
+    };
+
+    const handleSessions = (trackId) => {
+        if (!trackId) return;
+        navigate(`${ENGAGEMENT_PATHS.SESSIONS}/${trackId}`);
     };
 
     const handleDelete = (id) => {

@@ -147,7 +147,8 @@ const engagementComponents = {
     AddEngagement: React.lazy(() => import('./Pages/Engagement/AddEngagementPage.jsx')),
     ViewEngagement: React.lazy(() => import('./Pages/Engagement/ViewEngagementPage.jsx')),
     EngagementQA: React.lazy(() => import('./Pages/Engagement/EngagementQAPage.jsx')),
-    ViewEngagementQuestion: React.lazy(() => import('./Pages/Engagement/ViewEngagementQuestionPage.jsx'))
+    ViewEngagementQuestion: React.lazy(() => import('./Pages/Engagement/ViewEngagementQuestionPage.jsx')),
+    EngagementSessions: React.lazy(() => import('./Pages/Engagement/EngagementSessionsPage.jsx'))
 };
 
 /**
@@ -710,6 +711,18 @@ const engagementRoutes = [
         exact: true,
         name: 'Engagement Q&A',
         component: engagementComponents.EngagementQA
+    },
+    {
+        path: ENGAGEMENT_PATHS.QA,
+        exact: true,
+        name: 'Engagement Q&A (Session Only)',
+        component: engagementComponents.EngagementQA
+    },
+    {
+        path: ENGAGEMENT_PATHS.SESSIONS + '/:trackId',
+        exact: true,
+        name: 'Engagement Sessions',
+        component: engagementComponents.EngagementSessions
     }
 ];
 

@@ -5,13 +5,23 @@ import { Injectable } from '@nestjs/common';
 export class EmailService {
   private transporter: nodemailer.Transporter;
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      service: 'Gmail', // Use your email service
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    const transportOptions: nodemailer.TransportOptions = {
+      host,
+      port,
+      secure,
+    } as nodemailer.TransportOptions;
+
+    if (user && pass) {
+      (transportOptions as any).auth = { user, pass };
+    }
+
+    this.transporter = nodemailer.createTransport(transportOptions);
   }
   async sendModeratorAssignmentEmail(
     email: string,
@@ -21,7 +31,7 @@ export class EmailService {
     accessToken: string
   ): Promise<void> {
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: 'Event Assignment - Moderator Access',
       html: `
@@ -121,7 +131,7 @@ export class EmailService {
     const { moderator, event, track, session, questions } = assignmentData;
     
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: `Session Assignment - ${session.title}`,
       html: `
@@ -187,7 +197,7 @@ export class EmailService {
 
   async sendOTP(email: string,firstName: string, lastName: string, otp: string): Promise<string> {
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: 'Your OTP Code',
       text: `Your OTP is: ${otp}`,
@@ -251,7 +261,7 @@ export class EmailService {
 
   async sendWelcomeEmail(email: string, firstName: string, lastName: string, otp: string): Promise<string> {
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: 'Welcome to Our Event Platform - Verify Your Email',
       text: `Welcome ${firstName} ${lastName}! Please verify your email with OTP: ${otp}`,
@@ -342,7 +352,7 @@ export class EmailService {
     password: string
   ): Promise<string> {
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: 'Welcome as Exhibitor - Your Account Credentials',
       text: `Welcome ${firstName} ${lastName}! Your exhibitor account has been created. Email: ${email}, Password: ${password}`,
@@ -467,7 +477,7 @@ export class EmailService {
 
   async sendEmail(email: string, subject: string, html: string): Promise<string> {
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL || process.env.SMTP_USER,
       to: email,
       subject: subject,
       html: html,

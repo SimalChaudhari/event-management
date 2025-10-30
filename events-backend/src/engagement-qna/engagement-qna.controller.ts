@@ -85,10 +85,10 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
-      if (!query.engagementId) {
+      if (!query.engagementId && !query.sessionId) {
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
-          message: 'Engagement ID is required',
+          message: 'Engagement ID or Session ID is required',
           data: null,
           metadata: {
             timestamp: new Date().toISOString(),

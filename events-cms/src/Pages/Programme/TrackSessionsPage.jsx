@@ -10,7 +10,7 @@ import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
 import * as $ from 'jquery';
 import { getAllSessions, getAllTracks, getSessionsByTrack, deleteSession } from '../../store/actions/programmeActions';
-import { PROGRAMME_PATHS } from '../../utils/constants';
+import { PROGRAMME_PATHS, ENGAGEMENT_PATHS } from '../../utils/constants';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { toast } from 'react-toastify';
 import '../../assets/css/event.css';
@@ -84,7 +84,7 @@ const TrackSessionsPage = () => {
                     $('#track-sessions-table').DataTable().destroy();
                 }
 
-                $('#track-sessions-table').DataTable({
+                const dt = $('#track-sessions-table').DataTable({
                     data: trackSessions || [],
                     order: [[0, 'asc']],
                     searching: true,
@@ -160,6 +160,9 @@ const TrackSessionsPage = () => {
                                         <button type="button" class="btn btn-icon btn-success view-btn mr-2" data-id="${row.id}" title="View Session">
                                             <i class="feather icon-eye"></i>
                                         </button>
+                                        <button type="button" class="btn btn-icon btn-info qa-btn mr-2" data-sessionid="${row.sessionId || row.id}" title="Q&A">
+                                            <i class="feather icon-message-circle"></i>
+                                        </button>
                                         <button type="button" class="btn btn-icon btn-warning edit-btn mr-2" data-id="${row.id}" title="Edit Session">
                                             <i class="feather icon-edit"></i>
                                         </button>
@@ -213,6 +216,14 @@ const TrackSessionsPage = () => {
                     if (session) {
                         setSessionToDelete({ id: session.id, name: session.title });
                         setShowDeleteModal(true);
+                    }
+                });
+
+                $(document).off('click', '.qa-btn').on('click', '.qa-btn', function () {
+                    const rowData = dt.row($(this).closest('tr')).data() || {};
+                    const sessionId = rowData.sessionId || rowData.id || (rowData.session && rowData.session.id) || rowData.trackSessionId || $(this).data('sessionid') || $(this).data('id');
+                    if (sessionId) {
+                        navigate(`${ENGAGEMENT_PATHS.QA}?sessionId=${sessionId}`);
                     }
                 });
             }, 100);

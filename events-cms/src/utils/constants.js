@@ -129,7 +129,10 @@ export const ENGAGEMENT_PATHS = {
     
     // Q&A paths
     QA: '/engagement/qa',
-    VIEW_QA_QUESTION: '/engagement/qa/:engagementId/view/:questionId'
+    VIEW_QA_QUESTION: '/engagement/qa/:engagementId/view/:questionId',
+
+    // Engagement Sessions
+    SESSIONS: '/engagements/sessions'
 };
 
 export const LOGS_PATHS = {
