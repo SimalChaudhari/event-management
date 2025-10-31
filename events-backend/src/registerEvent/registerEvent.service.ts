@@ -29,6 +29,7 @@ import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
 import { AdminInfo } from './admin-info.entity';
 import { Engagement } from '../engagement/engagement.entity';
+import { EngagementService } from '../engagement/engagement.service';
 
 @Injectable()
 export class RegisterEventService {
@@ -54,6 +55,7 @@ export class RegisterEventService {
     @InjectRepository(Engagement)
     private readonly engagementRepository: Repository<Engagement>,
 
+    private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
@@ -292,9 +294,9 @@ export class RegisterEventService {
           // Format programme tracks with basic speaker info using utility
           const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
 
-          // Get engagements for this event
+          // Get engagements for this event with Q&A and polling data
           const engagements = registerEvent.eventId 
-            ? await UserUtils.getEngagementsByEventId(registerEvent.eventId, this.eventRepository, this.engagementRepository) 
+            ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
             : [];
 
           const {
@@ -522,9 +524,9 @@ export class RegisterEventService {
       // Format programme tracks with basic speaker info using utility
       const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
 
-      // Get engagements for this event
+      // Get engagements for this event with Q&A and polling data
       const engagements = registerEvent.eventId 
-        ? await UserUtils.getEngagementsByEventId(registerEvent.eventId, this.eventRepository, this.engagementRepository) 
+        ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
         : [];
 
       // Clean up event object

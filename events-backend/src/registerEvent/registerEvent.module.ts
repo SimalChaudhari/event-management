@@ -21,10 +21,12 @@ import { EventNotificationService } from '../utils/event-notification.service';
 import { NotificationUtil } from '../utils/notification.util';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
+import { EngagementModule } from '../engagement/engagement.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate]), UtilsModule,
+        EngagementModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration
