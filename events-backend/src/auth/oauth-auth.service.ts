@@ -346,15 +346,17 @@ console.log('tokenData:', tokenData);
       // Use the custom clearsession endpoint for SSO logout
       const revokeUrl = `${this.salesforceConfig.instanceUrl}/services/apexrest/v1/bodmobileapp/clearsession`;
       
-      await axios.post(
+      await axios.delete(
         revokeUrl,
-        new URLSearchParams({
-          token: accessToken,
-        }),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            Authorization: `Bearer ${accessToken}`,
           },
+          // axios.delete uses the `data` property for a request body
+          data: new URLSearchParams({
+            token: accessToken,
+          }),
         }
       );
 

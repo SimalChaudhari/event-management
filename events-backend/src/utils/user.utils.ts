@@ -350,7 +350,7 @@ export class UserUtils {
             totalVotesCount: 0
           },
           questions: session.questions || [],
-          polls: session.polls || []
+          polling: session.polling || null
         })) || [],
         sessionsCount: engagement.track?.sessions?.length || 0
       };

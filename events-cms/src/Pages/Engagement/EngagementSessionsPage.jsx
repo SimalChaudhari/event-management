@@ -7,9 +7,14 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
+import Modal from 'react-bootstrap/Modal';
+import Form from 'react-bootstrap/Form';
+import InputGroup from 'react-bootstrap/InputGroup';
 import Button from 'react-bootstrap/Button';
 import * as $ from 'jquery';
 import { getAllTracks, getSessionsByTrack } from '../../store/actions/programmeActions';
+import axiosInstance from '../../configs/axiosInstance';
+import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import '../../assets/css/event.css';
@@ -42,6 +47,12 @@ const EngagementSessionsPage = () => {
 
     const [trackSessions, setTrackSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showPollingModal, setShowPollingModal] = useState(false);
+    const [activeSession, setActiveSession] = useState(null);
+    const [pollingTitle, setPollingTitle] = useState('');
+    const [pollingUrl, setPollingUrl] = useState('');
+    const [pollingLinkId, setPollingLinkId] = useState(null);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         dispatch(getAllTracks());
@@ -141,6 +152,9 @@ const EngagementSessionsPage = () => {
                                         <button type="button" class="btn btn-icon btn-info qa-btn mr-2" data-sessionid="${row.id}" title="Q&A">
                                             <i class="feather icon-message-circle"></i>
                                         </button>
+                                        <button type="button" class="btn btn-icon btn-warning polling-btn" data-sessionid="${row.id}" title="Polling Link">
+                                            <i class="feather icon-link-2"></i>
+                                        </button>
                                     </div>`;
                             }
                         }
@@ -170,6 +184,25 @@ const EngagementSessionsPage = () => {
                     navigate(`${ENGAGEMENT_PATHS.QA}?sessionId=${sessionId}`);
                 });
 
+                $(document).off('click', '.polling-btn').on('click', '.polling-btn', async function () {
+                    const dtLocal = $('#engagement-sessions-table').DataTable();
+                    const rowData = dtLocal.row($(this).closest('tr')).data() || {};
+                    const sessionId = rowData.sessionId || rowData.id;
+                    setActiveSession(rowData);
+                    try {
+                        const res = await axiosInstance.get(`/engagements/sessions/${sessionId}/polling-link`);
+                        const link = res?.data?.data || null;
+                        setPollingLinkId(link?.id || null);
+                        setPollingTitle(link?.title || '');
+                        setPollingUrl(link?.url || '');
+                    } catch (e) {
+                        setPollingLinkId(null);
+                        setPollingTitle('');
+                        setPollingUrl('');
+                    }
+                    setShowPollingModal(true);
+                });
+
             }, 100);
         }
 
@@ -182,6 +215,51 @@ const EngagementSessionsPage = () => {
 
     const handleBack = () => {
         navigate(-1);
+    };
+
+    const handleSavePolling = async () => {
+        if (!activeSession) return;
+        if (!pollingTitle || !pollingUrl) {
+            toast.error('Title and URL are required');
+            return;
+        }
+        try {
+            setSaving(true);
+            const sessionId = activeSession.id;
+            const res = await axiosInstance.post(`/engagements/sessions/${sessionId}/polling-link`, {
+                title: pollingTitle,
+                url: pollingUrl
+            });
+            setPollingLinkId(res?.data?.data?.id || null);
+            toast.success('Polling link saved');
+            setShowPollingModal(false);
+        } catch (e) {
+            toast.error(e?.response?.data?.message || 'Failed to save polling link');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeletePolling = async () => {
+        if (!pollingLinkId) {
+            setPollingTitle('');
+            setPollingUrl('');
+            setShowPollingModal(false);
+            return;
+        }
+        try {
+            setSaving(true);
+            await axiosInstance.delete(`/engagements/polling-links/${pollingLinkId}`);
+            toast.success('Polling link deleted');
+            setPollingLinkId(null);
+            setPollingTitle('');
+            setPollingUrl('');
+            setShowPollingModal(false);
+        } catch (e) {
+            toast.error(e?.response?.data?.message || 'Failed to delete polling link');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -222,9 +300,51 @@ const EngagementSessionsPage = () => {
                     </Card>
                 </Col>
             </Row>
+            <Modal show={showPollingModal} onHide={() => setShowPollingModal(false)} centered>
+                <Modal.Header>
+                    <Modal.Title>Session Polling Link</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Title</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Enter title"
+                                value={pollingTitle}
+                                onChange={(e) => setPollingTitle(e.target.value)}
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>URL</Form.Label>
+                            <Form.Control
+                                type="url"
+                                placeholder="https://example.com"
+                                value={pollingUrl}
+                                onChange={(e) => setPollingUrl(e.target.value)}
+                            />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowPollingModal(false)}>
+                        Close
+                    </Button>
+                    {pollingLinkId && (
+                        <Button variant="danger" onClick={handleDeletePolling} disabled={saving}>
+                            <i className="feather icon-trash-2 mr-1"></i> Delete
+                        </Button>
+                    )}
+                    <Button variant="primary" onClick={handleSavePolling} disabled={saving}>
+                        <i className="feather icon-save mr-1"></i> Save
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </>
     );
 };
+
+// Modal JSX appended within the component above return - ensure it's inside the component
 
 export default EngagementSessionsPage;
 

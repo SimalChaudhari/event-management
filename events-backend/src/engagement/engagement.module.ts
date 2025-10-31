@@ -7,10 +7,12 @@ import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { EngagementQnaQuestion } from '../engagement-qna/engagement-qna.entity';
 import { Poll } from '../polling/polling.entity';
 import { JwtModule } from '@nestjs/jwt';
+import { EngagementPollingLink } from './engagement-polling.entity';
+import { ProgrammeSession } from '../programme/programme-session.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Engagement, ProgrammeTrack, EngagementQnaQuestion, Poll]),
+    TypeOrmModule.forFeature([Engagement, ProgrammeTrack, ProgrammeSession, EngagementQnaQuestion, Poll, EngagementPollingLink]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: {},

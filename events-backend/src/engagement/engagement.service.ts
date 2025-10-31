@@ -7,6 +7,8 @@ import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { UserUtils } from '../utils/user.utils';
 import { EngagementQnaQuestion } from '../engagement-qna/engagement-qna.entity';
 import { Poll } from '../polling/polling.entity';
+import { EngagementPollingLink } from './engagement-polling.entity';
+import { ProgrammeSession } from '../programme/programme-session.entity';
 
 @Injectable()
 export class EngagementService {
@@ -19,6 +21,10 @@ export class EngagementService {
     private engagementQnaQuestionRepository: Repository<EngagementQnaQuestion>,
     @InjectRepository(Poll)
     private pollRepository: Repository<Poll>,
+    @InjectRepository(EngagementPollingLink)
+    private engagementPollingLinkRepository: Repository<EngagementPollingLink>,
+    @InjectRepository(ProgrammeSession)
+    private programmeSessionRepository: Repository<ProgrammeSession>,
   ) {}
 
   /**
@@ -120,12 +126,12 @@ export class EngagementService {
     if (engagement?.track?.event) {
       polls = await this.pollRepository.find({
         where: { eventId: engagement.track.event.id, isActive: true },
-        relations: ['votes', 'speaker']
+        relations: ['votes', 'speaker', 'options']
       });
     }
 
     // Process each session
-    return sessions.map(session => {
+    return Promise.all(sessions.map(async (session) => {
       // Get session speakers
       const sessionSpeakerIds = session.speakers?.map((speaker: any) => speaker.id) || [];
       
@@ -134,15 +140,18 @@ export class EngagementService {
       const sessionQuestionsCount = sessionQuestions.length;
       const sessionAnsweredQuestionsCount = sessionQuestions.filter(q => q.status === 'answered').length;
       
-      // Count polls for this session (polls linked to speakers)
+      // Count polls for this session
+      // Show polls linked to session speakers OR polls without a speaker assigned (event-level polls)
       const sessionPolls = polls.filter(poll => 
-        poll.speakerId && sessionSpeakerIds.includes(poll.speakerId)
+        !poll.speakerId || sessionSpeakerIds.includes(poll.speakerId)
       );
       
       const sessionPollsCount = sessionPolls.length;
       const sessionVotesCount = sessionPolls.reduce((total, poll) => 
         total + (poll.votes?.length || 0), 0
       );
+
+      const pollingLink = await this.getPollingLinkForSession(session.id);
 
       return {
         ...session,
@@ -173,9 +182,10 @@ export class EngagementService {
             optionText: option.optionText,
             voteCount: option.voteCount
           })) || []
-        }))
+        })),
+        polling: pollingLink
       };
-    });
+    }));
   }
 
   /**
@@ -310,6 +320,49 @@ export class EngagementService {
 
     const formatted = UserUtils.formatEngagements([engagementWithStats]);
     return formatted[0];
+  }
+
+  /**
+   * Create a simple polling link for a session
+   */
+  async createPollingLinkForSession(sessionId: string, title: string, url: string): Promise<EngagementPollingLink> {
+    const session = await this.programmeSessionRepository.findOne({ where: { id: sessionId } });
+    if (!session) {
+      throw new NotFoundException(`Session with ID ${sessionId} not found`);
+    }
+    const link = this.engagementPollingLinkRepository.create({ sessionId, title, url, isActive: true });
+    return await this.engagementPollingLinkRepository.save(link);
+  }
+
+  /**
+   * Get active polling links for a session
+   */
+  async getPollingLinkForSession(sessionId: string): Promise<{ id: string; title: string; url: string } | null> {
+    const link = await this.engagementPollingLinkRepository.findOne({ where: { sessionId, isActive: true } });
+    if (!link) return null;
+    return { id: link.id, title: link.title, url: link.url };
+  }
+
+  async upsertPollingLinkForSession(sessionId: string, title: string, url: string): Promise<EngagementPollingLink> {
+    const existing = await this.engagementPollingLinkRepository.findOne({ where: { sessionId, isActive: true } });
+    if (existing) {
+      existing.title = title;
+      existing.url = url;
+      return await this.engagementPollingLinkRepository.save(existing);
+    }
+    return await this.createPollingLinkForSession(sessionId, title, url);
+  }
+
+  /**
+   * Delete a polling link by id
+   */
+  async deletePollingLink(linkId: string): Promise<{ message: string }> {
+    const link = await this.engagementPollingLinkRepository.findOne({ where: { id: linkId } });
+    if (!link) {
+      throw new NotFoundException('Polling link not found');
+    }
+    await this.engagementPollingLinkRepository.remove(link);
+    return { message: 'Polling link deleted successfully' };
   }
 
   /**

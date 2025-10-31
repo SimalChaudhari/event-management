@@ -20,6 +20,10 @@ import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
 import { Roles } from 'jwt/roles.decorator';
 import { Public } from 'jwt/public.decorator';
+import { 
+  IsNotEmpty, IsString, IsUrl 
+} from 'class-validator';
+import { ValidationPipe } from '@nestjs/common';
 
 @Controller('api/engagements')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,6 +51,63 @@ export class EngagementController {
         success: false,
         message: error.message || 'Failed to create engagement',
       });
+    }
+  }
+
+  /**
+   * Create a simple polling link for an engagement
+   */
+  @Post('sessions/:sessionId/polling-link')
+  @Roles(UserRole.Admin)
+  async createPollingLink(
+    @Param('sessionId') sessionId: string,
+    @Body(new ValidationPipe({ transform: true })) body: { title: string; url: string },
+    @Res() response: Response,
+  ) {
+    try {
+      if (!body?.title || !body?.url) {
+        return response.status(HttpStatus.BAD_REQUEST).json({ success: false, message: 'title and url are required' });
+      }
+      const link = await this.engagementService.upsertPollingLinkForSession(sessionId, body.title, body.url);
+      return response.status(HttpStatus.CREATED).json({ success: true, data: link });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.BAD_REQUEST;
+      return response.status(statusCode).json({ success: false, message: error.message || 'Failed to create polling link' });
+    }
+  }
+
+  /**
+   * Get polling links for an engagement as [{ title, url }]
+   */
+  @Get('sessions/:sessionId/polling-link')
+  @Roles(UserRole.Admin, UserRole.Moderator)
+  async getPollingLinks(
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const link = await this.engagementService.getPollingLinkForSession(sessionId);
+      return response.status(HttpStatus.OK).json({ success: true, data: link });
+    } catch (error: any) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message || 'Failed to fetch polling links' });
+    }
+  }
+
+  /**
+   * Delete a polling link by id
+   */
+  @Delete('polling-links/:linkId')
+  @Roles(UserRole.Admin)
+  async deletePollingLink(
+    @Param('linkId') linkId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementService.deletePollingLink(linkId);
+      return response.status(HttpStatus.OK).json({ success: true, message: result.message });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.BAD_REQUEST;
+      return response.status(statusCode).json({ success: false, message: error.message || 'Failed to delete polling link' });
     }
   }
 
