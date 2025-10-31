@@ -93,6 +93,10 @@ export class Event {
   @Column({ type: 'varchar', nullable: true })
   floorPlan?: string;
 
+  // Background image for Q&A pages
+  @Column({ type: 'varchar', nullable: true })
+  backgroundImage?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

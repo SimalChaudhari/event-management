@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsUUID, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsUUID, IsEnum, IsNumber } from 'class-validator';
 
 export enum QuestionSortBy {
   LIKES = 'likes',
@@ -65,5 +65,25 @@ export class GetEngagementQuestionsDto {
   @IsOptional()
   @IsEnum(QuestionSortBy)
   sortBy?: QuestionSortBy = QuestionSortBy.LIKES;
+}
+
+export class GenerateShareLinkDto {
+  @IsNotEmpty()
+  @IsUUID()
+  sessionId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  expiresInDays?: number; // Optional expiry in days
+}
+
+export class GenerateQuestionShareLinkDto {
+  @IsNotEmpty()
+  @IsUUID()
+  questionId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  expiresInDays?: number; // Optional expiry in days
 }
 

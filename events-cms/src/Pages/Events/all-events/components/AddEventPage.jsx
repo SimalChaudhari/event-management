@@ -10,6 +10,7 @@ import {
     eventById,
     exhibitorGet,
     removeEventFloorPlan,
+    removeEventBackgroundImage,
     removeEventStampImage
 } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
@@ -134,6 +135,7 @@ function AddEventPage() {
         latitude: '',
         longitude: '',
         floorPlan: null,
+        backgroundImage: null,
         exhibitorIds: [],
         exhibitorDescription: '',
         eventStampDescription: '',
@@ -177,6 +179,9 @@ function AddEventPage() {
 
     // Add floor plan preview state
     const [floorPlanPreview, setFloorPlanPreview] = useState(null);
+
+    // Add background image preview state
+    const [backgroundImagePreview, setBackgroundImagePreview] = useState(null);
 
     // Add new state for document names input
     const [documentNames, setDocumentNames] = useState([]);
@@ -310,6 +315,16 @@ function AddEventPage() {
                             }
                         }
 
+                        // Handle background image
+                        let backgroundImageData = null;
+                        let backgroundImagePreviewUrl = null;
+                        if (editData.backgroundImage) {
+                            if (typeof editData.backgroundImage === 'string') {
+                                backgroundImageData = editData.backgroundImage;
+                                backgroundImagePreviewUrl = `${API_URL}/${editData.backgroundImage.replace(/\\/g, '/')}`;
+                            }
+                        }
+
                         // Handle event stamps - Updated to match API response structure
                         let eventStampDescription = '';
                         let eventStampImagesData = [];
@@ -355,6 +370,7 @@ function AddEventPage() {
                             speakerIds: speakerIds,
                             categoryIds: categoryIds,
                             floorPlan: floorPlanData,
+                            backgroundImage: backgroundImageData,
                             exhibitorIds: exhibitorIds,
                             exhibitorDescription: exhibitorDescription,
                             eventStampDescription: eventStampDescription,
@@ -368,6 +384,7 @@ function AddEventPage() {
                         setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
 
                         setFloorPlanPreview(floorPlanPreviewUrl);
+                        setBackgroundImagePreview(backgroundImagePreviewUrl);
                     }
                 } catch (error) {
                     console.error('Error loading event data:', error);
@@ -574,6 +591,7 @@ function AddEventPage() {
             latitude: '',
             longitude: '',
             floorPlan: null,
+            backgroundImage: null,
             exhibitorIds: [],
             exhibitorDescription: '',
             eventStampDescription: '',
@@ -582,6 +600,8 @@ function AddEventPage() {
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
         setDocumentNames([]); // Add this
+        setFloorPlanPreview(null);
+        setBackgroundImagePreview(null);
         setEventStampImagePreviewUrls([]);
     };
 
@@ -713,6 +733,10 @@ function AddEventPage() {
                 if (dataToSend[key] instanceof File) {
                     formDataToSend.append('floorPlan', dataToSend[key]);
                 }
+            } else if (key === 'backgroundImage') {
+                if (dataToSend[key] instanceof File) {
+                    formDataToSend.append('backgroundImage', dataToSend[key]);
+                }
             } else if (key === 'images') {
                 if (dataToSend[key] && Array.isArray(dataToSend[key])) {
                     dataToSend[key].forEach((file) => {
@@ -775,6 +799,11 @@ function AddEventPage() {
                         formDataToSend.append('originalEventStampImages', image);
                     }
                 });
+            }
+
+            // Handle existing background image for edit mode
+            if (formData.backgroundImage && typeof formData.backgroundImage === 'string') {
+                formDataToSend.append('originalBackgroundImage', formData.backgroundImage);
             }
         }
 
@@ -903,6 +932,39 @@ function AddEventPage() {
                 floorPlan: null
             }));
             setFloorPlanPreview(null);
+        }
+    };
+
+    const handleRemoveBackgroundImage = async () => {
+        const response = await dispatch(removeEventBackgroundImage(id));
+        if (response.success) {
+            setFormData((prev) => ({
+                ...prev,
+                backgroundImage: null
+            }));
+            setBackgroundImagePreview(null);
+        }
+    };
+
+    // Handle background image change
+    const handleBackgroundImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+            // Validate file size (10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Image size should be less than 10MB');
+                return;
+            }
+            setFormData((prev) => ({
+                ...prev,
+                backgroundImage: file
+            }));
+            setBackgroundImagePreview(URL.createObjectURL(file));
         }
     };
 
@@ -2302,6 +2364,87 @@ function AddEventPage() {
                                                         </>
                                                     )}
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+
+                                    {/* Background Image Section */}
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <Badge bg="info">
+                                                {' '}
+                                                <span>Background Image (Optional) </span> {backgroundImagePreview ? 'Selected' : 'Not Selected'}
+                                            </Badge>
+                                            <div
+                                                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
+                                                style={{
+                                                    border: '2px dashed #ccc',
+                                                    borderRadius: '8px',
+                                                    padding: '20px',
+                                                    textAlign: 'center',
+                                                    backgroundColor: '#f9f9f9',
+                                                    marginBottom: '10px',
+                                                    minHeight: '120px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                {backgroundImagePreview && formData.backgroundImage ? (
+                                                    <div style={{ width: '100%', maxWidth: '300px' }}>
+                                                        <img
+                                                            src={backgroundImagePreview}
+                                                            alt="Background Image Preview"
+                                                            style={{
+                                                                width: '100%',
+                                                                height: 'auto',
+                                                                borderRadius: '8px',
+                                                                marginBottom: '10px'
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            variant="danger"
+                                                            size="sm"
+                                                            onClick={id ? handleRemoveBackgroundImage : () => {
+                                                                setFormData((prev) => ({
+                                                                    ...prev,
+                                                                    backgroundImage: null
+                                                                }));
+                                                                setBackgroundImagePreview(null);
+                                                            }}
+                                                            style={{ marginRight: '10px' }}
+                                                        >
+                                                            Remove Background Image
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="mb-3">
+                                                            <i className="fas fa-image fa-3x text-muted"></i>
+                                                        </div>
+                                                        <p className="text-muted mb-2">Upload background image for Q&A pages (Optional)</p>
+                                                        <p className="text-muted small">
+                                                            Supported formats: JPG, PNG, GIF. Max size: 10MB.
+                                                        </p>
+                                                        <input
+                                                            type="file"
+                                                            className="form-control"
+                                                            name="backgroundImage"
+                                                            onChange={handleBackgroundImageChange}
+                                                            accept="image/*"
+                                                            style={{ display: 'none' }}
+                                                            id="backgroundImageInput"
+                                                        />
+                                                        <Button
+                                                            variant="outline-primary"
+                                                            onClick={() => document.getElementById('backgroundImageInput').click()}
+                                                            style={{ marginTop: '10px' }}
+                                                        >
+                                                            Choose Background Image
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </Col>

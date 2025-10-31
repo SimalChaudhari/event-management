@@ -5,7 +5,7 @@ import Loader from './layout/Loader';
 import GlobalLoader from '../components/GlobalLoader';
 import GlobalError from '../components/GlobalError';
 import routesOnePage from '../route';
-import routes, { publicModeratorRoutes } from '../routes';
+import routes, { publicModeratorRoutes, publicQnaShareRoutes } from '../routes';
 import Config from '../config';
 import { checkAuthStatus } from '../store/actions/authActions';
 
@@ -51,6 +51,17 @@ const App = () => {
                         route.component && (
                             <Route
                                 key={`moderator-${index}`}
+                                path={route.path}
+                                element={<route.component />}
+                            />
+                        )
+                    )}
+                    
+                    {/* Public Q&A Share Link Routes (No Login Required) */}
+                    {publicQnaShareRoutes.map((route, index) =>
+                        route.component && (
+                            <Route
+                                key={`qna-share-${index}`}
                                 path={route.path}
                                 element={<route.component />}
                             />

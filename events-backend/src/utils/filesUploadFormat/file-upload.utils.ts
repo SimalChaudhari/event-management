@@ -10,6 +10,7 @@ export interface FileUploadConfig {
   floorPlan?: Express.Multer.File[];
   eventStampImages?: Express.Multer.File[];
   advertImage?: Express.Multer.File[];
+  backgroundImage?: Express.Multer.File[];
 }
 
 export interface FileUploadOptions {
@@ -40,7 +41,8 @@ export class FileUploadUtils {
       { name: 'images', maxCount: maxImageCount },
       { name: 'documents', maxCount: maxDocumentCount },
       { name: 'floorPlan', maxCount: maxFloorPlanCount },
-      { name: 'eventStampImages', maxCount: maxEventStampImageCount }
+      { name: 'eventStampImages', maxCount: maxEventStampImageCount },
+      { name: 'backgroundImage', maxCount: 1 }
     ];
   }
 
@@ -65,6 +67,9 @@ export class FileUploadUtils {
             break;
           case 'eventStampImages':
             destinationPath = './uploads/eventStamps/images';
+            break;
+          case 'backgroundImage':
+            destinationPath = './uploads/event/background';
             break;
           default:
             destinationPath = './uploads/event/images'; // Default fallback
@@ -93,7 +98,7 @@ export class FileUploadUtils {
       const mimeType = file.mimetype;
 
       // Check image files
-      if (['images', 'floorPlan', 'eventStampImages'].includes(fieldName)) {
+      if (['images', 'floorPlan', 'eventStampImages', 'backgroundImage'].includes(fieldName)) {
         if (this.ALLOWED_IMAGE_TYPES.includes(mimeType)) {
           cb(null, true);
           return;
@@ -148,23 +153,28 @@ export class FileUploadUtils {
     documents?: string[];
     floorPlan?: string;
     eventStampImages?: string[];
+    backgroundImage?: string;
   } {
     const result: any = {};
 
     if (files.images && files.images.length > 0) {
-      result.images = files.images.map(file => file.path);
+      result.images = files.images.map(file => `uploads/event/images/${file.filename}`);
     }
 
     if (files.documents && files.documents.length > 0) {
-      result.documents = files.documents.map(file => file.path);
+      result.documents = files.documents.map(file => `uploads/event/documents/${file.filename}`);
     }
 
     if (files.floorPlan && files.floorPlan.length > 0) {
-      result.floorPlan = files.floorPlan[0].path;
+      result.floorPlan = `uploads/event/floorPlan/${files.floorPlan[0].filename}`;
     }
 
     if (files.eventStampImages && files.eventStampImages.length > 0) {
-      result.eventStampImages = files.eventStampImages.map(file => file.path);
+      result.eventStampImages = files.eventStampImages.map(file => `uploads/eventStamps/images/${file.filename}`);
+    }
+
+    if (files.backgroundImage && files.backgroundImage.length > 0) {
+      result.backgroundImage = `uploads/event/background/${files.backgroundImage[0].filename}`;
     }
 
     return result;
@@ -174,7 +184,7 @@ export class FileUploadUtils {
    * Validate file types for a specific field
    */
   static validateFileType(fieldName: string, mimeType: string): boolean {
-    if (['images', 'floorPlan', 'eventStampImages'].includes(fieldName)) {
+    if (['images', 'floorPlan', 'eventStampImages', 'backgroundImage'].includes(fieldName)) {
       return this.ALLOWED_IMAGE_TYPES.includes(mimeType);
     }
     
@@ -189,7 +199,7 @@ export class FileUploadUtils {
    * Get allowed file types for a specific field
    */
   static getAllowedFileTypes(fieldName: string): string[] {
-    if (['images', 'floorPlan', 'eventStampImages'].includes(fieldName)) {
+    if (['images', 'floorPlan', 'eventStampImages', 'backgroundImage'].includes(fieldName)) {
       return this.ALLOWED_IMAGE_TYPES;
     }
     
@@ -213,6 +223,8 @@ export class FileUploadUtils {
         return './uploads/event/floorPlan';
       case 'eventStampImages':
         return './uploads/eventStamps/images';
+      case 'backgroundImage':
+        return './uploads/event/background';
       default:
         return './uploads/event/images';
     }
@@ -265,6 +277,15 @@ export class FileUploadUtils {
           }
         });
       }
+
+      if (files.backgroundImage) {
+        files.backgroundImage.forEach((file: any) => {
+          const uploadedPath = path.join(__dirname, '..', '..', '..', 'uploads', 'event', 'background', file.filename);
+          if (fs.existsSync(uploadedPath)) {
+            fs.unlinkSync(uploadedPath);
+          }
+        });
+      }
     } catch (cleanupError: any) {
       console.error('Error during file cleanup:', cleanupError);
       // Don't throw error during cleanup to avoid masking the original error
@@ -307,6 +328,14 @@ export class FileUploadUtils {
         files.eventStampImages.forEach((file: any, index: number) => {
           if (!file || !file.filename || !file.mimetype) {
             errors.push(`Invalid event stamp image file at index ${index}`);
+          }
+        });
+      }
+
+      if (files.backgroundImage && files.backgroundImage.length > 0) {
+        files.backgroundImage.forEach((file: any, index: number) => {
+          if (!file || !file.filename || !file.mimetype) {
+            errors.push(`Invalid background image file at index ${index}`);
           }
         });
       }

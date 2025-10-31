@@ -148,7 +148,9 @@ const engagementComponents = {
     ViewEngagement: React.lazy(() => import('./Pages/Engagement/ViewEngagementPage.jsx')),
     EngagementQA: React.lazy(() => import('./Pages/Engagement/EngagementQAPage.jsx')),
     ViewEngagementQuestion: React.lazy(() => import('./Pages/Engagement/ViewEngagementQuestionPage.jsx')),
-    EngagementSessions: React.lazy(() => import('./Pages/Engagement/EngagementSessionsPage.jsx'))
+    EngagementSessions: React.lazy(() => import('./Pages/Engagement/EngagementSessionsPage.jsx')),
+    QnAShareLink: React.lazy(() => import('./Pages/SharedQnA/QnAShareLinkPage.jsx')),
+    QuestionShare: React.lazy(() => import('./Pages/SharedQnA/QuestionSharePage.jsx'))
 };
 
 /**
@@ -789,6 +791,25 @@ const publicModeratorRoutes = [
 ];
 
 /**
+ * Public Q&A Share Link routes (no login required)
+ * @type {RouteConfig[]}
+ */
+const publicQnaShareRoutes = [
+    {
+        path: '/qna/share/:shareToken',
+        exact: true,
+        name: 'Q&A Share Link',
+        component: engagementComponents.QnAShareLink
+    },
+    {
+        path: '/qna/question/:shareToken',
+        exact: true,
+        name: 'Question Share',
+        component: engagementComponents.QuestionShare
+    }
+];
+
+/**
  * Combined routes configuration
  * @type {RouteConfig[]}
  */
@@ -811,4 +832,4 @@ const routes = [
 ];
 
 export default routes;
-export { publicModeratorRoutes };
+export { publicModeratorRoutes, publicQnaShareRoutes };

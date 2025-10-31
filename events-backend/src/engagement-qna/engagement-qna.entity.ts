@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Engagement } from '../engagement/engagement.entity';
 import { UserEntity } from '../user/users.entity';
+import { ProgrammeSession } from '../programme/programme-session.entity';
 
 @Entity('engagement_qna_questions')
 @Index('IDX_ENGAGEMENT_QNA_ENGAGEMENT_LIKES', ['engagementId', 'likesCount'])
@@ -108,5 +109,67 @@ export class EngagementQnaLike {
 
   @CreateDateColumn()
   createdAt!: Date;
+}
+
+@Entity('engagement_qna_share_links')
+@Index('IDX_ENGAGEMENT_QNA_SHARE_TOKEN', ['shareToken'], { unique: true })
+@Index('IDX_ENGAGEMENT_QNA_SHARE_SESSION', ['sessionId'])
+export class EngagementQnaShareLink {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Index()
+  @Column()
+  sessionId!: string;
+
+  @ManyToOne(() => ProgrammeSession, { eager: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'sessionId' })
+  session?: ProgrammeSession;
+
+  @Column({ type: 'varchar', unique: true })
+  shareToken!: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiresAt?: Date;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
+}
+
+@Entity('engagement_qna_question_share_links')
+@Index('IDX_ENGAGEMENT_QNA_QUESTION_SHARE_TOKEN', ['shareToken'], { unique: true })
+@Index('IDX_ENGAGEMENT_QNA_QUESTION_SHARE_QUESTION', ['questionId'])
+export class EngagementQnaQuestionShareLink {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Index()
+  @Column()
+  questionId!: string;
+
+  @ManyToOne(() => EngagementQnaQuestion, { eager: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'questionId' })
+  question?: EngagementQnaQuestion;
+
+  @Column({ type: 'varchar', unique: true })
+  shareToken!: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiresAt?: Date;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }
 

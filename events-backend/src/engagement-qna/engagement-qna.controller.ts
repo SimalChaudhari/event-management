@@ -14,12 +14,14 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { EngagementQnaService } from './engagement-qna.service';
-import { 
-  CreateEngagementQuestionDto, 
-  UpdateEngagementQuestionDto, 
-  AnswerEngagementQuestionDto, 
+import {
+  CreateEngagementQuestionDto,
+  UpdateEngagementQuestionDto,
+  AnswerEngagementQuestionDto,
   LikeEngagementQuestionDto,
   GetEngagementQuestionsDto,
+  GenerateShareLinkDto,
+  GenerateQuestionShareLinkDto,
 } from './engagement-qna.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -112,6 +114,178 @@ export class EngagementQnaController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get Engagement Q&A questions', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Get Session Q&A by Share Link (Public Access) - Must be before :id route
+  @Public()
+  @Get('share/:shareToken')
+  async getSessionQnaByShareLink(
+    @Param('shareToken') shareToken: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.getSessionQnaByShareLink(shareToken);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: result.metadata,
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get session Q&A by share link');
+      throw error;
+    }
+  }
+
+  // Answer Question via Share Link (Public Access)
+  @Public()
+  @Put('share/:shareToken/answer/:questionId')
+  async answerQuestionViaShareLink(
+    @Param('shareToken') shareToken: string,
+    @Param('questionId') questionId: string,
+    @Body() answerDto: AnswerEngagementQuestionDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.answerQuestionViaShareLink(
+        shareToken,
+        questionId,
+        answerDto.answer,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          shareToken: shareToken,
+          questionId: questionId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Answer question via share link');
+      throw error;
+    }
+  }
+
+  // Update Question via Share Link (Public Access)
+  @Public()
+  @Put('share/:shareToken/question/:questionId')
+  async updateQuestionViaShareLink(
+    @Param('shareToken') shareToken: string,
+    @Param('questionId') questionId: string,
+    @Body() updateDto: UpdateEngagementQuestionDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.updateQuestionViaShareLink(
+        shareToken,
+        questionId,
+        updateDto,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          shareToken: shareToken,
+          questionId: questionId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Update question via share link');
+      throw error;
+    }
+  }
+
+  // Delete Question via Share Link (Public Access)
+  @Public()
+  @Delete('share/:shareToken/question/:questionId')
+  async deleteQuestionViaShareLink(
+    @Param('shareToken') shareToken: string,
+    @Param('questionId') questionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.deleteQuestionViaShareLink(
+        shareToken,
+        questionId,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          shareToken: shareToken,
+          questionId: questionId,
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Delete question via share link');
+      throw error;
+    }
+  }
+
+  // Generate Shareable Link for Individual Question (Public Access - No Auth Required)
+  @Public()
+  @Post('generate-question-link')
+  async generateQuestionShareLink(
+    @Body() generateDto: GenerateQuestionShareLinkDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.generateQuestionShareLink(generateDto);
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          questionId: generateDto.questionId,
+        },
+      };
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Generate question share link');
+      throw error;
+    }
+  }
+
+  // Get Question by Share Link (Public Access) - Must be before :id route
+  @Public()
+  @Get('question/:shareToken')
+  async getQuestionByShareLink(
+    @Param('shareToken') shareToken: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.engagementQnaService.getQuestionByShareLink(shareToken);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: result.metadata,
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Get question by share link');
       throw error;
     }
   }
@@ -278,5 +452,35 @@ export class EngagementQnaController {
       throw error;
     }
   }
+
+  // Generate Shareable Link for Session Q&A (Admin/Moderator only)
+  @Post('generate-link')
+  @Roles(UserRole.Admin, UserRole.Moderator)
+  async generateShareLink(
+    @Body() generateDto: GenerateShareLinkDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.engagementQnaService.generateShareLink(generateDto);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          generatedBy: req.user?.id,
+          sessionId: generateDto.sessionId,
+        },
+      };
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Generate share link', req.user?.id);
+      throw error;
+    }
+  }
+
 }
 

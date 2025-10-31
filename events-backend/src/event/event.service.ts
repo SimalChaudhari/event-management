@@ -897,6 +897,35 @@ export class EventService {
     }
   }
 
+  async updateEventBackgroundImage(
+    id: string,
+    backgroundImage: string | null,
+  ): Promise<Partial<Event>> {
+    try {
+      const event = await this.eventRepository.findOne({ where: { id } });
+      if (!event) {
+        throw new ResourceNotFoundException('Event', id);
+      }
+
+      // Delete existing background image from filesystem if it exists
+      if (event.backgroundImage) {
+        const existingBackgroundImagePath = path.resolve(event.backgroundImage);
+        if (fs.existsSync(existingBackgroundImagePath)) {
+          fs.unlinkSync(existingBackgroundImagePath);
+        }
+      }
+
+      // Update background image in database - set to empty string instead of null
+      event.backgroundImage = backgroundImage === null ? '' : backgroundImage;
+      return await this.eventRepository.save(event);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      throw this.errorHandler.handleDatabaseError(error, 'Event background image update');
+    }
+  }
+
   private async updateEventAssociations(
     eventId: string,
     eventDto: Partial<EventDto>,
@@ -1255,6 +1284,14 @@ export class EventService {
       // Delete floor plan if it exists
       if (event.floorPlan) {
         const filePath = path.resolve(event.floorPlan);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+
+      // Delete background image if it exists
+      if (event.backgroundImage) {
+        const filePath = path.resolve(event.backgroundImage);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }

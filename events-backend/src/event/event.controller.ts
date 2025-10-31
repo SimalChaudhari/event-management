@@ -92,6 +92,11 @@ export class EventController {
         eventDto.floorPlan = fileProcessing.processedFiles.floorPlan;
       }
 
+      // Handle background image
+      if (fileProcessing.processedFiles?.backgroundImage) {
+        eventDto.backgroundImage = fileProcessing.processedFiles.backgroundImage;
+      }
+
       const savedEvent = await this.eventService.createEvent(eventDto);
 
     const successResponse: SuccessResponse = {
@@ -389,11 +394,28 @@ export class EventController {
          );
          allEventStampImages.push(...newEventStampImages);
        }
-      
-      // Set the combined event stamp images
-      if (allEventStampImages.length > 0) {
-        eventDto.eventStampImages = allEventStampImages;
-      }
+       
+       // Set the combined event stamp images
+       if (allEventStampImages.length > 0) {
+         eventDto.eventStampImages = allEventStampImages;
+       }
+
+       // Handle background image - single image only
+       if (files.backgroundImage && files.backgroundImage.length > 0) {
+         // Validate new background image before processing
+         const backgroundValidation = FileUploadUtils.validateUploadedFiles({ backgroundImage: files.backgroundImage });
+         if (!backgroundValidation.isValid) {
+           // Clean up invalid background image immediately
+           FileUploadUtils.cleanupUploadedFiles({ backgroundImage: files.backgroundImage });
+           throw new BadRequestException(`Background image validation failed: ${backgroundValidation.errors.join(', ')}`);
+         }
+         
+         // New background image uploaded - replace existing
+         eventDto.backgroundImage = `uploads/event/background/${files.backgroundImage[0].filename}`;
+       } else if (eventDto.originalBackgroundImage) {
+         // Keep existing background image if no new one uploaded
+         eventDto.backgroundImage = eventDto.originalBackgroundImage;
+       }
 
       const updatedEvent = await this.eventService.updateEvent(id, eventDto);
 
@@ -672,6 +694,45 @@ export class EventController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Event floor plan removal', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Remove background image
+  @Delete('background-image/:id')
+  @Roles(UserRole.Admin)
+  async removeEventBackgroundImage(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const event = await this.eventService.getEventEntityById(id);
+
+      if (!event.backgroundImage) {
+        throw new ResourceNotFoundException('Background image', 'in this event');
+      }
+
+      // Delete background image from filesystem
+      const fullPath = path.join(__dirname, '..', '..', event.backgroundImage);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+
+      await this.eventService.updateEventBackgroundImage(id, null);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Background image removed successfully',
+        data: { backgroundImage: "" },
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event background image removal', req.user?.id);
       throw error;
     }
   }

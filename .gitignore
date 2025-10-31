@@ -35,6 +35,9 @@ Thumbs.db
 .DS_Store
 
 # Environment files
+/events-cms/.env
+/events-backend/.env
+./env
 .env
 .env.local
 .env.development
@@ -68,3 +71,7 @@ pnpm-lock.yaml
 # API keys or other credentials
 *.key
 *.crt
+
+# Upload folders
+events-backend/src/upload/
+events-backend/uploads/

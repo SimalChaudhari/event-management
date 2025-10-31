@@ -389,6 +389,16 @@ export const removeEventFloorPlan = (eventId) => async (dispatch) => {
     }
 };
 
+export const removeEventBackgroundImage = (eventId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/events/background-image/${eventId}`);
+        return response.data;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
+    }
+};
+
 export const adminUpdateRegisterEvent = (id, data) => async (dispatch) => {
     try {
         const response = await axiosInstance.put(`/register-events/admin/update/${id}`, data);

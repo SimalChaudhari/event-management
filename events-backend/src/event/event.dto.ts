@@ -110,6 +110,11 @@ export class EventDto {
   @IsString()
   floorPlan?: string;
 
+  // Background image for Q&A pages
+  @IsOptional()
+  @IsString()
+  backgroundImage?: string;
+
     // Event Stamp fields
     @IsOptional()
     @IsString()
@@ -151,5 +156,6 @@ export class EventDto {
   originalEventStampImages: any;
   originalFloorPlan: any;
   originalDocumentNames: any; // Add this line
+  originalBackgroundImage: any;
 }
 
