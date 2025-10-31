@@ -157,14 +157,14 @@ const engagementComponents = {
  * Moderator related components
  * @type {Object.<string, React.LazyExoticComponent>}
  */
-const moderatorComponents = {
-    List: React.lazy(() => import('./Pages/Moderators/ModeratorList.jsx')),
-    AddModerator: React.lazy(() => import('./Pages/Moderators/AddModeratorPage.jsx')),
-    ViewModerator: React.lazy(() => import('./Pages/Moderators/ViewModeratorPage.jsx')),
-    AssignEvents: React.lazy(() => import('./Pages/Moderators/AssignEventsPage.jsx')),
-    Landing: React.lazy(() => import('./Pages/Moderators/ModeratorLandingPage.jsx')),
-    QA: React.lazy(() => import('./Pages/Moderators/ModeratorQAPage.jsx'))
-};
+// const moderatorComponents = {
+//     List: React.lazy(() => import('./Pages/Moderators/ModeratorList.jsx')),
+//     AddModerator: React.lazy(() => import('./Pages/Moderators/AddModeratorPage.jsx')),
+//     ViewModerator: React.lazy(() => import('./Pages/Moderators/ViewModeratorPage.jsx')),
+//     AssignEvents: React.lazy(() => import('./Pages/Moderators/AssignEventsPage.jsx')),
+//     Landing: React.lazy(() => import('./Pages/Moderators/ModeratorLandingPage.jsx')),
+//     QA: React.lazy(() => import('./Pages/Moderators/ModeratorQAPage.jsx'))
+// };
 
 /**
  * Settings related components
@@ -732,63 +732,63 @@ const engagementRoutes = [
  * Moderator routes configuration
  * @type {RouteConfig[]}
  */
-const moderatorRoutes = [
-    {
-        path: '/moderators',
-        exact: true,
-        name: 'Moderator Management',
-        component: moderatorComponents.List
-    },
-    {
-        path: '/moderators/add',
-        exact: true,
-        name: 'Add Moderator',
-        component: moderatorComponents.AddModerator
-    },
-    {
-        path: '/moderators/edit/:id',
-        exact: true,
-        name: 'Edit Moderator',
-        component: moderatorComponents.AddModerator
-    },
-    {
-        path: '/moderators/view/:id',
-        exact: true,
-        name: 'View Moderator',
-        component: moderatorComponents.ViewModerator
-    },
-    {
-        path: '/moderators/assign-events/:id',
-        exact: true,
-        name: 'Assign Events',
-        component: moderatorComponents.AssignEvents
-    }
-];
+// const moderatorRoutes = [
+//     {
+//         path: '/moderators',
+//         exact: true,
+//         name: 'Moderator Management',
+//         component: moderatorComponents.List
+//     },
+//     {
+//         path: '/moderators/add',
+//         exact: true,
+//         name: 'Add Moderator',
+//         component: moderatorComponents.AddModerator
+//     },
+//     {
+//         path: '/moderators/edit/:id',
+//         exact: true,
+//         name: 'Edit Moderator',
+//         component: moderatorComponents.AddModerator
+//     },
+//     {
+//         path: '/moderators/view/:id',
+//         exact: true,
+//         name: 'View Moderator',
+//         component: moderatorComponents.ViewModerator
+//     },
+//     {
+//         path: '/moderators/assign-events/:id',
+//         exact: true,
+//         name: 'Assign Events',
+//         component: moderatorComponents.AssignEvents
+//     }
+// ];
 
 /**
  * Public moderator routes (no login required)
  * @type {RouteConfig[]}
  */
-const publicModeratorRoutes = [
-    {
-        path: '/moderator/:moderatorId',
-        exact: true,
-        name: 'Moderator Landing',
-        component: moderatorComponents.Landing
-    },
-    {
-        path: '/moderator/session/:sessionId',
-        exact: true,
-        name: 'Moderator Session Landing',
-        component: moderatorComponents.Landing
-    },
-    {
-        path: '/moderator/qa/:moderatorId/:eventId',
-        exact: true,
-        name: 'Moderator QA',
-        component: moderatorComponents.QA
-    }
-];
+// const publicModeratorRoutes = [
+//     {
+//         path: '/moderator/:moderatorId',
+//         exact: true,
+//         name: 'Moderator Landing',
+//         component: moderatorComponents.Landing
+//     },
+//     {
+//         path: '/moderator/session/:sessionId',
+//         exact: true,
+//         name: 'Moderator Session Landing',
+//         component: moderatorComponents.Landing
+//     },
+//     {
+//         path: '/moderator/qa/:moderatorId/:eventId',
+//         exact: true,
+//         name: 'Moderator QA',
+//         component: moderatorComponents.QA
+//     }
+// ];
 
 /**
  * Public Q&A Share Link routes (no login required)
@@ -824,7 +824,7 @@ const routes = [
     ...pollingRoutes,
     ...programmeRoutes,
     ...engagementRoutes,
-    ...moderatorRoutes,
+    // ...moderatorRoutes,
     ...settingsRoutes,
     ...logsRoutes,
     ...transactionRoutes,
@@ -832,4 +832,5 @@ const routes = [
 ];
 
 export default routes;
-export { publicModeratorRoutes, publicQnaShareRoutes };
+// export { publicModeratorRoutes, publicQnaShareRoutes };
+export { publicQnaShareRoutes };

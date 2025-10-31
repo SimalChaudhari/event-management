@@ -166,17 +166,17 @@ const chartData = {
                         type: 'badge-success'
                     }
                 },
-                {
-                    id: 'moderators',
-                    title: 'Moderators',
-                    type: 'item',
-                    // icon: 'feather icon-shield',
-                    url: '/moderators',
-                    badge: {
-                        title: 'NEW',
-                        type: 'badge-info'
-                    }
-                }
+                // {
+                //     id: 'moderators',
+                //     title: 'Moderators',
+                //     type: 'item',
+                //     // icon: 'feather icon-shield',
+                //     url: '/moderators',
+                //     badge: {
+                //         title: 'NEW',
+                //         type: 'badge-info'
+                //     }
+                // }
                     ]
                 }
             ]
