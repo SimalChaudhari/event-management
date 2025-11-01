@@ -382,13 +382,13 @@ export class UserUtils {
    * @param eventId Event ID
    * @param eventRepository Event repository instance
    * @param engagementRepository Engagement repository instance
-   * @returns Formatted engagements array
+   * @returns Formatted engagements object (converted from array)
    */
   static async getEngagementsByEventId(
     eventId: string,
     eventRepository: any,
     engagementRepository: any
-  ): Promise<any[]> {
+  ): Promise<any> {
     try {
       // Get all programme tracks for this event
       const event = await eventRepository.findOne({
@@ -397,7 +397,18 @@ export class UserUtils {
       });
 
       if (!event || !event.programmeTracks || event.programmeTracks.length === 0) {
-        return [];
+        return {
+          event: null,
+          programmeTracks: [],
+          statistics: {
+            questionsCount: 0,
+            answeredQuestionsCount: 0,
+            unansweredQuestionsCount: 0,
+            pollsCount: 0,
+            totalVotesCount: 0
+          },
+          totalSessionsCount: 0
+        };
       }
 
       // Get all track IDs
@@ -409,11 +420,47 @@ export class UserUtils {
         relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
       });
 
-      // Format and return engagements
-      return this.formatEngagements(engagements);
+      // Format engagements as array first
+      const formattedArray = this.formatEngagements(engagements);
+      
+      // Convert array to object (return first element or empty object structure)
+      if (formattedArray && formattedArray.length > 0) {
+        return formattedArray[0];
+      }
+      
+      return {
+        event: {
+          id: eventId,
+          name: event.name,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          startTime: event.startTime,
+          endTime: event.endTime,
+        },
+        programmeTracks: [],
+        statistics: {
+          questionsCount: 0,
+          answeredQuestionsCount: 0,
+          unansweredQuestionsCount: 0,
+          pollsCount: 0,
+          totalVotesCount: 0
+        },
+        totalSessionsCount: 0
+      };
     } catch (error) {
       console.error(`Error fetching engagements for event ${eventId}:`, error);
-      return [];
+      return {
+        event: null,
+        programmeTracks: [],
+        statistics: {
+          questionsCount: 0,
+          answeredQuestionsCount: 0,
+          unansweredQuestionsCount: 0,
+          pollsCount: 0,
+          totalVotesCount: 0
+        },
+        totalSessionsCount: 0
+      };
     }
   }
 }

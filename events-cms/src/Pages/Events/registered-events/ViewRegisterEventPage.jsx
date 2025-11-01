@@ -18,6 +18,7 @@ import EventStampsComponent from '../../../components/events/EventStampsComponen
 import EventSurveyComponent from '../../../components/events/EventSurveyComponent';
 import EventExhibitorsComponent from '../../../components/events/EventExhibitorsComponent';
 import EventProgrammeComponent from '../../../components/events/EventProgrammeComponent';
+import EventEngagementComponent from '../../../components/events/EventEngagementComponent';
 import { ExpandableDescription } from '../../../components/ExpandableDescription';
 
 const ViewRegisterEventPage = () => {
@@ -371,6 +372,13 @@ const ViewRegisterEventPage = () => {
                                         <Nav.Link eventKey="agenda">
                                             <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                             My Agenda
+                                        </Nav.Link>
+                                    </Nav.Item>
+
+                                    <Nav.Item>
+                                        <Nav.Link eventKey="engagement">
+                                            <i className="fas fa-users" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                            Engagement
                                         </Nav.Link>
                                     </Nav.Item>
                                 </Nav>
@@ -911,6 +919,16 @@ const ViewRegisterEventPage = () => {
                                 <div className="p-3">
                                     <EventProgrammeComponent 
                                         programmeTracks={eventData?.event?.programmeTracks}
+                                        formatTime={formatTime}
+                                    />
+                                </div>
+                            </Tab.Pane>
+
+                            {/* Engagement Tab */}
+                            <Tab.Pane eventKey="engagement">
+                                <div className="p-3">
+                                    <EventEngagementComponent 
+                                        engagements={eventData?.event?.engagements}
                                         formatTime={formatTime}
                                     />
                                 </div>

@@ -26,26 +26,46 @@ const EventInfoSection = ({ event, track, session }) => {
 
   return (
     <div className="mb-3">
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "1", minWidth: "200px" }}>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+      <style>
+        {`
+          .event-info-wrapper {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 8px;
+            justify-content: space-between;
+            overflow-x: auto;
+          }
+          @media (max-width: 320px) {
+            .event-info-wrapper {
+              flex-direction: column;
+              flex-wrap: wrap;
+            }
+            .event-info-wrapper > div {
+              min-width: 100% !important;
+            }
+          }
+        `}
+      </style>
+      <div className="event-info-wrapper">
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0, minWidth: "140px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>Event Title:</strong> {event?.name || 'N/A'}
           </p>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>Track Title:</strong> {track?.title || 'N/A'}
           </p>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>Session Title:</strong> {session?.title || 'N/A'}
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "1", minWidth: "200px" }}>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0, minWidth: "140px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>Start Date:</strong> {formatDate(event?.startDate)}
           </p>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>End Date:</strong> {formatDate(event?.endDate)}
           </p>
-          <p style={{ margin: 0, fontSize: "14px" }}>
+          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong>Time:</strong> {formatTime(session?.startTime)} - {formatTime(session?.endTime)}
           </p>
         </div>

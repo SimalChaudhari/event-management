@@ -5,6 +5,7 @@ import { Button, Row, Col, Container } from 'react-bootstrap';
 import Select from 'react-select';
 import { createEngagement, updateEngagement, getEngagementById, getAllEngagements } from '../../store/actions/engagementActions';
 import { getAllTracks } from '../../store/actions/programmeActions';
+import { getAllEventsForFilter } from '../../store/actions/eventActions';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
 
@@ -21,13 +22,30 @@ const AddEngagementPage = () => {
         isActive: true
     });
 
+    const [selectedEventId, setSelectedEventId] = useState('');
     const [selectedTrackId, setSelectedTrackId] = useState('');
+    const [events, setEvents] = useState([]);
+    const [loadingEvents, setLoadingEvents] = useState(false);
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
+        const loadEvents = async () => {
+            setLoadingEvents(true);
+            try {
+                const eventsData = await dispatch(getAllEventsForFilter());
+                setEvents(eventsData || []);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                setEvents([]);
+            } finally {
+                setLoadingEvents(false);
+            }
+        };
+
         dispatch(getAllTracks());
         dispatch(getAllEngagements());
+        loadEvents();
         if (isEditing) {
             dispatch(getEngagementById(id));
         }
@@ -38,11 +56,23 @@ const AddEngagementPage = () => {
             setFormData({
                 isActive: selectedEngagement.isActive !== undefined ? selectedEngagement.isActive : true
             });
-            // Set the track ID from the engagement data
-            if (selectedEngagement.trackId && !selectedTrackId) {
-                setSelectedTrackId(selectedEngagement.trackId);
+            
+            // Handle both grouped format (from getEngagementById) and flat format
+            // Grouped format has: event, programmeTracks array
+            // Flat format has: trackId, track object
+            const firstTrack = selectedEngagement.programmeTracks?.[0];
+            const event = selectedEngagement.event;
+            const trackId = selectedEngagement.trackId || firstTrack?.id || firstTrack?.trackId;
+            const eventId = event?.id || selectedEngagement.track?.eventId || selectedEngagement.track?.event?.id;
+            
+            if (trackId) {
+                setSelectedTrackId(trackId);
+            }
+            if (eventId) {
+                setSelectedEventId(eventId);
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEditing, selectedEngagement]);
 
     const handleInputChange = (e) => {
@@ -60,6 +90,20 @@ const AddEngagementPage = () => {
         }
     };
 
+    const handleEventChange = (eventId) => {
+        setSelectedEventId(eventId || '');
+        // Only reset track selection when event changes in add mode, not in edit mode
+        if (!isEditing) {
+            setSelectedTrackId('');
+        }
+        if (errors.eventId) {
+            setErrors(prev => ({ ...prev, eventId: '' }));
+        }
+        if (errors.trackId) {
+            setErrors(prev => ({ ...prev, trackId: '' }));
+        }
+    };
+
     const handleTrackChange = (trackId) => {
         setSelectedTrackId(trackId || '');
         if (errors.trackId) {
@@ -69,6 +113,10 @@ const AddEngagementPage = () => {
 
     const validateForm = () => {
         const newErrors = {};
+
+        if (!selectedEventId) {
+            newErrors.eventId = 'Please select an event';
+        }
 
         if (!selectedTrackId) {
             newErrors.trackId = 'Please select a programme track';
@@ -128,13 +176,31 @@ const AddEngagementPage = () => {
         ? [...availableTracks, tracks?.find(t => t.id === selectedEngagement.trackId)].filter(Boolean)
         : availableTracks;
 
-    // Create track options for select dropdown with event name
-    const trackOptions = displayTracks.map(track => ({
-        value: track.id,
-        label: `${track.title} - ${track.event?.name || 'No Event'}`
-    }));
+    // Filter tracks by selected event
+    const filteredTracks = selectedEventId
+        ? displayTracks.filter(track => track.event?.id === selectedEventId)
+        : displayTracks;
 
+    // Create track options for select dropdown (simple list, not grouped since we filter by event)
+    const trackOptions = filteredTracks
+        .map(track => ({
+            value: track.id,
+            label: track.title
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Find selected track option
     const selectedTrackOption = trackOptions.find(option => option.value === selectedTrackId);
+
+    // Create event options for select dropdown
+    const eventOptions = events
+        .map(event => ({
+            value: event.id,
+            label: event.name
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+    const selectedEventOption = eventOptions.find(option => option.value === selectedEventId);
 
     return (
         <>
@@ -171,6 +237,44 @@ const AddEngagementPage = () => {
                                             <div className="form-group fill">
                                                 <label className="floating-label" 
                                                 style={{ marginTop: '-8px' }}
+                                                htmlFor="eventId">
+                                                    Event <span className="text-danger">*</span>
+                                                </label>
+                                                <Select
+                                                    options={eventOptions}
+                                                    value={selectedEventOption}
+                                                    onChange={(option) => handleEventChange(option?.value)}
+                                                    placeholder="Select Event..."
+                                                    isClearable
+                                                    isSearchable
+                                                    isDisabled={loadingEvents}
+                                                    isLoading={loadingEvents}
+                                                    className={errors.eventId ? 'is-invalid' : ''}
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            fontSize: '14px',
+                                                            borderColor: errors.eventId ? '#dc3545' : base.borderColor,
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999
+                                                        })
+                                                    }}
+                                                />
+                                                {errors.eventId && (
+                                                    <small className="text-danger">{errors.eventId}</small>
+                                                )}
+                                                <small className="form-text text-muted">
+                                                    Select an event to view its programme tracks
+                                                </small>
+                                            </div>
+                                        </Col>
+
+                                        <Col sm={12}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" 
+                                                style={{ marginTop: '-8px' }}
                                                 htmlFor="trackId">
                                                     Programme Track <span className="text-danger">*</span>
                                                 </label>
@@ -178,10 +282,10 @@ const AddEngagementPage = () => {
                                                     options={trackOptions}
                                                     value={selectedTrackOption}
                                                     onChange={(option) => handleTrackChange(option?.value)}
-                                                    placeholder="Select Programme Track..."
+                                                    placeholder={selectedEventId ? "Select Programme Track..." : "Please select an event first"}
                                                     isClearable
                                                     isSearchable
-                                                    isDisabled={isEditing}
+                                                    isDisabled={!selectedEventId}
                                                     className={errors.trackId ? 'is-invalid' : ''}
                                                     styles={{
                                                         control: (base) => ({
@@ -199,7 +303,10 @@ const AddEngagementPage = () => {
                                                     <small className="text-danger">{errors.trackId}</small>
                                                 )}
                                                 <small className="form-text text-muted">
-                                                    Only tracks without existing engagements are shown
+                                                    {selectedEventId 
+                                                        ? "Only tracks without existing engagements are shown"
+                                                        : "Select an event first to view available tracks"
+                                                    }
                                                 </small>
                                             </div>
                                         </Col>

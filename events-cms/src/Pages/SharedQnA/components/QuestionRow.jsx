@@ -47,7 +47,7 @@ const QuestionRow = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) =
         whiteSpace: "normal",
         lineHeight: "1.2",
         verticalAlign: "middle",
-        fontSize: "clamp(10px, 2vw, 13px)",
+        fontSize: "clamp(11px, 2vw, 15px)",
         textAlign: "start",
         cursor: onGenerateLink ? "pointer" : "default",
         transition: "all 0.2s ease"
@@ -75,7 +75,7 @@ const QuestionRow = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) =
         padding: "4px 1px", 
         textAlign: "center",
         verticalAlign: "middle",
-        fontSize: "clamp(10px, 2vw, 13px)",
+        fontSize: "clamp(11px, 2vw, 15px)",
         whiteSpace: "nowrap"
       }}>
         {question.likesCount || 0}
@@ -93,7 +93,7 @@ const QuestionRow = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) =
         wordBreak: "break-word",
         wordWrap: "break-word",
         whiteSpace: "normal",
-        fontSize: "clamp(10px, 2vw, 13px)"
+        fontSize: "clamp(11px, 2vw, 15px)"
       }}>
         {getStatusText(question.status)}
       </td>
@@ -108,7 +108,7 @@ const QuestionRow = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) =
         textAlign: "center",
         verticalAlign: "middle"
       }}>
-        <ActionButtons question={question} onAnswer={onAnswer} onEdit={onEdit} onDelete={onDelete} />
+        <ActionButtons question={question} onAnswer={onAnswer} onEdit={onEdit} onDelete={onDelete} onGenerateLink={onGenerateLink} />
       </td>
     </tr>
   );

@@ -219,8 +219,9 @@ export class EngagementService {
 
   /**
    * Get all engagements for a specific event
+   * Returns an object instead of array for consistency
    */
-  async getEngagementsByEvent(eventId: string): Promise<any[]> {
+  async getEngagementsByEvent(eventId: string): Promise<any> {
     const engagements = await this.engagementRepository.find({
       where: { 
         track: { 
@@ -248,7 +249,26 @@ export class EngagementService {
       })
     );
 
-    return UserUtils.formatEngagements(engagementsWithStats);
+    const formattedArray = UserUtils.formatEngagements(engagementsWithStats);
+    
+    // Convert array to object (return first element or empty object structure)
+    if (formattedArray && formattedArray.length > 0) {
+      return formattedArray[0];
+    }
+    
+    // Return empty object structure if no engagements
+    return {
+      event: null,
+      programmeTracks: [],
+      statistics: {
+        questionsCount: 0,
+        answeredQuestionsCount: 0,
+        unansweredQuestionsCount: 0,
+        pollsCount: 0,
+        totalVotesCount: 0
+      },
+      totalSessionsCount: 0
+    };
   }
 
   /**

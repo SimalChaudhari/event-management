@@ -32,15 +32,33 @@ const ReadMoreComponent = ({ text, maxLength = 100, className = '' }) => {
 
 /**
  * EventEngagementComponent - Reusable component to display event engagements
- * @param {Array} engagements - Engagement data
+ * @param {Object|Array} engagements - Engagement data (object with programmeTracks array or array for backward compatibility)
  * @param {Function} formatTime - Function to format time to 12-hour format
  */
 const EventEngagementComponent = ({ engagements, formatTime }) => {
-    // Filter only engagements with tracks that belong to this event
-    const eventEngagements = engagements || [];
+    // Handle both object and array formats for backward compatibility
+    let programmeTracks = [];
+    
+    if (engagements) {
+        // If engagements is an object with programmeTracks property
+        if (typeof engagements === 'object' && !Array.isArray(engagements) && engagements.programmeTracks) {
+            programmeTracks = engagements.programmeTracks || [];
+        }
+        // If engagements is still an array (backward compatibility)
+        else if (Array.isArray(engagements)) {
+            // Extract programmeTracks from array format
+            programmeTracks = engagements.flatMap(engagement => {
+                if (engagement.programmeTracks) {
+                    return engagement.programmeTracks;
+                }
+                // Legacy format: engagement might be a track itself
+                return [engagement];
+            });
+        }
+    }
 
-    // Check if engagements are available
-    if (!eventEngagements || eventEngagements.length === 0) {
+    // Check if programmeTracks are available
+    if (!programmeTracks || programmeTracks.length === 0) {
         return (
             <div className="text-center py-5">
                 <i className="fas fa-users-slash fa-3x text-muted mb-4"></i>
@@ -53,14 +71,12 @@ const EventEngagementComponent = ({ engagements, formatTime }) => {
     return (
         <>
             <h5 className="mb-4">Event Engagements</h5>
-            {eventEngagements.map((engagement, engagementIndex) => {
-                // Backend sends 'programmeTrack' instead of 'track'
-                const track = engagement.programmeTrack || engagement.track || {};
-                const event = engagement.event || {};
-                const isActive = engagement.isActive !== undefined ? engagement.isActive : true;
+            {programmeTracks.map((track, engagementIndex) => {
+                // track is already the programmeTrack object
+                const isActive = track.isActive !== undefined ? track.isActive : true;
 
                 return (
-                    <div key={engagement.id} className="mb-4">
+                    <div key={track.engagementId || track.id || engagementIndex} className="mb-4">
                         <Card className="border-0 shadow-sm">
                             <Card.Header style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #4680ff' }}>
                                 <div className="d-flex justify-content-between align-items-start">
@@ -81,8 +97,8 @@ const EventEngagementComponent = ({ engagements, formatTime }) => {
                                 </div>
                             </Card.Header>
                             <Card.Body>
-                                {engagement.sessions && engagement.sessions.length > 0 ? (
-                                    engagement.sessions.map((session, sessionIndex) => (
+                                {track.sessions && track.sessions.length > 0 ? (
+                                    track.sessions.map((session, sessionIndex) => (
                                         <div key={session.id || sessionIndex} className={`${sessionIndex > 0 ? 'mt-4 pt-4 border-top' : ''}`}>
                                             <div className="d-flex justify-content-between align-items-start mb-3">
                                                 <div>

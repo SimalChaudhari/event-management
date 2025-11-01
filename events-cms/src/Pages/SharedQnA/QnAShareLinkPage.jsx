@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Container, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { useParams } from "react-router-dom";
@@ -14,6 +14,7 @@ import {
   deleteQuestionViaShareLink,
   generateQuestionShareLink
 } from "./components/QnAShareApi";
+import { applyFiltersToQuestions } from "./utils/filterUtils";
 
 const QnAShareLinkPage = () => {
   const { shareToken } = useParams();
@@ -45,6 +46,22 @@ const QnAShareLinkPage = () => {
   const [questionShareUrls, setQuestionShareUrls] = useState({}); // Store URLs by question ID
   const [generatingQuestionLinks, setGeneratingQuestionLinks] = useState({}); // Track loading by question ID
   const [selectedQuestionUrl, setSelectedQuestionUrl] = useState(null); // Currently selected question URL for display
+  const [selectedQuestionText, setSelectedQuestionText] = useState(null); // Currently selected question text for display
+
+  // Filter state - simplified
+  const [voteFilter, setVoteFilter] = useState(null); // null = unsorted, 'asc' = ascending (0 to high), 'desc' = descending (high to 0)
+  const [statusFilter, setStatusFilter] = useState(null); // null = all, 'answering' = answering only, 'answered' = answered only, 'not_answered' = not answered only
+  const [allQuestions, setAllQuestions] = useState([]); // Store all questions for filtering
+
+  // Use refs to access latest state in callbacks
+  const questionShareUrlsRef = useRef({});
+  const generatingQuestionLinksRef = useRef({});
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    questionShareUrlsRef.current = questionShareUrls;
+    generatingQuestionLinksRef.current = generatingQuestionLinks;
+  }, [questionShareUrls, generatingQuestionLinks]);
 
   useEffect(() => {
     fetchData();
@@ -61,20 +78,75 @@ const QnAShareLinkPage = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Apply filters to questions - show filtered first, then rest
+  const applyFilters = useCallback(() => {
+    const filteredQuestions = applyFiltersToQuestions(allQuestions, voteFilter, statusFilter);
+    setQuestions(filteredQuestions);
+  }, [voteFilter, statusFilter, allQuestions]);
+
+  // Apply filters when filter states or allQuestions change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  // Handle generate question share link (when question clicked) - immediate update
+  const handleGenerateQuestionLink = useCallback(async (question) => {
+    // Use refs to access latest state (avoid stale closures)
+    const existingUrl = questionShareUrlsRef.current[question.id];
+    if (existingUrl) {
+      // Force immediate synchronous update
+      flushSync(() => {
+        setSelectedQuestionUrl(existingUrl);
+        setSelectedQuestionText(question.question); // Set question text for display
+      });
+      return;
+    }
+
+    // Check if already generating
+    if (generatingQuestionLinksRef.current[question.id]) {
+      return;
+    }
+
+    // Show loading state immediately
+    setGeneratingQuestionLinks(prev => ({ ...prev, [question.id]: true }));
+    
+    try {
+      const response = await generateQuestionShareLink(question.id);
+      
+      if (response.success && response.data?.shareUrl) {
+        const shareUrl = response.data.shareUrl;
+        // Force immediate synchronous update after API response
+        flushSync(() => {
+          setQuestionShareUrls(prev => ({ ...prev, [question.id]: shareUrl }));
+          setSelectedQuestionUrl(shareUrl);
+          setSelectedQuestionText(question.question); // Set question text for display
+        });
+      } else {
+        toast.error(response.message || 'Failed to generate question link');
+      }
+    } catch (error) {
+      console.error('Error generating question link:', error);
+      toast.error('Failed to generate question link');
+    } finally {
+      setGeneratingQuestionLinks(prev => ({ ...prev, [question.id]: false }));
+    }
+  }, []); // Empty deps - refs are stable
+
   // Auto-generate and display question link when answering question changes
   useEffect(() => {
     if (answeringQuestion && answeringQuestion.status === 'answering') {
       const questionId = answeringQuestion.id;
       // If URL exists, show it immediately
-      if (questionShareUrls[questionId]) {
-        setSelectedQuestionUrl(questionShareUrls[questionId]);
-      } else if (!generatingQuestionLinks[questionId]) {
+      if (questionShareUrlsRef.current[questionId]) {
+        setSelectedQuestionUrl(questionShareUrlsRef.current[questionId]);
+        setSelectedQuestionText(answeringQuestion.question); // Set question text
+      } else if (!generatingQuestionLinksRef.current[questionId]) {
         // Generate if not exists
         handleGenerateQuestionLink(answeringQuestion);
       }
     }
     // Don't clear URL when no answering question - keep last selected URL
-  }, [answeringQuestion]);
+  }, [answeringQuestion, handleGenerateQuestionLink]);
 
   const fetchData = async () => {
     try {
@@ -101,7 +173,9 @@ const QnAShareLinkPage = () => {
         setTrack(data.data.track);
         setSession(data.data.session);
         const fetchedQuestions = data.data.questions || [];
-        setQuestions(fetchedQuestions);
+        
+        // Store all questions for filtering
+        setAllQuestions(fetchedQuestions);
         
         // If any question has status "answering", set it as answering question to show in header
         const answeringQuestion = fetchedQuestions.find(q => q.status === 'answering');
@@ -136,13 +210,13 @@ const QnAShareLinkPage = () => {
       });
       
       if (response.success) {
-        // Update question in list
-        const updatedQuestions = questions.map(q => 
+        // Update question in allQuestions
+        const updatedAllQuestions = allQuestions.map(q => 
           q.id === question.id 
             ? { ...q, status: 'answering' }
             : q
         );
-        setQuestions(updatedQuestions);
+        setAllQuestions(updatedAllQuestions);
         
         // Set as answering question to show header (first position)
         setAnsweringQuestion({ ...question, status: 'answering' });
@@ -177,18 +251,18 @@ const QnAShareLinkPage = () => {
       if (response.success) {
         toast.success(`Question ${action === 'cancel' ? 'cancelled' : 'marked as answered'} successfully`);
         
-        // Update question in list
-        const updatedQuestions = questions.map(q => 
+        // Update question in allQuestions
+        const updatedAllQuestions = allQuestions.map(q => 
           q.id === answeringQuestion.id 
             ? { ...q, status: newStatus }
             : q
         );
-        setQuestions(updatedQuestions);
+        setAllQuestions(updatedAllQuestions);
         
         // Clear answering question or find next one with answering status
         if (newStatus !== 'answering') {
           // Find if any other question has answering status
-          const nextAnsweringQuestion = updatedQuestions.find(q => q.status === 'answering');
+          const nextAnsweringQuestion = updatedAllQuestions.find(q => q.status === 'answering');
           setAnsweringQuestion(nextAnsweringQuestion || null);
         } else {
           setAnsweringQuestion({ ...answeringQuestion, status: newStatus });
@@ -237,13 +311,13 @@ const QnAShareLinkPage = () => {
         setEditQuestionStatus('');
         setSelectedQuestionForEdit(null);
         
-        // Update question in list
-        const updatedQuestions = questions.map(q => 
+        // Update question in allQuestions
+        const updatedAllQuestions = allQuestions.map(q => 
           q.id === selectedQuestionForEdit.id 
             ? { ...q, question: editQuestionText.trim(), status: editQuestionStatus }
             : q
         );
-        setQuestions(updatedQuestions);
+        setAllQuestions(updatedAllQuestions);
         
         // Refresh data
         fetchData();
@@ -297,9 +371,9 @@ const QnAShareLinkPage = () => {
         }
         setSelectedQuestionForDelete(null);
         
-        // Remove question from list
-        const updatedQuestions = questions.filter(q => q.id !== selectedQuestionForDelete.id);
-        setQuestions(updatedQuestions);
+        // Remove question from allQuestions
+        const updatedAllQuestions = allQuestions.filter(q => q.id !== selectedQuestionForDelete.id);
+        setAllQuestions(updatedAllQuestions);
         
         // Refresh data
         fetchData();
@@ -318,47 +392,6 @@ const QnAShareLinkPage = () => {
   const handleCloseDeleteModal = () => {
     setShowDeleteModal(false);
     setSelectedQuestionForDelete(null);
-  };
-
-  // Handle generate question share link (when question clicked) - immediate update
-  const handleGenerateQuestionLink = async (question) => {
-    // If URL already exists, use it immediately (synchronous, no delay)
-    const existingUrl = questionShareUrls[question.id];
-    if (existingUrl) {
-      // Force immediate synchronous update
-      flushSync(() => {
-        setSelectedQuestionUrl(existingUrl);
-      });
-      return;
-    }
-
-    // Check if already generating
-    if (generatingQuestionLinks[question.id]) {
-      return;
-    }
-
-    // Show loading state immediately
-    setGeneratingQuestionLinks(prev => ({ ...prev, [question.id]: true }));
-    
-    try {
-      const response = await generateQuestionShareLink(question.id);
-      
-      if (response.success && response.data?.shareUrl) {
-        const shareUrl = response.data.shareUrl;
-        // Force immediate synchronous update after API response
-        flushSync(() => {
-          setQuestionShareUrls(prev => ({ ...prev, [question.id]: shareUrl }));
-          setSelectedQuestionUrl(shareUrl);
-        });
-      } else {
-        toast.error(response.message || 'Failed to generate question link');
-      }
-    } catch (error) {
-      console.error('Error generating question link:', error);
-      toast.error('Failed to generate question link');
-    } finally {
-      setGeneratingQuestionLinks(prev => ({ ...prev, [question.id]: false }));
-    }
   };
 
   if (loading) {
@@ -396,13 +429,13 @@ const QnAShareLinkPage = () => {
             <Row className="justify-content-center">
               <Col xl={10} lg={11} md={12}>
                 <Row className="align-items-center">
-                  <Col xs={12} md={8}>
+                  <Col xs={12} lg={8}>
                     <div style={{ 
                       fontFamily: "Arial",
                       fontWeight: "400",
                       fontStyle: "italic",
-                      fontSize: "12px",
-                      lineHeight: "18px",
+                      fontSize: "clamp(12px, 2vw, 16px)",
+                      lineHeight: "1.5",
                       marginBottom: "8px"
                     }}>
                       This question is now being answered:
@@ -412,8 +445,8 @@ const QnAShareLinkPage = () => {
                         fontFamily: "Arial",
                         fontWeight: "700",
                         fontStyle: "italic",
-                        fontSize: "14px",
-                        lineHeight: "18px",
+                        fontSize: "clamp(14px, 2vw, 18px)",
+                        lineHeight: "1.5",
                         letterSpacing: "0.5px",
                         color: "black",
                         wordBreak: "break-word"
@@ -422,8 +455,8 @@ const QnAShareLinkPage = () => {
                       {answeringQuestion.question}
                     </div>
                   </Col>
-                  <Col xs={12} md={4} className="text-md-end mt-3 mt-md-0">
-                    <div className="d-flex flex-row justify-content-center justify-content-md-end" style={{ gap: isMobile ? "16px" : "70px" }}>
+                  <Col xs={12} lg={4} className="text-lg-end mt-3 mt-lg-0">
+                    <div className="d-flex flex-row justify-content-center justify-content-lg-end" style={{ gap: "12px" }}>
                         <button
                           style={{
                             backgroundColor: "white",
@@ -433,7 +466,7 @@ const QnAShareLinkPage = () => {
                             padding: "8px 16px",
                             cursor: "pointer",
                             whiteSpace: "nowrap",
-                            fontSize: "14px",
+                            fontSize: "clamp(13px, 2vw, 16px)",
                             fontWeight: "500"
                           }}
                           onClick={() => handleQuestionStatusUpdate('cancel')}
@@ -450,7 +483,7 @@ const QnAShareLinkPage = () => {
                             padding: "8px 16px",
                             cursor: "pointer",
                             whiteSpace: "nowrap",
-                            fontSize: "14px",
+                            fontSize: "clamp(13px, 2vw, 16px)",
                             fontWeight: "500"
                           }}
                           onClick={() => handleQuestionStatusUpdate('answer')}
@@ -474,14 +507,72 @@ const QnAShareLinkPage = () => {
             <UrlFieldAndLegend 
               shareToken={shareToken} 
               answeringQuestionUrl={selectedQuestionUrl}
+              questionText={selectedQuestionText}
+              actualUrl={selectedQuestionUrl}
             />
-                   <QuestionsTable 
-                     questions={questions} 
-                     onAnswer={handleAnswerQuestion}
-                     onEdit={handleEditQuestion}
-                     onDelete={handleDeleteQuestionClick}
-                     onGenerateLink={handleGenerateQuestionLink}
-                   />
+
+            <QuestionsTable 
+              questions={questions} 
+              onAnswer={handleAnswerQuestion}
+              onEdit={handleEditQuestion}
+              onDelete={handleDeleteQuestionClick}
+              onGenerateLink={handleGenerateQuestionLink}
+              voteFilterActive={voteFilter}
+              statusFilterValue={statusFilter}
+              onVoteFilterClick={() => {
+                // If clicking on vote filter, reset status filter first
+                if (statusFilter !== null) {
+                  setStatusFilter(null);
+                }
+                // Cycle through: null (unsorted) -> 'desc' (high to low) -> 'asc' (low to high) -> repeat
+                if (voteFilter === null) {
+                  setVoteFilter('desc');
+                } else if (voteFilter === 'desc') {
+                  setVoteFilter('asc');
+                } else {
+                  setVoteFilter('desc'); // Loop back to desc instead of null
+                }
+              }}
+              onStatusFilterClick={() => {
+                // If clicking on status filter, reset vote filter first
+                if (voteFilter !== null) {
+                  setVoteFilter(null);
+                }
+                
+                // Get available statuses from data
+                const availableStatuses = [...new Set(allQuestions.map(q => q.status))];
+                const statusOrder = ['answering', 'answered', 'not_answered'];
+                
+                // Filter to only available statuses
+                const validStatuses = statusOrder.filter(status => availableStatuses.includes(status));
+                
+                // Cycle through available statuses only
+                if (statusFilter === null) {
+                  // Start with first available status
+                  setStatusFilter(validStatuses[0] || null);
+                } else {
+                  // Find current index and move to next
+                  const currentIndex = validStatuses.indexOf(statusFilter);
+                  if (currentIndex !== -1 && currentIndex < validStatuses.length - 1) {
+                    // Move to next available status
+                    setStatusFilter(validStatuses[currentIndex + 1]);
+                  } else {
+                    // Loop back to first available status
+                    setStatusFilter(validStatuses[0] || null);
+                  }
+                }
+              }}
+              onResetFilters={() => {
+                setVoteFilter(null);
+                setStatusFilter(null);
+              }}
+              onVoteFilterReset={() => {
+                setVoteFilter(null);
+              }}
+              onStatusFilterReset={() => {
+                setStatusFilter(null);
+              }}
+            />
           </Col>
         </Row>
       </Container>
