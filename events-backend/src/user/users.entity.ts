@@ -24,6 +24,37 @@ export enum AuthProvider {
   LOCAL = 'local',
   OAUTH = 'oauth',
 }
+export enum Industry {
+  Accounting = 'Accounting',
+  AdministrationOfficeSupport = 'Administration & Office Support',
+  AdvertisingArtsMedia = 'Advertising, Arts & Media',
+  BankingFinancialServices = 'Banking & Financial Services',
+  CallCentreCustomerService = 'Call Centre & Customer Service',
+  CommunityServicesDevelopment = 'Community Services & Development',
+  Construction = 'Construction',
+  ConsultingStrategy = 'Consulting & Strategy',
+  DesignArchitecture = 'Design & Architechture',
+  EducationTraining = 'Education & Training',
+  Engineering = 'Engineering',
+  FarmingAnimalsConservation = 'Farming, Animals & Conservation',
+  GovernmentDefence = 'Government & Defence',
+  HealthcareMedical = 'Healthcare & Medical',
+  HospitalityTourism = 'Hospitality & Tourism',
+  HumanResourcesRecruitment = 'Human Resources & Recruitment',
+  InformationCommunicationTechnology = 'Information & Communication Technology',
+  InsuranceSuperannuation = 'Insurance & Superannuation',
+  Legal = 'Legal',
+  ManufacturingTransportLogistics = 'Manufacturing, Transport & Logistics',
+  MarketingCommunications = 'Marketing & Communications',
+  MiningResourcesEnergy = 'Mining, Resources & Energy',
+  RealEstateProperty = 'Real Estate & Property',
+  RetailConsumerProducts = 'Retail & Consumer Products',
+  Sales = 'Sales',
+  ScienceTechnology = 'Science & Technology',
+  SportRecreation = 'Sport & Recreation',
+  TradesServices = 'Trades & Services',
+  Others = 'Others',
+}
 
 @Entity('users')
 export class UserEntity {
@@ -51,8 +82,15 @@ export class UserEntity {
   @Column({ nullable: true })
   company?: string; // Company/Organization name
 
+  @Column({
+    type: 'enum',
+    enum: Industry,
+    nullable: true,
+  })
+  industry?: Industry; // Industry sector
+
   @Column({ nullable: true })
-  industry?: string; // Industry sector
+  designation?: string; // Job designation/title
 
   @Column({
     type: 'enum',

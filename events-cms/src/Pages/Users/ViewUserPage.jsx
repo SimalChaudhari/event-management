@@ -217,7 +217,7 @@ const ViewUserPage = () => {
 
                             <InfoField 
                                 label="Full Name" 
-                                value={`${userData.firstName} ${userData.lastName}`}
+                                value={`${userData.salutation ? userData.salutation + ' ' : ''}${userData.firstName} ${userData.lastName}`}
                                 icon="feather icon-user"
                             />
 
@@ -232,6 +232,34 @@ const ViewUserPage = () => {
                                 value={formatPhoneDisplay(userData.mobile)}
                                 icon="feather icon-phone"
                             />
+                            {userData.salutation && (
+                                <InfoField 
+                                    label="Salutation" 
+                                    value={userData.salutation}
+                                    icon="feather icon-user"
+                                />
+                            )}
+                            {userData.company && (
+                                <InfoField 
+                                    label="Company" 
+                                    value={userData.company}
+                                    icon="feather icon-briefcase"
+                                />
+                            )}
+                            {userData.designation && (
+                                <InfoField 
+                                    label="Designation" 
+                                    value={userData.designation}
+                                    icon="feather icon-award"
+                                />
+                            )}
+                            {userData.industry && (
+                                <InfoField 
+                                    label="Industry" 
+                                    value={userData.industry}
+                                    icon="feather icon-trending-up"
+                                />
+                            )}
                         </InfoCard>
                     </Col>
 

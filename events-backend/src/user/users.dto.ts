@@ -12,7 +12,7 @@ import {
   Matches,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { AuthProvider, UserRole } from './users.entity';
+import { AuthProvider, UserRole, Industry } from './users.entity';
 import { UserEntity } from './users.entity';
 import { SingaporePhoneUtils } from '../utils/singapore-phone.utils';
 
@@ -63,8 +63,12 @@ export class UserDto {
   company?: string; // Company/Organization name
 
   @IsOptional()
+  @IsEnum(Industry)
+  industry?: Industry; // Industry sector
+
+  @IsOptional()
   @IsString()
-  industry?: string; // Industry sector
+  designation?: string; // Job designation/title
 
   @IsOptional()
   @IsBoolean()

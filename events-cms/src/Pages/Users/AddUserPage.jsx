@@ -19,6 +19,10 @@ const AddUserPage = () => {
         email: '',
         mobile: '',
         role: 'user',
+        salutation: '',
+        company: '',
+        industry: '',
+        designation: '',
         street: '',
         city: '',
         state: '',
@@ -70,6 +74,10 @@ const AddUserPage = () => {
               
                 mobile: editData.mobile || '',
                 role: editData.role || 'user',
+                salutation: editData.salutation || '',
+                company: editData.company || '',
+                industry: editData.industry || '',
+                designation: editData.designation || '',
                 street: defaultAddress.street || '',
                 city: defaultAddress.city || '',
                 state: defaultAddress.state || '',
@@ -154,6 +162,10 @@ const AddUserPage = () => {
                      
                         mobile: '',
                         role: 'user',
+                        salutation: '',
+                        company: '',
+                        industry: '',
+                        designation: '',
                         street: '',
                         city: '',
                         state: '',
@@ -291,6 +303,101 @@ const AddUserPage = () => {
                                                 <option value="admin">Admin</option>
                                                 <option value="speaker">Speaker</option>
                                                 <option value="exhibitor">Exhibitor</option>
+                                            </select>
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="salutation">
+                                                Salutation
+                                            </label>
+                                            <select
+                                                className="form-control"
+                                                name="salutation"
+                                                value={formData.salutation}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Select Salutation</option>
+                                                <option value="Mr.">Mr.</option>
+                                                <option value="Mrs.">Mrs.</option>
+                                                <option value="Miss">Miss</option>
+                                                <option value="Ms.">Ms.</option>
+                                                <option value="Dr.">Dr.</option>
+                                                <option value="Prof.">Prof.</option>
+                                            </select>
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="company">
+                                                Company
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="company"
+                                                value={formData.company}
+                                                onChange={handleChange}
+                                                placeholder="Company/Organization"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="designation">
+                                                Designation
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="designation"
+                                                value={formData.designation}
+                                                onChange={handleChange}
+                                                placeholder="Job Title/Designation"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="industry">
+                                                Industry
+                                            </label>
+                                            <select
+                                                className="form-control"
+                                                name="industry"
+                                                value={formData.industry}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">Select Industry</option>
+                                                <option value="Accounting">Accounting</option>
+                                                <option value="Administration & Office Support">Administration & Office Support</option>
+                                                <option value="Advertising, Arts & Media">Advertising, Arts & Media</option>
+                                                <option value="Banking & Financial Services">Banking & Financial Services</option>
+                                                <option value="Call Centre & Customer Service">Call Centre & Customer Service</option>
+                                                <option value="Community Services & Development">Community Services & Development</option>
+                                                <option value="Construction">Construction</option>
+                                                <option value="Consulting & Strategy">Consulting & Strategy</option>
+                                                <option value="Design & Architechture">Design & Architechture</option>
+                                                <option value="Education & Training">Education & Training</option>
+                                                <option value="Engineering">Engineering</option>
+                                                <option value="Farming, Animals & Conservation">Farming, Animals & Conservation</option>
+                                                <option value="Government & Defence">Government & Defence</option>
+                                                <option value="Healthcare & Medical">Healthcare & Medical</option>
+                                                <option value="Hospitality & Tourism">Hospitality & Tourism</option>
+                                                <option value="Human Resources & Recruitment">Human Resources & Recruitment</option>
+                                                <option value="Information & Communication Technology">Information & Communication Technology</option>
+                                                <option value="Insurance & Superannuation">Insurance & Superannuation</option>
+                                                <option value="Legal">Legal</option>
+                                                <option value="Manufacturing, Transport & Logistics">Manufacturing, Transport & Logistics</option>
+                                                <option value="Marketing & Communications">Marketing & Communications</option>
+                                                <option value="Mining, Resources & Energy">Mining, Resources & Energy</option>
+                                                <option value="Real Estate & Property">Real Estate & Property</option>
+                                                <option value="Retail & Consumer Products">Retail & Consumer Products</option>
+                                                <option value="Sales">Sales</option>
+                                                <option value="Science & Technology">Science & Technology</option>
+                                                <option value="Sport & Recreation">Sport & Recreation</option>
+                                                <option value="Trades & Services">Trades & Services</option>
+                                                <option value="Others">Others</option>
                                             </select>
                                         </div>
                                     </Col>
@@ -451,6 +558,22 @@ const AddUserPage = () => {
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="linkedinProfile">
+                                                LinkedIn Profile URL
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="linkedinProfile"
+                                                value={formData.linkedinProfile}
+                                                onChange={handleChange}
+                                                placeholder="https://linkedin.com/in/username"
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
                                             <label className="floating-label" htmlFor="profilePicture">
                                                 Profile Picture
                                             </label>
@@ -514,21 +637,6 @@ const AddUserPage = () => {
                                                         value={formData.position}
                                                         onChange={handleChange}
                                                         placeholder="Job Title/Position"
-                                                    />
-                                                </div>
-                                            </Col>
-                                            <Col sm={6}>
-                                                <div className="form-group fill">
-                                                    <label className="floating-label" htmlFor="linkedinProfile">
-                                                        LinkedIn Profile
-                                                    </label>
-                                                    <input
-                                                        type="url"
-                                                        className="form-control"
-                                                        name="linkedinProfile"
-                                                        value={formData.linkedinProfile}
-                                                        onChange={handleChange}
-                                                        placeholder="https://linkedin.com/in/username"
                                                     />
                                                 </div>
                                             </Col>
