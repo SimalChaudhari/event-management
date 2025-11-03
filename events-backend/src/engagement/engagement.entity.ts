@@ -24,6 +24,9 @@ export class Engagement {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ type: 'json', nullable: true })
+  sessionIds?: string[];
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button, Row, Col, Container } from 'react-bootstrap';
 import Select from 'react-select';
 import { createEngagement, updateEngagement, getEngagementById, getAllEngagements } from '../../store/actions/engagementActions';
-import { getAllTracks } from '../../store/actions/programmeActions';
+import { getAllTracks, getSessionsByTrack } from '../../store/actions/programmeActions';
 import { getAllEventsForFilter } from '../../store/actions/eventActions';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
@@ -16,7 +16,7 @@ const AddEngagementPage = () => {
     const isEditing = Boolean(id);
 
     const { selectedEngagement, engagements, loading } = useSelector((state) => state.engagement);
-    const { tracks } = useSelector((state) => state.programme);
+    const { tracks, trackSessions: allTrackSessions } = useSelector((state) => state.programme);
 
     const [formData, setFormData] = useState({
         isActive: true
@@ -24,10 +24,12 @@ const AddEngagementPage = () => {
 
     const [selectedEventId, setSelectedEventId] = useState('');
     const [selectedTrackId, setSelectedTrackId] = useState('');
+    const [selectedSessionIds, setSelectedSessionIds] = useState([]);
     const [events, setEvents] = useState([]);
     const [loadingEvents, setLoadingEvents] = useState(false);
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
+    const [loadingSessions, setLoadingSessions] = useState(false);
 
     useEffect(() => {
         const loadEvents = async () => {
@@ -65,11 +67,18 @@ const AddEngagementPage = () => {
             const trackId = selectedEngagement.trackId || firstTrack?.id || firstTrack?.trackId;
             const eventId = event?.id || selectedEngagement.track?.eventId || selectedEngagement.track?.event?.id;
             
+            if (eventId) {
+                setSelectedEventId(eventId);
+            }
             if (trackId) {
                 setSelectedTrackId(trackId);
             }
-            if (eventId) {
-                setSelectedEventId(eventId);
+
+            // Set session IDs if they exist - check both locations
+            if (selectedEngagement.sessionIds) {
+                setSelectedSessionIds(selectedEngagement.sessionIds);
+            } else if (firstTrack?.sessionIds) {
+                setSelectedSessionIds(firstTrack.sessionIds);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,10 +115,31 @@ const AddEngagementPage = () => {
 
     const handleTrackChange = (trackId) => {
         setSelectedTrackId(trackId || '');
+        setSelectedSessionIds([]); // Reset session selection when track changes
         if (errors.trackId) {
             setErrors(prev => ({ ...prev, trackId: '' }));
         }
+        if (errors.sessionIds) {
+            setErrors(prev => ({ ...prev, sessionIds: '' }));
+        }
     };
+
+    // Load sessions when track is selected
+    useEffect(() => {
+        const loadSessions = async () => {
+            if (selectedTrackId) {
+                setLoadingSessions(true);
+                try {
+                    await dispatch(getSessionsByTrack(selectedTrackId));
+                } catch (error) {
+                    console.error('Error loading sessions:', error);
+                } finally {
+                    setLoadingSessions(false);
+                }
+            }
+        };
+        loadSessions();
+    }, [dispatch, selectedTrackId]);
 
     const validateForm = () => {
         const newErrors = {};
@@ -120,6 +150,10 @@ const AddEngagementPage = () => {
 
         if (!selectedTrackId) {
             newErrors.trackId = 'Please select a programme track';
+        }
+
+        if (!selectedSessionIds || selectedSessionIds.length === 0) {
+            newErrors.sessionIds = 'Please select at least one session';
         }
 
         setErrors(newErrors);
@@ -138,9 +172,20 @@ const AddEngagementPage = () => {
 
         try {
             const payload = {
-                trackId: selectedTrackId,
-                ...formData
+                ...formData,
+                sessionIds: selectedSessionIds
             };
+
+            // Only include trackId for create or if it changed in edit
+            if (!isEditing) {
+                payload.trackId = selectedTrackId;
+            } else if (selectedEngagement) {
+                // Get existing trackId from either flat or nested format
+                const existingTrackId = selectedEngagement.trackId || selectedEngagement.programmeTracks?.[0]?.id || selectedEngagement.programmeTracks?.[0]?.trackId;
+                if (selectedTrackId !== existingTrackId) {
+                    payload.trackId = selectedTrackId;
+                }
+            }
 
             let result;
             if (isEditing) {
@@ -201,6 +246,17 @@ const AddEngagementPage = () => {
         .sort((a, b) => a.label.localeCompare(b.label));
 
     const selectedEventOption = eventOptions.find(option => option.value === selectedEventId);
+
+    // Get sessions for the selected track
+    const trackSessions = selectedTrackId && allTrackSessions[selectedTrackId] ? allTrackSessions[selectedTrackId] : [];
+    const sessionOptions = trackSessions
+        .map(session => ({
+            value: session.id,
+            label: `${session.title}${session.sessionDate ? ` - ${new Date(session.sessionDate).toLocaleDateString()}` : ''}`
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+    const selectedSessionOptions = sessionOptions.filter(option => selectedSessionIds.includes(option.value));
 
     return (
         <>
@@ -306,6 +362,53 @@ const AddEngagementPage = () => {
                                                     {selectedEventId 
                                                         ? "Only tracks without existing engagements are shown"
                                                         : "Select an event first to view available tracks"
+                                                    }
+                                                </small>
+                                            </div>
+                                        </Col>
+
+                                        <Col sm={12}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" 
+                                                style={{ marginTop: '-8px' }}
+                                                htmlFor="sessionIds">
+                                                    Sessions <span className="text-danger">*</span>
+                                                </label>
+                                                <Select
+                                                    options={sessionOptions}
+                                                    value={selectedSessionOptions}
+                                                    onChange={(options) => {
+                                                        const newSessionIds = options ? options.map(opt => opt.value) : [];
+                                                        setSelectedSessionIds(newSessionIds);
+                                                        if (errors.sessionIds && newSessionIds.length > 0) {
+                                                            setErrors(prev => ({ ...prev, sessionIds: '' }));
+                                                        }
+                                                    }}
+                                                    placeholder={selectedTrackId ? "Select Sessions..." : "Please select a track first"}
+                                                    isSearchable
+                                                    isMulti
+                                                    isDisabled={!selectedTrackId || loadingSessions}
+                                                    isLoading={loadingSessions}
+                                                    className={errors.sessionIds ? 'is-invalid' : ''}
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            fontSize: '14px',
+                                                            borderColor: errors.sessionIds ? '#dc3545' : base.borderColor,
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999
+                                                        })
+                                                    }}
+                                                />
+                                                {errors.sessionIds && (
+                                                    <small className="text-danger">{errors.sessionIds}</small>
+                                                )}
+                                                <small className="form-text text-muted">
+                                                    {selectedTrackId 
+                                                        ? "Select at least one session for this engagement (required)"
+                                                        : "Select a track first to view available sessions"
                                                     }
                                                 </small>
                                             </div>

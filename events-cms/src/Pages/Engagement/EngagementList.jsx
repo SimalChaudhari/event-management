@@ -318,9 +318,33 @@ const EngagementList = () => {
     };
 
     const handleDelete = (id) => {
-        const engagement = engagements.find((e) => e.id === id);
-        setEngagementToDelete(engagement);
-        setShowDeleteModal(true);
+        // Find engagement from grouped format
+        let engagement = null;
+        if (engagements && engagements.length > 0) {
+            for (const engagementGroup of engagements) {
+                if (engagementGroup.programmeTracks && engagementGroup.programmeTracks.length > 0) {
+                    const track = engagementGroup.programmeTracks.find(t => t.engagementId === id);
+                    if (track) {
+                        // Create engagement object with id and track info
+                        engagement = {
+                            id: id,
+                            track: {
+                                title: track.title,
+                                id: track.id
+                            }
+                        };
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (engagement) {
+            setEngagementToDelete(engagement);
+            setShowDeleteModal(true);
+        } else {
+            console.error('Engagement not found:', id);
+        }
     };
 
     const handleToggleStatus = async (id) => {
@@ -329,18 +353,20 @@ const EngagementList = () => {
     };
 
     const confirmDelete = async () => {
-        if (!engagementToDelete) return;
+        if (!engagementToDelete || !engagementToDelete.id) return;
 
         setIsDeleting(true);
         try {
             const result = await dispatch(deleteEngagement(engagementToDelete.id));
-            if (result.success) {
+            if (result && !result.error) {
+                // Refresh the list after successful deletion
                 await dispatch(getAllEngagements());
                 setShowDeleteModal(false);
                 setEngagementToDelete(null);
             }
         } catch (error) {
             console.error('Error deleting engagement:', error);
+            setIsDeleting(false);
         } finally {
             setIsDeleting(false);
         }
@@ -421,7 +447,7 @@ const EngagementList = () => {
                 onHide={handleCloseDeleteModal}
                 onConfirm={confirmDelete}
                 title="Delete Engagement"
-                message={`Are you sure you want to delete this engagement for track "${engagementToDelete?.track?.title}"? This action cannot be undone.`}
+                message={`Are you sure you want to delete this engagement${engagementToDelete?.track?.title ? ` for track "${engagementToDelete.track.title}"` : ''}? This action cannot be undone.`}
                 isDeleting={isDeleting}
             />
         </React.Fragment>

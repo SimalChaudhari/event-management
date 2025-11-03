@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsBoolean } from 'class-validator';
+import { IsUUID, IsOptional, IsBoolean, IsArray, IsNotEmpty } from 'class-validator';
 
 export class CreateEngagementDto {
   @IsUUID()
@@ -7,6 +7,11 @@ export class CreateEngagementDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsNotEmpty({ message: 'sessionIds is required' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  sessionIds!: string[];
 }
 
 export class UpdateEngagementDto {
@@ -17,5 +22,10 @@ export class UpdateEngagementDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsNotEmpty({ message: 'sessionIds is required' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  sessionIds!: string[];
 }
 

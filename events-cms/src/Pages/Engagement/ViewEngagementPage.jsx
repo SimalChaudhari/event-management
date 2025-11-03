@@ -106,8 +106,19 @@ const ViewEngagementPage = () => {
     const event = selectedEngagement.event || {};
     const isActive = selectedEngagement.isActive !== undefined ? selectedEngagement.isActive : true;
     
-    // Calculate total sessions across all tracks
-    const totalSessions = programmeTracks.reduce((total, track) => total + (track.sessions?.length || 0), 0);
+    // Get sessionIds from engagement (could be at root or in first track)
+    const engagementSessionIds = selectedEngagement.sessionIds || programmeTracks[0]?.sessionIds || [];
+    
+    // Filter sessions based on sessionIds if available
+    const filteredProgrammeTracks = engagementSessionIds.length > 0 
+        ? programmeTracks.map(track => ({
+            ...track,
+            sessions: track.sessions?.filter(session => engagementSessionIds.includes(session.id)) || []
+        }))
+        : programmeTracks;
+    
+    // Calculate total sessions across all tracks (only filtered sessions)
+    const totalSessions = filteredProgrammeTracks.reduce((total, track) => total + (track.sessions?.length || 0), 0);
 
     return (
         <div className="p-2 bg-light">
@@ -263,7 +274,7 @@ const ViewEngagementPage = () => {
             </InfoCard>
 
             {/* Programme Tracks with Sessions */}
-            {programmeTracks.length > 0 && programmeTracks.map((track, trackIndex) => 
+            {filteredProgrammeTracks.length > 0 && filteredProgrammeTracks.map((track, trackIndex) => 
                 track.sessions && track.sessions.length > 0 ? track.sessions.map((session, sessionIndex) => (
                     <InfoCard 
                         key={`${track.id || trackIndex}-${session.id || sessionIndex}`}

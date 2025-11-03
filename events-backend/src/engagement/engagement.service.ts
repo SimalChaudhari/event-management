@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Engagement } from './engagement.entity';
 import { CreateEngagementDto, UpdateEngagementDto } from './engagement.dto';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
@@ -49,6 +49,24 @@ export class EngagementService {
     if (existingEngagement) {
       throw new ConflictException(
         `Engagement already exists for this track.`
+      );
+    }
+
+    // Validate session IDs (now required)
+    if (!createEngagementDto.sessionIds || createEngagementDto.sessionIds.length === 0) {
+      throw new NotFoundException('At least one session ID is required');
+    }
+
+    const sessions = await this.programmeSessionRepository.find({
+      where: { trackId: createEngagementDto.trackId },
+    });
+
+    const validSessionIds = sessions.map(s => s.id);
+    const invalidSessionIds = createEngagementDto.sessionIds.filter(sessionId => !validSessionIds.includes(sessionId));
+
+    if (invalidSessionIds.length > 0) {
+      throw new NotFoundException(
+        `One or more sessions not found or do not belong to this track: ${invalidSessionIds.join(', ')}`
       );
     }
 
@@ -105,9 +123,15 @@ export class EngagementService {
   /**
    * Get session-specific statistics (questions and votes for each session)
    */
-  private async getSessionStatistics(engagementId: string, sessions: any[]): Promise<any[]> {
+  private async getSessionStatistics(engagementId: string, sessions: any[], selectedSessionIds?: string[]): Promise<any[]> {
     if (!sessions || sessions.length === 0) {
       return [];
+    }
+
+    // Filter sessions based on selectedSessionIds if provided
+    let filteredSessions = sessions;
+    if (selectedSessionIds && selectedSessionIds.length > 0) {
+      filteredSessions = sessions.filter(session => selectedSessionIds.includes(session.id));
     }
 
     // Get all questions for this engagement
@@ -131,7 +155,7 @@ export class EngagementService {
     }
 
     // Process each session
-    return Promise.all(sessions.map(async (session) => {
+    return Promise.all(filteredSessions.map(async (session) => {
       // Get session speakers
       const sessionSpeakerIds = session.speakers?.map((speaker: any) => speaker.id) || [];
       
@@ -201,7 +225,11 @@ export class EngagementService {
     const engagementsWithStats = await Promise.all(
       engagements.map(async (engagement) => {
         const statistics = await this.getEngagementStatistics(engagement.id);
-        const sessionsWithStats = await this.getSessionStatistics(engagement.id, engagement.track?.sessions || []);
+        const sessionsWithStats = await this.getSessionStatistics(
+          engagement.id, 
+          engagement.track?.sessions || [],
+          engagement.sessionIds || undefined
+        );
         
         return {
           ...engagement,
@@ -236,7 +264,11 @@ export class EngagementService {
     const engagementsWithStats = await Promise.all(
       engagements.map(async (engagement) => {
         const statistics = await this.getEngagementStatistics(engagement.id);
-        const sessionsWithStats = await this.getSessionStatistics(engagement.id, engagement.track?.sessions || []);
+        const sessionsWithStats = await this.getSessionStatistics(
+          engagement.id, 
+          engagement.track?.sessions || [],
+          engagement.sessionIds || undefined
+        );
         
         return {
           ...engagement,
@@ -291,14 +323,24 @@ export class EngagementService {
     let sessionsWithStats;
     if (sessionId) {
       // Filter to specific session only
+      // First check if sessionId is in the selected sessionIds (if any)
+      if (engagement.sessionIds && engagement.sessionIds.length > 0) {
+        if (!engagement.sessionIds.includes(sessionId)) {
+          throw new NotFoundException(`Session with ID ${sessionId} is not selected for this engagement`);
+        }
+      }
       const targetSession = engagement.track?.sessions?.find(s => s.id === sessionId);
       if (!targetSession) {
         throw new NotFoundException(`Session with ID ${sessionId} not found in this engagement`);
       }
-      sessionsWithStats = await this.getSessionStatistics(engagementId, [targetSession]);
+      sessionsWithStats = await this.getSessionStatistics(engagementId, [targetSession], engagement.sessionIds || undefined);
     } else {
-      // Get all sessions
-      sessionsWithStats = await this.getSessionStatistics(engagementId, engagement.track?.sessions || []);
+      // Get sessions based on selected sessionIds if available
+      sessionsWithStats = await this.getSessionStatistics(
+        engagementId, 
+        engagement.track?.sessions || [],
+        engagement.sessionIds || undefined
+      );
     }
 
     const engagementWithStats = {
@@ -327,7 +369,11 @@ export class EngagementService {
     }
 
     const statistics = await this.getEngagementStatistics(engagement.id);
-    const sessionsWithStats = await this.getSessionStatistics(engagement.id, engagement.track?.sessions || []);
+    const sessionsWithStats = await this.getSessionStatistics(
+      engagement.id, 
+      engagement.track?.sessions || [],
+      engagement.sessionIds || undefined
+    );
     
     const engagementWithStats = {
       ...engagement,
@@ -399,7 +445,11 @@ export class EngagementService {
     const engagementsWithStats = await Promise.all(
       engagements.map(async (engagement) => {
         const statistics = await this.getEngagementStatistics(engagement.id);
-        const sessionsWithStats = await this.getSessionStatistics(engagement.id, engagement.track?.sessions || []);
+        const sessionsWithStats = await this.getSessionStatistics(
+          engagement.id, 
+          engagement.track?.sessions || [],
+          engagement.sessionIds || undefined
+        );
         
         return {
           ...engagement,
@@ -450,17 +500,64 @@ export class EngagementService {
       }
     }
 
+    // Validate session IDs (now required)
+    if (!updateEngagementDto.sessionIds || updateEngagementDto.sessionIds.length === 0) {
+      throw new NotFoundException('At least one session ID is required');
+    }
+
+    const trackIdToValidate = updateEngagementDto.trackId || engagement.trackId;
+    const sessions = await this.programmeSessionRepository.find({
+      where: { trackId: trackIdToValidate },
+    });
+
+    const validSessionIds = sessions.map(s => s.id);
+    const invalidSessionIds = updateEngagementDto.sessionIds.filter(sessionId => !validSessionIds.includes(sessionId));
+
+    if (invalidSessionIds.length > 0) {
+      throw new NotFoundException(
+        `One or more sessions not found or do not belong to this track: ${invalidSessionIds.join(', ')}`
+      );
+    }
+
     Object.assign(engagement, updateEngagementDto);
     return await this.engagementRepository.save(engagement);
   }
 
   /**
-   * Delete an engagement
+   * Delete an engagement and all related data
    */
   async deleteEngagement(id: string): Promise<{ message: string }> {
-    const engagement = await this.getEngagementById(id);
+    const engagement = await this.engagementRepository.findOne({
+      where: { id },
+      relations: ['track', 'track.sessions'],
+    });
+
+    if (!engagement) {
+      throw new NotFoundException(`Engagement with ID ${id} not found`);
+    }
+
+    // 1. Delete all Q&A questions related to this engagement (likes and share links will be cascade deleted)
+    const questions = await this.engagementQnaQuestionRepository.find({
+      where: { engagementId: id },
+    });
+    if (questions.length > 0) {
+      await this.engagementQnaQuestionRepository.remove(questions);
+    }
+
+    // 2. Delete all polling links for sessions in this engagement
+    const sessionIds = engagement.sessionIds || [];
+    if (sessionIds.length > 0) {
+      const pollingLinks = await this.engagementPollingLinkRepository.find({
+        where: { sessionId: In(sessionIds) },
+      });
+      if (pollingLinks.length > 0) {
+        await this.engagementPollingLinkRepository.remove(pollingLinks);
+      }
+    }
+
+    // 3. Finally, delete the engagement itself
     await this.engagementRepository.remove(engagement);
-    return { message: 'Engagement deleted successfully' };
+    return { message: 'Engagement and all related data deleted successfully' };
   }
 
   /**
@@ -477,7 +574,11 @@ export class EngagementService {
     const engagementsWithStats = await Promise.all(
       engagements.map(async (engagement) => {
         const statistics = await this.getEngagementStatistics(engagement.id);
-        const sessionsWithStats = await this.getSessionStatistics(engagement.id, engagement.track?.sessions || []);
+        const sessionsWithStats = await this.getSessionStatistics(
+          engagement.id, 
+          engagement.track?.sessions || [],
+          engagement.sessionIds || undefined
+        );
         
         return {
           ...engagement,

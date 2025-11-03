@@ -318,6 +318,13 @@ export class UserUtils {
 
       const eventData = eventsMap.get(eventId);
       
+      // Filter sessions based on sessionIds if available
+      const allSessions = engagement.track?.sessions || [];
+      const sessionIds = engagement.sessionIds;
+      const filteredSessions = (sessionIds && sessionIds.length > 0)
+        ? allSessions.filter((session: any) => sessionIds.includes(session.id))
+        : allSessions;
+
       // Track with sessions
       const track = {
         id: engagement.track?.id,
@@ -325,9 +332,10 @@ export class UserUtils {
         engagementId: engagement.id,
         trackId: engagement.trackId,
         isActive: engagement.isActive,
+        sessionIds: engagement.sessionIds, // Include sessionIds
         createdAt: engagement.createdAt,
         updatedAt: engagement.updatedAt,
-        sessions: engagement.track?.sessions?.map((session: any) => ({
+        sessions: filteredSessions.map((session: any) => ({
           id: session.id,
           title: session.title,
           startDate: session.startDate,
@@ -351,8 +359,8 @@ export class UserUtils {
           },
           questions: session.questions || [],
           polling: session.polling || null
-        })) || [],
-        sessionsCount: engagement.track?.sessions?.length || 0
+        })),
+        sessionsCount: filteredSessions.length
       };
 
       eventData.programmeTracks.push(track);

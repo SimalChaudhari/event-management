@@ -12,7 +12,8 @@ import Form from 'react-bootstrap/Form';
 import InputGroup from 'react-bootstrap/InputGroup';
 import Button from 'react-bootstrap/Button';
 import * as $ from 'jquery';
-import { getAllTracks, getSessionsByTrack } from '../../store/actions/programmeActions';
+import { getAllTracks } from '../../store/actions/programmeActions';
+import { getEngagementsByTrack } from '../../store/actions/engagementActions';
 import axiosInstance from '../../configs/axiosInstance';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
@@ -43,7 +44,8 @@ const EngagementSessionsPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
-    const { tracks, trackSessions: allTrackSessions } = useSelector((state) => state.programme);
+    const { tracks } = useSelector((state) => state.programme);
+    const { trackEngagements } = useSelector((state) => state.engagement);
 
     const [trackSessions, setTrackSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -57,18 +59,40 @@ const EngagementSessionsPage = () => {
     useEffect(() => {
         dispatch(getAllTracks());
         if (trackId) {
-            dispatch(getSessionsByTrack(trackId));
+            // Use engagement API instead of programme API to get filtered sessions
+            dispatch(getEngagementsByTrack(trackId));
         }
     }, [dispatch, trackId]);
 
     useEffect(() => {
-        if (trackId && allTrackSessions[trackId]) {
-            setTrackSessions(allTrackSessions[trackId]);
-            setIsLoading(false);
-        } else if (trackId && !allTrackSessions[trackId]) {
+        if (trackId && trackEngagements && trackEngagements[trackId]) {
+            // Get engagements for this track from trackEngagements
+            const engagementsForTrack = trackEngagements[trackId];
+            
+            if (engagementsForTrack && engagementsForTrack.length > 0) {
+                // Get the first engagement (should only be one per track)
+                const engagementData = engagementsForTrack[0];
+                
+                // Extract sessions from programmeTracks
+                const programmeTracks = engagementData?.programmeTracks || [];
+                const trackData = programmeTracks.find(t => 
+                    t.trackId === trackId || t.id === trackId
+                );
+                
+                // Get filtered sessions (already filtered by backend based on sessionIds)
+                const sessions = trackData?.sessions || [];
+                
+                setTrackSessions(sessions);
+                setIsLoading(false);
+            } else {
+                // No engagement found for this track
+                setTrackSessions([]);
+                setIsLoading(false);
+            }
+        } else if (trackId) {
             setIsLoading(true);
         }
-    }, [allTrackSessions, trackId]);
+    }, [trackEngagements, trackId]);
 
     useEffect(() => {
         if (trackSessions.length >= 0 && !isLoading) {
