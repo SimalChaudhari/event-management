@@ -29,43 +29,53 @@ const EventInfoSection = ({ event, track, session }) => {
       <style>
         {`
           .event-info-wrapper {
-            display: flex;
-            flex-wrap: nowrap;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 8px;
-            justify-content: space-between;
-            overflow-x: auto;
+          }
+          .event-info-col {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 140px;
+          }
+          .event-info-item {
+            margin: 0;
+            font-size: clamp(11px, 2vw, 16px);
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
           }
           @media (max-width: 320px) {
             .event-info-wrapper {
-              flex-direction: column;
-              flex-wrap: wrap;
+              grid-template-columns: 1fr;
             }
-            .event-info-wrapper > div {
+            .event-info-col {
               min-width: 100% !important;
             }
           }
         `}
       </style>
       <div className="event-info-wrapper">
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0, minWidth: "140px" }}>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div className="event-info-col">
+          <p className="event-info-item">
             <strong>Event Title:</strong> {event?.name || 'N/A'}
           </p>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <p className="event-info-item">
             <strong>Track Title:</strong> {track?.title || 'N/A'}
           </p>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <p className="event-info-item">
             <strong>Session Title:</strong> {session?.title || 'N/A'}
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0, minWidth: "140px" }}>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div className="event-info-col">
+          <p className="event-info-item">
             <strong>Start Date:</strong> {formatDate(event?.startDate)}
           </p>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <p className="event-info-item">
             <strong>End Date:</strong> {formatDate(event?.endDate)}
           </p>
-          <p style={{ margin: 0, fontSize: "clamp(11px, 2vw, 16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <p className="event-info-item">
             <strong>Time:</strong> {formatTime(session?.startTime)} - {formatTime(session?.endTime)}
           </p>
         </div>

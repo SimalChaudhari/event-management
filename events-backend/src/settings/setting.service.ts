@@ -372,21 +372,57 @@ export class BannerEventService {
       });
 
       if (bannerEvent) {
-        // Delete previous files from upload folder
-        await this.deleteFilesFromFolder(bannerEvent.imageUrls);
+        // Append new images and hyperlinks to existing ones
+        const updatedImageUrls = [
+          ...bannerEvent.imageUrls,
+          ...createBannerEventDto.imageUrls,
+        ];
+        
+        // Merge hyperlinks arrays - pad existing hyperlinks if needed
+        let updatedHyperlinks: string[] = [];
+        if (bannerEvent.hyperlinks && bannerEvent.hyperlinks.length > 0) {
+          updatedHyperlinks = [...bannerEvent.hyperlinks];
+        } else {
+          // Initialize with empty strings if no existing hyperlinks
+          updatedHyperlinks = new Array(bannerEvent.imageUrls.length).fill('');
+        }
+        
+        // Add new hyperlinks
+        if (createBannerEventDto.hyperlinks && createBannerEventDto.hyperlinks.length > 0) {
+          updatedHyperlinks = [...updatedHyperlinks, ...createBannerEventDto.hyperlinks];
+        } else {
+          // If no hyperlinks provided for new images, add empty strings
+          updatedHyperlinks = [
+            ...updatedHyperlinks,
+            ...new Array(createBannerEventDto.imageUrls.length).fill(''),
+          ];
+        }
+        
+        // Ensure hyperlinks array matches imageUrls length
+        while (updatedHyperlinks.length < updatedImageUrls.length) {
+          updatedHyperlinks.push('');
+        }
+        updatedHyperlinks = updatedHyperlinks.slice(0, updatedImageUrls.length);
 
-        // Update existing banner
-        const updatedBannerEvent = this.bannerEventRepository.merge(
-          bannerEvent,
-          createBannerEventDto,
-        );
-        const result =
-          await this.bannerEventRepository.save(updatedBannerEvent);
-        return { message: 'Banner events updated successfully', data: result };
+        bannerEvent.imageUrls = updatedImageUrls;
+        bannerEvent.hyperlinks = updatedHyperlinks;
+        const result = await this.bannerEventRepository.save(bannerEvent);
+        return { message: 'Banner events added successfully', data: result };
       } else {
         // Create new banner if none exists
-        const newBannerEvent =
-          this.bannerEventRepository.create(createBannerEventDto);
+        // Ensure hyperlinks array matches imageUrls length
+        let hyperlinksArray = createBannerEventDto.hyperlinks || [];
+        if (hyperlinksArray.length < createBannerEventDto.imageUrls.length) {
+          while (hyperlinksArray.length < createBannerEventDto.imageUrls.length) {
+            hyperlinksArray.push('');
+          }
+        }
+        hyperlinksArray = hyperlinksArray.slice(0, createBannerEventDto.imageUrls.length);
+
+        const newBannerEvent = this.bannerEventRepository.create({
+          imageUrls: createBannerEventDto.imageUrls,
+          hyperlinks: hyperlinksArray,
+        });
         const result = await this.bannerEventRepository.save(newBannerEvent);
         return { message: 'Banner events created successfully', data: result };
       }
@@ -494,9 +530,9 @@ export class BannerEventService {
       // Delete all files from upload folder
       await this.deleteFilesFromFolder(bannerEvent.imageUrls);
 
-      // Clear the imageUrls array and hyperlink with empty values instead of null
+      // Clear the imageUrls array and hyperlinks array with empty values instead of null
       bannerEvent.imageUrls = [];
-      bannerEvent.hyperlink = '';
+      bannerEvent.hyperlinks = [];
       await this.bannerEventRepository.save(bannerEvent);
 
       return { message: 'All banner events cleared successfully' };
@@ -525,18 +561,22 @@ export class BannerEventService {
         throw new NotFoundException('No banner events found');
       }
 
-      const updatedImageUrls = bannerEvent.imageUrls.filter(
-        (url) => url !== imageUrl,
+      const imageIndex = bannerEvent.imageUrls.findIndex(
+        (url) => url === imageUrl,
       );
 
-      if (updatedImageUrls.length === bannerEvent.imageUrls.length) {
+      if (imageIndex === -1) {
         throw new NotFoundException('Image not found in banner events');
       }
 
       // Delete the specific file from upload folder
       await this.deleteFileFromFolder(imageUrl);
 
-      bannerEvent.imageUrls = updatedImageUrls;
+      // Remove image and corresponding hyperlink
+      bannerEvent.imageUrls.splice(imageIndex, 1);
+      if (bannerEvent.hyperlinks && bannerEvent.hyperlinks.length > imageIndex) {
+        bannerEvent.hyperlinks.splice(imageIndex, 1);
+      }
       const result = await this.bannerEventRepository.save(bannerEvent);
 
       return {
@@ -549,6 +589,68 @@ export class BannerEventService {
       }
       throw new InternalServerErrorException(
         'Error deleting specific banner event image',
+        error.message,
+      );
+    }
+  }
+
+  // New method to update hyperlink for a specific banner
+  async updateHyperlink(
+    imageUrl: string,
+    hyperlink: string,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      if (!imageUrl) {
+        throw new BadRequestException('Image URL is required');
+      }
+
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!bannerEvent) {
+        throw new NotFoundException('No banner events found');
+      }
+
+      // Normalize imageUrl - remove any API URL prefix if present
+      const normalizedImageUrl = imageUrl.replace(/^.*\/uploads\//, 'uploads/');
+      
+      const imageIndex = bannerEvent.imageUrls.findIndex(
+        (url) => {
+          // Compare normalized URLs
+          const normalizedUrl = url.replace(/^.*\/uploads\//, 'uploads/');
+          return normalizedUrl === normalizedImageUrl || url === imageUrl;
+        },
+      );
+
+      if (imageIndex === -1) {
+        throw new NotFoundException(`Image not found in banner events. Looking for: ${normalizedImageUrl}`);
+      }
+
+      // Initialize hyperlinks array if it doesn't exist or is too short
+      if (!bannerEvent.hyperlinks) {
+        bannerEvent.hyperlinks = new Array(bannerEvent.imageUrls.length).fill('');
+      }
+      while (bannerEvent.hyperlinks.length < bannerEvent.imageUrls.length) {
+        bannerEvent.hyperlinks.push('');
+      }
+
+      // Update the hyperlink at the specific index
+      bannerEvent.hyperlinks[imageIndex] = hyperlink || '';
+      const result = await this.bannerEventRepository.save(bannerEvent);
+
+      return {
+        message: 'Banner hyperlink updated successfully',
+        data: result,
+      };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        console.error('Error updating banner hyperlink:', error);
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error updating banner hyperlink',
         error.message,
       );
     }

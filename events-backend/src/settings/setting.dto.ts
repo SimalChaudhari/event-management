@@ -42,8 +42,9 @@ export class CreateBannerEventDto {
     readonly imageUrls!: string[];
 
     @IsOptional()
-    @IsString()
-    readonly hyperlink?: string;
+    @IsArray()
+    @IsString({ each: true })
+    readonly hyperlinks?: string[];
 }
 
 export class CreateLogoDto {

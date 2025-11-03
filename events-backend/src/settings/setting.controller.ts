@@ -8,6 +8,7 @@ import {
   Param,
   Body,
   Put,
+  Patch,
   UseInterceptors,
   UploadedFiles,
   UploadedFile,
@@ -202,13 +203,37 @@ export class BannerEventController {
   )
   async createOrUpdate(
     @UploadedFiles() files: Express.Multer.File[],
-    @Body('hyperlink') hyperlink?: string,
+    @Body('hyperlinks') hyperlinks?: string | string[],
   ): Promise<{ message: string; data: BannerEvent }> {
     const imageUrls = files.map(file => `uploads/banner-events/${file.filename}`);
     
+    // Parse hyperlinks - can be string (single) or array (multiple)
+    let hyperlinksArray: string[] | undefined;
+    if (hyperlinks) {
+      if (typeof hyperlinks === 'string') {
+        // If single string, try to parse as JSON array, otherwise make array with one element
+        try {
+          hyperlinksArray = JSON.parse(hyperlinks);
+        } catch {
+          // If not JSON, treat as single hyperlink and repeat for all images
+          hyperlinksArray = new Array(imageUrls.length).fill(hyperlinks);
+        }
+      } else if (Array.isArray(hyperlinks)) {
+        hyperlinksArray = hyperlinks;
+      }
+      // Ensure hyperlinks array matches imageUrls length
+      if (hyperlinksArray && hyperlinksArray.length !== imageUrls.length) {
+        // Pad with empty strings if shorter, trim if longer
+        while (hyperlinksArray.length < imageUrls.length) {
+          hyperlinksArray.push('');
+        }
+        hyperlinksArray = hyperlinksArray.slice(0, imageUrls.length);
+      }
+    }
+    
     const createBannerEventDto: CreateBannerEventDto = {
       imageUrls: imageUrls,
-      hyperlink: hyperlink
+      hyperlinks: hyperlinksArray
     };
     return this.bannerEventService.createOrUpdate(createBannerEventDto);
   }
@@ -223,6 +248,20 @@ export class BannerEventController {
   @Delete('delete-image')
   async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
     return this.bannerEventService.deleteSpecificImage(imageUrl);
+  }
+
+  // New API to update hyperlink for a specific banner
+  @Put('update-hyperlink')
+  async updateHyperlink(
+    @Body('imageUrl') imageUrl: string,
+    @Body('hyperlink') hyperlink?: string,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      return await this.bannerEventService.updateHyperlink(imageUrl, hyperlink || '');
+    } catch (error) {
+      console.error('Controller error updating hyperlink:', error);
+      throw error;
+    }
   }
 }
 

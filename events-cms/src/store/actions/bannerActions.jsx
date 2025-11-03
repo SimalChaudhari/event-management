@@ -84,7 +84,7 @@ export const uploadBanners = (file, hyperlink) => async dispatch => {
 };
 
 // Upload Banner Events
-export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
+export const uploadBannerEvents = (files, hyperlinks) => async (dispatch) => {
     try {
        
         const formData = new FormData();
@@ -92,9 +92,10 @@ export const uploadBannerEvents = (files, hyperlink) => async (dispatch) => {
             formData.append('images', file);
         });
         
-        // Add hyperlink to formData if provided
-        if (hyperlink) {
-            formData.append('hyperlink', hyperlink);
+        // Add hyperlinks array to formData if provided
+        if (hyperlinks && hyperlinks.length > 0) {
+            // Send as JSON string for array handling
+            formData.append('hyperlinks', JSON.stringify(hyperlinks));
         }
 
         const response = await axiosInstance.post('/banner-events', formData)
@@ -163,6 +164,47 @@ export const deleteBannerEventImage = (imageUrl) => async (dispatch) => {
         dispatch(setBannerLoading(false));
     }
     return false;
+};
+
+// Update Banner Event Hyperlink
+export const updateBannerEventHyperlink = (imageUrl, hyperlink) => async (dispatch) => {
+    try {
+        dispatch(setBannerLoading(true));
+        
+        console.log('Updating hyperlink:', { imageUrl, hyperlink });
+        
+        const response = await axiosInstance.put('/banner-events/update-hyperlink', {
+            imageUrl,
+            hyperlink: hyperlink || ''
+        });
+        
+        console.log('Hyperlink update response:', response.data);
+        
+        dispatch({
+            type: GET_BANNER_EVENTS,
+            payload: response.data.data,
+        });
+        
+        toast.success(response.data.message || 'Hyperlink updated successfully!');
+        return true;
+    } catch (error) {
+        console.error('Error updating hyperlink:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            response: error?.response,
+            request: error?.request,
+            config: error?.config
+        });
+        
+        const errorMessage = error?.response?.data?.message 
+            || error?.message 
+            || 'Failed to update hyperlink';
+        dispatch(setBannerError(errorMessage));
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        dispatch(setBannerLoading(false));
+    }
 };
 
 // Clear All Banners

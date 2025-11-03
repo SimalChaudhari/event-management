@@ -10,7 +10,8 @@ import {
     deleteBannerImage,
     deleteBannerEventImage,
     clearAllBanners,
-    clearAllBannerEvents
+    clearAllBannerEvents,
+    updateBannerEventHyperlink
 } from '../../../store/actions/bannerActions';
 
 const BannerManagement = () => {
@@ -26,8 +27,12 @@ const BannerManagement = () => {
     const [clearType, setClearType] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteItem, setDeleteItem] = useState(null);
-    // New state for hyperlink
-    const [hyperlink, setHyperlink] = useState('');
+    // State for hyperlinks - single for home, array for events
+    const [hyperlink, setHyperlink] = useState(''); // For home banner
+    const [hyperlinks, setHyperlinks] = useState([]); // For event banners - array of hyperlinks
+    // State for editing hyperlinks
+    const [editingHyperlink, setEditingHyperlink] = useState(null);
+    const [tempHyperlink, setTempHyperlink] = useState('');
 
     // Load data on component mount
     useEffect(() => {
@@ -41,7 +46,10 @@ const BannerManagement = () => {
         if (bannerType === 'home') {
             setSelectedFiles([files[0]]);
         } else {
-            setSelectedFiles(prev => [...prev, ...files]);
+            const newFiles = [...selectedFiles, ...files];
+            setSelectedFiles(newFiles);
+            // Initialize hyperlinks array to match files length
+            setHyperlinks(prev => [...prev, ...new Array(files.length).fill('')]);
         }
     };
 
@@ -66,13 +74,19 @@ const BannerManagement = () => {
             if (bannerType === 'home') {
                 setSelectedFiles([files[0]]);
             } else {
-                setSelectedFiles(prev => [...prev, ...files]);
+                const newFiles = [...selectedFiles, ...files];
+                setSelectedFiles(newFiles);
+                // Initialize hyperlinks array to match files length
+                setHyperlinks(prev => [...prev, ...new Array(files.length).fill('')]);
             }
         }
     };
 
     const removeFile = (index) => {
         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+        if (bannerType === 'event') {
+            setHyperlinks(prev => prev.filter((_, i) => i !== index));
+        }
     };
 
     const handleImageClick = (imageUrl, filename) => {
@@ -93,12 +107,13 @@ const BannerManagement = () => {
         }
 
         const success = bannerType === 'event' 
-            ? await dispatch(uploadBannerEvents(selectedFiles, hyperlink))
+            ? await dispatch(uploadBannerEvents(selectedFiles, hyperlinks))
             : await dispatch(uploadBanners(selectedFiles[0], hyperlink));
 
         if (success) {
             setSelectedFiles([]);
             setHyperlink('');
+            setHyperlinks([]);
             setBannerType('event');
             dispatch(getBanners());
             dispatch(getBannerEvents());
@@ -149,6 +164,29 @@ const BannerManagement = () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const handleEditHyperlink = (imageUrl, currentHyperlink) => {
+        setEditingHyperlink(imageUrl);
+        setTempHyperlink(currentHyperlink || '');
+    };
+
+    const handleSaveHyperlink = async (imageUrl) => {
+        if (editingHyperlink === imageUrl) {
+            // Ensure we send the relative path (remove API URL prefix if present)
+            const normalizedImageUrl = imageUrl.replace(/^.*\/uploads\//, 'uploads/');
+            const success = await dispatch(updateBannerEventHyperlink(normalizedImageUrl, tempHyperlink));
+            if (success) {
+                setEditingHyperlink(null);
+                setTempHyperlink('');
+                dispatch(getBannerEvents());
+            }
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingHyperlink(null);
+        setTempHyperlink('');
+    };
+
     const renderBannerCard = (banner, type) => (
         <Col key={banner.id} md={4} lg={3} className="mb-4">
             <Card className="h-100 shadow-sm border-0 banner-card">
@@ -181,14 +219,115 @@ const BannerManagement = () => {
                     <Card.Text className="text-muted small mb-2 text-truncate">
                         {banner.filename || 'Banner Image'}
                     </Card.Text>
-                    {banner.hyperlink && (
-                        <Card.Text className="text-muted small mb-2">
-                            <i className="fas fa-link me-1"></i>
-                            <a href={banner.hyperlink} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                    
+                    {/* Editable Hyperlink Section */}
+                    {type === 'event' ? (
+                        <div className="mb-2 p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+                            {editingHyperlink === banner.imageUrl ? (
+                                <div className="d-flex flex-column gap-2">
+                                    <Form.Label className="small fw-bold mb-0 d-flex align-items-center">
+                                        <i className="fas fa-link text-primary" style={{ marginRight: '6px' }}></i>
+                                        Hyperlink URL
+                                    </Form.Label>
+                                    <Form.Control
+                                        type="url"
+                                        size="sm"
+                                        placeholder="https://example.com"
+                                        value={tempHyperlink}
+                                        onChange={(e) => setTempHyperlink(e.target.value)}
+                                        className="border-primary"
+                                    />
+                                    <Form.Text className="text-muted small mb-0 d-flex align-items-center">
+                                        <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
+                                        This link will open when the banner is clicked
+                                    </Form.Text>
+                                    <div className="d-flex gap-2 mt-1">
+                                        <Button
+                                            variant="success"
+                                            size="sm"
+                                            onClick={() => handleSaveHyperlink(banner.imageUrl)}
+                                            disabled={loading}
+                                            className="flex-fill"
+                                        >
+                                            <i className="fas fa-check" style={{ marginRight: '8px' }}></i>
+                                            Save Link
+                                        </Button>
+                                        <Button
+                                            variant="outline-secondary"
+                                            size="sm"
+                                            onClick={handleCancelEdit}
+                                            className="flex-fill"
+                                        >
+                                            <i className="fas fa-times" style={{ marginRight: '8px' }}></i>
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="d-flex flex-column gap-2">
+                                    <div className="d-flex align-items-center justify-content-between">
+                                        <Form.Label className="small fw-bold mb-0 d-flex align-items-center">
+                                            <i className="fas fa-link" style={{ marginRight: '6px' }}></i>
+                                            Hyperlink
+                                        </Form.Label>
+                                        {banner.hyperlink ? (
+                                            <Button
+                                                variant="outline-primary"
+                                                size="sm"
+                                                onClick={() => handleEditHyperlink(banner.imageUrl, banner.hyperlink)}
+                                                title="Edit hyperlink"
+                                            >
+                                                <i className="fas fa-edit" style={{ marginRight: '8px' }}></i>
+                                                Edit
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                variant="outline-success"
+                                                size="sm"
+                                                onClick={() => handleEditHyperlink(banner.imageUrl, '')}
+                                                title="Add hyperlink"
+                                            >
+                                                <i className="fas fa-plus" style={{ marginRight: '8px' }}></i>
+                                                Add Link
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {banner.hyperlink ? (
+                                        <div className="p-2 bg-white rounded border">
+                                            <a 
+                                                href={banner.hyperlink} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="text-decoration-none text-primary small d-flex align-items-center"
+                                                title={banner.hyperlink}
+                                            >
+                                                <i className="fas fa-external-link-alt" style={{ marginRight: '8px' }}></i>
+                                                <span className="text-truncate">{banner.hyperlink}</span>
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <div className="p-2 bg-light rounded text-muted small text-center">
+                                            <i className="fas fa-link-slash" style={{ marginRight: '6px' }}></i>
+                                            No hyperlink set
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        // Home banner - simple display
+                        banner.hyperlink && (
+                            <div className="mb-2 p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                                <Card.Text className="text-muted small mb-0">
+                                    <i className="fas fa-link" style={{ marginRight: '6px' }}></i>
+                                    <a href={banner.hyperlink} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
                                 {banner.hyperlink}
                             </a>
                         </Card.Text>
+                            </div>
+                        )
                     )}
+                    
                     <Button
                         variant="outline-danger"
                         size="sm"
@@ -244,6 +383,7 @@ const BannerManagement = () => {
                                         onClick={() => {
                                             setBannerType('event');
                                             setSelectedFiles([]);
+                                            setHyperlinks([]);
                                         }}
                                     >
                                         <div className="banner-type-icon">
@@ -265,6 +405,7 @@ const BannerManagement = () => {
                                         onClick={() => {
                                             setBannerType('home');
                                             setSelectedFiles([]);
+                                            setHyperlinks([]);
                                         }}
                                     >
                                         <div className="banner-type-icon">
@@ -291,7 +432,8 @@ const BannerManagement = () => {
                                     {bannerType === 'home' ? 'Select Image :' : 'Select Images :'}
                                 </label>
                                 
-                                {/* Hyperlink Field */}
+                                {/* Hyperlink Field - Only for Home Banner */}
+                                {bannerType === 'home' && (
                                 <div className="mb-3">
                                     <Form.Group>
                                         <Form.Label className="fw-bold">Hyperlink (Optional) :</Form.Label>
@@ -307,6 +449,7 @@ const BannerManagement = () => {
                                         </Form.Text>
                                     </Form.Group>
                                 </div>
+                                )}
                                 
                                 {/* Drag & Drop Zone */}
                                 <div 
@@ -357,7 +500,12 @@ const BannerManagement = () => {
                                                 <Button
                                                     variant="outline-danger"
                                                     size="sm"
-                                                    onClick={() => setSelectedFiles([])}
+                                                    onClick={() => {
+                                                        setSelectedFiles([]);
+                                                        if (bannerType === 'event') {
+                                                            setHyperlinks([]);
+                                                        }
+                                                    }}
                                                 >
                                                     <i className="fas fa-times me-1" style={{ marginRight: '4px' }}></i>
                                                     Clear All
@@ -376,6 +524,30 @@ const BannerManagement = () => {
                                                             <div className="file-name">{file.name}</div>
                                                             <div className="file-size">{formatFileSize(file.size)}</div>
                                                         </div>
+                                                        {/* Hyperlink input for event banners */}
+                                                        {bannerType === 'event' && (
+                                                            <div className="file-hyperlink-input">
+                                                                <Form.Label className="small fw-bold mb-1 d-flex align-items-center">
+                                                                    <i className="fas fa-link" style={{ marginRight: '6px' }}></i>
+                                                                    Hyperlink (Optional)
+                                                                </Form.Label>
+                                                                <Form.Control
+                                                                    type="url"
+                                                                    size="sm"
+                                                                    placeholder="https://example.com"
+                                                                    value={hyperlinks[index] || ''}
+                                                                    onChange={(e) => {
+                                                                        const newHyperlinks = [...hyperlinks];
+                                                                        newHyperlinks[index] = e.target.value;
+                                                                        setHyperlinks(newHyperlinks);
+                                                                    }}
+                                                                    className="mt-1"
+                                                                />
+                                                                <Form.Text className="text-muted small">
+                                                                    Link opens when banner is clicked
+                                                                </Form.Text>
+                                                            </div>
+                                                        )}
                                                         <Button
                                                             variant="outline-danger"
                                                             size="sm"
@@ -478,7 +650,9 @@ const BannerManagement = () => {
                                     id: index, 
                                     imageUrl, 
                                     filename: `Event Banner ${index + 1}`,
-                                    hyperlink: bannerEvents.hyperlink
+                                    hyperlink: bannerEvents.hyperlinks && bannerEvents.hyperlinks[index] 
+                                        ? bannerEvents.hyperlinks[index] 
+                                        : undefined
                                 }, 'event')
                             )}
                         </Row>
@@ -531,52 +705,87 @@ const BannerManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Image Zoom Modal */}
+            {/* Image Zoom Modal - Event Images Style */}
             <Modal 
                 show={showImageModal} 
                 onHide={() => setShowImageModal(false)}
-                size="lg"
+                size="xl"
                 centered
+                contentClassName="bg-dark border-0"
             >
-                <Modal.Header>
-                    <Modal.Title>
-                        <i className="fas fa-image me-2"></i>
-                        {selectedImage?.filename}
-                    </Modal.Title>
-                    {/* Custom Close Button */}
-                    <button
-                        type="button"
-                        className="custom-close-btn"
-                        aria-label="Close"
+                <Modal.Body className="p-0 position-relative" style={{ minHeight: '90vh', backgroundColor: 'rgba(0,0,0,0.95)' }}>
+                    {/* Close Button */}
+                    <Button
+                        variant="light"
+                        size="sm"
                         onClick={() => setShowImageModal(false)}
+                        className="position-fixed"
                         style={{
-                            background: 'none',
+                            top: '20px',
+                            right: '20px',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
                             border: 'none',
-                            fontSize: '1.8rem',
-                            fontWeight: 'bold',
-                            color: '#333',
-                            position: 'absolute',
-                            top: '16px',
-                            right: '24px',
-                            cursor: 'pointer',
-                            zIndex: 10
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
                     >
-                        &times;
-                    </button>
-                </Modal.Header>
-                <Modal.Body className="text-center p-0">
+                        <i className="fas fa-times"></i>
+                    </Button>
+
+                    {/* Image Container */}
+                    <div
+                        className="d-flex justify-content-center align-items-center"
+                        style={{
+                            minHeight: '90vh',
+                            padding: '60px 80px 80px 80px'
+                        }}
+                    >
                     {selectedImage && (
                         <img 
                             src={`${process.env.REACT_APP_API_URL}/${selectedImage.imageUrl}`} 
                             alt={selectedImage.filename}
                             style={{ 
-                                width: '100%', 
-                                height: 'auto',
-                                maxHeight: '70vh',
-                                objectFit: 'contain'
+                                    maxWidth: '100%',
+                                    maxHeight: 'calc(100vh - 160px)',
+                                    objectFit: 'contain',
+                                    borderRadius: '8px',
+                                    background: 'white',
+                                    padding: '20px',
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                                }}
+                                onError={(e) => {
+                                    console.error('Banner image failed to load:', selectedImage.imageUrl);
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        )}
+                    </div>
+
+                    {/* Image Info Footer */}
+                    {selectedImage && (
+                        <div
+                            className="position-fixed text-white text-center"
+                            style={{
+                                bottom: '20px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                padding: '8px 20px',
+                                borderRadius: '20px',
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                zIndex: 1000
                             }}
-                        />
+                        >
+                            <i className="fas fa-image" style={{ marginRight: '8px' }}></i>
+                            {selectedImage.filename || 'Banner Image'}
+                        </div>
                     )}
                 </Modal.Body>
             </Modal>
@@ -894,6 +1103,28 @@ const BannerManagement = () => {
                 .file-size {
                     font-size: 11px;
                     color: #6c757d;
+                }
+
+                .file-hyperlink-input {
+                    padding: 8px 12px;
+                    background-color: #f8f9fa;
+                    border-top: 1px solid #dee2e6;
+                }
+
+                .file-hyperlink-input .form-control {
+                    font-size: 12px;
+                    padding: 6px 10px;
+                    border-radius: 6px;
+                }
+
+                .file-hyperlink-input label {
+                    color: #495057;
+                    font-size: 12px;
+                }
+
+                .file-hyperlink-input .form-text {
+                    font-size: 11px;
+                    margin-top: 4px;
                 }
 
                 .file-remove {

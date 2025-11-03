@@ -59,8 +59,8 @@ export class BannerEvent {
     @Column('simple-array')
     imageUrls!: string[]; // Array of image URLs
 
-    @Column('text', { nullable: true })
-    hyperlink?: string; // Single optional hyperlink
+    @Column('simple-array', { nullable: true })
+    hyperlinks?: string[]; // Array of hyperlinks, one per image
 
     @CreateDateColumn()
     createdAt!: Date;
