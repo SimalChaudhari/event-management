@@ -128,10 +128,10 @@ export class EngagementService {
       return [];
     }
 
-    // Filter sessions based on selectedSessionIds if provided
+    // Filter sessions based on selectedSessionIds if provided (show all sessions - active and inactive)
     let filteredSessions = sessions;
     if (selectedSessionIds && selectedSessionIds.length > 0) {
-      filteredSessions = sessions.filter(session => selectedSessionIds.includes(session.id));
+      filteredSessions = filteredSessions.filter(session => selectedSessionIds.includes(session.id));
     }
 
     // Get all questions for this engagement
@@ -242,18 +242,21 @@ export class EngagementService {
       })
     );
 
-    return UserUtils.formatEngagements(engagementsWithStats);
+    return UserUtils.formatEngagements(engagementsWithStats, false); // Admin can see all
   }
 
   /**
-   * Get all engagements for a specific event
+   * Get all engagements for a specific event (Public/User-facing)
    * Returns an object instead of array for consistency
+   * Filters out inactive tracks and inactive sessions for regular users
    */
   async getEngagementsByEvent(eventId: string): Promise<any> {
     const engagements = await this.engagementRepository.find({
       where: { 
+        isActive: true, // Only get active engagements for user-facing API
         track: { 
-          event: { id: eventId } 
+          event: { id: eventId },
+          isActive: true // Only get active tracks for user-facing API
         } 
       },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
@@ -281,7 +284,8 @@ export class EngagementService {
       })
     );
 
-    const formattedArray = UserUtils.formatEngagements(engagementsWithStats);
+    // Pass isUserFacing=true to filter inactive tracks and sessions for users
+    const formattedArray = UserUtils.formatEngagements(engagementsWithStats, true);
     
     // Convert array to object (return first element or empty object structure)
     if (formattedArray && formattedArray.length > 0) {
@@ -352,7 +356,7 @@ export class EngagementService {
       }
     };
 
-    return UserUtils.formatEngagements([engagementWithStats])[0];
+    return UserUtils.formatEngagements([engagementWithStats], false)[0]; // Admin/Moderator can see all
   }
 
   /**
@@ -384,7 +388,7 @@ export class EngagementService {
       }
     };
 
-    const formatted = UserUtils.formatEngagements([engagementWithStats]);
+    const formatted = UserUtils.formatEngagements([engagementWithStats], false); // Admin can see all
     return formatted[0];
   }
 
@@ -462,7 +466,7 @@ export class EngagementService {
       })
     );
 
-    return UserUtils.formatEngagements(engagementsWithStats);
+    return UserUtils.formatEngagements(engagementsWithStats, false); // Admin/Moderator can see all
   }
 
   /**
@@ -591,7 +595,8 @@ export class EngagementService {
       })
     );
 
-    return UserUtils.formatEngagements(engagementsWithStats);
+    // Pass isUserFacing=true to filter inactive tracks and sessions for users
+    return UserUtils.formatEngagements(engagementsWithStats, true);
   }
 
   /**
@@ -608,6 +613,22 @@ export class EngagementService {
     
     engagement.isActive = !engagement.isActive;
     return await this.engagementRepository.save(engagement);
+  }
+
+  /**
+   * Toggle engagement session active status
+   */
+  async toggleEngagementSessionStatus(sessionId: string): Promise<ProgrammeSession> {
+    const session = await this.programmeSessionRepository.findOne({
+      where: { id: sessionId },
+    });
+    
+    if (!session) {
+      throw new NotFoundException(`Session with ID ${sessionId} not found`);
+    }
+    
+    session.isActive = !session.isActive;
+    return await this.programmeSessionRepository.save(session);
   }
 
 }

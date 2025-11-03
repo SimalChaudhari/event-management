@@ -13,7 +13,7 @@ import InputGroup from 'react-bootstrap/InputGroup';
 import Button from 'react-bootstrap/Button';
 import * as $ from 'jquery';
 import { getAllTracks } from '../../store/actions/programmeActions';
-import { getEngagementsByTrack } from '../../store/actions/engagementActions';
+import { getEngagementsByTrack, toggleEngagementSessionStatus } from '../../store/actions/engagementActions';
 import axiosInstance from '../../configs/axiosInstance';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
@@ -94,6 +94,68 @@ const EngagementSessionsPage = () => {
         }
     }, [trackEngagements, trackId]);
 
+    const handleToggleSessionStatus = React.useCallback(async (sessionId, session) => {
+        try {
+            const currentIsActive = session.isActive !== undefined ? session.isActive : true;
+            const newIsActive = !currentIsActive;
+            
+            // Optimistic update - update local state and DataTable immediately
+            setTrackSessions(prevSessions => 
+                prevSessions.map(s => 
+                    s.id === sessionId ? { ...s, isActive: newIsActive } : s
+                )
+            );
+            
+            // Update DataTable directly
+            setTimeout(() => {
+                const dt = $('#engagement-sessions-table').DataTable();
+                if (dt) {
+                    dt.rows().every(function() {
+                        const rowData = this.data();
+                        if (rowData && rowData.id === sessionId) {
+                            const updatedData = { ...rowData, isActive: newIsActive };
+                            this.data(updatedData);
+                            return false; // Stop iteration
+                        }
+                        return true;
+                    });
+                    dt.draw(false);
+                }
+            }, 0);
+            
+            // Call engagement session toggle API - only one API call
+            const result = await dispatch(toggleEngagementSessionStatus(sessionId));
+            if (result && !result.error) {
+                // Success message already shown by action
+            } else {
+                // Revert on error
+                setTrackSessions(prevSessions => 
+                    prevSessions.map(s => 
+                        s.id === sessionId ? { ...s, isActive: currentIsActive } : s
+                    )
+                );
+                setTimeout(() => {
+                    const dt = $('#engagement-sessions-table').DataTable();
+                    if (dt) {
+                        dt.rows().every(function() {
+                            const rowData = this.data();
+                            if (rowData && rowData.id === sessionId) {
+                                this.data(session);
+                                return false;
+                            }
+                            return true;
+                        });
+                        dt.draw(false);
+                    }
+                }, 0);
+                toast.error('Failed to toggle session status');
+            }
+        } catch (error) {
+            console.error('Error toggling session status:', error);
+            toast.error('Failed to toggle session status');
+        }
+    }, [dispatch]);
+
     useEffect(() => {
         if (trackSessions.length >= 0 && !isLoading) {
             setTimeout(() => {
@@ -140,11 +202,12 @@ const EngagementSessionsPage = () => {
                             }
                         },
                         {
-                            data: 'sessionDate',
+                            data: null,
                             title: 'Date & Time',
                             render: function (data, type, row) {
-                                const dateStr = data ? formatDate(data) : 'N/A';
-                                const timeStr = row.startTime && row.endTime 
+                                // Use startDate for the date display
+                                const dateStr = row.startDate ? formatDate(row.startDate) : 'N/A';
+                                const timeStr = (row.startTime && row.endTime) 
                                     ? `${formatTime(row.startTime)} - ${formatTime(row.endTime)}`
                                     : 'N/A';
                                 return `
@@ -156,10 +219,25 @@ const EngagementSessionsPage = () => {
                             }
                         },
                         {
-                            data: 'createdAt',
-                            title: 'Created Date',
-                            render: function (data) {
-                                return data ? formatDate(data) : 'N/A';
+                            data: null,
+                            title: 'Status',
+                            className: 'text-center',
+                            width: '15%',
+                            orderable: false,
+                            render: function (data, type, row) {
+                                // Check isActive from row data
+                                const isActive = (row.isActive !== undefined && row.isActive !== null) ? row.isActive : true;
+                                const badgeClass = isActive ? 'badge-light-success' : 'badge-light-secondary';
+                                const statusText = isActive ? 'Active' : 'Inactive';
+                                const iconClass = isActive ? 'icon-check-circle' : 'icon-x-circle';
+                                
+                                return `
+                                    <span class="badge ${badgeClass} toggle-session-status-badge" data-id="${row.id}" 
+                                          style="cursor: pointer; font-size: 13px; padding: 6px 16px; min-width: 90px;" 
+                                          title="Click to toggle status">
+                                        <i class="feather ${iconClass}" style="margin-right: 4px;"></i>${statusText}
+                                    </span>
+                                `;
                             }
                         },
                         {
@@ -190,12 +268,12 @@ const EngagementSessionsPage = () => {
                     console.log(sessionId);
                     const session = trackSessions.find((s) => s.id === sessionId);
                     if (session) {
-                        // Navigate to common programme session view for detailed view
+                        // Navigate to engagement session view page (dedicated page for engagement)
                         const eventId = session.track && session.track.eventId ? session.track.eventId : (session.track && session.track.event && session.track.event.id);
                         if (eventId) {
-                            navigate(`/programme/view-session/${session.id}?eventId=${eventId}`);
+                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${session.id}?eventId=${eventId}`);
                         } else {
-                            navigate(`/programme/view-session/${session.id}`);
+                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${session.id}`);
                         }
                     }
                 });
@@ -227,6 +305,14 @@ const EngagementSessionsPage = () => {
                     setShowPollingModal(true);
                 });
 
+                $(document).off('click', '.toggle-session-status-badge').on('click', '.toggle-session-status-badge', function () {
+                    const sessionId = $(this).data('id');
+                    const session = trackSessions.find((s) => s.id === sessionId);
+                    if (session) {
+                        handleToggleSessionStatus(sessionId, session);
+                    }
+                });
+
             }, 100);
         }
 
@@ -235,7 +321,7 @@ const EngagementSessionsPage = () => {
                 $('#engagement-sessions-table').DataTable().destroy();
             }
         };
-    }, [trackSessions, navigate, isLoading]);
+    }, [trackSessions, navigate, isLoading, handleToggleSessionStatus]);
 
     const handleBack = () => {
         navigate(-1);
@@ -314,7 +400,7 @@ const EngagementSessionsPage = () => {
                                         <tr>
                                             <th>Session</th>
                                             <th>Date & Time</th>
-                                            <th>Created Date</th>
+                                            <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>

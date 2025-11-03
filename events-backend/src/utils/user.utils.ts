@@ -280,9 +280,10 @@ export class UserUtils {
   /**
    * Format engagements with minimal essential data
    * @param engagements Engagements array with track relations
+   * @param isUserFacing If true, filter out inactive tracks and inactive sessions for regular users
    * @returns Formatted engagements with only required fields
    */
-  static formatEngagements(engagements: any[]): any[] {
+  static formatEngagements(engagements: any[], isUserFacing: boolean = false): any[] {
     if (!engagements || !Array.isArray(engagements)) {
       return [];
     }
@@ -293,6 +294,14 @@ export class UserUtils {
     engagements.forEach(engagement => {
       const eventId = engagement.track?.event?.id;
       if (!eventId) return;
+
+      // For user-facing APIs: Skip inactive engagements and inactive tracks
+      if (isUserFacing) {
+        // Skip if engagement is not active (false, null, or undefined)
+        if (engagement.isActive !== true) return;
+        // Skip if track is not active (false, null, or undefined)
+        if (engagement.track?.isActive !== true) return;
+      }
 
       if (!eventsMap.has(eventId)) {
         eventsMap.set(eventId, {
@@ -321,9 +330,14 @@ export class UserUtils {
       // Filter sessions based on sessionIds if available
       const allSessions = engagement.track?.sessions || [];
       const sessionIds = engagement.sessionIds;
-      const filteredSessions = (sessionIds && sessionIds.length > 0)
+      let filteredSessions = (sessionIds && sessionIds.length > 0)
         ? allSessions.filter((session: any) => sessionIds.includes(session.id))
         : allSessions;
+
+      // For user-facing APIs: Filter out inactive sessions
+      if (isUserFacing) {
+        filteredSessions = filteredSessions.filter((session: any) => session.isActive === true);
+      }
 
       // Track with sessions
       const track = {
@@ -338,7 +352,7 @@ export class UserUtils {
         sessions: filteredSessions.map((session: any) => ({
           id: session.id,
           title: session.title,
-          startDate: session.startDate,
+          startDate: session.startDate || session.sessionDate,
           startTime: session.startTime,
           endDate: session.endDate,
           endTime: session.endTime,
@@ -350,6 +364,7 @@ export class UserUtils {
             profilePicture: speaker.profilePicture || '',
             description: speaker.speakerProfile?.description || ''
           })) || [],
+          isActive: session.isActive !== undefined ? session.isActive : true,
           statistics: session.statistics || {
             questionsCount: 0,
             answeredQuestionsCount: 0,
@@ -395,7 +410,8 @@ export class UserUtils {
   static async getEngagementsByEventId(
     eventId: string,
     eventRepository: any,
-    engagementRepository: any
+    engagementRepository: any,
+    isUserFacing: boolean = true // Default to true for user-facing APIs
   ): Promise<any> {
     try {
       // Get all programme tracks for this event
@@ -419,17 +435,40 @@ export class UserUtils {
         };
       }
 
-      // Get all track IDs
-      const trackIds = event.programmeTracks.map((track: any) => track.id);
+      // Get all track IDs - filter active tracks if user-facing
+      let trackIds = event.programmeTracks.map((track: any) => track.id);
+      if (isUserFacing) {
+        trackIds = event.programmeTracks
+          .filter((track: any) => track.isActive === true)
+          .map((track: any) => track.id);
+      }
+
+      // Build where condition
+      let whereCondition: any[];
+      if (isUserFacing) {
+        // For user-facing: only active engagements
+        whereCondition = trackIds.map((trackId: string) => ({ 
+          trackId, 
+          isActive: true
+        }));
+      } else {
+        // For admin: all engagements
+        whereCondition = trackIds.map((trackId: string) => ({ trackId }));
+      }
 
       // Fetch all engagements for these tracks
-      const engagements = await engagementRepository.find({
-        where: trackIds.map((trackId: string) => ({ trackId, isActive: true })),
+      let engagements = await engagementRepository.find({
+        where: whereCondition,
         relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
       });
 
-      // Format engagements as array first
-      const formattedArray = this.formatEngagements(engagements);
+      // Filter out inactive tracks if user-facing (TypeORM doesn't support nested where easily)
+      if (isUserFacing) {
+        engagements = engagements.filter((engagement: any) => engagement.track?.isActive === true);
+      }
+
+      // Format engagements as array first - pass isUserFacing parameter
+      const formattedArray = this.formatEngagements(engagements, isUserFacing);
       
       // Convert array to object (return first element or empty object structure)
       if (formattedArray && formattedArray.length > 0) {

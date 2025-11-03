@@ -220,8 +220,8 @@ export class FavoriteEventService {
         // Format programme tracks with basic speaker info using utility
         const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(favorite.event?.programmeTracks || []);
 
-        // Get engagements for this event
-        const engagements = await UserUtils.getEngagementsByEventId(favorite.eventId, this.eventRepository, this.engagementRepository);
+        // Get engagements for this event - pass isUserFacing=true for user-facing API
+        const engagements = await UserUtils.getEngagementsByEventId(favorite.eventId, this.eventRepository, this.engagementRepository, true);
 
         return {
           id: favorite.id,

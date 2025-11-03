@@ -88,6 +88,19 @@ const breadcrumbNavigation = {
                         { id: 'edit-gallery', title: 'Edit Gallery', type: 'item', url: '/events/gallery/edit' },
                         { id: 'view-gallery', title: 'View Gallery', type: 'item', url: '/events/gallery/view/:id' }
                     ]
+                },
+                {
+                    id: 'engagement-dynamic',
+                    title: 'Engagement',
+                    type: 'collapse',
+                    children: [
+                        { id: 'list-engagement', title: 'Engagement List', type: 'item', url: '/engagements' },
+                        { id: 'add-engagement', title: 'Add Engagement', type: 'item', url: '/engagements/add' },
+                        { id: 'edit-engagement', title: 'Edit Engagement', type: 'item', url: '/engagements/edit/:id' },
+                        { id: 'view-engagement', title: 'View Engagement', type: 'item', url: '/engagements/view/:id' },
+                        { id: 'engagement-sessions', title: 'Engagement Sessions', type: 'item', url: '/engagements/sessions/:trackId' },
+                        { id: 'view-engagement-session', title: 'View Engagement Session', type: 'item', url: '/engagements/view-session/:id' }
+                    ]
                 }
             ]
         }

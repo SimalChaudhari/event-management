@@ -156,7 +156,7 @@ const chartData = {
                     url: '/programme'
                 },
                 {
-                    id: 'engagement',
+                    id: 'engagements',
                     title: 'Engagement',
                     type: 'item',
                     // icon: 'feather icon-users',

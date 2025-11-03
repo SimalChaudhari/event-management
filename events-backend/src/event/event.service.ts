@@ -365,8 +365,8 @@ export class EventService {
           // Format programme tracks with basic speaker info using utility
           const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
          
-          // Get engagements for this event
-          const engagements = await UserUtils.getEngagementsByEventId(event.id, this.eventRepository, this.engagementRepository);
+          // Get engagements for this event - pass isUserFacing=true for user-facing API
+          const engagements = await UserUtils.getEngagementsByEventId(event.id, this.eventRepository, this.engagementRepository, true);
 
           // Build the complete event object
           const completeEvent = {
@@ -613,8 +613,8 @@ export class EventService {
       // Format programme tracks with basic speaker info using utility
       const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
 
-      // Get engagements for this event
-      const engagements = await UserUtils.getEngagementsByEventId(id, this.eventRepository, this.engagementRepository);
+      // Get engagements for this event - pass isUserFacing=true for user-facing API
+      const engagements = await UserUtils.getEngagementsByEventId(id, this.eventRepository, this.engagementRepository, true);
 
       const eventResponse = {
         ...eventFilteredData,

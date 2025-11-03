@@ -273,6 +273,31 @@ export class EngagementController {
   }
 
   /**
+   * Toggle engagement session active status
+   */
+  @Put('sessions/:sessionId/toggle-status')
+  @Roles(UserRole.Admin)
+  async toggleEngagementSessionStatus(
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const session = await this.engagementService.toggleEngagementSessionStatus(sessionId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: `Session ${session.isActive ? 'activated' : 'deactivated'} successfully`,
+        data: session,
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.BAD_REQUEST;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to toggle session status',
+      });
+    }
+  }
+
+  /**
    * Toggle engagement active status
    */
   @Put(':id/toggle-status')

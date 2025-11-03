@@ -194,6 +194,20 @@ export const toggleEngagementStatus = (id) => async (dispatch) => {
     }
 };
 
+// Toggle engagement session status
+export const toggleEngagementSessionStatus = (sessionId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.put(`/engagements/sessions/${sessionId}/toggle-status`);
+        
+        toast.success(response.data.message || 'Session status updated successfully!');
+        return { success: true, data: response.data.data };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to toggle session status';
+        toast.error(errorMessage);
+        return { error: true, message: errorMessage };
+    }
+};
+
 // Delete engagement
 export const deleteEngagement = (id) => async (dispatch) => {
     try {

@@ -247,9 +247,10 @@ const AddEngagementPage = () => {
 
     const selectedEventOption = eventOptions.find(option => option.value === selectedEventId);
 
-    // Get sessions for the selected track
+    // Get sessions for the selected track - only active sessions
     const trackSessions = selectedTrackId && allTrackSessions[selectedTrackId] ? allTrackSessions[selectedTrackId] : [];
-    const sessionOptions = trackSessions
+    const activeSessions = trackSessions.filter(session => session.isActive !== false); // Filter only active sessions
+    const sessionOptions = activeSessions
         .map(session => ({
             value: session.id,
             label: `${session.title}${session.sessionDate ? ` - ${new Date(session.sessionDate).toLocaleDateString()}` : ''}`

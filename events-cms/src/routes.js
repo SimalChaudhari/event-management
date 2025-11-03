@@ -149,6 +149,7 @@ const engagementComponents = {
     EngagementQA: React.lazy(() => import('./Pages/Engagement/EngagementQAPage.jsx')),
     ViewEngagementQuestion: React.lazy(() => import('./Pages/Engagement/ViewEngagementQuestionPage.jsx')),
     EngagementSessions: React.lazy(() => import('./Pages/Engagement/EngagementSessionsPage.jsx')),
+    ViewSession: React.lazy(() => import('./Pages/Engagement/ViewEngagementSessionPage.jsx')),
     QnAShareLink: React.lazy(() => import('./Pages/SharedQnA/QnAShareLinkPage.jsx')),
     QuestionShare: React.lazy(() => import('./Pages/SharedQnA/QuestionSharePage.jsx'))
 };
@@ -725,6 +726,12 @@ const engagementRoutes = [
         exact: true,
         name: 'Engagement Sessions',
         component: engagementComponents.EngagementSessions
+    },
+    {
+        path: ENGAGEMENT_PATHS.VIEW_SESSION + '/:id',
+        exact: true,
+        name: 'View Engagement Session',
+        component: engagementComponents.ViewSession
     }
 ];
 
