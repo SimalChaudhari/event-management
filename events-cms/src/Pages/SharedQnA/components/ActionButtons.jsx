@@ -2,7 +2,8 @@ import React from 'react';
 
 const ActionButtons = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) => {
   const handleAnswerClick = () => {
-    if (question.status === "answering") {
+    // Disable if answered, approval, or answering
+    if (question.status === "answered" || question.status === "approval" || question.status === "answering") {
       return;
     }
     onAnswer(question);
@@ -58,25 +59,33 @@ const ActionButtons = ({ question, onAnswer, onEdit, onDelete, onGenerateLink })
         `}
       </style>
       <div className="action-buttons-wrapper">
-        {/* Answer Now Button */}
+        {/* Answer Now Button (QA Icon) */}
         <button
           className="btn btn-icon"
           style={{
             borderRadius: "50%",
             border: "none",
             backgroundColor: "transparent",
-            cursor: question.status === "answering" ? "not-allowed" : "pointer",
+            cursor: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? "not-allowed" : "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
             padding: 0,
-            color: question.status === "answering" ? "#D4D6DD" : question.answer ? "#28a745" : "#71C0BB",
-            opacity: question.status === "answering" ? 0.5 : 1
+            color: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? "#D4D6DD" : "#71C0BB",
+            opacity: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? 0.5 : 1
           }}
           onClick={handleAnswerClick}
-          disabled={question.status === "answering"}
-          title={question.status === "answering" ? "Currently Being Answered" : question.answer ? "Edit Answer" : "Answer Now"}
+          disabled={question.status === "answered" || question.status === "approval" || question.status === "answering"}
+          title={
+            question.status === "answered" 
+              ? "Question Already Answered" 
+              : question.status === "approval" 
+                ? "Question Already Approved" 
+                : question.status === "answering"
+                  ? "Question Currently Being Answered"
+                  : "Approve Question"
+          }
         >
           <i className="feather icon-message-circle"></i>
         </button>

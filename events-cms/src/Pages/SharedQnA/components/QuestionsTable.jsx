@@ -2,7 +2,24 @@ import React from 'react';
 import { Table } from 'react-bootstrap';
 import QuestionRow from './QuestionRow';
 
-const QuestionsTable = ({ questions, onAnswer, onEdit, onDelete, onGenerateLink, voteFilterActive, statusFilterValue, onVoteFilterClick, onStatusFilterClick, onResetFilters, onVoteFilterReset, onStatusFilterReset }) => {
+const QuestionsTable = ({ 
+  questions, 
+  onQuestionClick, // New prop for QnAShareLinkPage
+  onAnswer, // Old props for TrackQnAShareLinkPage
+  onEdit,
+  onDelete,
+  onGenerateLink,
+  voteFilterActive, 
+  statusFilterValue, // Old prop for TrackQnAShareLinkPage
+  onVoteFilterClick, 
+  onStatusFilterClick, // Old prop for TrackQnAShareLinkPage
+  onResetFilters, 
+  onVoteFilterReset,
+  onStatusFilterReset // Old prop for TrackQnAShareLinkPage
+}) => {
+  // Determine if we're using new version (QnAShareLinkPage) or old version (TrackQnAShareLinkPage)
+  const isNewVersion = !!onQuestionClick;
+  const colSpan = isNewVersion ? 2 : 4;
   return (
     <div>
       <style>
@@ -65,21 +82,21 @@ const QuestionsTable = ({ questions, onAnswer, onEdit, onDelete, onGenerateLink,
               padding: "8px 4px", 
               backgroundColor: "#000", 
               color: "white",
-              width: "52%",
+              width: isNewVersion ? "85%" : "52%",
               minWidth: "100px",
               textAlign: "center"
             }}>Questions</th>
             <th 
               onClick={onVoteFilterClick}
               style={{ 
-                borderRight: "1px solid #D4D6DD",
+                borderRight: isNewVersion ? "none" : "1px solid #D4D6DD",
                 borderTop: "none",
                 borderBottom: "1px solid #D4D6DD",
                 borderLeft: "1px solid #D4D6DD",
                 padding: "4px 2px", 
                 backgroundColor: voteFilterActive ? "#71C0BB" : "#000", 
                 color: "white",
-                width: "8%",
+                width: isNewVersion ? "15%" : "8%",
                 minWidth: "35px",
                 maxWidth: "50px",
                 textAlign: "center",
@@ -127,89 +144,101 @@ const QuestionsTable = ({ questions, onAnswer, onEdit, onDelete, onGenerateLink,
                 </button>
               )}
             </th>
-            <th 
-              onClick={onStatusFilterClick}
-              style={{ 
-                borderRight: "1px solid #D4D6DD",
-                borderTop: "none",
-                borderBottom: "1px solid #D4D6DD",
-                borderLeft: "1px solid #D4D6DD",
-                padding: "4px 2px", 
-                backgroundColor: statusFilterValue ? "#71C0BB" : "#000", 
-                color: "white",
-                width: "15%",
-                minWidth: "55px",
-                maxWidth: "80px",
-                textAlign: "center",
-                cursor: "pointer",
-                userSelect: "none",
-                position: "relative"
-              }}
-              title={
-                statusFilterValue === null 
-                  ? "Click to filter by status" 
-                  : statusFilterValue === 'answering' 
-                    ? "Showing answering - Click for answered" 
-                    : statusFilterValue === 'answered'
-                      ? "Showing answered - Click for not answered"
-                      : "Showing not answered - Click for answering"
-              }
-            >
-              Status {statusFilterValue && <i className="feather icon-filter"></i>}
-              {statusFilterValue && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStatusFilterReset();
-                  }}
-                  style={{
-                    position: "absolute",
-                    right: "2px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+            {!isNewVersion && (
+              <>
+                <th 
+                  onClick={onStatusFilterClick}
+                  style={{ 
+                    borderRight: "1px solid #D4D6DD",
+                    borderTop: "none",
+                    borderBottom: "1px solid #D4D6DD",
+                    borderLeft: "1px solid #D4D6DD",
+                    padding: "4px 2px", 
+                    backgroundColor: statusFilterValue ? "#71C0BB" : "#000", 
                     color: "white",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: "16px",
-                    height: "16px",
+                    width: "15%",
+                    minWidth: "55px",
+                    maxWidth: "80px",
+                    textAlign: "center",
                     cursor: "pointer",
-                    fontSize: "10px",
-                    padding: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    lineHeight: 1
+                    userSelect: "none",
+                    position: "relative"
                   }}
-                  title="Reset status filter"
+                  title={
+                    statusFilterValue === null 
+                      ? "Click to filter by status" 
+                      : statusFilterValue === 'answering' 
+                        ? "Showing answering - Click for answered" 
+                        : statusFilterValue === 'answered'
+                          ? "Showing answered - Click for not answered"
+                          : "Showing not answered - Click for answering"
+                  }
                 >
-                  ×
-                </button>
-              )}
-            </th>
-            <th style={{ 
-              borderRight: "none",
-              borderTop: "none",
-              borderBottom: "1px solid #D4D6DD",
-              borderLeft: "1px solid #D4D6DD",
-              padding: "4px 1px", 
-              backgroundColor: "#000", 
-              color: "white",
-              width: "18%",
-              minWidth: "100px",
-              maxWidth: "135px",
-              textAlign: "center"
-            }}>Actions</th>
+                  Status {statusFilterValue && <i className="feather icon-filter"></i>}
+                  {statusFilterValue && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStatusFilterReset();
+                      }}
+                      style={{
+                        position: "absolute",
+                        right: "2px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        backgroundColor: "rgba(255, 255, 255, 0.2)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "16px",
+                        height: "16px",
+                        cursor: "pointer",
+                        fontSize: "10px",
+                        padding: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        lineHeight: 1
+                      }}
+                      title="Reset status filter"
+                    >
+                      ×
+                    </button>
+                  )}
+                </th>
+                <th style={{ 
+                  borderRight: "none",
+                  borderTop: "none",
+                  borderBottom: "1px solid #D4D6DD",
+                  borderLeft: "1px solid #D4D6DD",
+                  padding: "4px 1px", 
+                  backgroundColor: "#000", 
+                  color: "white",
+                  width: "18%",
+                  minWidth: "100px",
+                  maxWidth: "135px",
+                  textAlign: "center"
+                }}>Actions</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
           {questions.length > 0 ? (
             questions.map((q) => (
-              <QuestionRow key={q.id} question={q} onAnswer={onAnswer} onEdit={onEdit} onDelete={onDelete} onGenerateLink={onGenerateLink} />
+              <QuestionRow 
+                key={q.id} 
+                question={q} 
+                onQuestionClick={onQuestionClick}
+                onAnswer={onAnswer}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onGenerateLink={onGenerateLink}
+              />
             ))
           ) : (
             <tr>
-              <td colSpan="4" className="text-center text-muted py-4">
+              <td colSpan={colSpan} className="text-center text-muted py-4">
                 <i className="fas fa-inbox fa-2x mb-2"></i>
                 <br />
                 No data available

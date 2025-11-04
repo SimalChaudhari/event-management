@@ -17,6 +17,10 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Survey, SurveySession } from '../survey/survey.entity';
+import { Gallery } from '../gallery/gallery.entity';
+import { OrderItemEntity } from '../order/event.item.entity';
+import { EventAttendance } from '../attendance/attendance.entity';
+import { Feedback } from '../feedback/feedback.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { UtilsModule } from '../utils/utils.module'; // Import Utils Module
 import { EmailService } from '../service/email.service';
@@ -51,6 +55,10 @@ import { Engagement } from '../engagement/engagement.entity';
         PushNotification,
         UserPermissions,
         PermissionTemplate,
+        Gallery,
+        OrderItemEntity,
+        EventAttendance,
+        Feedback,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({

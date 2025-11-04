@@ -53,9 +53,9 @@ export class EngagementQnaQuestion {
 
   @Column({ 
     type: 'enum', 
-    enum: ['not_answered', 'answering', 'answered'], 
+    enum: ['not_answered', 'answering', 'answered', 'approval'], 
     nullable: true,
-    default: 'answering'
+    default: 'not_answered'
   })
   status?: string;
 
@@ -156,6 +156,33 @@ export class EngagementQnaQuestionShareLink {
   @ManyToOne(() => EngagementQnaQuestion, { eager: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'questionId' })
   question?: EngagementQnaQuestion;
+
+  @Column({ type: 'varchar', unique: true })
+  shareToken!: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiresAt?: Date;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
+}
+
+@Entity('engagement_qna_track_share_links')
+@Index('IDX_ENGAGEMENT_QNA_TRACK_SHARE_TOKEN', ['shareToken'], { unique: true })
+@Index('IDX_ENGAGEMENT_QNA_TRACK_SHARE_TRACK', ['trackId'])
+export class EngagementQnaTrackShareLink {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @Index()
+  @Column()
+  trackId!: string;
 
   @Column({ type: 'varchar', unique: true })
   shareToken!: string;

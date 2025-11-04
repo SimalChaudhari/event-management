@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Repository, In } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EngagementQnaQuestion, EngagementQnaLike, EngagementQnaShareLink, EngagementQnaQuestionShareLink } from './engagement-qna.entity';
+import { EngagementQnaQuestion, EngagementQnaLike, EngagementQnaShareLink, EngagementQnaQuestionShareLink, EngagementQnaTrackShareLink } from './engagement-qna.entity';
 import {
   CreateEngagementQuestionDto,
   UpdateEngagementQuestionDto,
@@ -12,6 +12,7 @@ import {
   QuestionStatus,
   GenerateShareLinkDto,
   GenerateQuestionShareLinkDto,
+  GenerateTrackShareLinkDto,
 } from './engagement-qna.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
@@ -22,6 +23,7 @@ import { Engagement } from '../engagement/engagement.entity';
 import { UserEntity } from '../user/users.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { ProgrammeSession } from '../programme/programme-session.entity';
+import { ProgrammeTrack } from '../programme/programme-track.entity';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -35,6 +37,8 @@ export class EngagementQnaService {
     private engagementQnaShareLinkRepository: Repository<EngagementQnaShareLink>,
     @InjectRepository(EngagementQnaQuestionShareLink)
     private engagementQnaQuestionShareLinkRepository: Repository<EngagementQnaQuestionShareLink>,
+    @InjectRepository(EngagementQnaTrackShareLink)
+    private engagementQnaTrackShareLinkRepository: Repository<EngagementQnaTrackShareLink>,
     @InjectRepository(Engagement)
     private engagementRepository: Repository<Engagement>,
     @InjectRepository(UserEntity)
@@ -43,6 +47,8 @@ export class EngagementQnaService {
     private registerEventRepository: Repository<RegisterEvent>,
     @InjectRepository(ProgrammeSession)
     private programmeSessionRepository: Repository<ProgrammeSession>,
+    @InjectRepository(ProgrammeTrack)
+    private programmeTrackRepository: Repository<ProgrammeTrack>,
     private errorHandler: ErrorHandlerService,
   ) {}
 
@@ -92,7 +98,7 @@ export class EngagementQnaService {
       question.likesCount = 0;
       question.isPinned = false;
       question.isActive = true;
-      question.status = QuestionStatus.NOT_ANSWERED; // Default status is answering
+      question.status = QuestionStatus.NOT_ANSWERED; // Default status is not_answered
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 
@@ -158,6 +164,8 @@ export class EngagementQnaService {
         whereConditions.status = 'not_answered';
       } else if (getDto.status === QuestionStatus.ANSWERING) {
         whereConditions.status = 'answering';
+      } else if (getDto.status === QuestionStatus.APPROVAL) {
+        whereConditions.status = 'approval';
       }
 
       const questions = await this.engagementQnaQuestionRepository.find({
@@ -264,6 +272,7 @@ export class EngagementQnaService {
       const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
       const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
       const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+      const approvalQuestions = questions.filter((q) => q.status === 'approval').length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
 
       return {
@@ -275,6 +284,7 @@ export class EngagementQnaService {
           answered: answeredQuestions,
           answering: answeringQuestions,
           unanswered: unansweredQuestions,
+          approval: approvalQuestions,
           pinned: pinnedQuestions,
           engagementId: getDto.engagementId,
           sessionId: getDto.sessionId,
@@ -771,6 +781,7 @@ export class EngagementQnaService {
       const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
       const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
       const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+      const approvalQuestions = questions.filter((q) => q.status === 'approval').length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
 
       return {
@@ -807,6 +818,7 @@ export class EngagementQnaService {
                 startDate: session.track.event.startDate,
                 endDate: session.track.event.endDate,
                 location: session.track.event.location,
+                backgroundImage: session.track.event.backgroundImage || null,
               }
             : null,
           questions: sortedQuestions,
@@ -815,6 +827,7 @@ export class EngagementQnaService {
             answered: answeredQuestions,
             answering: answeringQuestions,
             unanswered: unansweredQuestions,
+            approval: approvalQuestions,
             pinned: pinnedQuestions,
           },
         },
@@ -905,27 +918,54 @@ export class EngagementQnaService {
     updateDto: UpdateEngagementQuestionDto,
   ) {
     try {
-      // Validate share link
-      const shareLink = await this.engagementQnaShareLinkRepository.findOne({
+      // First try to find session share link
+      let shareLink = await this.engagementQnaShareLinkRepository.findOne({
         where: { shareToken },
       });
 
+      // If not found, try track share link
+      let trackShareLink = null;
       if (!shareLink) {
+        trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+          where: { shareToken },
+        });
+      }
+
+      if (!shareLink && !trackShareLink) {
         throw new ResourceNotFoundException('Share link', shareToken);
       }
 
-      if (!shareLink.isActive) {
+      const activeShareLink = shareLink || trackShareLink;
+      if (!activeShareLink) {
+        throw new ResourceNotFoundException('Share link', shareToken);
+      }
+      
+      if (!activeShareLink.isActive) {
         throw new ValidationException('This share link is no longer active');
       }
 
-      if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+      if (activeShareLink.expiresAt && activeShareLink.expiresAt < new Date()) {
         throw new ValidationException('This share link has expired');
       }
 
       // Get question
-      const question = await this.engagementQnaQuestionRepository.findOne({
-        where: { id: questionId, sessionId: shareLink.sessionId },
-      });
+      let question;
+      if (shareLink) {
+        // Session share link - question must belong to this session
+        question = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId, sessionId: shareLink.sessionId },
+        });
+      } else if (trackShareLink) {
+        // Track share link - question must belong to a session in this track
+        question = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId },
+          relations: ['engagement', 'engagement.track'],
+        });
+        
+        if (question && question.engagement?.trackId !== trackShareLink.trackId) {
+          throw new ValidationException('Question does not belong to this track');
+        }
+      }
 
       if (!question) {
         throw new ResourceNotFoundException('Question', questionId);
@@ -966,27 +1006,54 @@ export class EngagementQnaService {
     questionId: string,
   ) {
     try {
-      // Validate share link
-      const shareLink = await this.engagementQnaShareLinkRepository.findOne({
+      // First try to find session share link
+      let shareLink = await this.engagementQnaShareLinkRepository.findOne({
         where: { shareToken },
       });
 
+      // If not found, try track share link
+      let trackShareLink = null;
       if (!shareLink) {
+        trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+          where: { shareToken },
+        });
+      }
+
+      if (!shareLink && !trackShareLink) {
         throw new ResourceNotFoundException('Share link', shareToken);
       }
 
-      if (!shareLink.isActive) {
+      const activeShareLink = shareLink || trackShareLink;
+      if (!activeShareLink) {
+        throw new ResourceNotFoundException('Share link', shareToken);
+      }
+      
+      if (!activeShareLink.isActive) {
         throw new ValidationException('This share link is no longer active');
       }
 
-      if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+      if (activeShareLink.expiresAt && activeShareLink.expiresAt < new Date()) {
         throw new ValidationException('This share link has expired');
       }
 
       // Get question
-      const question = await this.engagementQnaQuestionRepository.findOne({
-        where: { id: questionId, sessionId: shareLink.sessionId },
-      });
+      let question;
+      if (shareLink) {
+        // Session share link - question must belong to this session
+        question = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId, sessionId: shareLink.sessionId },
+        });
+      } else if (trackShareLink) {
+        // Track share link - question must belong to a session in this track
+        question = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId },
+          relations: ['engagement', 'engagement.track'],
+        });
+        
+        if (question && question.engagement?.trackId !== trackShareLink.trackId) {
+          throw new ValidationException('Question does not belong to this track');
+        }
+      }
 
       if (!question) {
         throw new ResourceNotFoundException('Question', questionId);
@@ -1095,13 +1162,204 @@ export class EngagementQnaService {
     }
   }
 
-  // Get Question by Share Link (Public Access)
-  async getQuestionByShareLink(shareToken: string) {
+  // Generate Shareable Link for Track (All Sessions with Questions)
+  async generateTrackShareLink(generateDto: GenerateTrackShareLinkDto) {
+    try {
+      // Validate track exists
+      const track = await this.programmeTrackRepository.findOne({
+        where: { id: generateDto.trackId },
+        relations: ['event', 'sessions'],
+      });
+
+      if (!track) {
+        throw new ResourceNotFoundException('Track', generateDto.trackId);
+      }
+
+      // Check if an active link already exists for this track
+      let shareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+        where: {
+          trackId: generateDto.trackId,
+          isActive: true,
+        },
+      });
+
+      // If link exists and not expired, return existing link
+      if (shareLink) {
+        if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+          // Link expired, deactivate it
+          shareLink.isActive = false;
+          await this.engagementQnaTrackShareLinkRepository.save(shareLink);
+        } else {
+          // Return existing active link
+          const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+          const shareUrl = `${baseUrl}/qna/track/${shareLink.shareToken}`;
+          
+          // Get session share links for all sessions in this track
+          const sessionShareLinks = [];
+          const trackSessions = await this.programmeSessionRepository.find({
+            where: { trackId: shareLink.trackId, isActive: true },
+            order: { sessionDate: 'ASC', startTime: 'ASC' },
+          });
+
+          for (const session of trackSessions) {
+            // Check if session share link exists
+            let sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+              where: {
+                sessionId: session.id,
+                isActive: true,
+              },
+            });
+
+            // Generate if doesn't exist
+            if (!sessionShareLink) {
+              const sessionShareToken = crypto.randomBytes(32).toString('hex');
+              const sessionExpiresAt = generateDto.expiresInDays && generateDto.expiresInDays > 0
+                ? (() => {
+                    const exp = new Date();
+                    exp.setDate(exp.getDate() + generateDto.expiresInDays);
+                    return exp;
+                  })()
+                : undefined;
+
+              sessionShareLink = this.engagementQnaShareLinkRepository.create({
+                sessionId: session.id,
+                shareToken: sessionShareToken,
+                isActive: true,
+                expiresAt: sessionExpiresAt,
+              });
+              sessionShareLink = await this.engagementQnaShareLinkRepository.save(sessionShareLink);
+            }
+
+            const sessionShareUrl = `${baseUrl}/qna/share/${sessionShareLink.shareToken}`;
+            sessionShareLinks.push({
+              sessionId: session.id,
+              sessionTitle: session.title,
+              shareToken: sessionShareLink.shareToken,
+              shareUrl: sessionShareUrl,
+              expiresAt: sessionShareLink.expiresAt,
+            });
+          }
+          
+          return {
+            success: true,
+            message: 'Track share link retrieved successfully',
+            data: {
+              shareToken: shareLink.shareToken,
+              shareUrl: shareUrl,
+              trackId: shareLink.trackId,
+              expiresAt: shareLink.expiresAt,
+              createdAt: shareLink.createdAt,
+              sessionShareLinks: sessionShareLinks,
+            },
+          };
+        }
+      }
+
+      // Generate unique share token
+      const shareToken = crypto.randomBytes(32).toString('hex');
+
+      // Calculate expiry date if provided
+      let expiresAt: Date | undefined;
+      if (generateDto.expiresInDays && generateDto.expiresInDays > 0) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + generateDto.expiresInDays);
+      }
+
+      // Create new share link
+      const newShareLink = this.engagementQnaTrackShareLinkRepository.create({
+        trackId: generateDto.trackId,
+        shareToken: shareToken,
+        isActive: true,
+        expiresAt: expiresAt,
+      });
+
+      const savedShareLink = await this.engagementQnaTrackShareLinkRepository.save(newShareLink);
+
+      const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+      const shareUrl = `${baseUrl}/qna/track/${savedShareLink.shareToken}`;
+
+      // Generate session share links for all sessions in this track
+      const sessionShareLinks = [];
+      const trackSessions = await this.programmeSessionRepository.find({
+        where: { trackId: generateDto.trackId, isActive: true },
+        order: { sessionDate: 'ASC', startTime: 'ASC' },
+      });
+
+      for (const session of trackSessions) {
+        // Check if session share link already exists
+        let sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+          where: {
+            sessionId: session.id,
+            isActive: true,
+          },
+        });
+
+        // If link exists and not expired, use it
+        if (sessionShareLink) {
+          if (sessionShareLink.expiresAt && sessionShareLink.expiresAt < new Date()) {
+            sessionShareLink.isActive = false;
+            await this.engagementQnaShareLinkRepository.save(sessionShareLink);
+            sessionShareLink = null;
+          }
+        }
+
+        // Generate new link if needed
+        if (!sessionShareLink) {
+          const sessionShareToken = crypto.randomBytes(32).toString('hex');
+          const sessionExpiresAt = generateDto.expiresInDays && generateDto.expiresInDays > 0
+            ? (() => {
+                const exp = new Date();
+                exp.setDate(exp.getDate() + generateDto.expiresInDays);
+                return exp;
+              })()
+            : undefined;
+
+          sessionShareLink = this.engagementQnaShareLinkRepository.create({
+            sessionId: session.id,
+            shareToken: sessionShareToken,
+            isActive: true,
+            expiresAt: sessionExpiresAt,
+          });
+          sessionShareLink = await this.engagementQnaShareLinkRepository.save(sessionShareLink);
+        }
+
+        const sessionShareUrl = `${baseUrl}/qna/share/${sessionShareLink.shareToken}`;
+        sessionShareLinks.push({
+          sessionId: session.id,
+          sessionTitle: session.title,
+          shareToken: sessionShareLink.shareToken,
+          shareUrl: sessionShareUrl,
+          expiresAt: sessionShareLink.expiresAt,
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Track share link generated successfully',
+        data: {
+          shareToken: savedShareLink.shareToken,
+          shareUrl: shareUrl,
+          trackId: savedShareLink.trackId,
+          expiresAt: savedShareLink.expiresAt,
+          createdAt: savedShareLink.createdAt,
+          sessionShareLinks: sessionShareLinks,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Generate track share link');
+      this.errorHandler.handleDatabaseError(error, 'Track share link generation');
+    }
+  }
+
+  // Get Track Q&A by Share Link (All Sessions with Questions) - Public Access
+  async getTrackQnaByShareLink(shareToken: string) {
     try {
       // Find the share link
-      const shareLink = await this.engagementQnaQuestionShareLinkRepository.findOne({
+      const shareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
         where: { shareToken },
-        relations: ['question'],
       });
 
       if (!shareLink) {
@@ -1118,73 +1376,189 @@ export class EngagementQnaService {
         throw new ValidationException('This share link has expired');
       }
 
-      // Get question with related data
-      const question = await this.engagementQnaQuestionRepository.findOne({
-        where: { id: shareLink.questionId },
-        relations: ['askedBy', 'answeredByUser', 'engagement'],
+      // Get track details with event
+      const track = await this.programmeTrackRepository.findOne({
+        where: { id: shareLink.trackId },
+        relations: ['event', 'sessions', 'sessions.speakers'],
       });
 
-      if (!question) {
-        throw new ResourceNotFoundException('Question', shareLink.questionId);
+      if (!track) {
+        throw new ResourceNotFoundException('Track', shareLink.trackId);
       }
 
-      // Get session and related event/track data
-      const session = await this.programmeSessionRepository.findOne({
-        where: { id: question.sessionId },
-        relations: ['track', 'track.event'],
+      // Get all sessions for this track
+      const sessions = await this.programmeSessionRepository.find({
+        where: { trackId: shareLink.trackId, isActive: true },
+        relations: ['speakers', 'track'],
+        order: { sessionDate: 'ASC', startTime: 'ASC' },
       });
 
-      if (!session) {
-        throw new ResourceNotFoundException('Session', question.sessionId);
+      // Get all questions for all sessions in this track
+      const sessionIds = sessions.map(s => s.id);
+      const allQuestions = sessionIds.length > 0 
+        ? await this.engagementQnaQuestionRepository.find({
+            where: {
+              sessionId: In(sessionIds),
+              isActive: true,
+            },
+            relations: ['askedBy', 'answeredByUser'],
+            order: { likesCount: 'DESC', createdAt: 'DESC' },
+          })
+        : [];
+
+      // Get session share links for all sessions
+      const sessionShareLinksMap = new Map();
+      for (const session of sessions) {
+        let sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+          where: {
+            sessionId: session.id,
+            isActive: true,
+          },
+        });
+
+        // Generate if doesn't exist
+        if (!sessionShareLink) {
+          const sessionShareToken = crypto.randomBytes(32).toString('hex');
+          const sessionExpiresAt = shareLink.expiresAt ? new Date(shareLink.expiresAt) : undefined;
+          sessionShareLink = this.engagementQnaShareLinkRepository.create({
+            sessionId: session.id,
+            shareToken: sessionShareToken,
+            isActive: true,
+            expiresAt: sessionExpiresAt, // Use same expiry as track link
+          });
+          sessionShareLink = await this.engagementQnaShareLinkRepository.save(sessionShareLink);
+        }
+
+        const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+        const sessionShareUrl = `${baseUrl}/qna/share/${sessionShareLink.shareToken}`;
+        sessionShareLinksMap.set(session.id, {
+          shareToken: sessionShareLink.shareToken,
+          shareUrl: sessionShareUrl,
+        });
       }
 
-      const event = session.track?.event;
+      // Group questions by session
+      const sessionsWithQuestions = sessions.map((session) => {
+        const sessionQuestions = allQuestions.filter(q => q.sessionId === session.id);
+        const sessionShareLink = sessionShareLinksMap.get(session.id);
+        
+        // Process questions for this session
+        const processedQuestions = sessionQuestions.map((question) => {
+          return {
+            id: question.id,
+            question: question.question,
+            askedBy: question.isAnonymous
+              ? null
+              : question.askedBy
+                ? {
+                    id: question.askedBy.id,
+                    firstName: question.askedBy.firstName,
+                    lastName: question.askedBy.lastName,
+                    fullName: `${question.askedBy.firstName} ${question.askedBy.lastName}`.trim(),
+                  }
+                : null,
+            answeredBy: question.answeredByUser
+              ? {
+                  id: question.answeredByUser.id,
+                  firstName: question.answeredByUser.firstName,
+                  lastName: question.answeredByUser.lastName,
+                  fullName: `${question.answeredByUser.firstName} ${question.answeredByUser.lastName}`.trim(),
+                }
+              : null,
+            isAnonymous: question.isAnonymous,
+            likesCount: question.likesCount,
+            isPinned: question.isPinned,
+            status: question.status || 'not_answered',
+            answeredAt: question.answeredAt,
+            answer: question.answer || null,
+            createdAt: question.createdAt,
+            updatedAt: question.updatedAt,
+            isAnswered: !!question.answeredAt,
+          };
+        });
 
-      // Format question for public view
-      const formattedQuestion = {
-        id: question.id,
-        question: question.question,
-        answer: question.answer,
-        status: question.status || 'not_answered',
-        likesCount: question.likesCount || 0,
-        createdAt: question.createdAt,
-        answeredAt: question.answeredAt,
-        answeredBy: question.answeredByUser
-          ? {
-              id: question.answeredByUser.id,
-              firstName: question.answeredByUser.firstName,
-              lastName: question.answeredByUser.lastName,
-              fullName: `${question.answeredByUser.firstName} ${question.answeredByUser.lastName}`.trim(),
-            }
-          : null,
-      };
+        // Sort questions by pinned first, then by likes
+        const sortedQuestions = processedQuestions.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return b.likesCount - a.likesCount;
+        });
+
+        // Calculate statistics for this session
+        const totalQuestions = sessionQuestions.length;
+        const answeredQuestions = sessionQuestions.filter((q) => q.status === 'answered').length;
+        const answeringQuestions = sessionQuestions.filter((q) => q.status === 'answering').length;
+        const unansweredQuestions = sessionQuestions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+        const approvalQuestions = sessionQuestions.filter((q) => q.status === 'approval').length;
+        const pinnedQuestions = sessionQuestions.filter((q) => q.isPinned).length;
+
+        return {
+          id: session.id,
+          title: session.title,
+          description: session.description,
+          sessionDate: session.sessionDate,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          venue: session.venue,
+          speakers: session.speakers?.map((speaker) => ({
+            id: speaker.id,
+            firstName: speaker.firstName,
+            lastName: speaker.lastName,
+            fullName: `${speaker.firstName} ${speaker.lastName}`.trim(),
+          })) || [],
+          questions: sortedQuestions,
+          statistics: {
+            total: totalQuestions,
+            answered: answeredQuestions,
+            answering: answeringQuestions,
+            unanswered: unansweredQuestions,
+            approval: approvalQuestions,
+            pinned: pinnedQuestions,
+          },
+          shareLink: sessionShareLink ? {
+            shareToken: sessionShareLink.shareToken,
+            shareUrl: sessionShareLink.shareUrl,
+          } : null,
+        };
+      });
+
+      // Calculate overall statistics
+      const totalQuestions = allQuestions.length;
+      const answeredQuestions = allQuestions.filter((q) => q.status === 'answered').length;
+      const answeringQuestions = allQuestions.filter((q) => q.status === 'answering').length;
+      const unansweredQuestions = allQuestions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+      const approvalQuestions = allQuestions.filter((q) => q.status === 'approval').length;
+      const pinnedQuestions = allQuestions.filter((q) => q.isPinned).length;
 
       return {
         success: true,
-        message: 'Question retrieved successfully',
+        message: 'Track Q&A retrieved successfully',
         data: {
-          question: formattedQuestion,
-          session: {
-            id: session.id,
-            title: session.title,
-            startTime: session.startTime,
-            endTime: session.endTime,
+          track: {
+            id: track.id,
+            title: track.title,
+            description: track.description,
           },
-          track: session.track
+          event: track.event
             ? {
-                id: session.track.id,
-                title: session.track.title,
+                id: track.event.id,
+                name: track.event.name,
+                description: track.event.description,
+                startDate: track.event.startDate,
+                endDate: track.event.endDate,
+                location: track.event.location,
               }
             : null,
-          event: event
-            ? {
-                id: event.id,
-                name: event.name,
-                startDate: event.startDate,
-                endDate: event.endDate,
-                backgroundImage: event.backgroundImage,
-              }
-            : null,
+          sessions: sessionsWithQuestions,
+          overallStatistics: {
+            totalSessions: sessions.length,
+            totalQuestions: totalQuestions,
+            answered: answeredQuestions,
+            answering: answeringQuestions,
+            unanswered: unansweredQuestions,
+            approval: approvalQuestions,
+            pinned: pinnedQuestions,
+          },
         },
         metadata: {
           timestamp: new Date().toISOString(),
@@ -1192,9 +1566,14 @@ export class EngagementQnaService {
         },
       };
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get question by share link');
-      this.errorHandler.handleDatabaseError(error, 'Get question by share link');
-      throw error;
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ValidationException
+      ) {
+        throw error;
+      }
+      this.errorHandler.logError(error, 'Get track Q&A by share link');
+      this.errorHandler.handleDatabaseError(error, 'Track Q&A retrieval');
     }
   }
 

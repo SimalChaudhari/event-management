@@ -55,6 +55,9 @@ const EngagementSessionsPage = () => {
     const [pollingUrl, setPollingUrl] = useState('');
     const [pollingLinkId, setPollingLinkId] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [showTrackLinkModal, setShowTrackLinkModal] = useState(false);
+    const [trackShareUrl, setTrackShareUrl] = useState('');
+    const [generatingTrackLink, setGeneratingTrackLink] = useState(false);
 
     useEffect(() => {
         dispatch(getAllTracks());
@@ -313,6 +316,29 @@ const EngagementSessionsPage = () => {
                     }
                 });
 
+                $(document).off('click', '.track-link-btn').on('click', '.track-link-btn', async function () {
+                    if (!trackId) {
+                        toast.error('Track ID is required');
+                        return;
+                    }
+                    setGeneratingTrackLink(true);
+                    try {
+                        const res = await axiosInstance.post('/engagements/qna/generate-track-link', {
+                            trackId: trackId
+                        });
+                        if (res?.data?.success && res?.data?.data?.shareUrl) {
+                            setTrackShareUrl(res.data.data.shareUrl);
+                            setShowTrackLinkModal(true);
+                        } else {
+                            toast.error(res?.data?.message || 'Failed to generate track link');
+                        }
+                    } catch (e) {
+                        toast.error(e?.response?.data?.message || 'Failed to generate track link');
+                    } finally {
+                        setGeneratingTrackLink(false);
+                    }
+                });
+
             }, 100);
         }
 
@@ -380,10 +406,41 @@ const EngagementSessionsPage = () => {
                         <Card.Header>
                             <div className="d-flex justify-content-between align-items-center">
                                 <h5 className="mb-0">Engagement Sessions</h5>
-                                <Button variant="secondary" onClick={handleBack}>
-                                    <i className="feather icon-arrow-left mr-1"></i>
-                                    Back
-                                </Button>
+                                <div className="d-flex gap-2">
+                                    <Button 
+                                        variant="primary" 
+                                        onClick={async () => {
+                                            if (!trackId) {
+                                                toast.error('Track ID is required');
+                                                return;
+                                            }
+                                            setGeneratingTrackLink(true);
+                                            try {
+                                                const res = await axiosInstance.post('/engagements/qna/generate-track-link', {
+                                                    trackId: trackId
+                                                });
+                                                if (res?.data?.success && res?.data?.data?.shareUrl) {
+                                                    setTrackShareUrl(res.data.data.shareUrl);
+                                                    setShowTrackLinkModal(true);
+                                                } else {
+                                                    toast.error(res?.data?.message || 'Failed to generate track link');
+                                                }
+                                            } catch (e) {
+                                                toast.error(e?.response?.data?.message || 'Failed to generate track link');
+                                            } finally {
+                                                setGeneratingTrackLink(false);
+                                            }
+                                        }}
+                                        disabled={generatingTrackLink || !trackId}
+                                    >
+                                        <i className="feather icon-link mr-1"></i>
+                                        {generatingTrackLink ? 'Generating...' : 'Generate Link'}
+                                    </Button>
+                                    <Button variant="secondary" onClick={handleBack}>
+                                        <i className="feather icon-arrow-left mr-1"></i>
+                                        Back
+                                    </Button>
+                                </div>
                             </div>
                         </Card.Header>
                         <Card.Body>
@@ -447,6 +504,52 @@ const EngagementSessionsPage = () => {
                     )}
                     <Button variant="primary" onClick={handleSavePolling} disabled={saving}>
                         <i className="feather icon-save mr-1"></i> Save
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+            <Modal show={showTrackLinkModal} onHide={() => setShowTrackLinkModal(false)} centered size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Track Q&A Share Link</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form.Group className="mb-3">
+                        <Form.Label>Share Link URL</Form.Label>
+                        <InputGroup>
+                            <Form.Control
+                                type="text"
+                                value={trackShareUrl}
+                                readOnly
+                                className="bg-light"
+                            />
+                            <InputGroup.Text>
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(trackShareUrl);
+                                        toast.success('Link copied to clipboard!');
+                                    }}
+                                >
+                                    <i className="feather icon-copy"></i> Copy
+                                </Button>
+                            </InputGroup.Text>
+                        </InputGroup>
+                        <Form.Text className="text-muted">
+                            Share this link to allow public access to all sessions and questions in this track.
+                        </Form.Text>
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowTrackLinkModal(false)}>
+                        Close
+                    </Button>
+                    <Button 
+                        variant="primary" 
+                        onClick={() => {
+                            window.open(trackShareUrl, '_blank');
+                        }}
+                    >
+                        <i className="feather icon-external-link mr-1"></i> Open Link
                     </Button>
                 </Modal.Footer>
             </Modal>

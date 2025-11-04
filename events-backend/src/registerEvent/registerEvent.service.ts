@@ -213,7 +213,7 @@ export class RegisterEventService {
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
-          // .where('user.id = :userId', { userId });
+          .where('user.id = :userId', { userId })
           .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true });
 
         // Apply event filter for regular users

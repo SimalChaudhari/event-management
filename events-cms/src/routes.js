@@ -151,7 +151,7 @@ const engagementComponents = {
     EngagementSessions: React.lazy(() => import('./Pages/Engagement/EngagementSessionsPage.jsx')),
     ViewSession: React.lazy(() => import('./Pages/Engagement/ViewEngagementSessionPage.jsx')),
     QnAShareLink: React.lazy(() => import('./Pages/SharedQnA/QnAShareLinkPage.jsx')),
-    QuestionShare: React.lazy(() => import('./Pages/SharedQnA/QuestionSharePage.jsx'))
+    TrackQnAShareLink: React.lazy(() => import('./Pages/SharedQnA/TrackQnAShareLinkPage.jsx'))
 };
 
 /**
@@ -809,10 +809,10 @@ const publicQnaShareRoutes = [
         component: engagementComponents.QnAShareLink
     },
     {
-        path: '/qna/question/:shareToken',
+        path: '/qna/track/:shareToken',
         exact: true,
-        name: 'Question Share',
-        component: engagementComponents.QuestionShare
+        name: 'Track Q&A Share Link',
+        component: engagementComponents.TrackQnAShareLink
     }
 ];
 

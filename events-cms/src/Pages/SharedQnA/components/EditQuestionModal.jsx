@@ -98,7 +98,7 @@ const EditQuestionModal = ({
                 }}
               >
                 <option value="not_answered">Not Answered</option>
-                <option value="answering">Answering</option>
+                <option value="approval">Approval</option>
                 <option value="answered">Answered</option>
               </Form.Select>
               <small className="text-muted" style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '4px' }}>

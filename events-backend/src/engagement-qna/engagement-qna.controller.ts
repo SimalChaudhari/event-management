@@ -22,6 +22,7 @@ import {
   GetEngagementQuestionsDto,
   GenerateShareLinkDto,
   GenerateQuestionShareLinkDto,
+  GenerateTrackShareLinkDto,
 } from './engagement-qna.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { RolesGuard } from 'jwt/roles.guard';
@@ -266,15 +267,17 @@ export class EngagementQnaController {
     }
   }
 
-  // Get Question by Share Link (Public Access) - Must be before :id route
+
+  // Get Track Q&A by Share Link (All Sessions with Questions) - Public Access
+  // Must be before :id route to avoid route conflicts
   @Public()
-  @Get('question/:shareToken')
-  async getQuestionByShareLink(
+  @Get('track/:shareToken')
+  async getTrackQnaByShareLink(
     @Param('shareToken') shareToken: string,
     @Res() response: Response,
   ) {
     try {
-      const result = await this.engagementQnaService.getQuestionByShareLink(shareToken);
+      const result = await this.engagementQnaService.getTrackQnaByShareLink(shareToken);
 
       const successResponse: SuccessResponse = {
         success: result.success,
@@ -285,7 +288,7 @@ export class EngagementQnaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get question by share link');
+      this.errorHandler.logError(error, 'Get track Q&A by share link');
       throw error;
     }
   }
@@ -478,6 +481,35 @@ export class EngagementQnaController {
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'Generate share link', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Generate Shareable Link for Track (All Sessions with Questions) - Admin/Moderator only
+  @Post('generate-track-link')
+  @Roles(UserRole.Admin, UserRole.Moderator)
+  async generateTrackShareLink(
+    @Body() generateDto: GenerateTrackShareLinkDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.engagementQnaService.generateTrackShareLink(generateDto);
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          generatedBy: req.user?.id,
+          trackId: generateDto.trackId,
+        },
+      };
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Generate track share link', req.user?.id);
       throw error;
     }
   }

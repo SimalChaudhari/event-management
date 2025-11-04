@@ -18,6 +18,11 @@ import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { Survey } from '../survey/survey.entity';
 import { Engagement } from '../engagement/engagement.entity';
+import { Gallery } from '../gallery/gallery.entity';
+import { Cart } from '../cart/cart.entity';
+import { OrderItemEntity } from '../order/event.item.entity';
+import { EventAttendance } from '../attendance/attendance.entity';
+import { Feedback } from '../feedback/feedback.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import {
   ResourceNotFoundException,
@@ -66,6 +71,16 @@ export class EventService {
     private eventAgendaRepository: Repository<EventAgenda>,
     @InjectRepository(Engagement)
     private engagementRepository: Repository<Engagement>,
+    @InjectRepository(Gallery)
+    private galleryRepository: Repository<Gallery>,
+    @InjectRepository(Cart)
+    private cartRepository: Repository<Cart>,
+    @InjectRepository(OrderItemEntity)
+    private orderItemRepository: Repository<OrderItemEntity>,
+    @InjectRepository(EventAttendance)
+    private attendanceRepository: Repository<EventAttendance>,
+    @InjectRepository(Feedback)
+    private feedbackRepository: Repository<Feedback>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
@@ -736,35 +751,65 @@ export class EventService {
         throw new ResourceNotFoundException('Event', id);
       }
 
-      // Check if event has registrations
-      const registrationCount = await this.errorHandler.getRelatedDataCount(
-        this.registerEventRepository,
-        { eventId: id },
-        'Event Registrations',
-      );
+      // Delete all associated data before deleting the event
+      // 1. Delete registered events (registrations)
+      await this.registerEventRepository.delete({ eventId: id });
 
-      // Delete associated EventBooth records
+      // 2. Delete favorite events (has CASCADE but explicit for clarity)
+      await this.favoriteEventRepository.delete({ eventId: id });
+
+      // 3. Delete galleries (uploaded event galleries)
+      await this.galleryRepository.delete({ eventId: id });
+
+      // 4. Delete cart items
+      await this.cartRepository.delete({ eventId: id });
+
+      // 5. Delete attendance records (has CASCADE but explicit for clarity)
+      await this.attendanceRepository.delete({ eventId: id });
+
+      // 6. Delete feedback records (has CASCADE but explicit for clarity)
+      await this.feedbackRepository.delete({ eventId: id });
+
+      // 7. Delete event agendas
+      await this.eventAgendaRepository.delete({ eventId: id });
+
+      // 8. Delete event booths
       await this.eventBoothRepository.delete({ eventId: id });
 
-      if (registrationCount > 0) {
-        throw new ForeignKeyConstraintException(
-          'Event',
-          'Registration',
-          registrationCount,
-          'delete',
-        );
+      // 9. Delete event speakers
+      await this.eventSpeakerRepository.delete({ eventId: id });
+
+      // 10. Delete event categories
+      await this.eventCategoryRepository.delete({ eventId: id });
+
+      // 11. Delete event exhibitors
+      await this.eventExhibitorRepository.delete({ eventId: id });
+
+      // 12. Delete order items (handled via CASCADE in OrderItemEntity, but explicit for clarity)
+      // Note: OrderItemEntity has onDelete: 'CASCADE' so items will be auto-deleted
+      // Using query builder to find by event relationship
+      const orderItems = await this.orderItemRepository
+        .createQueryBuilder('orderItem')
+        .leftJoinAndSelect('orderItem.event', 'event')
+        .where('event.id = :eventId', { eventId: id })
+        .getMany();
+      
+      if (orderItems.length > 0) {
+        // Delete order items (cascade will handle, but explicit deletion for safety)
+        await this.orderItemRepository.remove(orderItems);
       }
+
+      // 13. Surveys are deleted automatically via cascade
+      // 14. Programme tracks are deleted automatically via cascade (which includes engagements)
 
       // Delete associated files
       this.deleteEventFiles(event);
 
+      // Finally, delete the event itself
       await this.eventRepository.remove(event);
-      return { message: 'Event deleted successfully' };
+      return { message: 'Event and all associated data deleted successfully' };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof ForeignKeyConstraintException
-      ) {
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
       throw this.errorHandler.handleDatabaseError(error, 'Event deletion');

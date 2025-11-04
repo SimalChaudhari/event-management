@@ -10,7 +10,8 @@ export enum QuestionStatus {
   ALL = 'all',
   NOT_ANSWERED = 'not_answered',
   ANSWERING = 'answering',
-  ANSWERED = 'answered'
+  ANSWERED = 'answered',
+  APPROVAL = 'approval'
 }
 
 export class CreateEngagementQuestionDto {
@@ -81,6 +82,16 @@ export class GenerateQuestionShareLinkDto {
   @IsNotEmpty()
   @IsUUID()
   questionId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  expiresInDays?: number; // Optional expiry in days
+}
+
+export class GenerateTrackShareLinkDto {
+  @IsNotEmpty()
+  @IsUUID()
+  trackId!: string;
 
   @IsOptional()
   @IsNumber()
