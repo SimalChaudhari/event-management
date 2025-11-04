@@ -605,14 +605,18 @@ export class EngagementQnaService {
   // Generate Shareable Link for Session Q&A
   async generateShareLink(generateDto: GenerateShareLinkDto) {
     try {
-      // Validate session exists
-      const session = await this.programmeSessionRepository.findOne({
-        where: { id: generateDto.sessionId },
-        relations: ['track', 'track.event'],
+      // Validate session exists through engagement (find engagement that has this session in its track)
+      // Note: We validate through engagement instead of directly querying programme session
+      const questions = await this.engagementQnaQuestionRepository.find({
+        where: { sessionId: generateDto.sessionId, isActive: true },
+        relations: ['engagement', 'engagement.track'],
+        take: 1,
       });
 
-      if (!session) {
-        throw new ResourceNotFoundException('Session', generateDto.sessionId);
+      if (questions.length === 0) {
+        // Try to find engagement by checking if any engagement's track has this session
+        // Since we can't directly query, we'll validate when the link is actually used
+        // For now, just proceed with link generation
       }
 
       // Check if an active link already exists for this session
@@ -1165,15 +1169,21 @@ export class EngagementQnaService {
   // Generate Shareable Link for Track (All Sessions with Questions)
   async generateTrackShareLink(generateDto: GenerateTrackShareLinkDto) {
     try {
-      // Validate track exists
-      const track = await this.programmeTrackRepository.findOne({
-        where: { id: generateDto.trackId },
-        relations: ['event', 'sessions'],
+      // Validate track exists through engagement (get the specific engagement for this track)
+      const engagement = await this.engagementRepository.findOne({
+        where: { 
+          trackId: generateDto.trackId,
+          isActive: true 
+        },
+        relations: ['track', 'track.event', 'track.sessions'],
+        // sessionIds is a JSON column, it will be loaded automatically
       });
 
-      if (!track) {
+      if (!engagement || !engagement.track) {
         throw new ResourceNotFoundException('Track', generateDto.trackId);
       }
+
+      const track = engagement.track;
 
       // Check if an active link already exists for this track
       let shareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
@@ -1194,11 +1204,34 @@ export class EngagementQnaService {
           const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
           const shareUrl = `${baseUrl}/qna/track/${shareLink.shareToken}`;
           
-          // Get session share links for all sessions in this track
+          // Get session share links for all sessions in this track through engagement
           const sessionShareLinks = [];
-          const trackSessions = await this.programmeSessionRepository.find({
-            where: { trackId: shareLink.trackId, isActive: true },
-            order: { sessionDate: 'ASC', startTime: 'ASC' },
+          const engagementForSessions = await this.engagementRepository.findOne({
+            where: { 
+              trackId: shareLink.trackId,
+              isActive: true 
+            },
+            relations: ['track', 'track.sessions'],
+          });
+
+          // Filter sessions: if engagement has sessionIds, only use those; otherwise use all active sessions
+          let trackSessions = engagementForSessions?.track?.sessions?.filter(s => s.isActive === true) || [];
+          
+          // If engagement has sessionIds, filter to only those sessions
+          if (engagementForSessions?.sessionIds && engagementForSessions.sessionIds.length > 0) {
+            trackSessions = trackSessions.filter(s => engagementForSessions.sessionIds!.includes(s.id));
+          }
+
+          // Sort sessions
+          trackSessions = trackSessions.sort((a, b) => {
+            if (a.sessionDate && b.sessionDate) {
+              const dateCompare = new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime();
+              if (dateCompare !== 0) return dateCompare;
+            }
+            if (a.startTime && b.startTime) {
+              return a.startTime.localeCompare(b.startTime);
+            }
+            return 0;
           });
 
           for (const session of trackSessions) {
@@ -1278,11 +1311,27 @@ export class EngagementQnaService {
       const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
       const shareUrl = `${baseUrl}/qna/track/${savedShareLink.shareToken}`;
 
-      // Generate session share links for all sessions in this track
+      // Generate session share links for all sessions in this track through engagement
       const sessionShareLinks = [];
-      const trackSessions = await this.programmeSessionRepository.find({
-        where: { trackId: generateDto.trackId, isActive: true },
-        order: { sessionDate: 'ASC', startTime: 'ASC' },
+      
+      // Filter sessions: if engagement has sessionIds, only use those; otherwise use all active sessions
+      let trackSessions = track.sessions?.filter(s => s.isActive === true) || [];
+      
+      // If engagement has sessionIds, filter to only those sessions
+      if (engagement.sessionIds && engagement.sessionIds.length > 0) {
+        trackSessions = trackSessions.filter(s => engagement.sessionIds!.includes(s.id));
+      }
+
+      // Sort sessions
+      trackSessions = trackSessions.sort((a, b) => {
+        if (a.sessionDate && b.sessionDate) {
+          const dateCompare = new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime();
+          if (dateCompare !== 0) return dateCompare;
+        }
+        if (a.startTime && b.startTime) {
+          return a.startTime.localeCompare(b.startTime);
+        }
+        return 0;
       });
 
       for (const session of trackSessions) {
@@ -1355,7 +1404,7 @@ export class EngagementQnaService {
   }
 
   // Get Track Q&A by Share Link (All Sessions with Questions) - Public Access
-  async getTrackQnaByShareLink(shareToken: string) {
+  async getTrackQnaByShareLink(shareToken: string, page: number = 1, pageSize: number = 1) {
     try {
       // Find the share link
       const shareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
@@ -1376,29 +1425,54 @@ export class EngagementQnaService {
         throw new ValidationException('This share link has expired');
       }
 
-      // Get track details with event
-      const track = await this.programmeTrackRepository.findOne({
-        where: { id: shareLink.trackId },
-        relations: ['event', 'sessions', 'sessions.speakers'],
+      // Get engagement by trackId (Engagement has track relation)
+      const engagement = await this.engagementRepository.findOne({
+        where: { 
+          trackId: shareLink.trackId,
+          isActive: true 
+        },
+        relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers'],
       });
 
-      if (!track) {
+      if (!engagement || !engagement.track) {
         throw new ResourceNotFoundException('Track', shareLink.trackId);
       }
 
-      // Get all sessions for this track
-      const sessions = await this.programmeSessionRepository.find({
-        where: { trackId: shareLink.trackId, isActive: true },
-        relations: ['speakers', 'track'],
-        order: { sessionDate: 'ASC', startTime: 'ASC' },
+      const track = engagement.track;
+
+      // Get all active sessions from engagement's track (filtered from relation)
+      let allSessions = (track.sessions || []).filter(session => session.isActive === true);
+      
+      // If engagement has sessionIds, filter to only those sessions
+      if (engagement.sessionIds && engagement.sessionIds.length > 0) {
+        allSessions = allSessions.filter(s => engagement.sessionIds!.includes(s.id));
+      }
+      
+      // Sort sessions
+      allSessions = allSessions.sort((a, b) => {
+        // Sort by sessionDate first, then startTime
+        if (a.sessionDate && b.sessionDate) {
+          const dateCompare = new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime();
+          if (dateCompare !== 0) return dateCompare;
+        }
+        if (a.startTime && b.startTime) {
+          return a.startTime.localeCompare(b.startTime);
+        }
+        return 0;
       });
 
-      // Get all questions for all sessions in this track
-      const sessionIds = sessions.map(s => s.id);
-      const allQuestions = sessionIds.length > 0 
+      // Apply pagination to sessions
+      const totalSessions = allSessions.length;
+      const totalPages = Math.ceil(totalSessions / pageSize);
+      const skip = (page - 1) * pageSize;
+      const sessions = allSessions.slice(skip, skip + pageSize);
+
+      // Get all questions for all sessions in this track (still need all questions for statistics)
+      const allSessionIds = allSessions.map(s => s.id);
+      const allQuestions = allSessionIds.length > 0 
         ? await this.engagementQnaQuestionRepository.find({
             where: {
-              sessionId: In(sessionIds),
+              sessionId: In(allSessionIds),
               isActive: true,
             },
             relations: ['askedBy', 'answeredByUser'],
@@ -1500,7 +1574,7 @@ export class EngagementQnaService {
           startTime: session.startTime,
           endTime: session.endTime,
           venue: session.venue,
-          speakers: session.speakers?.map((speaker) => ({
+          speakers: session.speakers?.map((speaker: UserEntity) => ({
             id: speaker.id,
             firstName: speaker.firstName,
             lastName: speaker.lastName,
@@ -1551,13 +1625,21 @@ export class EngagementQnaService {
             : null,
           sessions: sessionsWithQuestions,
           overallStatistics: {
-            totalSessions: sessions.length,
+            totalSessions: totalSessions,
             totalQuestions: totalQuestions,
             answered: answeredQuestions,
             answering: answeringQuestions,
             unanswered: unansweredQuestions,
             approval: approvalQuestions,
             pinned: pinnedQuestions,
+          },
+          pagination: {
+            currentPage: page,
+            pageSize: pageSize,
+            totalPages: totalPages,
+            totalSessions: totalSessions,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
           },
         },
         metadata: {

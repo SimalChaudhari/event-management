@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
-import { Container, Row, Col, Spinner, Alert, Modal, Button } from "react-bootstrap";
+import { Container, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { API_URL, BASE_URL } from "../../configs/env";
@@ -8,12 +8,15 @@ import EventInfoSection from "./components/EventInfoSection";
 import QuestionsTable from "./components/QuestionsTable";
 import EditQuestionModal from "./components/EditQuestionModal";
 import DeleteConfirmationModal from "./components/DeleteConfirmationModal";
+import ApproveQuestionModal from "./components/ApproveQuestionModal";
 import {
   updateQuestionViaShareLink,
   deleteQuestionViaShareLink,
-  generateQuestionShareLink
+  generateQuestionShareLink,
+  getTrackQnaByShareLink
 } from "./components/QnAShareApi";
 import { applyFiltersToQuestions } from "./utils/filterUtils";
+import { setCookie, getCookie } from "../../utils/cookieUtils";
 
 const TrackQnAShareLinkPage = () => {
   const { shareToken } = useParams();
@@ -23,6 +26,13 @@ const TrackQnAShareLinkPage = () => {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Pagination state - restore from cookies if available
+  const [currentPage, setCurrentPage] = useState(() => {
+    const savedPage = getCookie(`trackQnAPage_${shareToken}`);
+    return savedPage ? parseInt(savedPage, 10) : 1;
+  });
+  const [paginationInfo, setPaginationInfo] = useState(null);
   
   // Question share link state
   const [questionShareUrls, setQuestionShareUrls] = useState({}); // Store URLs by question ID
@@ -63,7 +73,7 @@ const TrackQnAShareLinkPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [shareToken]);
+  }, [shareToken, currentPage]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -149,6 +159,14 @@ const TrackQnAShareLinkPage = () => {
     });
   }, [sessionFilters, allQuestionsBySession, applyFiltersForSession]);
 
+  // Save current page to cookies when it changes
+  useEffect(() => {
+    if (currentPage > 0) {
+      setCookie(`trackQnAPage_${shareToken}`, currentPage.toString());
+    }
+  }, [currentPage, shareToken]);
+
+
   // Handle generate question share link
   const handleGenerateQuestionLink = useCallback(async (question) => {
     const existingUrl = questionShareUrlsRef.current[question.id];
@@ -191,19 +209,14 @@ const TrackQnAShareLinkPage = () => {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/engagements/qna/track/${shareToken}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
+      // Use backend pagination - 1 session per page
+      const data = await getTrackQnaByShareLink(shareToken, currentPage, 1);
 
       if (data.success && data.data) {
         setEvent(data.data.event);
         setTrack(data.data.track);
         setSessions(data.data.sessions || []);
+        setPaginationInfo(data.data.pagination || null);
       } else {
         toast.error(data.message || 'Failed to fetch track Q&A data');
       }
@@ -463,6 +476,75 @@ const TrackQnAShareLinkPage = () => {
     );
   }
 
+  // Get current session for pagination (backend returns only current page's sessions)
+  const currentSession = sessions[0] || null;
+  const totalPages = paginationInfo?.totalPages || 1;
+  const hasPrevious = paginationInfo?.hasPreviousPage || false;
+  const hasNext = paginationInfo?.hasNextPage || false;
+
+  // Handle page navigation
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Handle previous page
+  const handlePrevious = () => {
+    if (hasPrevious && currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  // Handle next page
+  const handleNext = () => {
+    if (hasNext && currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
+  // Generate page numbers array with ellipsis
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPages = totalPages;
+    
+    if (maxPages <= 7) {
+      // Show all pages if 7 or fewer
+      for (let i = 1; i <= maxPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      if (currentPage <= 3) {
+        // Near the beginning: 1, 2, 3, 4, ..., last
+        for (let i = 2; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push('ellipsis');
+        pages.push(maxPages);
+      } else if (currentPage >= maxPages - 2) {
+        // Near the end: 1, ..., last-3, last-2, last-1, last
+        pages.push('ellipsis');
+        for (let i = maxPages - 3; i <= maxPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // In the middle: 1, ..., current-1, current, current+1, ..., last
+        pages.push('ellipsis');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('ellipsis');
+        pages.push(maxPages);
+      }
+    }
+    
+    return pages;
+  };
+
   // Create a dummy session object for EventInfoSection (it expects session prop)
   const dummySession = {
     title: `${sessions.length} Session${sessions.length > 1 ? 's' : ''}`,
@@ -520,12 +602,12 @@ const TrackQnAShareLinkPage = () => {
               </div>
             </div>
 
-            {/* Multiple Sessions - Each with its own table */}
-            {sessions.map((session, index) => {
-              const filterHandlers = getFilterHandlers(session.id);
+            {/* Current Session - Show only one session at a time */}
+            {currentSession && (() => {
+              const filterHandlers = getFilterHandlers(currentSession.id);
               
               return (
-                <div key={session.id} style={{ marginBottom: index < sessions.length - 1 ? "40px" : "20px" }}>
+                <div>
                   {/* Session Header */}
                   <div style={{ 
                     marginBottom: "20px",
@@ -540,26 +622,26 @@ const TrackQnAShareLinkPage = () => {
                       fontWeight: "600",
                       color: "#000"
                     }}>
-                      {session.title}
+                      {currentSession.title}
                     </h5>
-                    {session.sessionDate && (
+                    {currentSession.sessionDate && (
                       <p style={{ 
                         margin: "8px 0 0 0",
                         fontSize: "clamp(12px, 2vw, 14px)",
                         color: "#666"
                       }}>
-                        {new Date(session.sessionDate).toLocaleDateString('en-US', { 
+                        {new Date(currentSession.sessionDate).toLocaleDateString('en-US', { 
                           weekday: 'short', 
                           year: 'numeric', 
                           month: 'short', 
                           day: 'numeric' 
                         })}
-                        {session.startTime && session.endTime && (
-                          <span> • {session.startTime} - {session.endTime}</span>
+                        {currentSession.startTime && currentSession.endTime && (
+                          <span> • {currentSession.startTime} - {currentSession.endTime}</span>
                         )}
                       </p>
                     )}
-                    {session.statistics && (
+                    {currentSession.statistics && (
                       <div style={{ 
                         marginTop: "8px",
                         display: "flex",
@@ -567,29 +649,29 @@ const TrackQnAShareLinkPage = () => {
                         flexWrap: "wrap"
                       }}>
                         <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#666" }}>
-                          Total: <strong>{session.statistics.total || 0}</strong>
+                          Total: <strong>{currentSession.statistics.total || 0}</strong>
                         </span>
                         <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#28a745" }}>
-                          Answered: <strong>{session.statistics.answered || 0}</strong>
+                          Answered: <strong>{currentSession.statistics.answered || 0}</strong>
                         </span>
                         <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#ffc107" }}>
-                          Unanswered: <strong>{session.statistics.unanswered || 0}</strong>
+                          Unanswered: <strong>{currentSession.statistics.unanswered || 0}</strong>
                         </span>
-                        {session.statistics.answering > 0 && (
+                        {currentSession.statistics.answering > 0 && (
                           <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#71C0BB" }}>
-                            Answering: <strong>{session.statistics.answering || 0}</strong>
+                            Answering: <strong>{currentSession.statistics.answering || 0}</strong>
                           </span>
                         )}
-                        {session.statistics.approval > 0 && (
+                        {currentSession.statistics.approval > 0 && (
                           <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#71C0BB" }}>
-                            Approval: <strong>{session.statistics.approval || 0}</strong>
+                            Approval: <strong>{currentSession.statistics.approval || 0}</strong>
                           </span>
                         )}
                       </div>
                     )}
                     
                     {/* Session Share URL Field */}
-                    {session.shareLink && session.shareLink.shareUrl && (
+                    {currentSession.shareLink && currentSession.shareLink.shareUrl && (
                       <div style={{ marginTop: "16px" }}>
                         <p style={{ marginBottom: "8px", fontSize: "clamp(13px, 2vw, 16px)" }}>
                           <strong>Session Share URL:</strong>
@@ -598,14 +680,14 @@ const TrackQnAShareLinkPage = () => {
                           <input
                             readOnly
                             onClick={() => {
-                              navigator.clipboard.writeText(session.shareLink.shareUrl);
+                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
                               toast.success('Session URL copied to clipboard!');
                             }}
                             onDoubleClick={() => {
-                              navigator.clipboard.writeText(session.shareLink.shareUrl);
+                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
                               toast.success('Session URL copied to clipboard!');
                             }}
-                            value={session.shareLink.shareUrl}
+                            value={currentSession.shareLink.shareUrl}
                             style={{
                               flex: 1,
                               backgroundColor: "#D9D9D9",
@@ -628,7 +710,7 @@ const TrackQnAShareLinkPage = () => {
                           />
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(session.shareLink.shareUrl);
+                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
                               toast.success('Session URL copied to clipboard!');
                             }}
                             style={{
@@ -653,9 +735,9 @@ const TrackQnAShareLinkPage = () => {
 
                   {/* Questions Table for this session */}
                   <QuestionsTable 
-                    questions={session.questions || []} 
+                    questions={currentSession.questions || []} 
                     onAnswer={handleAnswerQuestion}
-                    onEdit={(q) => handleEditQuestion(q, session.id)}
+                    onEdit={(q) => handleEditQuestion(q, currentSession.id)}
                     onDelete={handleDeleteQuestionClick}
                     onGenerateLink={handleGenerateQuestionLink}
                     voteFilterActive={filterHandlers.voteFilter}
@@ -668,7 +750,162 @@ const TrackQnAShareLinkPage = () => {
                   />
                 </div>
               );
-            })}
+            })()}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ 
+                position: "sticky",
+                bottom: "20px",
+                display: "flex", 
+                justifyContent: "flex-end", 
+                alignItems: "center",
+                gap: "clamp(4px, 1vw, 8px)",
+                marginTop: "40px",
+                padding: "12px clamp(8px, 2vw, 16px)",
+                flexWrap: "wrap",
+                width: "100%",
+                maxWidth: "100%",
+                boxSizing: "border-box",
+                overflow: "hidden",
+                zIndex: 100
+              }}>
+                {/* Previous Button */}
+                <button
+                  onClick={handlePrevious}
+                  disabled={!hasPrevious}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: hasPrevious ? "#666" : "#ccc",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
+                    fontSize: "clamp(14px, 1.5vw, 18px)",
+                    fontWeight: "500",
+                    cursor: hasPrevious ? "pointer" : "not-allowed",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                    minWidth: "clamp(32px, 4vw, 40px)",
+                    height: "clamp(32px, 4vw, 40px)",
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    if (hasPrevious) {
+                      e.target.style.backgroundColor = "#f5f5f5";
+                      e.target.style.color = "#333";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (hasPrevious) {
+                      e.target.style.backgroundColor = "transparent";
+                      e.target.style.color = "#666";
+                    }
+                  }}
+                >
+                  <i className="feather icon-chevron-left"></i>
+                </button>
+
+                {/* Page Numbers */}
+                {getPageNumbers().map((page, index) => {
+                  if (page === 'ellipsis') {
+                    return (
+                      <span 
+                        key={`ellipsis-${index}`}
+                        style={{
+                          padding: "clamp(6px, 1vw, 8px) clamp(2px, 0.5vw, 4px)",
+                          color: "#999",
+                          fontSize: "clamp(12px, 1.3vw, 16px)",
+                          fontWeight: "500",
+                          flexShrink: 0
+                        }}
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  const isActive = page === currentPage;
+                  
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      style={{
+                        backgroundColor: isActive ? "#71C0BB" : "transparent",
+                        color: isActive ? "white" : "#666",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
+                        fontSize: "clamp(12px, 1.3vw, 16px)",
+                        fontWeight: isActive ? "600" : "500",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s ease",
+                        minWidth: "clamp(32px, 4vw, 40px)",
+                        height: "clamp(32px, 4vw, 40px)",
+                        boxShadow: isActive ? "0 2px 4px rgba(113, 192, 187, 0.3)" : "none",
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.target.style.backgroundColor = "#f5f5f5";
+                          e.target.style.color = "#333";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.target.style.backgroundColor = "transparent";
+                          e.target.style.color = "#666";
+                        }
+                      }}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+
+                {/* Next Button */}
+                <button
+                  onClick={handleNext}
+                  disabled={!hasNext}
+                  style={{
+                    backgroundColor: "transparent",
+                    color: hasNext ? "#666" : "#ccc",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
+                    fontSize: "clamp(14px, 1.5vw, 18px)",
+                    fontWeight: "500",
+                    cursor: hasNext ? "pointer" : "not-allowed",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                    minWidth: "clamp(32px, 4vw, 40px)",
+                    height: "clamp(32px, 4vw, 40px)",
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    if (hasNext) {
+                      e.target.style.backgroundColor = "#f5f5f5";
+                      e.target.style.color = "#333";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (hasNext) {
+                      e.target.style.backgroundColor = "transparent";
+                      e.target.style.color = "#666";
+                    }
+                  }}
+                >
+                  <i className="feather icon-chevron-right"></i>
+                </button>
+              </div>
+            )}
           </Col>
         </Row>
       </Container>
@@ -697,46 +934,14 @@ const TrackQnAShareLinkPage = () => {
       />
 
       {/* Approve/Cancel Modal */}
-      <Modal show={showApproveModal} onHide={handleCancelApprove} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Approve Question</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedQuestionForApprove && (
-            <div>
-              <p style={{ marginBottom: "16px", fontSize: "16px" }}>
-                <strong>Question:</strong>
-              </p>
-              <p style={{ 
-                marginBottom: "20px", 
-                padding: "12px",
-                backgroundColor: "#f8f9fa",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontStyle: "italic"
-              }}>
-                {selectedQuestionForApprove.question}
-              </p>
-              <p style={{ fontSize: "14px", color: "#666" }}>
-                Do you want to approve this question?
-              </p>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCancelApprove} disabled={approving}>
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleApproveQuestion} 
-            disabled={approving}
-            style={{ backgroundColor: "#71C0BB", borderColor: "#71C0BB" }}
-          >
-            {approving ? 'Approving...' : 'Approve'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ApproveQuestionModal
+        show={showApproveModal}
+        onHide={handleCancelApprove}
+        question={selectedQuestionForApprove}
+        onApprove={handleApproveQuestion}
+        onCancel={handleCancelApprove}
+        approving={approving}
+      />
     </div>
   );
 };

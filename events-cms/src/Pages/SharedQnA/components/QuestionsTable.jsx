@@ -61,8 +61,12 @@ const QuestionsTable = ({
         marginTop: "20px", 
         overflowX: "auto", 
         overflowY: "auto",
-        maxHeight: "calc(100vh - 400px)",
-        WebkitOverflowScrolling: "touch" 
+        WebkitOverflowScrolling: "touch",
+        height: "auto",
+        minHeight: "auto",
+        maxHeight: "calc(100vh - 500px)",
+        display: "flex",
+        flexDirection: "column"
       }}>
         <Table bordered className="questions-table" style={{ 
           borderCollapse: 'separate', 

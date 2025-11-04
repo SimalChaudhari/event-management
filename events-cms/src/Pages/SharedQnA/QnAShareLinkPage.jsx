@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Spinner, Alert, Button } from "react-bootstrap";
+import { Container, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { API_URL } from "../../configs/env";
 import EventInfoSection from "./components/EventInfoSection";
 import QuestionsTable from "./components/QuestionsTable";
-import { updateQuestionViaShareLink } from "./components/QnAShareApi";
+import FullScreenQuestionPopup from "./components/FullScreenQuestionPopup";
+import { updateQuestionViaShareLink, getSessionQnaByShareLink } from "./components/QnAShareApi";
 import { applyFiltersToQuestions } from "./utils/filterUtils";
 
 const QnAShareLinkPage = () => {
@@ -57,15 +58,7 @@ const QnAShareLinkPage = () => {
         return;
       }
 
-      // Fetch from public API endpoint without authentication
-      const response = await fetch(`${API_URL}/api/engagements/qna/share/${shareToken}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
+      const data = await getSessionQnaByShareLink(shareToken);
 
       if (data.success && data.data) {
         setEvent(data.data.event);
@@ -192,165 +185,14 @@ const QnAShareLinkPage = () => {
       </Container>
 
       {/* Full-screen Question Popup */}
-      {showQuestionPopup && selectedQuestion && (
-        <div
-          onClick={(e) => {
-            // Close popup if clicking on background
-            if (e.target === e.currentTarget) {
-              handleClosePopup();
-            }
-          }}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden"
-          }}
-        >
-          {/* Background Image */}
-          {backgroundImageUrl && (
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundImage: `url(${backgroundImageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-                backgroundAttachment: "fixed",
-                filter: "blur(2px)",
-                zIndex: 0
-              }}
-            />
-          )}
-          
-          {/* Light overlay for better text visibility */}
-          <div style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(255, 255, 255, 0.3)",
-            zIndex: 1
-          }}></div>
-
-          {/* Close Button (X) - Top Right */}
-          <button
-            onClick={handleClosePopup}
-            disabled={markingAsAnswered}
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              width: "40px",
-              height: "40px",
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-              border: "none",
-              borderRadius: "50%",
-              cursor: markingAsAnswered ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "24px",
-              fontWeight: "bold",
-              color: "#333",
-              zIndex: 10000,
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
-              transition: "all 0.2s ease"
-            }}
-            onMouseEnter={(e) => {
-              if (!markingAsAnswered) {
-                e.target.style.backgroundColor = "rgba(255, 255, 255, 1)";
-                e.target.style.transform = "scale(1.1)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
-              e.target.style.transform = "scale(1)";
-            }}
-          >
-            ×
-          </button>
-
-          {/* Question Content */}
-          <div
-            style={{
-              position: "relative",
-              zIndex: 2,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "40px",
-              width: "100%",
-              maxWidth: "90%",
-              padding: "20px"
-            }}
-          >
-            {/* Question Text */}
-            <h1
-              style={{
-                color: "#000000",
-                fontWeight: "700",
-                fontStyle: "italic",
-                fontSize: "clamp(28px, 5vw, 48px)",
-                lineHeight: "1.4",
-                wordBreak: "break-word",
-                marginBottom: "0",
-                textAlign: "center",
-                padding: "20px",
-                fontFamily: "Arial, sans-serif",
-                letterSpacing: "0.5px",
-                textShadow: "2px 2px 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.6), -2px -2px 8px rgba(255, 255, 255, 0.8)"
-              }}
-            >
-              {selectedQuestion.question}
-            </h1>
-
-            {/* Mark as Answered Button */}
-            <Button
-              onClick={handleMarkAsAnswered}
-              disabled={markingAsAnswered}
-              style={{
-                backgroundColor: markingAsAnswered ? "#6c757d" : "#71C0BB",
-                borderColor: markingAsAnswered ? "#6c757d" : "#71C0BB",
-                color: "white",
-                padding: "12px 40px",
-                fontSize: "clamp(16px, 3vw, 20px)",
-                fontWeight: "600",
-                borderRadius: "8px",
-                border: "none",
-                cursor: markingAsAnswered ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                minWidth: "200px"
-              }}
-              onMouseEnter={(e) => {
-                if (!markingAsAnswered) {
-                  e.target.style.backgroundColor = "#5fa8a3";
-                  e.target.style.transform = "scale(1.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!markingAsAnswered) {
-                  e.target.style.backgroundColor = "#71C0BB";
-                  e.target.style.transform = "scale(1)";
-                }
-              }}
-            >
-              {markingAsAnswered ? 'Marking...' : 'Mark as Answered'}
-            </Button>
-          </div>
-        </div>
-      )}
+      <FullScreenQuestionPopup
+        show={showQuestionPopup}
+        question={selectedQuestion}
+        backgroundImageUrl={backgroundImageUrl}
+        markingAsAnswered={markingAsAnswered}
+        onClose={handleClosePopup}
+        onMarkAsAnswered={handleMarkAsAnswered}
+      />
     </div>
   );
 };

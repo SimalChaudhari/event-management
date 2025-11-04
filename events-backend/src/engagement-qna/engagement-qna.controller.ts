@@ -275,9 +275,17 @@ export class EngagementQnaController {
   async getTrackQnaByShareLink(
     @Param('shareToken') shareToken: string,
     @Res() response: Response,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     try {
-      const result = await this.engagementQnaService.getTrackQnaByShareLink(shareToken);
+      const pageNumber = page ? parseInt(page, 10) : 1;
+      const pageSizeNumber = pageSize ? parseInt(pageSize, 10) : 1; // Default 1 session per page
+      const result = await this.engagementQnaService.getTrackQnaByShareLink(
+        shareToken,
+        pageNumber,
+        pageSizeNumber,
+      );
 
       const successResponse: SuccessResponse = {
         success: result.success,
