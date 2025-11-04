@@ -36,7 +36,7 @@ const BannerManagement = () => {
 
     // Load data on component mount
     useEffect(() => {
-        dispatch(getBanners('home'));
+        dispatch(getBanners());
         dispatch(getBannerEvents());
     }, [dispatch]);
 
@@ -90,13 +90,13 @@ const BannerManagement = () => {
 
         const success = bannerType === 'event' 
             ? await dispatch(uploadBannerEvents(selectedFiles, hyperlinks))
-            : await dispatch(uploadBanners(selectedFiles, hyperlinks, 'home'));
+            : await dispatch(uploadBanners(selectedFiles, hyperlinks));
 
         if (success) {
             setSelectedFiles([]);
             setHyperlinks([]);
             setBannerType('event');
-            dispatch(getBanners('home'));
+            dispatch(getBanners());
             dispatch(getBannerEvents());
         }
     };
@@ -111,10 +111,10 @@ const BannerManagement = () => {
 
         const success = deleteItem.type === 'event' 
             ? await dispatch(deleteBannerEventImage(deleteItem.imageUrl))
-            : await dispatch(deleteBannerImage(deleteItem.imageUrl, 'home'));
+            : await dispatch(deleteBannerImage(deleteItem.imageUrl));
 
         if (success) {
-            dispatch(getBanners('home'));
+            dispatch(getBanners());
             dispatch(getBannerEvents());
             setShowDeleteModal(false);
             setDeleteItem(null);
@@ -129,7 +129,7 @@ const BannerManagement = () => {
     const confirmClearAll = async () => {
         const success = clearType === 'event' 
             ? await dispatch(clearAllBannerEvents())
-            : await dispatch(clearAllBanners('home'));
+            : await dispatch(clearAllBanners());
 
         if (success) {
             setShowClearModal(false);
@@ -156,12 +156,12 @@ const BannerManagement = () => {
             const normalizedImageUrl = imageUrl.replace(/^.*\/uploads\//, 'uploads/');
             const success = type === 'event' 
                 ? await dispatch(updateBannerEventHyperlink(normalizedImageUrl, tempHyperlink))
-                : await dispatch(updateBannerHyperlink(normalizedImageUrl, tempHyperlink, 'home'));
+                : await dispatch(updateBannerHyperlink(normalizedImageUrl, tempHyperlink));
             if (success) {
                 setEditingHyperlink(null);
                 setTempHyperlink('');
                 dispatch(getBannerEvents());
-                dispatch(getBanners('home'));
+                dispatch(getBanners());
             }
         }
     };

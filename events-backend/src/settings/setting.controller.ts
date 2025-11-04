@@ -22,6 +22,7 @@ import {
   PrivacyPolicyService,
   TermsConditionsService,
   BannerService,
+  BannerEventService,
   LogoService,
   UserPermissionsService,
   PermissionTemplateService,
@@ -32,6 +33,7 @@ import {
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
   CreateBannerDto,
+  CreateBannerEventDto,
   CreateLogoDto,
   CreatePermissionTemplateDto,
   UpdateUserPermissionDto,
@@ -48,7 +50,7 @@ import {
   CreateAdvertNotificationFormDto,
   UpdateAdvertNotificationFormDto,
 } from './setting.dto';
-import { PrivacyPolicy, TermsConditions, Banner, Logo, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
+import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, Logo, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
@@ -107,22 +109,25 @@ export class TermsConditionsController {
   }
 }
 
-@Controller('api/banners')
+@Controller('api/auth/banners')
 export class BannerController {
   constructor(private readonly bannerService: BannerService) { }
 
-  @Get(':type')
-  async getByType(@Param('type') type: 'home' | 'event'): Promise<Banner | { message: string }> {
-    return this.bannerService.getByType(type);
+  @Get()
+  async getOrShow(): Promise<Banner | { message: string }> {
+    const banner = await this.bannerService.getOrShow();
+    if (!banner) {
+      return { message: 'No banners found' };
+    }
+    return banner;
   }
 
-  @Post(':type')
+  @Post()
   @UseInterceptors(
     FilesInterceptor('images', 10, {
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const type = req.params.type || 'home';
-          const destinationPath = `./uploads/banners/${type}`;
+          const destinationPath = './uploads/banners';
           if (!fs.existsSync(destinationPath)) {
             fs.mkdirSync(destinationPath, { recursive: true });
           }
@@ -136,13 +141,11 @@ export class BannerController {
     }),
   )
   async createOrUpdate(
-    @Param('type') type: 'home' | 'event',
     @UploadedFiles() files: Express.Multer.File[],
     @Body('hyperlinks') hyperlinks?: string | string[],
   ): Promise<{ message: string; data: Banner }> {
-    const imageUrls = files.map(file => `uploads/banners/${type}/${file.filename}`);
+    const imageUrls = files.map(file => `uploads/banners/${file.filename}`);
     
-    // Parse hyperlinks - can be string (single) or array (multiple)
     let hyperlinksArray: string[] | undefined;
     if (hyperlinks) {
       if (typeof hyperlinks === 'string') {
@@ -163,37 +166,116 @@ export class BannerController {
     }
     
     const createBannerDto: CreateBannerDto = {
-      type: type,
       imageUrls: imageUrls,
       hyperlinks: hyperlinksArray
     };
     return this.bannerService.createOrUpdate(createBannerDto);
   }
 
-  // New API to clear all banners by type
-  @Delete(':type/clear-all')
-  async clearAllBanners(@Param('type') type: 'home' | 'event'): Promise<{ message: string }> {
-    return this.bannerService.clearBanner(type);
+  @Delete('clear-all')
+  async clearAllBanners(): Promise<{ message: string }> {
+    return this.bannerService.clearBanner();
   }
 
-  // New API to delete specific image by type
-  @Delete(':type/delete-image')
-  async deleteSpecificImage(
-    @Param('type') type: 'home' | 'event',
-    @Body('imageUrl') imageUrl: string,
-  ): Promise<{ message: string; data: Banner }> {
-    return this.bannerService.deleteBannerImage(imageUrl, type);
+  @Delete('delete-image')
+  async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: Banner }> {
+    return this.bannerService.deleteBannerImage(imageUrl);
   }
 
-  // New API to update hyperlink for a specific banner by type
-  @Put(':type/update-hyperlink')
+  @Put('update-hyperlink')
   async updateHyperlink(
-    @Param('type') type: 'home' | 'event',
     @Body('imageUrl') imageUrl: string,
     @Body('hyperlink') hyperlink?: string,
   ): Promise<{ message: string; data: Banner }> {
     try {
-      return await this.bannerService.updateHyperlink(imageUrl, hyperlink || '', type);
+      return await this.bannerService.updateHyperlink(imageUrl, hyperlink || '');
+    } catch (error) {
+      console.error('Controller error updating hyperlink:', error);
+      throw error;
+    }
+  }
+}
+
+@Controller('api/banner-events')
+export class BannerEventController {
+  constructor(private readonly bannerEventService: BannerEventService) { }
+
+  @Get()
+  async getOrShow(): Promise<BannerEvent | { message: string }> {
+    const bannerEvent = await this.bannerEventService.getOrShow();
+    if (!bannerEvent) {
+      return { message: 'No banner events found' };
+    }
+    return bannerEvent;
+  }
+
+  @Post()
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/banner-events';
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+    }),
+  )
+  async createOrUpdate(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('hyperlinks') hyperlinks?: string | string[],
+  ): Promise<{ message: string; data: BannerEvent }> {
+    const imageUrls = files.map(file => `uploads/banner-events/${file.filename}`);
+    
+    let hyperlinksArray: string[] | undefined;
+    if (hyperlinks) {
+      if (typeof hyperlinks === 'string') {
+        try {
+          hyperlinksArray = JSON.parse(hyperlinks);
+        } catch {
+          hyperlinksArray = new Array(imageUrls.length).fill(hyperlinks);
+        }
+      } else if (Array.isArray(hyperlinks)) {
+        hyperlinksArray = hyperlinks;
+      }
+      if (hyperlinksArray && hyperlinksArray.length !== imageUrls.length) {
+        while (hyperlinksArray.length < imageUrls.length) {
+          hyperlinksArray.push('');
+        }
+        hyperlinksArray = hyperlinksArray.slice(0, imageUrls.length);
+      }
+    }
+    
+    const createBannerEventDto: CreateBannerEventDto = {
+      imageUrls: imageUrls,
+      hyperlinks: hyperlinksArray
+    };
+    return this.bannerEventService.createOrUpdate(createBannerEventDto);
+  }
+
+  @Delete('clear-all')
+  async clearAllBannerEvents(): Promise<{ message: string }> {
+    return this.bannerEventService.clearAllBannerEvents();
+  }
+
+  @Delete('delete-image')
+  async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: BannerEvent }> {
+    return this.bannerEventService.deleteSpecificImage(imageUrl);
+  }
+
+  @Put('update-hyperlink')
+  async updateHyperlink(
+    @Body('imageUrl') imageUrl: string,
+    @Body('hyperlink') hyperlink?: string,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      return await this.bannerEventService.updateHyperlink(imageUrl, hyperlink || '');
     } catch (error) {
       console.error('Controller error updating hyperlink:', error);
       throw error;

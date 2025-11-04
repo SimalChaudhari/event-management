@@ -12,6 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import {
   Banner,
+  BannerEvent,
   Logo,
   PrivacyPolicy,
   TermsConditions,
@@ -29,6 +30,7 @@ import {
 } from './event-notification.entity';
 import {
   CreateBannerDto,
+  CreateBannerEventDto,
   CreateLogoDto,
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
@@ -201,20 +203,20 @@ export class BannerService {
     private bannerRepository: Repository<Banner>,
   ) {}
 
-  async getByType(type: 'home' | 'event'): Promise<Banner | { message: string }> {
+  async getOrShow(): Promise<Banner | { message: string }> {
     try {
-      const banner = await this.bannerRepository.findOne({
-        where: { type },
-        order: { createdAt: 'DESC' },
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
       });
 
       if (!banner) {
-        return { message: `No ${type} banners found` };
+        return { message: 'No banners found' };
       }
       return banner;
     } catch (error: any) {
       throw new InternalServerErrorException(
-        `Error retrieving ${type} banners`,
+        'Error retrieving banners',
         error.message,
       );
     }
@@ -224,10 +226,9 @@ export class BannerService {
     createBannerDto: CreateBannerDto,
   ): Promise<{ message: string; data: Banner }> {
     try {
-      // Find existing banner of the same type
-      const banner = await this.bannerRepository.findOne({
-        where: { type: createBannerDto.type },
-        order: { createdAt: 'DESC' },
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
       });
 
       if (banner) {
@@ -266,7 +267,7 @@ export class BannerService {
         banner.imageUrls = updatedImageUrls;
         banner.hyperlinks = updatedHyperlinks;
         const result = await this.bannerRepository.save(banner);
-        return { message: `${createBannerDto.type} banner added successfully`, data: result };
+        return { message: 'Banner added successfully', data: result };
       } else {
         // Create new banner if none exists
         // Ensure hyperlinks array matches imageUrls length
@@ -279,12 +280,11 @@ export class BannerService {
         hyperlinksArray = hyperlinksArray.slice(0, createBannerDto.imageUrls.length);
 
         const newBanner = this.bannerRepository.create({
-          type: createBannerDto.type,
           imageUrls: createBannerDto.imageUrls,
           hyperlinks: hyperlinksArray,
         });
         const result = await this.bannerRepository.save(newBanner);
-        return { message: `${createBannerDto.type} banner created successfully`, data: result };
+        return { message: 'Banner created successfully', data: result };
       }
     } catch (error: any) {
       throw new InternalServerErrorException(
@@ -294,16 +294,16 @@ export class BannerService {
     }
   }
 
-  // New method to clear banner by type
-  async clearBanner(type: 'home' | 'event'): Promise<{ message: string }> {
+  // New method to clear banner
+  async clearBanner(): Promise<{ message: string }> {
     try {
-      const banner = await this.bannerRepository.findOne({
-        where: { type },
-        order: { createdAt: 'DESC' },
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
       });
 
       if (!banner) {
-        throw new NotFoundException(`No ${type} banner found`);
+        throw new NotFoundException('No banner found');
       }
 
       // Delete all files from upload folder
@@ -314,28 +314,28 @@ export class BannerService {
       banner.hyperlinks = [];
       await this.bannerRepository.save(banner);
 
-      return { message: `${type} banner cleared successfully` };
+      return { message: 'Banner cleared successfully' };
     } catch (error: any) {
       if (error instanceof NotFoundException) {
         throw error;
       }
       throw new InternalServerErrorException(
-        `Error clearing ${type} banner`,
+        'Error clearing banner',
         error.message,
       );
     }
   }
 
-  // New method to delete banner image by type
-  async deleteBannerImage(imageUrl: string, type: 'home' | 'event'): Promise<{ message: string; data: Banner }> {
+  // New method to delete banner image
+  async deleteBannerImage(imageUrl: string): Promise<{ message: string; data: Banner }> {
     try {
-      const banner = await this.bannerRepository.findOne({
-        where: { type },
-        order: { createdAt: 'DESC' },
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
       });
 
       if (!banner) {
-        throw new NotFoundException(`No ${type} banner found`);
+        throw new NotFoundException('No banner found');
       }
 
       const imageIndex = banner.imageUrls.findIndex(
@@ -343,7 +343,7 @@ export class BannerService {
       );
 
       if (imageIndex === -1) {
-        throw new NotFoundException(`Image not found in ${type} banners`);
+        throw new NotFoundException('Image not found in banners');
       }
 
       // Delete the file from upload folder
@@ -356,36 +356,35 @@ export class BannerService {
       }
       const result = await this.bannerRepository.save(banner);
 
-      return { message: `${type} banner image deleted successfully`, data: result };
+      return { message: 'Banner image deleted successfully', data: result };
     } catch (error: any) {
       if (error instanceof NotFoundException) {
         throw error;
       }
       throw new InternalServerErrorException(
-        `Error deleting ${type} banner image`,
+        'Error deleting banner image',
         error.message,
       );
     }
   }
 
-  // New method to update hyperlink for a specific banner by type
+  // New method to update hyperlink for a specific banner
   async updateHyperlink(
     imageUrl: string,
     hyperlink: string,
-    type: 'home' | 'event',
   ): Promise<{ message: string; data: Banner }> {
     try {
       if (!imageUrl) {
         throw new BadRequestException('Image URL is required');
       }
 
-      const banner = await this.bannerRepository.findOne({
-        where: { type },
-        order: { createdAt: 'DESC' },
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
       });
 
       if (!banner) {
-        throw new NotFoundException(`No ${type} banners found`);
+        throw new NotFoundException('No banners found');
       }
 
       // Normalize imageUrl - remove any API URL prefix if present
@@ -400,7 +399,7 @@ export class BannerService {
       );
 
       if (imageIndex === -1) {
-        throw new NotFoundException(`Image not found in ${type} banners. Looking for: ${normalizedImageUrl}`);
+        throw new NotFoundException(`Image not found in banners. Looking for: ${normalizedImageUrl}`);
       }
 
       // Initialize hyperlinks array if it doesn't exist or is too short
@@ -416,7 +415,7 @@ export class BannerService {
       const result = await this.bannerRepository.save(banner);
 
       return {
-        message: `${type} banner hyperlink updated successfully`,
+        message: 'Banner hyperlink updated successfully',
         data: result,
       };
     } catch (error: any) {
@@ -425,7 +424,7 @@ export class BannerService {
         throw error;
       }
       throw new InternalServerErrorException(
-        `Error updating ${type} banner hyperlink`,
+        'Error updating banner hyperlink',
         error.message,
       );
     }
@@ -445,6 +444,250 @@ export class BannerService {
   }
 
   // Helper method to delete multiple files from folder
+  private async deleteFilesFromFolder(imageUrls: string[]): Promise<void> {
+    try {
+      for (const imageUrl of imageUrls) {
+        await this.deleteFileFromFolder(imageUrl);
+      }
+    } catch (error) {
+      console.error('Error deleting files:', error);
+    }
+  }
+}
+
+// Banner Event
+
+@Injectable()
+export class BannerEventService {
+  constructor(
+    @InjectRepository(BannerEvent)
+    private bannerEventRepository: Repository<BannerEvent>,
+  ) {}
+
+  async getOrShow(): Promise<BannerEvent | { message: string }> {
+    try {
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!bannerEvent) {
+        return { message: 'No banner events found' };
+      }
+      return bannerEvent;
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        'Error retrieving banner events',
+        error.message,
+      );
+    }
+  }
+
+  async createOrUpdate(
+    createBannerEventDto: CreateBannerEventDto,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (bannerEvent) {
+        const updatedImageUrls = [
+          ...bannerEvent.imageUrls,
+          ...createBannerEventDto.imageUrls,
+        ];
+        
+        let updatedHyperlinks: string[] = [];
+        if (bannerEvent.hyperlinks && bannerEvent.hyperlinks.length > 0) {
+          updatedHyperlinks = [...bannerEvent.hyperlinks];
+        } else {
+          updatedHyperlinks = new Array(bannerEvent.imageUrls.length).fill('');
+        }
+        
+        if (createBannerEventDto.hyperlinks && createBannerEventDto.hyperlinks.length > 0) {
+          updatedHyperlinks = [...updatedHyperlinks, ...createBannerEventDto.hyperlinks];
+        } else {
+          updatedHyperlinks = [
+            ...updatedHyperlinks,
+            ...new Array(createBannerEventDto.imageUrls.length).fill(''),
+          ];
+        }
+        
+        while (updatedHyperlinks.length < updatedImageUrls.length) {
+          updatedHyperlinks.push('');
+        }
+        updatedHyperlinks = updatedHyperlinks.slice(0, updatedImageUrls.length);
+
+        bannerEvent.imageUrls = updatedImageUrls;
+        bannerEvent.hyperlinks = updatedHyperlinks;
+        const result = await this.bannerEventRepository.save(bannerEvent);
+        return { message: 'Banner events added successfully', data: result };
+      } else {
+        let hyperlinksArray = createBannerEventDto.hyperlinks || [];
+        if (hyperlinksArray.length < createBannerEventDto.imageUrls.length) {
+          while (hyperlinksArray.length < createBannerEventDto.imageUrls.length) {
+            hyperlinksArray.push('');
+          }
+        }
+        hyperlinksArray = hyperlinksArray.slice(0, createBannerEventDto.imageUrls.length);
+
+        const newBannerEvent = this.bannerEventRepository.create({
+          imageUrls: createBannerEventDto.imageUrls,
+          hyperlinks: hyperlinksArray,
+        });
+        const result = await this.bannerEventRepository.save(newBannerEvent);
+        return { message: 'Banner events created successfully', data: result };
+      }
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        'Error creating or updating banners',
+        error.message,
+      );
+    }
+  }
+
+  async deleteSpecificImage(
+    imageUrl: string,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!bannerEvent) {
+        throw new NotFoundException('No banner events found');
+      }
+
+      const imageIndex = bannerEvent.imageUrls.findIndex(
+        (url) => url === imageUrl,
+      );
+
+      if (imageIndex === -1) {
+        throw new NotFoundException('Image not found in banner events');
+      }
+
+      await this.deleteFileFromFolder(imageUrl);
+
+      bannerEvent.imageUrls.splice(imageIndex, 1);
+      if (bannerEvent.hyperlinks && bannerEvent.hyperlinks.length > imageIndex) {
+        bannerEvent.hyperlinks.splice(imageIndex, 1);
+      }
+      const result = await this.bannerEventRepository.save(bannerEvent);
+
+      return {
+        message: 'Specific banner event image deleted successfully',
+        data: result,
+      };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error deleting specific banner event image',
+        error.message,
+      );
+    }
+  }
+
+  async updateHyperlink(
+    imageUrl: string,
+    hyperlink: string,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      if (!imageUrl) {
+        throw new BadRequestException('Image URL is required');
+      }
+
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!bannerEvent) {
+        throw new NotFoundException('No banner events found');
+      }
+
+      const normalizedImageUrl = imageUrl.replace(/^.*\/uploads\//, 'uploads/');
+      
+      const imageIndex = bannerEvent.imageUrls.findIndex(
+        (url) => {
+          const normalizedUrl = url.replace(/^.*\/uploads\//, 'uploads/');
+          return normalizedUrl === normalizedImageUrl || url === imageUrl;
+        },
+      );
+
+      if (imageIndex === -1) {
+        throw new NotFoundException(`Image not found in banner events. Looking for: ${normalizedImageUrl}`);
+      }
+
+      if (!bannerEvent.hyperlinks) {
+        bannerEvent.hyperlinks = new Array(bannerEvent.imageUrls.length).fill('');
+      }
+      while (bannerEvent.hyperlinks.length < bannerEvent.imageUrls.length) {
+        bannerEvent.hyperlinks.push('');
+      }
+
+      bannerEvent.hyperlinks[imageIndex] = hyperlink || '';
+      const result = await this.bannerEventRepository.save(bannerEvent);
+
+      return {
+        message: 'Banner hyperlink updated successfully',
+        data: result,
+      };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        console.error('Error updating banner hyperlink:', error);
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error updating banner hyperlink',
+        error.message,
+      );
+    }
+  }
+
+  async clearAllBannerEvents(): Promise<{ message: string }> {
+    try {
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+
+      if (!bannerEvent) {
+        throw new NotFoundException('No banner events found');
+      }
+
+      await this.deleteFilesFromFolder(bannerEvent.imageUrls);
+
+      bannerEvent.imageUrls = [];
+      bannerEvent.hyperlinks = [];
+      await this.bannerEventRepository.save(bannerEvent);
+
+      return { message: 'All banner events cleared successfully' };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error clearing all banner events',
+        error.message,
+      );
+    }
+  }
+
+  private async deleteFileFromFolder(imageUrl: string): Promise<void> {
+    try {
+      const filePath = path.join(process.cwd(), imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      console.error(`Error deleting file ${imageUrl}:`, error);
+    }
+  }
+
   private async deleteFilesFromFolder(imageUrls: string[]): Promise<void> {
     try {
       for (const imageUrl of imageUrls) {

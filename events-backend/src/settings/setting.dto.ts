@@ -25,8 +25,19 @@ export class CreateBannerDto {
     @IsString()
     readonly id?: string;
 
-    @IsEnum(['home', 'event'])
-    readonly type!: 'home' | 'event'; // Banner type: home or event
+    @IsArray()
+    @IsString({ each: true })
+    readonly imageUrls!: string[];
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    readonly hyperlinks?: string[];
+}
+
+export class CreateBannerEventDto {
+    @IsString()
+    readonly id?: string;
 
     @IsArray()
     @IsString({ each: true })
