@@ -28,7 +28,7 @@ export class EngagementService {
   ) {}
 
   /**
-   * Create a new engagement
+   * Create a new engagement or update existing one by adding new sessions
    */
   async createEngagement(createEngagementDto: CreateEngagementDto): Promise<Engagement> {
     // Verify that the programme track exists
@@ -39,17 +39,6 @@ export class EngagementService {
 
     if (!track) {
       throw new NotFoundException(`Programme track with ID ${createEngagementDto.trackId} not found`);
-    }
-
-    // Check if an engagement already exists for this track
-    const existingEngagement = await this.engagementRepository.findOne({
-      where: { trackId: createEngagementDto.trackId },
-    });
-
-    if (existingEngagement) {
-      throw new ConflictException(
-        `Engagement already exists for this track.`
-      );
     }
 
     // Validate session IDs (now required)
@@ -70,6 +59,31 @@ export class EngagementService {
       );
     }
 
+    // Check if an engagement already exists for this track
+    const existingEngagement = await this.engagementRepository.findOne({
+      where: { trackId: createEngagementDto.trackId },
+    });
+
+    if (existingEngagement) {
+      // Merge new sessionIds with existing ones (avoid duplicates)
+      const existingSessionIds = existingEngagement.sessionIds || [];
+      const newSessionIds = createEngagementDto.sessionIds || [];
+      
+      // Combine and remove duplicates
+      const mergedSessionIds = [...new Set([...existingSessionIds, ...newSessionIds])];
+      
+      // Update existing engagement with merged sessionIds
+      existingEngagement.sessionIds = mergedSessionIds;
+      
+      // Update isActive if provided
+      if (createEngagementDto.isActive !== undefined) {
+        existingEngagement.isActive = createEngagementDto.isActive;
+      }
+      
+      return await this.engagementRepository.save(existingEngagement);
+    }
+
+    // Create new engagement if one doesn't exist
     const engagement = this.engagementRepository.create(createEngagementDto);
     return await this.engagementRepository.save(engagement);
   }

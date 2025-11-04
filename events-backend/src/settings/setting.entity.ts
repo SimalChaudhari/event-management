@@ -38,23 +38,8 @@ export class Banner {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
 
-    @Column('text')
-    imageUrl!: string; // Single image URL
-
-    @Column('text', { nullable: true })
-    hyperlink?: string; // Single optional hyperlink
-
-    @CreateDateColumn()
-    createdAt!: Date;
-
-    @UpdateDateColumn()
-    updatedAt!: Date;
-}
-
-@Entity('banner_events')
-export class BannerEvent {
-    @PrimaryGeneratedColumn('uuid')
-    id!: string;
+    @Column({ type: 'enum', enum: ['home', 'event'], default: 'home' })
+    type!: 'home' | 'event'; // Banner type: home or event
 
     @Column('simple-array')
     imageUrls!: string[]; // Array of image URLs

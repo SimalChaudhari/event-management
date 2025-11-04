@@ -92,7 +92,7 @@ export class EngagementQnaService {
       question.likesCount = 0;
       question.isPinned = false;
       question.isActive = true;
-      question.status = 'answering'; // Default status is answering
+      question.status = QuestionStatus.NOT_ANSWERED; // Default status is answering
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 

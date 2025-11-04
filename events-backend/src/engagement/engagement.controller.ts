@@ -31,7 +31,7 @@ export class EngagementController {
   constructor(private readonly engagementService: EngagementService) {}
 
   /**
-   * Create a new engagement
+   * Create a new engagement or add sessions to existing engagement
    */
   @Post()
   @Roles(UserRole.Admin)
@@ -43,13 +43,13 @@ export class EngagementController {
       const engagement = await this.engagementService.createEngagement(createEngagementDto);
       return response.status(HttpStatus.CREATED).json({
         success: true,
-        message: 'Engagement created successfully',
+        message: 'Engagement created/updated successfully',
         data: engagement,
       });
     } catch (error: any) {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
-        message: error.message || 'Failed to create engagement',
+        message: error.message || 'Failed to create/update engagement',
       });
     }
   }

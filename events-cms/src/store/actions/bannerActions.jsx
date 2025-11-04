@@ -25,11 +25,11 @@ export const setBannerError = (error) => ({
     payload: error
 });
 
-// Get Banners
-export const getBanners = () => async (dispatch) => {
+// Get Banners by type
+export const getBanners = (type = 'home') => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
-        const response = await axiosInstance.get('/auth/banners');
+        const response = await axiosInstance.get(`/banners/${type}`);
         dispatch({
             type: GET_BANNERS,
             payload: response.data,
@@ -49,7 +49,7 @@ export const getBanners = () => async (dispatch) => {
 export const getBannerEvents = () => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
-        const response = await axiosInstance.get('/banner-events');
+        const response = await axiosInstance.get('/banners/event');
         dispatch({
             type: GET_BANNER_EVENTS,
             payload: response.data,
@@ -66,27 +66,8 @@ export const getBannerEvents = () => async (dispatch) => {
 };
 
 // Upload Banners
-export const uploadBanners = (file, hyperlink) => async dispatch => {
+export const uploadBanners = (files, hyperlinks, type = 'home') => async dispatch => {
     try {
-        const formData = new FormData();
-        formData.append('image', file)
-        if (hyperlink) formData.append('hyperlink', hyperlink);
-
-        // axios/fetch call
-        const response = await axiosInstance.post('/auth/banners', formData)
-        // success dispatch
-        dispatch({ type: UPLOAD_BANNERS, payload: response.data });
-        return true;
-    } catch (error) {
-        dispatch({ type: SET_BANNER_ERROR, payload: error.message });
-        return false;
-    }
-};
-
-// Upload Banner Events
-export const uploadBannerEvents = (files, hyperlinks) => async (dispatch) => {
-    try {
-       
         const formData = new FormData();
         files.forEach((file) => {
             formData.append('images', file);
@@ -98,7 +79,33 @@ export const uploadBannerEvents = (files, hyperlinks) => async (dispatch) => {
             formData.append('hyperlinks', JSON.stringify(hyperlinks));
         }
 
-        const response = await axiosInstance.post('/banner-events', formData)
+        const response = await axiosInstance.post(`/banners/${type}`, formData);
+        dispatch({ type: UPLOAD_BANNERS, payload: response.data.data });
+        toast.success(response.data.message || 'Banners uploaded successfully!');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to upload banners';
+        dispatch({ type: SET_BANNER_ERROR, payload: errorMessage });
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Upload Banner Events
+export const uploadBannerEvents = (files, hyperlinks) => async (dispatch) => {
+    try {
+        const formData = new FormData();
+        files.forEach((file) => {
+            formData.append('images', file);
+        });
+        
+        // Add hyperlinks array to formData if provided
+        if (hyperlinks && hyperlinks.length > 0) {
+            // Send as JSON string for array handling
+            formData.append('hyperlinks', JSON.stringify(hyperlinks));
+        }
+
+        const response = await axiosInstance.post('/banners/event', formData);
         
         dispatch({
             type: UPLOAD_BANNER_EVENTS,
@@ -115,11 +122,11 @@ export const uploadBannerEvents = (files, hyperlinks) => async (dispatch) => {
 };
 
 // Delete Specific Banner Image
-export const deleteBannerImage = (imageUrl) => async (dispatch) => {
+export const deleteBannerImage = (imageUrl, type = 'home') => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/auth/banners/delete-image', {
+        const response = await axiosInstance.delete(`/banners/${type}/delete-image`, {
             data: { imageUrl }
         });
         
@@ -140,12 +147,53 @@ export const deleteBannerImage = (imageUrl) => async (dispatch) => {
     return false;
 };
 
+// Update Banner Hyperlink
+export const updateBannerHyperlink = (imageUrl, hyperlink, type = 'home') => async (dispatch) => {
+    try {
+        dispatch(setBannerLoading(true));
+        
+        console.log('Updating banner hyperlink:', { imageUrl, hyperlink, type });
+        
+        const response = await axiosInstance.put(`/banners/${type}/update-hyperlink`, {
+            imageUrl,
+            hyperlink: hyperlink || ''
+        });
+        
+        console.log('Banner hyperlink update response:', response.data);
+        
+        dispatch({
+            type: GET_BANNERS,
+            payload: response.data.data,
+        });
+        
+        toast.success(response.data.message || 'Hyperlink updated successfully!');
+        return true;
+    } catch (error) {
+        console.error('Error updating banner hyperlink:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            response: error?.response,
+            request: error?.request,
+            config: error?.config
+        });
+        
+        const errorMessage = error?.response?.data?.message 
+            || error?.message 
+            || 'Failed to update hyperlink';
+        dispatch(setBannerError(errorMessage));
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        dispatch(setBannerLoading(false));
+    }
+};
+
 // Delete Specific Banner Event Image
 export const deleteBannerEventImage = (imageUrl) => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/banner-events/delete-image', {
+        const response = await axiosInstance.delete('/banners/event/delete-image', {
             data: { imageUrl }
         });
         
@@ -173,7 +221,7 @@ export const updateBannerEventHyperlink = (imageUrl, hyperlink) => async (dispat
         
         console.log('Updating hyperlink:', { imageUrl, hyperlink });
         
-        const response = await axiosInstance.put('/banner-events/update-hyperlink', {
+        const response = await axiosInstance.put('/banners/event/update-hyperlink', {
             imageUrl,
             hyperlink: hyperlink || ''
         });
@@ -208,11 +256,11 @@ export const updateBannerEventHyperlink = (imageUrl, hyperlink) => async (dispat
 };
 
 // Clear All Banners
-export const clearAllBanners = () => async (dispatch) => {
+export const clearAllBanners = (type = 'home') => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/auth/banners/clear-all');
+        const response = await axiosInstance.delete(`/banners/${type}/clear-all`);
         
         dispatch({
             type: CLEAR_ALL_BANNERS,
@@ -236,7 +284,7 @@ export const clearAllBannerEvents = () => async (dispatch) => {
     try {
         dispatch(setBannerLoading(true));
         
-        const response = await axiosInstance.delete('/banner-events/clear-all');
+        const response = await axiosInstance.delete('/banners/event/clear-all');
         
         dispatch({
             type: CLEAR_ALL_BANNER_EVENTS,
