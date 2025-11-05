@@ -153,9 +153,20 @@ export class UserUtils {
       ...sanitizedUser 
     } = user;
     
+    // Determine button visibility and action
+    // If isDeleteButtonVisible is true, show button (active or inactive)
+    // If isDeleteButtonVisible is false, don't show button (set accountActionButton to null)
+    const isDeleteButtonVisible = true;
+    
+    const accountActionButton = isDeleteButtonVisible
+      ? (user.isActive ? 'Deactivate Account' : 'Delete Account')
+      : null;
+    
     return {
       ...sanitizedUser,
-      formattedAddress: this.formatUserAddress(user)
+      formattedAddress: this.formatUserAddress(user),
+      accountActionButton: accountActionButton,
+      isDeleteButtonVisible: isDeleteButtonVisible
     };
   }
 
