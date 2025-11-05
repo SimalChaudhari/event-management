@@ -24,10 +24,13 @@ import { UserEntity } from '../user/users.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { ProgrammeSession } from '../programme/programme-session.entity';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
+import { EngagementQnaGateway } from './engagement-qna.gateway';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class EngagementQnaService {
+  private gateway: EngagementQnaGateway | null = null;
+
   constructor(
     @InjectRepository(EngagementQnaQuestion)
     private engagementQnaQuestionRepository: Repository<EngagementQnaQuestion>,
@@ -51,6 +54,11 @@ export class EngagementQnaService {
     private programmeTrackRepository: Repository<ProgrammeTrack>,
     private errorHandler: ErrorHandlerService,
   ) {}
+
+  // Set gateway reference (called from module to avoid circular dependency)
+  setGateway(gateway: EngagementQnaGateway) {
+    this.gateway = gateway;
+  }
 
   // 1. Create Question (Only for registered users of the event)
   async createQuestion(createDto: CreateEngagementQuestionDto, askedById: string) {
@@ -162,10 +170,8 @@ export class EngagementQnaService {
         whereConditions.status = 'answered';
       } else if (getDto.status === QuestionStatus.NOT_ANSWERED) {
         whereConditions.status = 'not_answered';
-      } else if (getDto.status === QuestionStatus.ANSWERING) {
-        whereConditions.status = 'answering';
-      } else if (getDto.status === QuestionStatus.APPROVAL) {
-        whereConditions.status = 'approval';
+      } else if (getDto.status === QuestionStatus.APPROVED) {
+        whereConditions.status = 'approved';
       }
 
       const questions = await this.engagementQnaQuestionRepository.find({
@@ -270,9 +276,8 @@ export class EngagementQnaService {
       // Calculate summary statistics
       const totalQuestions = questions.length;
       const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
-      const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
       const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
-      const approvalQuestions = questions.filter((q) => q.status === 'approval').length;
+      const approvedQuestions = questions.filter((q) => q.status === 'approved').length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
 
       return {
@@ -282,9 +287,8 @@ export class EngagementQnaService {
         metadata: {
           total: totalQuestions,
           answered: answeredQuestions,
-          answering: answeringQuestions,
           unanswered: unansweredQuestions,
-          approval: approvalQuestions,
+          approved: approvedQuestions,
           pinned: pinnedQuestions,
           engagementId: getDto.engagementId,
           sessionId: getDto.sessionId,
@@ -308,8 +312,8 @@ export class EngagementQnaService {
         metadata: {
           total: 0,
           answered: 0,
-          answering: 0,
           unanswered: 0,
+          approved: 0,
           pinned: 0,
           engagementId: getDto.engagementId,
           status: getDto.status,
@@ -783,9 +787,8 @@ export class EngagementQnaService {
       // Calculate summary statistics
       const totalQuestions = questions.length;
       const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
-      const answeringQuestions = questions.filter((q) => q.status === 'answering').length;
       const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
-      const approvalQuestions = questions.filter((q) => q.status === 'approval').length;
+      const approvedQuestions = questions.filter((q) => q.status === 'approved').length;
       const pinnedQuestions = questions.filter((q) => q.isPinned).length;
 
       return {
@@ -829,9 +832,8 @@ export class EngagementQnaService {
           statistics: {
             total: totalQuestions,
             answered: answeredQuestions,
-            answering: answeringQuestions,
             unanswered: unansweredQuestions,
-            approval: approvalQuestions,
+            approved: approvedQuestions,
             pinned: pinnedQuestions,
           },
         },
@@ -896,6 +898,34 @@ export class EngagementQnaService {
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 
+      // Emit WebSocket event for real-time updates to ALL related share tokens
+      if (this.gateway) {
+        // Emit to the current shareToken room (session share link)
+        this.gateway.emitQuestionUpdate(shareToken, 'question_answered', {
+          question: savedQuestion,
+          shareToken
+        });
+
+        // Also emit to track share link if exists
+        const questionWithTrack = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId },
+          relations: ['engagement', 'engagement.track'],
+        });
+        
+        if (questionWithTrack?.engagement?.trackId) {
+          const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+            where: { trackId: questionWithTrack.engagement.trackId, isActive: true },
+          });
+          
+          if (trackShareLink) {
+            this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_answered', {
+              question: savedQuestion,
+              shareToken: trackShareLink.shareToken
+            });
+          }
+        }
+      }
+
       return {
         success: true,
         message: isUpdating 
@@ -954,10 +984,13 @@ export class EngagementQnaService {
 
       // Get question
       let question;
+      let questionTrackId = null; // Store track ID for WebSocket emission
+      
       if (shareLink) {
         // Session share link - question must belong to this session
         question = await this.engagementQnaQuestionRepository.findOne({
           where: { id: questionId, sessionId: shareLink.sessionId },
+          relations: ['engagement', 'engagement.track'], // Load track relation for WebSocket
         });
       } else if (trackShareLink) {
         // Track share link - question must belong to a session in this track
@@ -969,10 +1002,18 @@ export class EngagementQnaService {
         if (question && question.engagement?.trackId !== trackShareLink.trackId) {
           throw new ValidationException('Question does not belong to this track');
         }
+        
+        // Store track ID before saving (since save() might not preserve relations)
+        questionTrackId = question?.engagement?.trackId || trackShareLink.trackId;
       }
 
       if (!question) {
         throw new ResourceNotFoundException('Question', questionId);
+      }
+
+      // Store track ID if not already stored
+      if (!questionTrackId && question.engagement?.trackId) {
+        questionTrackId = question.engagement.trackId;
       }
 
       // Update question
@@ -986,6 +1027,46 @@ export class EngagementQnaService {
       }
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
+
+      // Emit WebSocket event for real-time updates to ALL related share tokens
+      if (this.gateway) {
+        // Emit to the current shareToken room
+        this.gateway.emitQuestionUpdate(shareToken, 'question_updated', {
+          question: savedQuestion,
+          shareToken
+        });
+
+        // Also emit to related share tokens:
+        // 1. If updated via track share link, also emit to session share link
+        // 2. If updated via session share link, also emit to track share link
+        if (shareLink && savedQuestion.sessionId) {
+          // Find track share link for this session's track
+          if (questionTrackId) {
+            const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+              where: { trackId: questionTrackId, isActive: true },
+            });
+            
+            if (trackShareLink) {
+              this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_updated', {
+                question: savedQuestion,
+                shareToken: trackShareLink.shareToken
+              });
+            }
+          }
+        } else if (trackShareLink && savedQuestion.sessionId) {
+          // Find session share link for this question's session
+          const sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+            where: { sessionId: savedQuestion.sessionId, isActive: true },
+          });
+          
+          if (sessionShareLink) {
+            this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_updated', {
+              question: savedQuestion,
+              shareToken: sessionShareLink.shareToken
+            });
+          }
+        }
+      }
 
       return {
         success: true,
@@ -1063,8 +1144,61 @@ export class EngagementQnaService {
         throw new ResourceNotFoundException('Question', questionId);
       }
 
+      // Store question info before deletion for WebSocket emission
+      const questionSessionId = question.sessionId;
+      let questionTrackId = null;
+      
+      // Get track ID if available
+      if (question.engagement?.trackId) {
+        questionTrackId = question.engagement.trackId;
+      } else {
+        const questionWithTrack = await this.engagementQnaQuestionRepository.findOne({
+          where: { id: questionId },
+          relations: ['engagement', 'engagement.track'],
+        });
+        questionTrackId = questionWithTrack?.engagement?.trackId || null;
+      }
+
       // Delete question
       await this.engagementQnaQuestionRepository.remove(question);
+
+      // Emit WebSocket event for real-time updates to ALL related share tokens
+      if (this.gateway) {
+        // Emit to the current shareToken room
+        this.gateway.emitQuestionUpdate(shareToken, 'question_deleted', {
+          questionId,
+          shareToken
+        });
+
+        // Also emit to related share tokens
+        if (shareLink && questionSessionId) {
+          // Find track share link
+          if (questionTrackId) {
+            const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+              where: { trackId: questionTrackId, isActive: true },
+            });
+            
+            if (trackShareLink) {
+              this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_deleted', {
+                questionId,
+                shareToken: trackShareLink.shareToken
+              });
+            }
+          }
+        } else if (trackShareLink && questionSessionId) {
+          // Find session share link
+          const sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+            where: { sessionId: questionSessionId, isActive: true },
+          });
+          
+          if (sessionShareLink) {
+            this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_deleted', {
+              questionId,
+              shareToken: sessionShareLink.shareToken
+            });
+          }
+        }
+      }
 
       return {
         success: true,
@@ -1561,9 +1695,8 @@ export class EngagementQnaService {
         // Calculate statistics for this session
         const totalQuestions = sessionQuestions.length;
         const answeredQuestions = sessionQuestions.filter((q) => q.status === 'answered').length;
-        const answeringQuestions = sessionQuestions.filter((q) => q.status === 'answering').length;
         const unansweredQuestions = sessionQuestions.filter((q) => q.status === 'not_answered' || q.status === null).length;
-        const approvalQuestions = sessionQuestions.filter((q) => q.status === 'approval').length;
+        const approvedQuestions = sessionQuestions.filter((q) => q.status === 'approved').length;
         const pinnedQuestions = sessionQuestions.filter((q) => q.isPinned).length;
 
         return {
@@ -1584,9 +1717,8 @@ export class EngagementQnaService {
           statistics: {
             total: totalQuestions,
             answered: answeredQuestions,
-            answering: answeringQuestions,
             unanswered: unansweredQuestions,
-            approval: approvalQuestions,
+            approved: approvedQuestions,
             pinned: pinnedQuestions,
           },
           shareLink: sessionShareLink ? {
@@ -1599,9 +1731,8 @@ export class EngagementQnaService {
       // Calculate overall statistics
       const totalQuestions = allQuestions.length;
       const answeredQuestions = allQuestions.filter((q) => q.status === 'answered').length;
-      const answeringQuestions = allQuestions.filter((q) => q.status === 'answering').length;
       const unansweredQuestions = allQuestions.filter((q) => q.status === 'not_answered' || q.status === null).length;
-      const approvalQuestions = allQuestions.filter((q) => q.status === 'approval').length;
+      const approvedQuestions = allQuestions.filter((q) => q.status === 'approved').length;
       const pinnedQuestions = allQuestions.filter((q) => q.isPinned).length;
 
       return {
@@ -1628,9 +1759,8 @@ export class EngagementQnaService {
             totalSessions: totalSessions,
             totalQuestions: totalQuestions,
             answered: answeredQuestions,
-            answering: answeringQuestions,
             unanswered: unansweredQuestions,
-            approval: approvalQuestions,
+            approved: approvedQuestions,
             pinned: pinnedQuestions,
           },
           pagination: {

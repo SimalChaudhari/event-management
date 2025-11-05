@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { EngagementQnaController } from './engagement-qna.controller';
 import { EngagementQnaService } from './engagement-qna.service';
+import { EngagementQnaGateway } from './engagement-qna.gateway';
 import { EngagementQnaQuestion, EngagementQnaLike, EngagementQnaShareLink, EngagementQnaQuestionShareLink, EngagementQnaTrackShareLink } from './engagement-qna.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { UserEntity } from '../user/users.entity';
@@ -35,8 +36,8 @@ import { UtilsModule } from '../utils/utils.module';
     UtilsModule,
   ],
   controllers: [EngagementQnaController],
-  providers: [EngagementQnaService, ErrorHandlerService],
-  exports: [EngagementQnaService],
+  providers: [EngagementQnaService, EngagementQnaGateway, ErrorHandlerService],
+  exports: [EngagementQnaService, EngagementQnaGateway],
 })
 export class EngagementQnaModule {}
 

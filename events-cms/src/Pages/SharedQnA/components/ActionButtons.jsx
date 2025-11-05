@@ -2,8 +2,8 @@ import React from 'react';
 
 const ActionButtons = ({ question, onAnswer, onEdit, onDelete, onGenerateLink }) => {
   const handleAnswerClick = () => {
-    // Disable if answered, approval, or answering
-    if (question.status === "answered" || question.status === "approval" || question.status === "answering") {
+    // Disable if answered or approved
+    if (question.status === "answered" || question.status === "approved") {
       return;
     }
     onAnswer(question);
@@ -59,35 +59,33 @@ const ActionButtons = ({ question, onAnswer, onEdit, onDelete, onGenerateLink })
         `}
       </style>
       <div className="action-buttons-wrapper">
-        {/* Answer Now Button (QA Icon) */}
+        {/* Approve Question Button (Verify Icon) */}
         <button
           className="btn btn-icon"
           style={{
             borderRadius: "50%",
             border: "none",
             backgroundColor: "transparent",
-            cursor: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? "not-allowed" : "pointer",
+            cursor: (question.status === "answered" || question.status === "approved") ? "not-allowed" : "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
             padding: 0,
-            color: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? "#D4D6DD" : "#71C0BB",
-            opacity: (question.status === "answered" || question.status === "approval" || question.status === "answering") ? 0.5 : 1
+            color: (question.status === "answered" || question.status === "approved") ? "#D4D6DD" : "#71C0BB",
+            opacity: (question.status === "answered" || question.status === "approved") ? 0.5 : 1
           }}
           onClick={handleAnswerClick}
-          disabled={question.status === "answered" || question.status === "approval" || question.status === "answering"}
+          disabled={question.status === "answered" || question.status === "approved"}
           title={
             question.status === "answered" 
               ? "Question Already Answered" 
-              : question.status === "approval" 
+              : question.status === "approved" 
                 ? "Question Already Approved" 
-                : question.status === "answering"
-                  ? "Question Currently Being Answered"
-                  : "Approve Question"
+                : "Approve Question"
           }
         >
-          <i className="feather icon-message-circle"></i>
+          <i className="feather icon-check-circle"></i>
         </button>
         
         {/* Edit Question Button */}

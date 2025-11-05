@@ -215,11 +215,6 @@ const EngagementQAPage = () => {
     // Delete modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     
-    // Generate URL modal state
-    const [showGenerateUrlModal, setShowGenerateUrlModal] = useState(false);
-    const [shareUrl, setShareUrl] = useState('');
-    const [generating, setGenerating] = useState(false);
-    const [copied, setCopied] = useState(false);
 
     // Read sessionId from query
     const [sessionFilterId, setSessionFilterId] = useState(null);
@@ -312,45 +307,6 @@ const EngagementQAPage = () => {
         }
     }, [dispatch, engagementId, sessionFilterId]);
 
-    const handleGenerateUrl = useCallback(async () => {
-        if (!sessionFilterId) {
-            toast.error('Session ID is required');
-            return;
-        }
-
-        setGenerating(true);
-        setCopied(false);
-        try {
-            const response = await axiosInstance.post('/engagements/qna/generate-link', {
-                sessionId: sessionFilterId
-            });
-
-            if (response.data.success && response.data.data.shareUrl) {
-                const url = response.data.data.shareUrl;
-                setShareUrl(url);
-                setShowGenerateUrlModal(true);
-            } else {
-                toast.error(response.data.message || 'Failed to generate URL');
-            }
-        } catch (error) {
-            console.error('Error generating share URL:', error);
-            toast.error(error?.response?.data?.message || 'Failed to generate URL');
-        } finally {
-            setGenerating(false);
-        }
-    }, [sessionFilterId]);
-
-    const handleCopyUrl = useCallback(() => {
-        if (shareUrl) {
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                setCopied(true);
-                toast.success('URL copied to clipboard!');
-                setTimeout(() => setCopied(false), 2000);
-            }).catch(() => {
-                toast.error('Failed to copy URL');
-            });
-        }
-    }, [shareUrl]);
 
     useEffect(() => {
         if (filteredQaData) {
@@ -380,31 +336,6 @@ const EngagementQAPage = () => {
                                         <span className="badge badge-primary" style={{ backgroundColor: '#4680ff', fontSize: '11px', padding: '4px 8px' }}>
                                             1 Active
                                         </span>
-                                    )}
-                                    {sessionFilterId && (
-                                        <Button
-                                            variant="primary"
-                                            onClick={handleGenerateUrl}
-                                            disabled={generating}
-                                            style={{
-                                                backgroundColor: '#71C0BB',
-                                                borderColor: '#71C0BB',
-                                                fontSize: '14px',
-                                                padding: '6px 16px'
-                                            }}
-                                        >
-                                            {generating ? (
-                                                <>
-                                                    <span className="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
-                                                    Generating...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <i className="feather icon-link-2 mr-2"></i>
-                                                    Generate Share URL
-                                                </>
-                                            )}
-                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -487,111 +418,6 @@ const EngagementQAPage = () => {
                 onSubmit={handleDeleteSubmit}
             />
 
-            {/* Generate URL Modal */}
-            <Modal show={showGenerateUrlModal} onHide={() => setShowGenerateUrlModal(false)} centered size="lg">
-                <Modal.Header style={{ borderBottom: '1px solid #e0e0e0', padding: '20px', position: 'relative' }}>
-                    <Modal.Title style={{ color: '#333', fontWeight: '600', fontSize: '18px' }}>
-                        <i className="feather icon-link-2 mr-2" style={{ color: '#71C0BB' }}></i>
-                        Shareable Q&A Link
-                    </Modal.Title>
-                    <button
-                        type="button"
-                        className="btn-close"
-                        onClick={() => setShowGenerateUrlModal(false)}
-                        style={{
-                            position: 'absolute',
-                            top: '15px',
-                            right: '15px',
-                            width: '30px',
-                            height: '30px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            fontSize: '18px',
-                            color: '#666',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '50%',
-                            transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#f5f5f5';
-                            e.target.style.color = '#333';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = 'transparent';
-                            e.target.style.color = '#666';
-                        }}
-                    >
-                        <i className="feather icon-x" style={{ fontSize: '16px' }}></i>
-                    </button>
-                </Modal.Header>
-                <Modal.Body style={{ padding: '20px' }}>
-                    <div className="mb-3">
-                        <Form.Label style={{ color: '#333', fontWeight: '600', marginBottom: '8px' }}>
-                            <i className="feather icon-info mr-2" style={{ color: '#71C0BB' }}></i>
-                            Share this link to allow public access to session Q&A
-                        </Form.Label>
-                        <InputGroup>
-                            <Form.Control
-                                type="text"
-                                value={shareUrl}
-                                readOnly
-                                style={{
-                                    border: '1px solid #ced4da',
-                                    borderRadius: '6px 0 0 6px',
-                                    fontSize: '14px',
-                                    backgroundColor: '#f8f9fa'
-                                }}
-                            />
-                            <Button
-                                variant={copied ? "success" : "primary"}
-                                onClick={handleCopyUrl}
-                                style={{
-                                    backgroundColor: copied ? '#28a745' : '#71C0BB',
-                                    borderColor: copied ? '#28a745' : '#71C0BB',
-                                    borderRadius: '0 6px 6px 0',
-                                    borderLeft: 'none',
-                                    padding: '8px 20px',
-                                    fontSize: '14px',
-                                    fontWeight: '500'
-                                }}
-                            >
-                                {copied ? (
-                                    <>
-                                        <i className="feather icon-check mr-2"></i>
-                                        Copied!
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="feather icon-copy mr-2"></i>
-                                        Copy
-                                    </>
-                                )}
-                            </Button>
-                        </InputGroup>
-                        <small className="text-muted" style={{ fontSize: '12px', display: 'block', marginTop: '8px' }}>
-                            <i className="feather icon-alert-circle mr-1"></i>
-                            This link provides public access. Anyone with this link can view and manage Q&A for this session.
-                        </small>
-                    </div>
-                </Modal.Body>
-                <Modal.Footer style={{ borderTop: '1px solid #e0e0e0', padding: '20px', justifyContent: 'flex-end' }}>
-                    <Button
-                        variant="secondary"
-                        onClick={() => setShowGenerateUrlModal(false)}
-                        style={{
-                            borderRadius: '6px',
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            fontWeight: '500'
-                        }}
-                    >
-                        Close
-                    </Button>
-                </Modal.Footer>
-            </Modal>
         </div>
     );
 };

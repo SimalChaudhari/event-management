@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
-import { Container, Row, Col, Spinner, Alert } from "react-bootstrap";
+import { 
+  Container, 
+  Row, 
+  Col, 
+  Spinner, 
+  Alert, 
+  Card, 
+  Badge, 
+  Button,
+  FormControl
+} from "react-bootstrap";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { API_URL, BASE_URL } from "../../configs/env";
@@ -17,6 +27,7 @@ import {
 } from "./components/QnAShareApi";
 import { applyFiltersToQuestions } from "./utils/filterUtils";
 import { setCookie, getCookie } from "../../utils/cookieUtils";
+import { useQnaWebSocket } from "./hooks/useQnaWebSocket";
 
 const TrackQnAShareLinkPage = () => {
   const { shareToken } = useParams();
@@ -71,9 +82,65 @@ const TrackQnAShareLinkPage = () => {
     generatingQuestionLinksRef.current = generatingQuestionLinks;
   }, [questionShareUrls, generatingQuestionLinks]);
 
+  // Define fetchData before using it in useEffect
+  const fetchData = useCallback(async (isInitialLoad = false) => {
+    try {
+      // Only show loading spinner on initial load
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+
+      if (!shareToken) {
+        if (isInitialLoad) {
+          toast.error('Share token is required');
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Fetch all sessions at once
+      const data = await getTrackQnaByShareLink(shareToken, 1, 1000);
+
+      if (data.success && data.data) {
+        setEvent(data.data.event);
+        setTrack(data.data.track);
+        setSessions(data.data.sessions || []);
+        setPaginationInfo(data.data.pagination || null);
+      } else {
+        if (isInitialLoad) {
+          toast.error(data.message || 'Failed to fetch track Q&A data');
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      if (isInitialLoad) {
+        toast.error("Failed to fetch track Q&A data");
+      }
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+      }
+    }
+  }, [shareToken]);
+
+  // WebSocket handlers
+  const handleQuestionUpdate = useCallback((data) => {
+    // Refresh data when question is updated
+    fetchData(false);
+  }, [fetchData]);
+
+  const handleSessionUpdate = useCallback((data) => {
+    // Refresh data when session is updated
+    fetchData(false);
+  }, [fetchData]);
+
+  // Set up WebSocket connection
+  useQnaWebSocket(shareToken, handleQuestionUpdate, handleSessionUpdate);
+
   useEffect(() => {
-    fetchData();
-  }, [shareToken, currentPage]);
+    // Initial load with loading spinner
+    fetchData(true);
+  }, [shareToken, fetchData]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -199,35 +266,6 @@ const TrackQnAShareLinkPage = () => {
     }
   }, []);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      if (!shareToken) {
-        toast.error('Share token is required');
-        setLoading(false);
-        return;
-      }
-
-      // Use backend pagination - 1 session per page
-      const data = await getTrackQnaByShareLink(shareToken, currentPage, 1);
-
-      if (data.success && data.data) {
-        setEvent(data.data.event);
-        setTrack(data.data.track);
-        setSessions(data.data.sessions || []);
-        setPaginationInfo(data.data.pagination || null);
-      } else {
-        toast.error(data.message || 'Failed to fetch track Q&A data');
-      }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      toast.error("Failed to fetch track Q&A data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle edit question
   const handleEditQuestion = (question, sessionId) => {
     setSelectedQuestionForEdit(question);
@@ -239,15 +277,9 @@ const TrackQnAShareLinkPage = () => {
 
   // Handle edit submission
   const handleSubmitEdit = async () => {
-    if (!editQuestionText.trim()) {
-      toast.error('Please enter question text');
-      return;
-    }
-
     setSubmittingEdit(true);
     try {
       const response = await updateQuestionViaShareLink(shareToken, selectedQuestionForEdit.id, {
-        question: editQuestionText.trim(),
         status: editQuestionStatus
       });
       
@@ -260,8 +292,8 @@ const TrackQnAShareLinkPage = () => {
         setSelectedQuestionForEdit(null);
         setCurrentSessionId(null);
         
-        // Refresh data
-        fetchData();
+        // Refresh data immediately (without loading spinner)
+        await fetchData(false);
       } else {
         toast.error(response.message || 'Failed to update question');
       }
@@ -308,8 +340,8 @@ const TrackQnAShareLinkPage = () => {
         setShowDeleteModal(false);
         setSelectedQuestionForDelete(null);
         
-        // Refresh data
-        fetchData();
+        // Refresh data immediately (without loading spinner)
+        await fetchData(false);
       } else {
         toast.error(response.message || 'Failed to delete question');
       }
@@ -347,7 +379,7 @@ const TrackQnAShareLinkPage = () => {
     setApproving(true);
     try {
       const response = await updateQuestionViaShareLink(shareToken, selectedQuestionForApprove.id, {
-        status: 'approval'
+        status: 'approved'
       });
       
       if (response.success) {
@@ -356,8 +388,8 @@ const TrackQnAShareLinkPage = () => {
         setShowApproveModal(false);
         setSelectedQuestionForApprove(null);
         
-        // Refresh data
-        fetchData();
+        // Refresh data immediately (without loading spinner)
+        await fetchData(false);
       } else {
         toast.error(response.message || 'Failed to approve question');
       }
@@ -400,7 +432,7 @@ const TrackQnAShareLinkPage = () => {
       },
       onStatusFilterClick: () => {
         const availableStatuses = [...new Set(allQuestions.map(q => q.status))];
-        const statusOrder = ['answering', 'answered', 'approval', 'not_answered'];
+        const statusOrder = ['answered', 'approved', 'not_answered'];
         const validStatuses = statusOrder.filter(status => availableStatuses.includes(status));
         
         const currentStatus = filters.statusFilter;
@@ -458,92 +490,62 @@ const TrackQnAShareLinkPage = () => {
 
   if (loading) {
     return (
-      <Container className="text-center mt-5">
-        <Spinner animation="border" />
-        <p className="mt-3">Loading track Q&A data...</p>
-      </Container>
+      <div style={{ 
+        backgroundColor: "#f8f9fa", 
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
+        <Container>
+          <div className="text-center py-5">
+            <Spinner 
+              animation="border" 
+              variant="primary" 
+              style={{ width: "3rem", height: "3rem", borderWidth: "0.3rem" }}
+            />
+            <h5 className="mt-4 mb-2" style={{ color: "#495057", fontWeight: 500 }}>
+              Loading Track Q&A Data
+            </h5>
+            <p className="text-muted mb-0" style={{ fontSize: "0.95rem" }}>
+              Please wait while we fetch the information...
+            </p>
+          </div>
+        </Container>
+      </div>
     );
   }
 
   if (!track || !sessions.length) {
     return (
-      <Container className="mt-5">
-        <Alert variant="danger">
-          <h5>Access Denied</h5>
-          Invalid or expired share link, or no sessions found.
-        </Alert>
-      </Container>
+      <div style={{ backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
+        <Container className="py-5">
+          <Row className="justify-content-center">
+            <Col xs={12} sm={10} md={8} lg={6}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body className="p-4 text-center">
+                  <div className="mb-3">
+                    <i 
+                      className="feather icon-alert-circle" 
+                      style={{ fontSize: "4rem", color: "#dc3545" }}
+                    ></i>
+                  </div>
+                  <Alert variant="danger" className="mb-0">
+                    <Alert.Heading className="h5 mb-2">Access Denied</Alert.Heading>
+                    <p className="mb-0" style={{ fontSize: "0.95rem" }}>
+                      Invalid or expired share link, or no sessions found.
+                    </p>
+                  </Alert>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Container>
+      </div>
     );
   }
 
-  // Get current session for pagination (backend returns only current page's sessions)
-  const currentSession = sessions[0] || null;
-  const totalPages = paginationInfo?.totalPages || 1;
-  const hasPrevious = paginationInfo?.hasPreviousPage || false;
-  const hasNext = paginationInfo?.hasNextPage || false;
-
-  // Handle page navigation
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  // Handle previous page
-  const handlePrevious = () => {
-    if (hasPrevious && currentPage > 1) {
-      handlePageChange(currentPage - 1);
-    }
-  };
-
-  // Handle next page
-  const handleNext = () => {
-    if (hasNext && currentPage < totalPages) {
-      handlePageChange(currentPage + 1);
-    }
-  };
-
-  // Generate page numbers array with ellipsis
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPages = totalPages;
-    
-    if (maxPages <= 7) {
-      // Show all pages if 7 or fewer
-      for (let i = 1; i <= maxPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Always show first page
-      pages.push(1);
-      
-      if (currentPage <= 3) {
-        // Near the beginning: 1, 2, 3, 4, ..., last
-        for (let i = 2; i <= 4; i++) {
-          pages.push(i);
-        }
-        pages.push('ellipsis');
-        pages.push(maxPages);
-      } else if (currentPage >= maxPages - 2) {
-        // Near the end: 1, ..., last-3, last-2, last-1, last
-        pages.push('ellipsis');
-        for (let i = maxPages - 3; i <= maxPages; i++) {
-          pages.push(i);
-        }
-      } else {
-        // In the middle: 1, ..., current-1, current, current+1, ..., last
-        pages.push('ellipsis');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pages.push(i);
-        }
-        pages.push('ellipsis');
-        pages.push(maxPages);
-      }
-    }
-    
-    return pages;
-  };
+  // Display all sessions
 
   // Create a dummy session object for EventInfoSection (it expects session prop)
   const dummySession = {
@@ -554,358 +556,341 @@ const TrackQnAShareLinkPage = () => {
 
   return (
     <div style={{ backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
+      {/* Real-time indicator */}
+      <div style={{
+        position: "fixed",
+        top: "10px",
+        right: "10px",
+        zIndex: 1000,
+        backgroundColor: "rgba(113, 192, 187, 0.9)",
+        color: "white",
+        padding: "4px 12px",
+        borderRadius: "20px",
+        fontSize: "0.75rem",
+        fontWeight: 500,
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)"
+      }}>
+        <div style={{
+          width: "8px",
+          height: "8px",
+          borderRadius: "50%",
+          backgroundColor: "#4ade80",
+          animation: "pulse 2s infinite"
+        }}></div>
+        <span>Live Updates</span>
+      </div>
+      <style>
+        {`
+          @media (max-width: 576px) {
+            .card-body {
+              padding: 1rem !important;
+            }
+            .badge {
+              font-size: 0.75rem !important;
+              padding: 0.375rem 0.75rem !important;
+            }
+            h4 {
+              font-size: 1.25rem !important;
+            }
+          }
+          .shadow-sm {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+          }
+          .card {
+            transition: box-shadow 0.15s ease-in-out, transform 0.2s ease;
+          }
+          .card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+            transform: translateY(-2px);
+          }
+          .gradient-bg-1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .gradient-bg-2 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          }
+          .gradient-bg-3 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          }
+          .gradient-bg-4 {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+          }
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.5;
+              transform: scale(0.8);
+            }
+          }
+        `}
+      </style>
       <Container fluid className="py-4 px-3">
         <Row className="justify-content-center">
           <Col xl={10} lg={11} md={12}>
-            <EventInfoSection event={event} track={track} session={dummySession} />
-            
-            {/* Legend */}
-            <div className="mb-4">
-              <div className="d-flex align-items-center flex-wrap" style={{ gap: "16px" }}>
-                <div className="d-flex align-items-center">
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      border: "1px solid #ccc",
-                      marginRight: "8px",
-                      backgroundColor: "white",
-                      flexShrink: 0
-                    }}
-                  ></div>
-                  <span style={{ fontSize: "clamp(13px, 2vw, 16px)", whiteSpace: "nowrap" }}>Not Answered</span>
+            {/* Event Info Section */}
+            <Card className="mb-4 border-0 shadow-lg" style={{ 
+              background: "linear-gradient(135deg, #71C0BB 0%, #5a9a96 100%)",
+              borderRadius: "12px",
+              overflow: "hidden"
+            }}>
+              <Card.Body style={{ padding: 0 }}>
+                {/* Header */}
+                <div style={{
+                  padding: "clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 16px)"
+                }}>
+                  <div className="d-flex align-items-center">
+                    <i className="feather icon-info mr-2" style={{ fontSize: "clamp(1.2rem, 2.5vw, 1.4rem)", color: "#ffffff" }}></i>
+                    <h3 className="mb-0" style={{ fontWeight: 700, fontSize: "clamp(1.2rem, 2.5vw, 1.5rem)", color: "#ffffff" }}>
+                      Event Information
+                    </h3>
+                  </div>
                 </div>
-                <div className="d-flex align-items-center">
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      backgroundColor: "#4E6688",
-                      marginRight: "8px",
-                      flexShrink: 0
-                    }}
-                  ></div>
-                  <span style={{ fontSize: "clamp(13px, 2vw, 16px)", whiteSpace: "nowrap" }}>Answered</span>
+                {/* Content section */}
+                <div style={{ 
+                  padding: "clamp(8px, 2vw, 12px) 16px clamp(8px, 2vw, 12px) 16px", 
+                  backgroundColor: "#ffffff",
+                  borderRadius: "0 0 12px 12px"
+                }}>
+                  <EventInfoSection event={event} track={track} session={dummySession} />
                 </div>
-                <div className="d-flex align-items-center">
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      backgroundColor: "#71C0BB",
-                      marginRight: "8px",
-                      flexShrink: 0
-                    }}
-                  ></div>
-                  <span style={{ fontSize: "clamp(13px, 2vw, 16px)", whiteSpace: "nowrap" }}>Approval</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Current Session - Show only one session at a time */}
-            {currentSession && (() => {
-              const filterHandlers = getFilterHandlers(currentSession.id);
+              </Card.Body>
+            </Card>
+            {/* All Sessions - Display all sessions */}
+            {sessions.map((session, index) => {
+              const filterHandlers = getFilterHandlers(session.id);
               
               return (
-                <div>
-                  {/* Session Header */}
-                  <div style={{ 
-                    marginBottom: "20px",
-                    padding: "12px 16px",
-                    backgroundColor: "#fff",
-                    border: "1px solid #D4D6DD",
-                    borderRadius: "4px"
+                <div key={session.id} className="mb-5">
+                  {/* Session Header Card */}
+                  <Card className="mb-4 border-0 shadow-lg" style={{ 
+                    background: "linear-gradient(135deg, #71C0BB 0%, #5a9a96 100%)",
+                    borderRadius: "12px",
+                    overflow: "hidden"
                   }}>
-                    <h5 style={{ 
-                      margin: 0, 
-                      fontSize: "clamp(16px, 2vw, 20px)",
-                      fontWeight: "600",
-                      color: "#000"
-                    }}>
-                      {currentSession.title}
-                    </h5>
-                    {currentSession.sessionDate && (
-                      <p style={{ 
-                        margin: "8px 0 0 0",
-                        fontSize: "clamp(12px, 2vw, 14px)",
-                        color: "#666"
-                      }}>
-                        {new Date(currentSession.sessionDate).toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                        {currentSession.startTime && currentSession.endTime && (
-                          <span> • {currentSession.startTime} - {currentSession.endTime}</span>
-                        )}
-                      </p>
-                    )}
-                    {currentSession.statistics && (
-                      <div style={{ 
-                        marginTop: "8px",
-                        display: "flex",
-                        gap: "12px",
-                        flexWrap: "wrap"
-                      }}>
-                        <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#666" }}>
-                          Total: <strong>{currentSession.statistics.total || 0}</strong>
-                        </span>
-                        <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#28a745" }}>
-                          Answered: <strong>{currentSession.statistics.answered || 0}</strong>
-                        </span>
-                        <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#ffc107" }}>
-                          Unanswered: <strong>{currentSession.statistics.unanswered || 0}</strong>
-                        </span>
-                        {currentSession.statistics.answering > 0 && (
-                          <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#71C0BB" }}>
-                            Answering: <strong>{currentSession.statistics.answering || 0}</strong>
-                          </span>
-                        )}
-                        {currentSession.statistics.approval > 0 && (
-                          <span style={{ fontSize: "clamp(11px, 2vw, 13px)", color: "#71C0BB" }}>
-                            Approval: <strong>{currentSession.statistics.approval || 0}</strong>
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Session Share URL Field */}
-                    {currentSession.shareLink && currentSession.shareLink.shareUrl && (
-                      <div style={{ marginTop: "16px" }}>
-                        <p style={{ marginBottom: "8px", fontSize: "clamp(13px, 2vw, 16px)" }}>
-                          <strong>Session Share URL:</strong>
-                        </p>
-                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                          <input
-                            readOnly
-                            onClick={() => {
-                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
-                              toast.success('Session URL copied to clipboard!');
-                            }}
-                            onDoubleClick={() => {
-                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
-                              toast.success('Session URL copied to clipboard!');
-                            }}
-                            value={currentSession.shareLink.shareUrl}
-                            style={{
-                              flex: 1,
-                              backgroundColor: "#D9D9D9",
-                              border: "1px solid #ccc",
-                              color: "#000",
-                              cursor: "pointer",
-                              fontSize: "clamp(12px, 2vw, 14px)",
-                              fontWeight: "600",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              padding: "4px 8px",
-                              borderRadius: "2px",
-                              height: "28px",
-                              lineHeight: "20px",
-                              userSelect: "none",
-                              WebkitUserSelect: "none",
-                              MozUserSelect: "none",
-                              msUserSelect: "none"
-                            }}
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(currentSession.shareLink.shareUrl);
-                              toast.success('Session URL copied to clipboard!');
-                            }}
-                            style={{
-                              backgroundColor: "#71C0BB",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "4px",
-                              padding: "4px 12px",
-                              cursor: "pointer",
-                              fontSize: "clamp(12px, 2vw, 14px)",
-                              fontWeight: "500",
-                              whiteSpace: "nowrap"
-                            }}
-                          >
-                            <i className="feather icon-copy" style={{ marginRight: "4px" }}></i>
-                            Copy
-                          </button>
+                    <Card.Body style={{ padding: 0 }}>
+                      {/* Session Title */}
+                      <div>
+                        <div className="d-flex align-items-center" style={{
+                          padding: "clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 16px) 0 clamp(12px, 2.5vw, 16px)"
+                        }}>
+                          <i className="feather icon-video mr-2" style={{ 
+                            fontSize: "clamp(1.2rem, 2.5vw, 1.5rem)", 
+                            color: "#ffffff" 
+                          }}></i>
+                          <h4 className="mb-0" style={{ 
+                            fontSize: "clamp(1.2rem, 2.5vw, 1.5rem)",
+                            fontWeight: 700,
+                            color: "#ffffff",
+                            lineHeight: 1.3
+                          }}>
+                            Session {index + 1}
+                          </h4>
+                        </div>
+                        {/* Separator Line */}
+                        <div style={{
+                          height: "2px",
+                          background: "rgba(255, 255, 255, 0.3)",
+                          marginBottom: "clamp(8px, 1.5vw, 12px)",
+                          marginTop: "clamp(8px, 2vw, 12px)",
+                          marginLeft: "clamp(12px, 2.5vw, 16px)",
+                          marginRight: "clamp(12px, 2.5vw, 16px)",
+                          borderRadius: "1px"
+                        }}></div>
+                        {/* Session Title Below Divider */}
+                        <div style={{
+                          padding: "0 clamp(12px, 2.5vw, 16px) clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 16px)"
+                        }}>
+                          <h5 className="mb-2" style={{
+                            fontSize: "clamp(0.95rem, 1.9vw, 1.15rem)",
+                            fontWeight: 700,
+                            color: "#ffffff",
+                            lineHeight: 1.5
+                          }}>
+                            {session.title}
+                          </h5>
+                          {/* Session Time Below Title */}
+                          {session.startTime && session.endTime && (
+                            <div className="d-flex align-items-center" style={{
+                              color: "#ffffff",
+                              fontSize: "clamp(0.85rem, 1.7vw, 1rem)",
+                              fontWeight: 600
+                            }}>
+                              <i className="feather icon-clock mr-2" style={{ 
+                                fontSize: "clamp(0.85rem, 1.7vw, 1rem)",
+                                color: "#ffffff"
+                              }}></i>
+                              <span>{session.startTime} - {session.endTime}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Questions Table for this session */}
-                  <QuestionsTable 
-                    questions={currentSession.questions || []} 
-                    onAnswer={handleAnswerQuestion}
-                    onEdit={(q) => handleEditQuestion(q, currentSession.id)}
-                    onDelete={handleDeleteQuestionClick}
-                    onGenerateLink={handleGenerateQuestionLink}
-                    voteFilterActive={filterHandlers.voteFilter}
-                    statusFilterValue={filterHandlers.statusFilter}
-                    onVoteFilterClick={filterHandlers.onVoteFilterClick}
-                    onStatusFilterClick={filterHandlers.onStatusFilterClick}
-                    onResetFilters={filterHandlers.onResetFilters}
-                    onVoteFilterReset={filterHandlers.onVoteFilterReset}
-                    onStatusFilterReset={filterHandlers.onStatusFilterReset}
-                  />
+                      {/* Statistics */}
+                      {session.statistics && (
+                        <div style={{ 
+                          padding: "0 clamp(12px, 2.5vw, 16px) clamp(12px, 2vw, 16px) clamp(12px, 2.5vw, 16px)"
+                        }}>
+                          <div className="d-flex flex-wrap align-items-center" style={{ gap: "clamp(0.5rem, 2vw, 1rem)" }}>
+                            <Badge 
+                              style={{ 
+                                fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)", 
+                                fontWeight: 600,
+                                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                                color: "white",
+                                border: "2px solid rgba(255, 255, 255, 0.4)",
+                                borderRadius: "8px",
+                                padding: "clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2vw, 1rem)"
+                              }}
+                            >
+                              <i className="feather icon-list mr-2" style={{ fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)" }}></i>
+                              Total: <strong>{session.statistics.total || 0}</strong>
+                            </Badge>
+                            <Badge 
+                              style={{ 
+                                fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)", 
+                                fontWeight: 600,
+                                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                                color: "white",
+                                border: "2px solid rgba(255, 255, 255, 0.4)",
+                                borderRadius: "8px",
+                                padding: "clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2vw, 1rem)"
+                              }}
+                            >
+                              <i className="feather icon-check-circle mr-2" style={{ fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)" }}></i>
+                              Answered: <strong>{session.statistics.answered || 0}</strong>
+                            </Badge>
+                            <Badge 
+                              style={{ 
+                                fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)", 
+                                fontWeight: 600,
+                                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                                color: "white",
+                                border: "2px solid rgba(255, 255, 255, 0.4)",
+                                borderRadius: "8px",
+                                padding: "clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2vw, 1rem)"
+                              }}
+                            >
+                              <i className="feather icon-alert-circle mr-2" style={{ fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)" }}></i>
+                              Unanswered: <strong>{session.statistics.unanswered || 0}</strong>
+                            </Badge>
+                            {session.statistics.approved > 0 && (
+                              <Badge 
+                                style={{ 
+                                  fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)",
+                                  fontWeight: 600,
+                                  backgroundColor: "rgba(255, 255, 255, 0.25)",
+                                  color: "white",
+                                  border: "2px solid rgba(255, 255, 255, 0.4)",
+                                  borderRadius: "8px",
+                                  padding: "clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2vw, 1rem)"
+                                }}
+                              >
+                                <i className="feather icon-check-circle mr-2" style={{ fontSize: "clamp(0.75rem, 1.8vw, 0.95rem)" }}></i>
+                                Approved: <strong>{session.statistics.approved || 0}</strong>
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Session Share URL Field */}
+                      {session.shareLink && session.shareLink.shareUrl && (
+                        <div style={{ 
+                          borderTop: "2px solid rgba(255, 255, 255, 0.3)",
+                          background: "linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)",
+                          margin: "clamp(8px, 2vw, 12px) clamp(12px, 2.5vw, 16px)",
+                          borderRadius: "8px",
+                          padding: "clamp(12px, 2vw, 16px)"
+                        }}>
+                          <div className="d-flex align-items-center mb-2">
+                            <i className="feather icon-link mr-2" style={{ 
+                              fontSize: "clamp(1.2rem, 2.5vw, 1.5rem)", 
+                              color: "#666666" 
+                            }}></i>
+                            <label className="mb-0" style={{ 
+                              fontSize: "clamp(1.2rem, 2.5vw, 1.5rem)", 
+                              fontWeight: 700,
+                              color: "#666666"
+                            }}>
+                              Session Share URL
+                            </label>
+                          </div>
+                          <div className="d-flex">
+                            <FormControl
+                              readOnly
+                              onClick={() => {
+                                navigator.clipboard.writeText(session.shareLink.shareUrl);
+                                toast.success('Session URL copied to clipboard!');
+                              }}
+                              value={session.shareLink.shareUrl}
+                              style={{
+                                backgroundColor: "#ffffff",
+                                border: "2px solid #d0d0d0",
+                                cursor: "pointer",
+                                fontSize: "clamp(0.85rem, 1.8vw, 0.95rem)",
+                                fontWeight: 500,
+                                borderRight: "none",
+                                borderTopRightRadius: 0,
+                                borderBottomRightRadius: 0,
+                                color: "#333333"
+                              }}
+                            />
+                            <Button
+                              variant="primary"
+                              onClick={() => {
+                                navigator.clipboard.writeText(session.shareLink.shareUrl);
+                                toast.success('Session URL copied to clipboard!');
+                              }}
+                              style={{
+                                background: "linear-gradient(135deg, #71C0BB 0%, #5a9a96 100%)",
+                                border: "2px solid #d0d0d0",
+                                borderLeft: "none",
+                                fontWeight: 600,
+                                borderTopLeftRadius: 0,
+                                borderBottomLeftRadius: 0,
+                                color: "white",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+                                fontSize: "clamp(0.85rem, 1.8vw, 0.95rem)"
+                              }}
+                            >
+                              <i className="feather icon-copy mr-2" style={{ fontSize: "clamp(0.85rem, 1.8vw, 0.95rem)" }}></i>
+                              Copy
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+
+                  {/* Questions Table Card */}
+                  <Card className="mb-4 border-0 shadow-sm">
+                    <Card.Body className="p-0">
+                      <QuestionsTable 
+                        questions={session.questions || []} 
+                        onAnswer={handleAnswerQuestion}
+                        onEdit={(q) => handleEditQuestion(q, session.id)}
+                        onDelete={handleDeleteQuestionClick}
+                        onGenerateLink={handleGenerateQuestionLink}
+                        voteFilterActive={filterHandlers.voteFilter}
+                        statusFilterValue={filterHandlers.statusFilter}
+                        onVoteFilterClick={filterHandlers.onVoteFilterClick}
+                        onStatusFilterClick={filterHandlers.onStatusFilterClick}
+                        onResetFilters={filterHandlers.onResetFilters}
+                        onVoteFilterReset={filterHandlers.onVoteFilterReset}
+                        onStatusFilterReset={filterHandlers.onStatusFilterReset}
+                      />
+                    </Card.Body>
+                  </Card>
                 </div>
               );
-            })()}
+            })}
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div style={{ 
-                position: "sticky",
-                bottom: "20px",
-                display: "flex", 
-                justifyContent: "flex-end", 
-                alignItems: "center",
-                gap: "clamp(4px, 1vw, 8px)",
-                marginTop: "40px",
-                padding: "12px clamp(8px, 2vw, 16px)",
-                flexWrap: "wrap",
-                width: "100%",
-                maxWidth: "100%",
-                boxSizing: "border-box",
-                overflow: "hidden",
-                zIndex: 100
-              }}>
-                {/* Previous Button */}
-                <button
-                  onClick={handlePrevious}
-                  disabled={!hasPrevious}
-                  style={{
-                    backgroundColor: "transparent",
-                    color: hasPrevious ? "#666" : "#ccc",
-                    border: "none",
-                    borderRadius: "6px",
-                    padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
-                    fontSize: "clamp(14px, 1.5vw, 18px)",
-                    fontWeight: "500",
-                    cursor: hasPrevious ? "pointer" : "not-allowed",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s ease",
-                    minWidth: "clamp(32px, 4vw, 40px)",
-                    height: "clamp(32px, 4vw, 40px)",
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    if (hasPrevious) {
-                      e.target.style.backgroundColor = "#f5f5f5";
-                      e.target.style.color = "#333";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (hasPrevious) {
-                      e.target.style.backgroundColor = "transparent";
-                      e.target.style.color = "#666";
-                    }
-                  }}
-                >
-                  <i className="feather icon-chevron-left"></i>
-                </button>
-
-                {/* Page Numbers */}
-                {getPageNumbers().map((page, index) => {
-                  if (page === 'ellipsis') {
-                    return (
-                      <span 
-                        key={`ellipsis-${index}`}
-                        style={{
-                          padding: "clamp(6px, 1vw, 8px) clamp(2px, 0.5vw, 4px)",
-                          color: "#999",
-                          fontSize: "clamp(12px, 1.3vw, 16px)",
-                          fontWeight: "500",
-                          flexShrink: 0
-                        }}
-                      >
-                        ...
-                      </span>
-                    );
-                  }
-                  
-                  const isActive = page === currentPage;
-                  
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      style={{
-                        backgroundColor: isActive ? "#71C0BB" : "transparent",
-                        color: isActive ? "white" : "#666",
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
-                        fontSize: "clamp(12px, 1.3vw, 16px)",
-                        fontWeight: isActive ? "600" : "500",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s ease",
-                        minWidth: "clamp(32px, 4vw, 40px)",
-                        height: "clamp(32px, 4vw, 40px)",
-                        boxShadow: isActive ? "0 2px 4px rgba(113, 192, 187, 0.3)" : "none",
-                        flexShrink: 0
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.target.style.backgroundColor = "#f5f5f5";
-                          e.target.style.color = "#333";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.target.style.backgroundColor = "transparent";
-                          e.target.style.color = "#666";
-                        }
-                      }}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-
-                {/* Next Button */}
-                <button
-                  onClick={handleNext}
-                  disabled={!hasNext}
-                  style={{
-                    backgroundColor: "transparent",
-                    color: hasNext ? "#666" : "#ccc",
-                    border: "none",
-                    borderRadius: "6px",
-                    padding: "clamp(6px, 1vw, 8px) clamp(8px, 1.5vw, 12px)",
-                    fontSize: "clamp(14px, 1.5vw, 18px)",
-                    fontWeight: "500",
-                    cursor: hasNext ? "pointer" : "not-allowed",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s ease",
-                    minWidth: "clamp(32px, 4vw, 40px)",
-                    height: "clamp(32px, 4vw, 40px)",
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    if (hasNext) {
-                      e.target.style.backgroundColor = "#f5f5f5";
-                      e.target.style.color = "#333";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (hasNext) {
-                      e.target.style.backgroundColor = "transparent";
-                      e.target.style.color = "#666";
-                    }
-                  }}
-                >
-                  <i className="feather icon-chevron-right"></i>
-                </button>
-              </div>
-            )}
           </Col>
         </Row>
       </Container>

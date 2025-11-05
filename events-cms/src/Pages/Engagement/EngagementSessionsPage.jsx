@@ -9,7 +9,6 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
-import InputGroup from 'react-bootstrap/InputGroup';
 import Button from 'react-bootstrap/Button';
 import * as $ from 'jquery';
 import { getAllTracks } from '../../store/actions/programmeActions';
@@ -18,6 +17,7 @@ import axiosInstance from '../../configs/axiosInstance';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import TrackQnAShareLinkModal from './components/TrackQnAShareLinkModal';
 import '../../assets/css/event.css';
 
 // @ts-ignore
@@ -58,6 +58,10 @@ const EngagementSessionsPage = () => {
     const [showTrackLinkModal, setShowTrackLinkModal] = useState(false);
     const [trackShareUrl, setTrackShareUrl] = useState('');
     const [generatingTrackLink, setGeneratingTrackLink] = useState(false);
+    const [showGenerateQuestionModal, setShowGenerateQuestionModal] = useState(false);
+    const [questionTitle, setQuestionTitle] = useState('');
+    const [questionText, setQuestionText] = useState('');
+    const [generatingQuestion, setGeneratingQuestion] = useState(false);
 
     useEffect(() => {
         dispatch(getAllTracks());
@@ -406,9 +410,8 @@ const EngagementSessionsPage = () => {
                         <Card.Header>
                             <div className="d-flex justify-content-between align-items-center">
                                 <h5 className="mb-0">Engagement Sessions</h5>
-                                <div className="d-flex gap-2">
+                                <div className="d-flex" style={{ gap: '12px' }}>
                                     <Button 
-                                        variant="primary" 
                                         onClick={async () => {
                                             if (!trackId) {
                                                 toast.error('Track ID is required');
@@ -432,6 +435,23 @@ const EngagementSessionsPage = () => {
                                             }
                                         }}
                                         disabled={generatingTrackLink || !trackId}
+                                        style={{
+                                            backgroundColor: '#71C0BB',
+                                            borderColor: '#71C0BB',
+                                            color: 'white'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!generatingTrackLink && trackId) {
+                                                e.target.style.backgroundColor = '#5ba8a3';
+                                                e.target.style.borderColor = '#5ba8a3';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!generatingTrackLink && trackId) {
+                                                e.target.style.backgroundColor = '#71C0BB';
+                                                e.target.style.borderColor = '#71C0BB';
+                                            }
+                                        }}
                                     >
                                         <i className="feather icon-link mr-1"></i>
                                         {generatingTrackLink ? 'Generating...' : 'Generate Link'}
@@ -468,8 +488,39 @@ const EngagementSessionsPage = () => {
                 </Col>
             </Row>
             <Modal show={showPollingModal} onHide={() => setShowPollingModal(false)} centered>
-                <Modal.Header>
+                <Modal.Header style={{ position: 'relative' }}>
                     <Modal.Title>Session Polling Link</Modal.Title>
+                    <button
+                        type="button"
+                        onClick={() => setShowPollingModal(false)}
+                        style={{
+                            position: 'absolute',
+                            top: '15px',
+                            right: '15px',
+                            width: '30px',
+                            height: '30px',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            fontSize: '18px',
+                            color: '#666',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                            e.target.style.color = '#333';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                            e.target.style.color = '#666';
+                        }}
+                    >
+                        <i className="feather icon-x" style={{ fontSize: '16px' }}></i>
+                    </button>
                 </Modal.Header>
                 <Modal.Body>
                     <Form>
@@ -507,49 +558,101 @@ const EngagementSessionsPage = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
-            <Modal show={showTrackLinkModal} onHide={() => setShowTrackLinkModal(false)} centered size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>Track Q&A Share Link</Modal.Title>
+            <TrackQnAShareLinkModal
+                show={showTrackLinkModal}
+                onHide={() => setShowTrackLinkModal(false)}
+                trackShareUrl={trackShareUrl}
+            />
+            <Modal show={showGenerateQuestionModal} onHide={() => setShowGenerateQuestionModal(false)} centered>
+                <Modal.Header style={{ position: 'relative' }}>
+                    <Modal.Title>Generate Question</Modal.Title>
+                    <button
+                        type="button"
+                        onClick={() => setShowGenerateQuestionModal(false)}
+                        style={{
+                            position: 'absolute',
+                            top: '15px',
+                            right: '15px',
+                            width: '30px',
+                            height: '30px',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            fontSize: '18px',
+                            color: '#666',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                            e.target.style.color = '#333';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                            e.target.style.color = '#666';
+                        }}
+                    >
+                        <i className="feather icon-x" style={{ fontSize: '16px' }}></i>
+                    </button>
                 </Modal.Header>
                 <Modal.Body>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Share Link URL</Form.Label>
-                        <InputGroup>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Question Title</Form.Label>
                             <Form.Control
                                 type="text"
-                                value={trackShareUrl}
-                                readOnly
-                                className="bg-light"
+                                placeholder="Enter question title"
+                                value={questionTitle}
+                                onChange={(e) => setQuestionTitle(e.target.value)}
                             />
-                            <InputGroup.Text>
-                                <Button
-                                    variant="outline-secondary"
-                                    size="sm"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(trackShareUrl);
-                                        toast.success('Link copied to clipboard!');
-                                    }}
-                                >
-                                    <i className="feather icon-copy"></i> Copy
-                                </Button>
-                            </InputGroup.Text>
-                        </InputGroup>
-                        <Form.Text className="text-muted">
-                            Share this link to allow public access to all sessions and questions in this track.
-                        </Form.Text>
-                    </Form.Group>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Question Text</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                rows={4}
+                                placeholder="Enter question text"
+                                value={questionText}
+                                onChange={(e) => setQuestionText(e.target.value)}
+                            />
+                        </Form.Group>
+                    </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowTrackLinkModal(false)}>
+                    <Button variant="secondary" onClick={() => setShowGenerateQuestionModal(false)} disabled={generatingQuestion}>
                         Close
                     </Button>
                     <Button 
                         variant="primary" 
-                        onClick={() => {
-                            window.open(trackShareUrl, '_blank');
+                        onClick={async () => {
+                            if (!questionTitle || !questionText) {
+                                toast.error('Title and question text are required');
+                                return;
+                            }
+                            setGeneratingQuestion(true);
+                            try {
+                                // Add your API call here to generate question
+                                // const res = await axiosInstance.post('/engagements/questions/generate', {
+                                //     title: questionTitle,
+                                //     text: questionText,
+                                //     trackId: trackId
+                                // });
+                                toast.success('Question generated successfully');
+                                setQuestionTitle('');
+                                setQuestionText('');
+                                setShowGenerateQuestionModal(false);
+                            } catch (e) {
+                                toast.error(e?.response?.data?.message || 'Failed to generate question');
+                            } finally {
+                                setGeneratingQuestion(false);
+                            }
                         }}
+                        disabled={generatingQuestion}
                     >
-                        <i className="feather icon-external-link mr-1"></i> Open Link
+                        <i className="feather icon-save mr-1"></i> {generatingQuestion ? 'Generating...' : 'Generate'}
                     </Button>
                 </Modal.Footer>
             </Modal>

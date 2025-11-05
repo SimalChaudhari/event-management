@@ -197,6 +197,7 @@ export const toggleEngagementStatus = (id) => async (dispatch) => {
 // Toggle engagement session status
 export const toggleEngagementSessionStatus = (sessionId) => async (dispatch) => {
     try {
+        dispatch(setEngagementLoading(true));
         const response = await axiosInstance.put(`/engagements/sessions/${sessionId}/toggle-status`);
         
         toast.success(response.data.message || 'Session status updated successfully!');
@@ -205,6 +206,8 @@ export const toggleEngagementSessionStatus = (sessionId) => async (dispatch) => 
         const errorMessage = error?.response?.data?.message || 'Failed to toggle session status';
         toast.error(errorMessage);
         return { error: true, message: errorMessage };
+    } finally {
+        dispatch(setEngagementLoading(false));
     }
 };
 

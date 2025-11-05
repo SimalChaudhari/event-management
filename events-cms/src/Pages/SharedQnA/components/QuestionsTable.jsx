@@ -20,8 +20,87 @@ const QuestionsTable = ({
   // Determine if we're using new version (QnAShareLinkPage) or old version (TrackQnAShareLinkPage)
   const isNewVersion = !!onQuestionClick;
   const colSpan = isNewVersion ? 2 : 4;
+  
+  // Dynamic font sizes for QnAShareLinkPage
+  const thFontSize = isNewVersion ? '20px' : '18px';
+  const thIconFontSize = isNewVersion ? '18px' : '16px';
+  const thFontSizeTablet = isNewVersion ? '15px' : '13px';
+  const thIconFontSizeTablet = isNewVersion ? '14px' : '12px';
+  const thFontSizeMobile = isNewVersion ? '13px' : '11px';
+  const thIconFontSizeMobile = isNewVersion ? '12px' : '10px';
+  
   return (
     <div>
+      {/* Status Legend - Only show for TrackQnAShareLinkPage (not new version) */}
+      {!isNewVersion && (
+        <div className="d-flex align-items-center justify-content-end flex-wrap" style={{ 
+          gap: "clamp(0.5rem, 1.5vw, 1rem)", 
+          padding: "clamp(10px, 1.5vw, 14px) clamp(12px, 2vw, 16px)",
+          backgroundColor: "#f8f9fa",
+          borderBottom: "1px solid #e0e0e0"
+        }}>
+          <div className="d-flex align-items-center" style={{
+            padding: "clamp(0.3rem, 1.2vw, 0.4rem) clamp(0.5rem, 1.5vw, 0.75rem)",
+            borderRadius: "6px",
+            flexShrink: 0
+          }}>
+            <div
+              className="rounded"
+              style={{
+                width: "clamp(16px, 2vw, 20px)",
+                height: "clamp(16px, 2vw, 20px)",
+                border: "2px solid #333",
+                marginRight: "clamp(5px, 1vw, 8px)",
+                backgroundColor: "#ffffff",
+                flexShrink: 0
+              }}
+            ></div>
+            <span style={{ fontSize: "clamp(0.65rem, 1.4vw, 0.85rem)", fontWeight: 600, color: "#333", whiteSpace: "nowrap" }}>
+              Not Answered
+            </span>
+          </div>
+          <div className="d-flex align-items-center" style={{
+            padding: "clamp(0.3rem, 1.2vw, 0.4rem) clamp(0.5rem, 1.5vw, 0.75rem)",
+            borderRadius: "6px",
+            flexShrink: 0
+          }}>
+            <div
+              className="rounded"
+              style={{
+                width: "clamp(16px, 2vw, 20px)",
+                height: "clamp(16px, 2vw, 20px)",
+                backgroundColor: "#4E6688",
+                marginRight: "clamp(5px, 1vw, 8px)",
+                flexShrink: 0
+              }}
+            ></div>
+            <span style={{ fontSize: "clamp(0.65rem, 1.4vw, 0.85rem)", fontWeight: 600, color: "#333", whiteSpace: "nowrap" }}>
+              Answered
+            </span>
+          </div>
+          <div className="d-flex align-items-center" style={{
+            padding: "clamp(0.3rem, 1.2vw, 0.4rem) clamp(0.5rem, 1.5vw, 0.75rem)",
+            borderRadius: "6px",
+            flexShrink: 0
+          }}>
+            <div
+              className="rounded d-flex align-items-center justify-content-center"
+              style={{
+                width: "clamp(16px, 2vw, 20px)",
+                height: "clamp(16px, 2vw, 20px)",
+                backgroundColor: "#71C0BB",
+                marginRight: "clamp(5px, 1vw, 8px)",
+                flexShrink: 0
+              }}
+            >
+              <i className="feather icon-check-circle" style={{ color: "white", fontSize: "clamp(9px, 1.4vw, 12px)" }}></i>
+            </div>
+            <span style={{ fontSize: "clamp(0.65rem, 1.4vw, 0.85rem)", fontWeight: 600, color: "#333", whiteSpace: "nowrap" }}>
+              Approved
+            </span>
+          </div>
+        </div>
+      )}
       <style>
         {`
           .table-scroll-container::-webkit-scrollbar {
@@ -34,31 +113,31 @@ const QuestionsTable = ({
             scrollbar-width: none;
           }
           .questions-table th {
-            font-size: 18px;
+            font-size: ${thFontSize};
           }
           .questions-table th i.feather {
-            font-size: 16px;
+            font-size: ${thIconFontSize};
           }
           @media (max-width: 768px) {
             .questions-table th {
-              font-size: 13px;
+              font-size: ${thFontSizeTablet};
             }
             .questions-table th i.feather {
-              font-size: 12px;
+              font-size: ${thIconFontSizeTablet};
             }
           }
           @media (max-width: 425px) {
             .questions-table th {
-              font-size: 11px;
+              font-size: ${thFontSizeMobile};
             }
             .questions-table th i.feather {
-              font-size: 10px;
+              font-size: ${thIconFontSizeMobile};
             }
           }
         `}
       </style>
       <div className="table-responsive table-scroll-container" style={{ 
-        marginTop: "20px", 
+        marginTop: !isNewVersion ? "0" : "20px", 
         overflowX: "auto", 
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
@@ -74,7 +153,7 @@ const QuestionsTable = ({
           width: '100%', 
           minWidth: '320px',
           border: "1px solid #D4D6DD",
-          fontSize: "clamp(12px, 2vw, 16px)"
+          fontSize: isNewVersion ? "clamp(14px, 2vw, 18px)" : "clamp(12px, 2vw, 16px)"
         }}>
         <thead style={{ backgroundColor: "#000", color: "white", position: "sticky", top: 0, zIndex: 10 }}>
           <tr>
@@ -171,11 +250,11 @@ const QuestionsTable = ({
                   title={
                     statusFilterValue === null 
                       ? "Click to filter by status" 
-                      : statusFilterValue === 'answering' 
-                        ? "Showing answering - Click for answered" 
-                        : statusFilterValue === 'answered'
-                          ? "Showing answered - Click for not answered"
-                          : "Showing not answered - Click for answering"
+                      : statusFilterValue === 'answered' 
+                        ? "Showing answered - Click for approved" 
+                        : statusFilterValue === 'approved'
+                          ? "Showing approved - Click for not answered"
+                          : "Showing not answered - Click for answered"
                   }
                 >
                   Status {statusFilterValue && <i className="feather icon-filter"></i>}

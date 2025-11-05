@@ -3,12 +3,10 @@ import ActionButtons from './ActionButtons';
 
 const getStatusColor = (status) => {
   switch (status) {
-    case "answering":
-      return "#71C0BB";
     case "answered":
       return "#4E6688";
-    case "approval":
-      return "#71C0BB"; // Same color as answering
+    case "approved":
+      return "#71C0BB";
     default:
       return "#ffffff";
   }
@@ -16,8 +14,7 @@ const getStatusColor = (status) => {
 
 const getStatusText = (status) => {
   if (status === "answered") return "Answered";
-  if (status === "approval") return "Approval";
-  if (status === "answering") return "Approval"; // Show answering as Approval in table
+  if (status === "approved") return "Approved";
   return "Not Answered";
 };
 
@@ -44,7 +41,7 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
   };
 
   if (isNewVersion) {
-    // New version: Simple row with just question and votes
+    // New version: Simple row with just question and votes (QnAShareLinkPage)
     return (
       <tr key={question.id}>
         <td 
@@ -55,8 +52,8 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
             }
           }}
           style={{ 
-          backgroundColor: "#ffffff",
-          color: "black",
+          backgroundColor: "#71C0BB",
+          color: "#000000",
           fontWeight: "bold",
           fontStyle: "italic",
           borderRight: "1px solid #D4D6DD",
@@ -67,25 +64,27 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
           wordBreak: "break-word",
           wordWrap: "break-word",
           whiteSpace: "normal",
-          lineHeight: "1.2",
+          lineHeight: "1.4",
           verticalAlign: "middle",
-          fontSize: "clamp(11px, 2vw, 15px)",
+          fontSize: "clamp(14px, 2vw, 18px)",
           textAlign: "start",
           cursor: "pointer",
           transition: "all 0.2s ease"
         }}
         onMouseEnter={(e) => {
-          e.target.style.backgroundColor = "#f0f0f0";
+          e.target.style.backgroundColor = "#5a9a96";
+          e.target.style.color = "#000000";
         }}
         onMouseLeave={(e) => {
-          e.target.style.backgroundColor = "#ffffff";
+          e.target.style.backgroundColor = "#71C0BB";
+          e.target.style.color = "#000000";
         }}
         >
           {question.question}
         </td>
         <td style={{ 
-          backgroundColor: "#ffffff",
-          color: "black",
+          backgroundColor: "#71C0BB",
+          color: "#000000",
           borderRight: "none",
           borderTop: "1px solid #D4D6DD",
           borderBottom: "1px solid #D4D6DD",
@@ -93,7 +92,8 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
           padding: "4px 1px", 
           textAlign: "center",
           verticalAlign: "middle",
-          fontSize: "clamp(11px, 2vw, 15px)",
+          fontSize: "clamp(14px, 2vw, 18px)",
+          fontWeight: "600",
           whiteSpace: "nowrap"
         }}>
           {question.likesCount || 0}
@@ -177,6 +177,9 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
         whiteSpace: "normal",
         fontSize: "clamp(11px, 2vw, 15px)"
       }}>
+        {question.status === "approved" && (
+          <i className="feather icon-check-circle mr-1" style={{ color: "#71C0BB" }}></i>
+        )}
         {getStatusText(question.status)}
       </td>
       <td style={{ 

@@ -53,7 +53,7 @@ export class EngagementQnaQuestion {
 
   @Column({ 
     type: 'enum', 
-    enum: ['not_answered', 'answering', 'answered', 'approval'], 
+    enum: ['not_answered', 'answered', 'approved'], 
     nullable: true,
     default: 'not_answered'
   })

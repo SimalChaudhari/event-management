@@ -10,7 +10,9 @@ import {
     SETTINGS_LOADING,
     WITHDRAW_LOADING,
     AUTH_LOADING,
-    PROMOTIONAL_OFFER_LOADING
+    PROMOTIONAL_OFFER_LOADING,
+    ENGAGEMENT_LOADING,
+    PROGRAMME_LOADING
 } from '../constants/actionTypes';
 
 const initialState = {
@@ -25,6 +27,8 @@ const initialState = {
     settings: false,
     withdraw: false,
     auth: false,
+    engagement: false,
+    programme: false,
     global: false
 };
 
@@ -116,13 +120,27 @@ const loadingReducer = (state = initialState, { type, payload } = {}) => {
             };
             break;
         
+        case ENGAGEMENT_LOADING:
+            newState = {
+                ...state,
+                engagement: payload
+            };
+            break;
+        
+        case PROGRAMME_LOADING:
+            newState = {
+                ...state,
+                programme: payload
+            };
+            break;
+        
         default:
             return state;
     }
     
     // Calculate global loading state - true if any individual loading is true
-    const { user, event, order, speaker, exhibitor, banner, gallery, category, settings, withdraw, auth } = newState;
-    newState.global = user || event || order || speaker || exhibitor || banner || gallery || category || settings || withdraw || auth;
+    const { user, event, order, speaker, exhibitor, banner, gallery, category, settings, withdraw, auth, engagement, programme } = newState;
+    newState.global = user || event || order || speaker || exhibitor || banner || gallery || category || settings || withdraw || auth || engagement || programme;
     
     return newState;
 };

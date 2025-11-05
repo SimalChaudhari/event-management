@@ -9,9 +9,8 @@ export enum QuestionSortBy {
 export enum QuestionStatus {
   ALL = 'all',
   NOT_ANSWERED = 'not_answered',
-  ANSWERING = 'answering',
   ANSWERED = 'answered',
-  APPROVAL = 'approval'
+  APPROVED = 'approved'
 }
 
 export class CreateEngagementQuestionDto {

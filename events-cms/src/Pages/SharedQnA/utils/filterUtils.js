@@ -10,7 +10,7 @@
  * 
  * @param {Array} allQuestions - All questions to filter
  * @param {string|null} voteFilter - Vote filter: 'desc' (high to low), 'asc' (low to high), null (unsorted)
- * @param {string|null} statusFilter - Status filter: 'answering', 'answered', 'not_answered', null (all)
+ * @param {string|null} statusFilter - Status filter: 'answered', 'approved', 'not_answered', null (all)
  * @returns {Array} - Filtered and sorted questions array
  */
 export const applyFiltersToQuestions = (allQuestions, voteFilter, statusFilter) => {
