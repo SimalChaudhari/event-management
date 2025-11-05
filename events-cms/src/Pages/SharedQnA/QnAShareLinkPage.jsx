@@ -82,8 +82,32 @@ const QnAShareLinkPage = () => {
     fetchData(false);
   }, [fetchData]);
 
+  // Handle modal state changes from other devices
+  const handleModalStateChange = useCallback((data) => {
+    if (!data || !data.modalType || !data.action) return;
+
+    // Only handle fullscreen popup modal type
+    if (data.modalType === 'fullscreen_popup') {
+      if (data.action === 'open') {
+        // Find the question in allQuestions (not just filtered questions)
+        const question = data.questionData ? allQuestions.find(q => q.id === data.questionData.id) : null;
+        if (question) {
+          // Only open if not already open with the same question
+          if (!showQuestionPopup || selectedQuestion?.id !== question.id) {
+            setSelectedQuestion(question);
+            setShowQuestionPopup(true);
+          }
+        }
+      } else if (data.action === 'close') {
+        // Close popup
+        setShowQuestionPopup(false);
+        setSelectedQuestion(null);
+      }
+    }
+  }, [allQuestions, showQuestionPopup, selectedQuestion]);
+
   // Set up WebSocket connection
-  useQnaWebSocket(shareToken, handleQuestionUpdate, handleSessionUpdate);
+  const { emitModalStateChange } = useQnaWebSocket(shareToken, handleQuestionUpdate, handleSessionUpdate, handleModalStateChange);
 
   useEffect(() => {
     // Initial load with loading spinner
@@ -111,12 +135,23 @@ const QnAShareLinkPage = () => {
   const handleQuestionClick = (question) => {
     setSelectedQuestion(question);
     setShowQuestionPopup(true);
+    
+    // Emit modal state change to other devices
+    if (emitModalStateChange) {
+      emitModalStateChange('fullscreen_popup', 'open', question);
+    }
   };
 
   // Handle close popup
   const handleClosePopup = () => {
+    const question = selectedQuestion;
     setShowQuestionPopup(false);
     setSelectedQuestion(null);
+    
+    // Emit modal state change to other devices
+    if (emitModalStateChange && question) {
+      emitModalStateChange('fullscreen_popup', 'close', question);
+    }
   };
 
   // Handle mark as answered
@@ -135,8 +170,14 @@ const QnAShareLinkPage = () => {
         toast.success('Question marked as answered successfully');
         
         // Close popup
+        const question = selectedQuestion;
         setShowQuestionPopup(false);
         setSelectedQuestion(null);
+        
+        // Emit modal state change to other devices
+        if (emitModalStateChange && question) {
+          emitModalStateChange('fullscreen_popup', 'close', question);
+        }
         
         // Refresh data immediately to get latest state (without loading spinner)
         await fetchData(false);

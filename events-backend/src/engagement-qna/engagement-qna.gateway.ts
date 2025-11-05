@@ -118,6 +118,30 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
     }
   }
 
+  @SubscribeMessage('modal_state_change')
+  handleModalStateChange(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { shareToken: string; modalType: string; action: string; questionData?: any }
+  ) {
+    try {
+      if (!data?.shareToken || !data?.modalType || !data?.action) {
+        client.emit('error', { message: 'Share token, modal type, and action are required' });
+        return;
+      }
+
+      // Broadcast to all clients in the share token room (except the sender)
+      this.server.to(`share:${data.shareToken}`).emit('modal_state_change', {
+        modalType: data.modalType,
+        action: data.action,
+        questionData: data.questionData || null,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error handling modal state change:', error);
+      client.emit('error', { message: 'Failed to broadcast modal state change' });
+    }
+  }
+
   // Method to emit question update to all clients in a share token room
   emitQuestionUpdate(shareToken: string, eventType: string, data: any) {
     this.server.to(`share:${shareToken}`).emit('question_update', {

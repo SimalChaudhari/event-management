@@ -7,8 +7,9 @@ import { API_URL } from '../../../configs/env';
  * @param {string} shareToken - The share token to join the room for
  * @param {Function} onQuestionUpdate - Callback when question is updated
  * @param {Function} onSessionUpdate - Callback when session is updated
+ * @param {Function} onModalStateChange - Callback when modal state changes (open/close)
  */
-export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate) => {
+export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate, onModalStateChange) => {
   const socketRef = useRef(null);
   const isConnectedRef = useRef(false);
 
@@ -69,6 +70,14 @@ export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate) =
       }
     });
 
+    // Modal state change handlers
+    socket.on('modal_state_change', (data) => {
+      console.log('Modal state change received:', data);
+      if (onModalStateChange) {
+        onModalStateChange(data);
+      }
+    });
+
     // Cleanup on unmount
     return () => {
       if (socketRef.current) {
@@ -77,11 +86,25 @@ export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate) =
         socketRef.current = null;
       }
     };
-  }, [shareToken, onQuestionUpdate, onSessionUpdate]);
+  }, [shareToken, onQuestionUpdate, onSessionUpdate, onModalStateChange]);
+
+  // Function to emit modal state change
+  const emitModalStateChange = (modalType, action, questionData = null) => {
+    if (socketRef.current && isConnectedRef.current) {
+      socketRef.current.emit('modal_state_change', {
+        shareToken,
+        modalType, // 'edit', 'delete', 'approve', etc.
+        action, // 'open', 'close'
+        questionData, // question object if opening
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
 
   return {
     isConnected: isConnectedRef.current,
     socket: socketRef.current,
+    emitModalStateChange,
   };
 };
 

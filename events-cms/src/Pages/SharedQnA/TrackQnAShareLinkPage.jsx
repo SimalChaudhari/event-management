@@ -277,11 +277,24 @@ const TrackQnAShareLinkPage = () => {
 
   // Handle edit submission
   const handleSubmitEdit = async () => {
+    // Validate question text if status is not_answered
+    if (editQuestionStatus === 'not_answered' && !editQuestionText.trim()) {
+      toast.error('Please enter question text');
+      return;
+    }
+
     setSubmittingEdit(true);
     try {
-      const response = await updateQuestionViaShareLink(shareToken, selectedQuestionForEdit.id, {
+      const updateData = {
         status: editQuestionStatus
-      });
+      };
+      
+      // Only include question text if status is not_answered (editable)
+      if (editQuestionStatus === 'not_answered') {
+        updateData.question = editQuestionText.trim();
+      }
+      
+      const response = await updateQuestionViaShareLink(shareToken, selectedQuestionForEdit.id, updateData);
       
       if (response.success) {
         toast.success('Question updated successfully');

@@ -18,7 +18,7 @@ const EditQuestionModal = ({
       <Modal.Header style={{ borderBottom: '1px solid #e0e0e0', padding: '20px', position: 'relative' }}>
         <Modal.Title style={{ color: '#333', fontWeight: '600', fontSize: '18px' }}>
           <i className="feather icon-edit mr-2" style={{ color: '#71C0BB' }}></i>
-          Change Question Status
+          Edit Question
         </Modal.Title>
         <button
           type="button"
@@ -58,23 +58,51 @@ const EditQuestionModal = ({
           <div>
             <div className="mb-3">
               <h6 style={{ color: '#333', fontWeight: '600', marginBottom: '8px' }}>Question Text:</h6>
-              <div
-                style={{
-                  backgroundColor: '#f8f9fa',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  padding: '12px',
-                  color: '#333',
-                  minHeight: '80px'
-                }}
-              >
-                {question.question || 'N/A'}
-              </div>
-              <small className="text-muted" style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '4px' }}>
-                (Read-only)
-              </small>
+              {editQuestionStatus === 'not_answered' ? (
+                <>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    value={editQuestionText}
+                    onChange={(e) => setEditQuestionText(e.target.value)}
+                    placeholder="Enter question text..."
+                    style={{
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      padding: '12px',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      boxShadow: 'none',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <small className="text-muted" style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '4px' }}>
+                    Character count: {editQuestionText.length}
+                  </small>
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      backgroundColor: '#f8f9fa',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      padding: '12px',
+                      color: '#333',
+                      minHeight: '80px'
+                    }}
+                  >
+                    {question.question || 'N/A'}
+                  </div>
+                  <small className="text-muted" style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '4px' }}>
+                    (Read-only - cannot edit when status is "{editQuestionStatus === 'approved' ? 'Approved' : 'Answered'}")
+                  </small>
+                </>
+              )}
             </div>
             
             <div className="mb-3">
@@ -161,7 +189,7 @@ const EditQuestionModal = ({
           <Button 
             variant="primary" 
             onClick={onSubmit}
-            disabled={submitting}
+            disabled={submitting || (editQuestionStatus === 'not_answered' && !editQuestionText.trim())}
             style={{ 
               backgroundColor: '#71C0BB', 
               borderColor: '#71C0BB',
