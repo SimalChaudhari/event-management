@@ -281,6 +281,13 @@ export class AuthService {
         );
       }
 
+      // Check if user account is deactivated
+      if (user.isActive === false) {
+        throw new UnauthorizedException(
+          'Your account has been deactivated. Please contact the administrator for assistance.',
+        );
+      }
+
       // Check if user is not verified
       if (!user.isVerify) {
         // Generate new OTP for verification
@@ -422,6 +429,14 @@ export class AuthService {
         // Check if user is an admin
         throw new UnauthorizedException('Invalid admin credentials');
       }
+
+      // Check if user account is deactivated
+      if (user.isActive === false) {
+        throw new UnauthorizedException(
+          'Your account has been deactivated. Please contact the administrator for assistance.',
+        );
+      }
+
       if (!user.isVerify) {
         throw new UnauthorizedException(
           'User is not verified. Please verify your email.',

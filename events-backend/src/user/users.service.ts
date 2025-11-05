@@ -777,4 +777,97 @@ export class UserService {
       this.errorHandler.handleDatabaseError(error, 'QR code image generation');
     }
   }
+
+  /**
+   * Deactivate user account
+   * After deactivation, user cannot login again
+   * @param id User ID
+   * @returns Updated user without sensitive data
+   */
+  async deactivateUser(id: string): Promise<Partial<UserEntity>> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      // Check if user is already deactivated
+      if (!user.isActive) {
+        throw new ConflictException('User account is already deactivated');
+      }
+
+      // Deactivate the user account
+      await this.userRepository.update(id, { isActive: false });
+
+      // Get the updated user to return
+      const updatedUser = await this.userRepository.findOne({
+        where: { id },
+        relations: ['addresses'],
+      });
+
+      if (!updatedUser) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      // Return sanitized user data
+      return UserUtils.sanitizeUserData(updatedUser);
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'User deactivation');
+    }
+  }
+
+  /**
+   * Activate user account (for reactivation)
+   * @param id User ID
+   * @returns Updated user without sensitive data
+   */
+  async activateUser(id: string): Promise<Partial<UserEntity>> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      // Check if user is already activated
+      if (user.isActive) {
+        throw new ConflictException('User account is already active');
+      }
+
+      // Activate the user account
+      await this.userRepository.update(id, { isActive: true });
+
+      // Get the updated user to return
+      const updatedUser = await this.userRepository.findOne({
+        where: { id },
+        relations: ['addresses'],
+      });
+
+      if (!updatedUser) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      // Return sanitized user data
+      return UserUtils.sanitizeUserData(updatedUser);
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'User activation');
+    }
+  }
 }

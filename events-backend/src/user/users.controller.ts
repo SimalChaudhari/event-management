@@ -725,5 +725,105 @@ export class UserController {
     }
   }
 
+  /**
+   * Deactivate own account (self-deactivation)
+   * User can deactivate their own account - no ID needed, uses authenticated user's ID
+   * After deactivation, user cannot login again
+   */
+  @Put('deactivate')
+  @UseGuards(JwtAuthGuard)
+  async deactivateOwnAccount(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      await this.userService.deactivateUser(userId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Your account has been deactivated successfully. You will not be able to login again.',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'User self-deactivation', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Deactivate user account (Admin only)
+   * Admin can deactivate any user by providing their ID
+   * After deactivation, user cannot login again
+   */
+  @Put('deactivate/:id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.Admin)
+  async deactivateUser(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      await this.userService.deactivateUser(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User account deactivated successfully. User will not be able to login again.',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'User deactivation', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Activate user account (Admin only - for reactivation)
+   */
+  @Put('activate/:id')
+  @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.Admin)
+  async activateUser(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.userService.activateUser(id);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'User account activated successfully. User can now login again.',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'User activation', req.user?.id);
+      throw error;
+    }
+  }
+
 
 }

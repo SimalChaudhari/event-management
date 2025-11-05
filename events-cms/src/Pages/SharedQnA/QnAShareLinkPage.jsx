@@ -99,9 +99,20 @@ const QnAShareLinkPage = () => {
           }
         }
       } else if (data.action === 'close') {
-        // Close popup
-        setShowQuestionPopup(false);
-        setSelectedQuestion(null);
+        // Close popup only if:
+        // 1. Question IDs match (same question being closed)
+        // 2. OR no questionData provided (general close command)
+        // This prevents closing wrong popup if different questions are open on different devices
+        if (showQuestionPopup) {
+          const shouldClose = !data.questionData || 
+                             !selectedQuestion || 
+                             selectedQuestion.id === data.questionData?.id;
+          
+          if (shouldClose) {
+            setShowQuestionPopup(false);
+            setSelectedQuestion(null);
+          }
+        }
       }
     }
   }, [allQuestions, showQuestionPopup, selectedQuestion]);
@@ -169,14 +180,17 @@ const QnAShareLinkPage = () => {
       if (response.success) {
         toast.success('Question marked as answered successfully');
         
+        // Store question ID before closing
+        const questionId = selectedQuestion.id;
+        const questionForClose = { ...selectedQuestion, id: questionId };
+        
         // Close popup
-        const question = selectedQuestion;
         setShowQuestionPopup(false);
         setSelectedQuestion(null);
         
-        // Emit modal state change to other devices
-        if (emitModalStateChange && question) {
-          emitModalStateChange('fullscreen_popup', 'close', question);
+        // Emit modal state change to other devices - include question ID for matching
+        if (emitModalStateChange && questionForClose) {
+          emitModalStateChange('fullscreen_popup', 'close', questionForClose);
         }
         
         // Refresh data immediately to get latest state (without loading spinner)

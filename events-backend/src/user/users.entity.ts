@@ -154,6 +154,9 @@ export class UserEntity {
   @Column({ nullable: true })
   socialTokenExpiry?: Date; // Token expiry from social provider
 
+  @Column({ default: true })
+  isActive!: boolean; // User account active status
+
   // Speaker-specific fields - now in separate SpeakerProfile entity
   // companyName, position, description moved to speaker_profiles table
 
