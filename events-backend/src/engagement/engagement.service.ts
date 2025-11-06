@@ -232,7 +232,7 @@ export class EngagementService {
   async getAllEngagements(): Promise<any[]> {
     const engagements = await this.engagementRepository.find({
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'ASC' },
     });
 
     // Get statistics for each engagement

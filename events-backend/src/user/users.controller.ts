@@ -73,6 +73,57 @@ export class UserController {
     }
   }
 
+  @Get('export')
+  @Roles(UserRole.Admin)
+  async exportUsers(@Res() response: Response, @Request() req: any) {
+    try {
+      // Get only users with role "user" (no exhibitors, speakers, etc.)
+      const users = await this.userService.getAll([UserRole.User], 'user');
+      
+      // Sort users alphabetically by name (firstName + lastName)
+      const sortedUsers = users.sort((a, b) => {
+        const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim().toLowerCase();
+        const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      
+      // Generate CSV content
+      const headers = ['Name', 'Email', 'Unique ID'];
+      
+      const csvRows = sortedUsers.map(user => {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A';
+        const email = user.email || 'N/A';
+        const uniqueId = user.id || 'N/A';
+        
+        return [name, email, uniqueId];
+      });
+      
+      // Combine headers and rows, escape fields that contain commas
+      const csvContent = [headers, ...csvRows]
+        .map(row => row.map(field => {
+          // Escape fields containing commas, quotes, or newlines
+          const fieldStr = String(field || '');
+          if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
+            return `"${fieldStr.replace(/"/g, '""')}"`;
+          }
+          return fieldStr;
+        }).join(','))
+        .join('\n');
+      
+      // Set response headers for CSV download
+      response.setHeader('Content-Type', 'text/csv');
+      response.setHeader(
+        'Content-Disposition',
+        `attachment; filename="users-export-${new Date().toISOString().split('T')[0]}.csv"`,
+      );
+      
+      return response.status(HttpStatus.OK).send(csvContent);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Users CSV export', req.user?.id);
+      throw error;
+    }
+  }
+
   @Get('get/:id')
   async getUserById(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
     try {

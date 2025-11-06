@@ -196,7 +196,7 @@ const BannerManagement = () => {
                         bg={type === 'event' ? 'success' : 'info'} 
                         className="position-absolute top-0 start-0 m-2"
                     >
-                        {type === 'event' ? 'Event' : 'Home'}
+                        {type === 'event' ? 'Event(Home)' : 'Login Page'}
                     </Badge>
                 </div>
                 <Card.Body className="d-flex flex-column">
@@ -334,7 +334,7 @@ const BannerManagement = () => {
                         <div>
                             <h5 className="mb-1">Upload New Banners</h5>
                             <small className="opacity-75">
-                                Select multiple images for {bannerType === 'home' ? 'home' : 'event'} banners
+                                Select multiple images for {bannerType === 'home' ? 'login page' : 'event(home)'} banners
                             </small>
                         </div>
                     </div>
@@ -360,8 +360,8 @@ const BannerManagement = () => {
                                             <i className="fas fa-calendar-alt"></i>
                                         </div>
                                         <div className="banner-type-content">
-                                            <h6 className="mb-1">Event Banners</h6>
-                                            <small className="text-muted">Multiple images for event pages</small>
+                                            <h6 className="mb-1">Event(Home) Banners</h6>
+                                            <small className="text-muted">Multiple images for home pages</small>
                                         </div>
                                         {bannerType === 'event' && (
                                             <div className="banner-type-check">
@@ -382,8 +382,8 @@ const BannerManagement = () => {
                                             <i className="fas fa-home"></i>
                                         </div>
                                         <div className="banner-type-content">
-                                            <h6 className="mb-1">Home Banners</h6>
-                                            <small className="text-muted">Multiple images for homepage</small>
+                                            <h6 className="mb-1">Login Page Banners</h6>
+                                            <small className="text-muted">Multiple images for login page</small>
                                         </div>
                                         {bannerType === 'home' && (
                                             <div className="banner-type-check">
@@ -539,7 +539,7 @@ const BannerManagement = () => {
                             ) : (
                                 <>
                                     <i className="fas fa-upload" style={{ marginRight: '4px' }}></i>
-                                    Upload {bannerType === 'home' ? 'Home' : 'Event'} Banner
+                                    Upload {bannerType === 'home' ? 'Login Page' : 'Event(Home)'} Banner
                                 </>
                             )}
                         </Button>
@@ -547,14 +547,14 @@ const BannerManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Event Banners Section */}
+            {/* Event(Home) Banners Section */}
             <Card className="mb-4 border-0 shadow">
                 <Card.Header className="text-white py-3" style={{ backgroundColor: '#71C0BB' }}>
                     <div className="d-flex justify-content-between align-items-center">
                         <div className="d-flex align-items-center">
                             <div>
-                                <h5 className="mb-1">Event Banners</h5>
-                                <small className="opacity-75">Manage your event page banners</small>
+                                <h5 className="mb-1">Event(Home) Banners</h5>
+                                <small className="opacity-75">Manage your home page banners</small>
                             </div>
                         </div>
                         <div className="d-flex align-items-center" style={{ gap: '0.2rem' }}>
@@ -574,9 +574,9 @@ const BannerManagement = () => {
                     {!bannerEvents || bannerEvents.imageUrls?.length === 0 ? (
                         <div className="text-center py-5">
                             <div className="empty-state">
-                                <i className="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted">No Event Banners</h5>
-                                <p className="text-muted mb-0">Upload some event banners to get started</p>
+                                <i className="fas fa-home fa-3x text-muted mb-3"></i>
+                                <h5 className="text-muted">No Event(Home) Banners</h5>
+                                <p className="text-muted mb-0">Upload some home banners to get started</p>
                             </div>
                         </div>
                     ) : (
@@ -585,7 +585,7 @@ const BannerManagement = () => {
                                 renderBannerCard({ 
                                     id: index, 
                                     imageUrl, 
-                                    filename: `Event Banner ${index + 1}`,
+                                    filename: `Event(Home) Banner ${index + 1}`,
                                     hyperlink: bannerEvents.hyperlinks && bannerEvents.hyperlinks[index] 
                                         ? bannerEvents.hyperlinks[index] 
                                         : undefined
@@ -596,14 +596,14 @@ const BannerManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Home Banners Section */}
+            {/* Login Page Banners Section */}
             <Card className="border-0 shadow">
                 <Card.Header className="text-white py-3" style={{ backgroundColor: '#71C0BB' }}>
                     <div className="d-flex justify-content-between align-items-center">
                         <div className="d-flex align-items-center">
                             <div>
-                                <h5 className="mb-1">Home Banners</h5>
-                                <small className="opacity-75">Manage your homepage banners</small>
+                                <h5 className="mb-1">Login Page Banners</h5>
+                                <small className="opacity-75">Manage your login page banners</small>
                             </div>
                         </div>
                         <div className="d-flex align-items-center" style={{ gap: '0.2rem' }}>
@@ -623,9 +623,9 @@ const BannerManagement = () => {
                     {!banners || !banners.imageUrls || banners.imageUrls.length === 0 ? (
                         <div className="text-center py-5">
                             <div className="empty-state">
-                                <i className="fas fa-home fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted">No Home Banners</h5>
-                                <p className="text-muted mb-0">Upload some home banners to get started</p>
+                                <i className="fas fa-sign-in-alt fa-3x text-muted mb-3"></i>
+                                <h5 className="text-muted">No Login Page Banners</h5>
+                                <p className="text-muted mb-0">Upload some login page banners to get started</p>
                             </div>
                         </div>
                     ) : (
@@ -634,7 +634,7 @@ const BannerManagement = () => {
                                 renderBannerCard({ 
                                     id: index, 
                                     imageUrl, 
-                                    filename: `Home Banner ${index + 1}`,
+                                    filename: `Login Page Banner ${index + 1}`,
                                     hyperlink: banners.hyperlinks && banners.hyperlinks[index] 
                                         ? banners.hyperlinks[index] 
                                         : undefined
@@ -764,7 +764,7 @@ const BannerManagement = () => {
                     </button>
                 </Modal.Header>
                 <Modal.Body className="py-3 px-4">
-                    <p className="mb-1">Are you sure you want to clear all {clearType === 'event' ? 'event' : 'home'} banners?</p>
+                    <p className="mb-1">Are you sure you want to clear all {clearType === 'event' ? 'event(home)' : 'login page'} banners?</p>
                     <p className="text-muted small mb-0">This action cannot be undone.</p>
                 </Modal.Body>
                 <Modal.Footer>

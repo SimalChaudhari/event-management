@@ -11,6 +11,7 @@ import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import ExportConfirmationModal from '../../components/modal/ExportConfirmationModal';
 import CsvUploadModal from '../../components/modals/CsvUploadModal';
 import { useNavigate } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
@@ -20,7 +21,7 @@ import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser) {
+function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser, handleExportUsers) {
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -47,7 +48,7 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
         ],
         pagingType: 'full_numbers', 
         dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'csv-upload-button ml-1'><'add-user-button ml-1'>>>" +
+            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-user-button ml-1'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
@@ -164,21 +165,6 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
                 $('#addUserBtn').on('click', handleAddUser);
             }
 
-            // Add CSV Upload Button
-            if (!$('#csvUploadBtn').length) {
-                $('.csv-upload-button').html(`
-                    <button class="btn btn-success d-flex align-items-center ml-2" id="csvUploadBtn">
-                        <i class="feather icon-upload mr-1"></i>
-                        CSV Upload
-                    </button>
-                `);
-
-                $('#csvUploadBtn').on('click', function() {
-                    // Trigger the modal through the component
-                    const event = new CustomEvent('csvUploadRequested');
-                    document.dispatchEvent(event);
-                });
-            }
 
 
 
@@ -228,13 +214,15 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
 }
 
 const UserList = () => {
-    const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample } = FetchUsers();
+    const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
     const { user } = useSelector((state) => state.user);
     const navigate = useNavigate();
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
+    const [showExportConfirmModal, setShowExportConfirmModal] = useState(false);
     const [userIdToDelete, setUserIdToDelete] = React.useState(null);
     const [isLoading, setIsLoading] = React.useState(false);
+    const [isExporting, setIsExporting] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
     const [roleFilter, setRoleFilter] = useState('all');
 
@@ -292,6 +280,22 @@ const UserList = () => {
         await fetchData(roleFilter === 'all' ? null : roleFilter);
     };
 
+    const handleExportUsers = () => {
+        setShowExportConfirmModal(true);
+    };
+
+    const confirmExportUsers = async () => {
+        setIsExporting(true);
+        try {
+            await exportUsersData();
+            setShowExportConfirmModal(false);
+        } catch (error) {
+            console.error('Error exporting users:', error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     // Define filter options for the reusable component
     const roleFilterOptions = [
         { value: 'user', label: 'Users Only' },
@@ -316,7 +320,8 @@ const UserList = () => {
                     handleAddUser,
                     handleEditUser,
                     handleDeleteUser,
-                    handleViewUser
+                    handleViewUser,
+                    handleExportUsers
                 );
                 setCurrentTable(table);
             } catch (error) {
@@ -338,18 +343,6 @@ const UserList = () => {
         return () => destroyTable();
     }, [user]);
 
-    // Event listener for CSV upload button
-    useEffect(() => {
-        const handleCsvUploadEvent = () => {
-            handleCsvUpload();
-        };
-        
-        document.addEventListener('csvUploadRequested', handleCsvUploadEvent);
-        
-        return () => {
-            document.removeEventListener('csvUploadRequested', handleCsvUploadEvent);
-        };
-    }, []);
 
     return (
         <>
@@ -362,6 +355,13 @@ const UserList = () => {
                 message="Are you sure you want to delete this user? This action cannot be undone."
             />
 
+            <ExportConfirmationModal
+                show={showExportConfirmModal}
+                onHide={() => setShowExportConfirmModal(false)}
+                onConfirm={confirmExportUsers}
+                isLoading={isExporting}
+            />
+
             <CsvUploadModal
                 show={showCsvUploadModal}
                 onHide={() => setShowCsvUploadModal(false)}
@@ -372,7 +372,7 @@ const UserList = () => {
                 <Col sm={12} className="btn-page">
                     <Card className="user-list"> 
                         <Card.Body>
-                            {/* Reusable User Filter Component */}
+                            {/* Filter Component with Action Buttons */}
                             <UserFilterComponent
                                 filterOptions={roleFilterOptions}
                                 selectedFilter={roleFilter}
@@ -385,6 +385,26 @@ const UserList = () => {
                                 onClearFilters={handleClearFilters}
                                 allOptionLabel="All Users & Exhibitors"
                                 allOptionValue="all"
+                                actionButtons={
+                                    <>
+                                        <button 
+                                            className="btn btn-success d-flex align-items-center" 
+                                            id="csvUploadBtn"
+                                            onClick={handleCsvUpload}
+                                        >
+                                            <i className="feather icon-upload mr-1"></i>
+                                            CSV Upload
+                                        </button>
+                                        <button 
+                                            className="btn btn-info d-flex align-items-center" 
+                                            id="exportUsersBtn"
+                                            onClick={handleExportUsers}
+                                        >
+                                            <i className="feather icon-download mr-1"></i>
+                                            Export Users
+                                        </button>
+                                    </>
+                                }
                             />
                             
                             <Table striped hover responsive id="user-data-table">

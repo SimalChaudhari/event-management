@@ -18,6 +18,7 @@ import {
 } from '../../store/actions/programmeActions';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { PROGRAMME_PATHS } from '../../utils/constants';
+import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -50,7 +51,7 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
 
     $(tableZero).DataTable({
         data: data || [],
-        order: [[0, 'asc']],
+        // order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -119,7 +120,7 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
                 data: 'createdAt',
                 title: 'Created Date',
                 render: function (data, type, row) {
-                    return data ? formatDate(data) : 'N/A';
+                    return data ? formatDateTimeForTable(data) : 'N/A';
                 }
             },
             {

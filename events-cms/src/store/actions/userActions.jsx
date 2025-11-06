@@ -224,3 +224,35 @@ export const downloadSampleCsv = () => async (dispatch) => {
         setLoading(dispatch, false);
     }
 };
+
+// Export Users to CSV (only users with role "user", no exhibitors/speakers)
+export const exportUsers = () => async (dispatch) => {
+    try {
+        setLoading(dispatch, true);
+        
+        const response = await axiosInstance.get('/users/export', {
+            responseType: 'blob'
+        });
+
+        // Create blob and trigger download
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url2 = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url2;
+        const fileName = `users-export-${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url2);
+
+        toast.success('Users exported successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to export users';
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        setLoading(dispatch, false);
+    }
+};

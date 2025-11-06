@@ -16,6 +16,7 @@ import { Row, Col, Card, Form, Button } from 'react-bootstrap';
  * @param {Function} onClearFilters - Callback to clear all filters
  * @param {string} allOptionLabel - Label for "all" option
  * @param {string} allOptionValue - Value for "all" option
+ * @param {ReactNode} actionButtons - Additional action buttons to display on the right side
  */
 const UserFilterComponent = ({
     filterOptions = [],
@@ -28,7 +29,8 @@ const UserFilterComponent = ({
     activeFilters = {},
     onClearFilters,
     allOptionLabel = 'All Items',
-    allOptionValue = 'all'
+    allOptionValue = 'all',
+    actionButtons = null
 }) => {
     // Auto-apply filter when dropdown changes
     const handleFilterChange = async (event) => {
@@ -80,8 +82,8 @@ const UserFilterComponent = ({
                 </div>
             </Card.Header>
             <Card.Body style={{ padding: '20px' }}>
-                <Row className="align-items-end g-3">
-                    <Col xl={4} lg={4} md={6} sm={12} xs={12}>
+                <Row className="align-items-end">
+                    <Col xl={actionButtons ? 4 : 12} lg={actionButtons ? 4 : 12} md={actionButtons ? 6 : 12} sm={12} xs={12}>
                         <Form.Group className="mb-0">
                             <Form.Label
                                 style={{
@@ -119,8 +121,17 @@ const UserFilterComponent = ({
                         </Form.Group>
                     </Col>
 
-                    {/* Action Buttons */}
-                    {(hasActiveFilters || activeFilterCount > 0) && (
+                    {/* Action Buttons Column */}
+                    {actionButtons && (
+                        <Col xl={8} lg={8} md={6} sm={12} xs={12} className="d-flex justify-content-xl-end justify-content-lg-end justify-content-md-end justify-content-start align-items-end mt-xl-0 mt-lg-0 mt-md-0 mt-3">
+                            <div className="d-flex flex-wrap" style={{ gap: '12px' }}>
+                                {actionButtons}
+                            </div>
+                        </Col>
+                    )}
+
+                    {/* Clear Button - Only show if filters are active and no action buttons */}
+                    {!actionButtons && (hasActiveFilters || activeFilterCount > 0) && (
                         <Col xl={4} lg={4} md={12} sm={12} xs={12} className="mt-md-3 mt-sm-3 mt-3">
                             <div
                                 className="d-flex align-items-end justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start flex-wrap"
