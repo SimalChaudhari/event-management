@@ -727,7 +727,7 @@ export class RegisterEventService {
         .getMany();
 
       // Generate CSV content
-      const headers = ['User Name', 'Company', 'Designation', 'Email', 'UID'];
+      const headers = ['First Name', 'Last Name', 'Company', 'Designation', 'Email', 'UID'];
       
       // Sort users alphabetically by name
       const sortedRegistrations = registerEvents.sort((a, b) => {
@@ -737,13 +737,14 @@ export class RegisterEventService {
       });
 
       const csvRows = sortedRegistrations.map(reg => {
-        const name = `${reg.user?.firstName || ''} ${reg.user?.lastName || ''}`.trim() || 'N/A';
+        const firstName = reg.user?.firstName || 'N/A';
+        const lastName = reg.user?.lastName || 'N/A';
         const company = reg.user?.company || 'N/A';
         const designation = reg.user?.designation || 'N/A';
         const email = reg.user?.email || 'N/A';
         const uid = reg.user?.id || 'N/A';
         
-        return [name, company, designation, email, uid];
+        return [firstName, lastName, company, designation, email, uid];
       });
       
       // Combine headers and rows, escape fields that contain commas

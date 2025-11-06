@@ -59,6 +59,17 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                 mobile: values[headers.indexOf('mobile')],
             };
 
+            // Add optional fields if present in headers
+            const companyIndex = headers.findIndex(h => ['company', 'company_name', 'organization', 'org'].includes(h));
+            if (companyIndex >= 0 && values[companyIndex]) {
+                user.company = values[companyIndex];
+            }
+
+            const designationIndex = headers.findIndex(h => ['designation', 'job_title', 'position', 'title'].includes(h));
+            if (designationIndex >= 0 && values[designationIndex]) {
+                user.designation = values[designationIndex];
+            }
+
             users.push(user);
         }
 
@@ -402,6 +413,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                             <strong>Required Columns:</strong> firstName, lastName, email, mobile
                         </p>
                         <p className="mb-2">
+                            <strong>Optional Columns:</strong> company, designation
+                        </p>
+                        <p className="mb-2">
                             <strong>Mobile Format:</strong> Singapore mobile numbers (8 digits starting with 8 or 9)
                         </p>
                         <p className="mb-0">
@@ -736,6 +750,8 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Last Name</th>
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Email</th>
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Mobile</th>
+                                    <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Company</th>
+                                    <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Designation</th>
                                     <th style={{ width: '120px', padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Status</th>
                                 </tr>
                             </thead>
@@ -770,6 +786,8 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                                             <td style={{ padding: '12px' }} className="fw-medium">
                                                 {row.mobile ? formatPhoneDisplay(row.mobile) : <span className="text-muted">N/A</span>}
                                             </td>
+                                            <td style={{ padding: '12px' }} className="fw-medium">{row.company || <span className="text-muted">N/A</span>}</td>
+                                            <td style={{ padding: '12px' }} className="fw-medium">{row.designation || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="text-center">
                                                 {isValid ? (
                                                     <Badge 

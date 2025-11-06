@@ -641,5 +641,61 @@ export class AuthController {
     }
   }
 
+  /**
+   * Download sample CSV file for user upload
+   * POST /auth/download-csv
+   */
+  @Post('download-csv')
+  async downloadSampleCsv(
+    @Body() body: { fields?: Array<{ header: string; values: string[] }> },
+    @Res() response: Response,
+  ) {
+    try {
+      // Default fields if not provided
+      const fields = body.fields || [
+        {
+          header: 'firstName',
+          values: ['John', 'Jane', 'Mike']
+        },
+        {
+          header: 'lastName',
+          values: ['Doe', 'Smith', 'Johnson']
+        },
+        {
+          header: 'email',
+          values: ['john.doe@example.com', 'jane.smith@example.com', 'mike.johnson@example.com']
+        },
+        {
+          header: 'mobile',
+          values: ['81234567', '91234567', '82345678']
+        },
+        {
+          header: 'company',
+          values: ['Tech Corp', 'Design Studio', 'Marketing Agency']
+        },
+        {
+          header: 'designation',
+          values: ['Software Engineer', 'UI/UX Designer', 'Marketing Manager']
+        }
+      ];
+
+      const result = await this.authService.generateSampleCsv(fields);
+      const csvContent = result.csvContent;
+
+      response.setHeader('Content-Type', 'text/csv');
+      response.setHeader(
+        'Content-Disposition',
+        'attachment; filename="sample_users.csv"',
+      );
+      response.send(csvContent);
+    } catch (error: any) {
+      console.error('❌ Failed to generate sample CSV:', error);
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: error.message || 'Failed to generate sample CSV',
+      });
+    }
+  }
+
   
 }

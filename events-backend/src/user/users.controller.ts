@@ -88,14 +88,17 @@ export class UserController {
       });
       
       // Generate CSV content
-      const headers = ['Name', 'Email', 'Unique ID'];
+      const headers = ['First Name', 'Last Name', 'Company', 'Designation', 'Email', 'Unique ID'];
       
       const csvRows = sortedUsers.map(user => {
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A';
+        const firstName = user.firstName || 'N/A';
+        const lastName = user.lastName || 'N/A';
+        const company = user.company || 'N/A';
+        const designation = user.designation || 'N/A';
         const email = user.email || 'N/A';
         const uniqueId = user.id || 'N/A';
         
-        return [name, email, uniqueId];
+        return [firstName, lastName, company, designation, email, uniqueId];
       });
       
       // Combine headers and rows, escape fields that contain commas

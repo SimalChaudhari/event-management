@@ -223,6 +223,14 @@ export class CsvUserDto {
 
   @IsValidMobile()
   mobile!: string;
+
+  @IsOptional()
+  @IsString()
+  company?: string;
+
+  @IsOptional()
+  @IsString()
+  designation?: string;
 }
 
 export class CsvUploadResponseDto {

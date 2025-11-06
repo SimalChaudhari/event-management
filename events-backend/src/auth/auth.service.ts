@@ -1050,7 +1050,7 @@ export class AuthService {
 
     // Prepare bulk operations data
     const usersToCreate: any[] = [];
-    const usersToUpdate: Array<{id: string, password: string}> = [];
+    const usersToUpdate: Array<{id: string, password: string, company?: string, designation?: string}> = [];
     const emailsToSend: UserCredentialsData[] = [];
     const skippedUsers: string[] = [];
     let passwordsGenerated = 0;
@@ -1060,12 +1060,14 @@ export class AuthService {
       const existingUser = existingUsersMap.get(userData.email);
 
       if (existingUser) {
-        // Existing user - update password if needed
+        // Existing user - update password if needed, and also update company/designation
         if (!existingUser.password || existingUser.password.trim() === '') {
           const randomPassword = PasswordUtils.generateRandomPassword(12);
           usersToUpdate.push({
             id: existingUser.id,
-            password: await PasswordUtils.hashPassword(randomPassword)
+            password: await PasswordUtils.hashPassword(randomPassword),
+            company: userData.company,
+            designation: userData.designation
           });
           emailsToSend.push({
             email: existingUser.email,
@@ -1075,8 +1077,18 @@ export class AuthService {
           });
           passwordsGenerated++;
         } else {
-          // User exists and has password - skip
-          skippedUsers.push(`${existingUser.email} (already has password)`);
+          // User exists and has password - still update company/designation if provided
+          if (userData.company || userData.designation) {
+            usersToUpdate.push({
+              id: existingUser.id,
+              password: existingUser.password, // Keep existing password
+              company: userData.company,
+              designation: userData.designation
+            });
+          } else {
+            // User exists and has password - skip
+            skippedUsers.push(`${existingUser.email} (already has password)`);
+          }
         }
       } else {
         // New user - prepare for bulk creation
@@ -1086,6 +1098,8 @@ export class AuthService {
           lastName: userData.lastName,
           email: userData.email,
           mobile: userData.mobile,
+          company: userData.company,
+          designation: userData.designation,
           password: await PasswordUtils.hashPassword(randomPassword),
           role: UserRole.User,
           isVerify: true,
@@ -1128,9 +1142,21 @@ export class AuthService {
     // Bulk update existing users
     if (usersToUpdate.length > 0) {
       try {
-        const updatePromises = usersToUpdate.map(updateData => 
-          this.userRepository.update({ id: updateData.id }, { password: updateData.password })
-        );
+        const updatePromises = usersToUpdate.map(updateData => {
+          const existingUser = existingUsers.find(u => u.id === updateData.id);
+          const updateFields: any = {};
+          
+          // Only update password if it's a new hashed password (different from existing)
+          if (updateData.password && existingUser && updateData.password !== existingUser.password) {
+            updateFields.password = updateData.password;
+          }
+          
+          // Update company and designation if provided
+          if (updateData.company !== undefined) updateFields.company = updateData.company;
+          if (updateData.designation !== undefined) updateFields.designation = updateData.designation;
+          
+          return this.userRepository.update({ id: updateData.id }, updateFields);
+        });
         await Promise.all(updatePromises);
       } catch (updateError) {
         console.error('❌ Bulk update failed:', updateError);
@@ -1785,14 +1811,19 @@ export class AuthService {
         csvHeaders.push(header);
         
         // Map to standard field names based on header content
-        if (header.toLowerCase().includes('first') || header.toLowerCase().includes('name')) {
+        const headerLower = header.toLowerCase();
+        if (headerLower.includes('first') && !headerLower.includes('last')) {
           fieldMapping[header] = 'firstName';
-        } else if (header.toLowerCase().includes('last') || header.toLowerCase().includes('surname')) {
+        } else if (headerLower.includes('last') || headerLower.includes('surname')) {
           fieldMapping[header] = 'lastName';
-        } else if (header.toLowerCase().includes('email') || header.toLowerCase().includes('mail')) {
+        } else if (headerLower.includes('email') || headerLower.includes('mail')) {
           fieldMapping[header] = 'email';
-        } else if (header.toLowerCase().includes('mobile') || header.toLowerCase().includes('phone')) {
+        } else if (headerLower.includes('mobile') || headerLower.includes('phone')) {
           fieldMapping[header] = 'mobile';
+        } else if (headerLower.includes('company') || headerLower.includes('organization') || headerLower.includes('org')) {
+          fieldMapping[header] = 'company';
+        } else if (headerLower.includes('designation') || headerLower.includes('job') || headerLower.includes('position') || headerLower.includes('title')) {
+          fieldMapping[header] = 'designation';
         } else {
           fieldMapping[header] = header;
         }
@@ -1805,14 +1836,19 @@ export class AuthService {
       csvRows.push(csvHeaders.join(','));
       
       // Add data rows based on provided values
-      const maxRows = Math.max(...fields.map(field => field.values.length));
+      const maxRows = Math.max(...fields.map(field => field.values.length), 0);
       
       for (let i = 0; i < maxRows; i++) {
         const rowData: string[] = [];
         
         fields.forEach((field) => {
           const value = field.values[i] || ''; // Use provided value or empty string
-          rowData.push(value);
+          // Escape values that contain commas, quotes, or newlines
+          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+            rowData.push(`"${value.replace(/"/g, '""')}"`);
+          } else {
+            rowData.push(value);
+          }
         });
         
         csvRows.push(rowData.join(','));
@@ -1828,5 +1864,6 @@ export class AuthService {
       this.handleError(error);
     }
   }
+
 }
 

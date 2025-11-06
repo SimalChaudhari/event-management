@@ -198,6 +198,8 @@ const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess }) => {
                                 <th>Last Name</th>
                                 <th>Email</th>
                                 <th>Mobile</th>
+                                <th>Company</th>
+                                <th>Designation</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -211,6 +213,8 @@ const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess }) => {
                                         <td>{row.lastName || <span className="text-muted">N/A</span>}</td>
                                         <td>{row.email || <span className="text-muted">N/A</span>}</td>
                                         <td>{row.mobile || <span className="text-muted">N/A</span>}</td>
+                                        <td>{row.company || <span className="text-muted">N/A</span>}</td>
+                                        <td>{row.designation || <span className="text-muted">N/A</span>}</td>
                                         <td>
                                             {validationStatus === 'valid' ? (
                                                 <Badge className="badge-success">Valid</Badge>

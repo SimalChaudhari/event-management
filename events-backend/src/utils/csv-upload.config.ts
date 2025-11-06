@@ -70,7 +70,15 @@ export class CsvUploadConfigService {
       'mobile': 'mobile',
       'phone': 'mobile',
       'phone_number': 'mobile',
-      'contact': 'mobile'
+      'contact': 'mobile',
+      'company': 'company',
+      'company_name': 'company',
+      'organization': 'company',
+      'org': 'company',
+      'designation': 'designation',
+      'job_title': 'designation',
+      'position': 'designation',
+      'title': 'designation'
     },
     
     // Performance settings
@@ -309,7 +317,15 @@ export class CsvUploadConfigService {
         'mobile': 'mobile',
         'phone': 'mobile',
         'phone_number': 'mobile',
-        'contact': 'mobile'
+        'contact': 'mobile',
+        'company': 'company',
+        'company_name': 'company',
+        'organization': 'company',
+        'org': 'company',
+        'designation': 'designation',
+        'job_title': 'designation',
+        'position': 'designation',
+        'title': 'designation'
       },
       chunkSize: 1000,
       maxRetries: 3,

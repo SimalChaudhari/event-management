@@ -195,7 +195,15 @@ export const downloadSampleCsv = () => async (dispatch) => {
             },
             {
                 header: 'mobile',
-                values: ['1234567890', '0987654321', '5555555555']
+                values: ['81234567', '91234567', '82345678']
+            },
+            {
+                header: 'company',
+                values: ['Tech Corp', 'Design Studio', 'Marketing Agency']
+            },
+            {
+                header: 'designation',
+                values: ['Software Engineer', 'UI/UX Designer', 'Marketing Manager']
             }
         ];
 

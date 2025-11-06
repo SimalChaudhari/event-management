@@ -352,7 +352,9 @@ export class CsvProcessorService {
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
-        mobile: this.formatMobileForDatabase(userData.mobile)
+        mobile: this.formatMobileForDatabase(userData.mobile),
+        company: userData.company || undefined,
+        designation: userData.designation || undefined
       };
 
     } catch (error: any) {
