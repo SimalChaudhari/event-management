@@ -159,7 +159,8 @@ export class UserUtils {
     const isDeleteButtonVisible = true;
     
     const accountActionButton = isDeleteButtonVisible
-      ? (user.isActive ? 'Deactivate Account' : 'Delete Account')
+      // ? (user.isActive ? 'Deactivate Account' : 'Delete Account')
+      ? (user.isActive ? 'Delete Account' : 'Delete Account')
       : null;
     
     return {
