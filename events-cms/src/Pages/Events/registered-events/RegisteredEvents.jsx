@@ -4,7 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { Row, Col, Card, Table, Form, Button, InputGroup } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter } from '../../../store/actions/eventActions';
+import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter, exportRegisteredUsersByEvent } from '../../../store/actions/eventActions';
 import FilterComponent from '../../../components/common/FilterComponent';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useFilterLogic from '../../../hooks/useFilterLogic';
@@ -12,6 +12,7 @@ import '../../../assets/css/register.css';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
+import ExportConfirmationModal from '../../../components/modal/ExportConfirmationModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
 
@@ -369,6 +370,10 @@ const RegisteredEvents = () => {
     const [registrationToDelete, setRegistrationToDelete] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
+    // Export modal states
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+
     // Add handler for view button
     const handleView = (registration) => {
         navigate(EVENT_PATHS.VIEW_REGISTER_EVENT + '/' + registration.id);
@@ -413,6 +418,36 @@ const RegisteredEvents = () => {
     // Add handler for Add Register Event button
     const handleAddRegisterEvent = () => {
         navigate(`/events/add-register-event`);
+    };
+
+    // Handle export button click
+    const handleExportClick = () => {
+        if (!selectedEventId) {
+            alert('Please select an event to export registered users');
+            return;
+        }
+        setShowExportModal(true);
+    };
+
+    // Get selected event name for modal
+    const selectedEvent = events.find(event => event.id === selectedEventId);
+    const selectedEventName = selectedEvent ? selectedEvent.name : '';
+
+    // Handle export confirmation
+    const handleExportConfirm = async () => {
+        if (!selectedEventId) {
+            alert('Please select an event to export');
+            return;
+        }
+        setIsExporting(true);
+        try {
+            await dispatch(exportRegisteredUsersByEvent(selectedEventId));
+            setShowExportModal(false);
+        } catch (error) {
+            console.error('Error exporting registered users:', error);
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const destroyTable = () => {
@@ -460,6 +495,16 @@ const RegisteredEvents = () => {
                 activeFilters={activeFilters}
                 showUserFilter={true}
                 showEventFilter={true}
+                actionButtons={
+                    <button 
+                        className="btn btn-info d-flex align-items-center" 
+                        onClick={handleExportClick}
+                        disabled={!selectedEventId}
+                    >
+                        <i className="feather icon-download mr-1"></i>
+                        Export Users
+                    </button>
+                }
             />
             
             <Row>
@@ -492,6 +537,16 @@ const RegisteredEvents = () => {
                 onConfirm={handleDeleteConfirm}
                 title="Delete Registration"
                 isLoading={deleteLoading}
+            />
+
+            {/* Export Confirmation Modal */}
+            <ExportConfirmationModal
+                show={showExportModal}
+                onHide={() => setShowExportModal(false)}
+                onConfirm={handleExportConfirm}
+                isLoading={isExporting}
+                exportType="registrations"
+                eventName={selectedEventName}
             />
         </>
     );

@@ -202,4 +202,29 @@ export class RegisterEventController {
       throw error;
     }
   }
+
+  @Get('export/event/:eventId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async exportRegisteredUsersByEvent(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Req() req: Request,
+  ) {
+    try {
+      const csvContent = await this.registerEventService.exportRegisteredUsersByEvent(eventId);
+      
+      // Set response headers for CSV download
+      response.setHeader('Content-Type', 'text/csv');
+      response.setHeader(
+        'Content-Disposition',
+        `attachment; filename="event-registrations-${eventId}-${new Date().toISOString().split('T')[0]}.csv"`,
+      );
+      
+      return response.status(HttpStatus.OK).send(csvContent);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Export registered users by event', req.user?.id);
+      throw error;
+    }
+  }
 }

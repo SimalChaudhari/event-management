@@ -715,4 +715,53 @@ export class RegisterEventService {
     }
   }
 
+  async exportRegisteredUsersByEvent(eventId: string): Promise<string> {
+    try {
+      // Get all registered users for the specific event
+      const registerEvents = await this.registerEventRepository
+        .createQueryBuilder('registerEvent')
+        .leftJoinAndSelect('registerEvent.user', 'user')
+        .leftJoinAndSelect('registerEvent.event', 'event')
+        .where('registerEvent.eventId = :eventId', { eventId })
+        .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true })
+        .getMany();
+
+      // Generate CSV content
+      const headers = ['User Name', 'Company', 'Designation', 'Email', 'UID'];
+      
+      // Sort users alphabetically by name
+      const sortedRegistrations = registerEvents.sort((a, b) => {
+        const nameA = `${a.user?.firstName || ''} ${a.user?.lastName || ''}`.trim().toLowerCase();
+        const nameB = `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+
+      const csvRows = sortedRegistrations.map(reg => {
+        const name = `${reg.user?.firstName || ''} ${reg.user?.lastName || ''}`.trim() || 'N/A';
+        const company = reg.user?.company || 'N/A';
+        const designation = reg.user?.designation || 'N/A';
+        const email = reg.user?.email || 'N/A';
+        const uid = reg.user?.id || 'N/A';
+        
+        return [name, company, designation, email, uid];
+      });
+      
+      // Combine headers and rows, escape fields that contain commas
+      const csvContent = [headers, ...csvRows]
+        .map(row => row.map(field => {
+          // Escape fields containing commas, quotes, or newlines
+          const fieldStr = String(field || '');
+          if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
+            return `"${fieldStr.replace(/"/g, '""')}"`;
+          }
+          return fieldStr;
+        }).join(','))
+        .join('\n');
+      
+      return csvContent;
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Export registered users by event');
+    }
+  }
+
 }

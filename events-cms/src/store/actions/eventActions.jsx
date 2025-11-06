@@ -460,6 +460,37 @@ export const getAllEventsForFilter = () => async (dispatch) => {
 };
 
 // Update event tab visibility
+export const exportRegisteredUsersByEvent = (eventId) => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        
+        const response = await axiosInstance.get(`/register-events/export/event/${eventId}`, {
+            responseType: 'blob'
+        });
+
+        // Create blob and trigger download
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const fileName = `event-registrations-${eventId}-${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        toast.success('Registered users exported successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to export registered users';
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        setEventLoading(dispatch, false);
+    }
+};
+
 export const updateEventTabVisibility = (eventId, tabVisibilitySettings) => async (dispatch) => {
     try {
         const response = await axiosInstance.put(`/events/${eventId}/tab-visibility`, tabVisibilitySettings);
