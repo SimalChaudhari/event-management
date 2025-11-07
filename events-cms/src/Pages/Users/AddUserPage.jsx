@@ -148,9 +148,13 @@ const AddUserPage = () => {
             if (id) {
                 setIsLoading(true);
                 response = await dispatch(editUser(id, formDataToSend));
+                setIsLoading(false);
+
             } else {
                 setIsLoading(true);
                 response = await dispatch(createUser(formDataToSend));
+                setIsLoading(false);
+
             }
 
             if (response) {
@@ -278,6 +282,9 @@ const AddUserPage = () => {
                                     
                                     <Col sm={6}>
                                         <div className="form-group fill">
+                                        <label className="floating-label" htmlFor="moible">
+                                                Mobile<span className="text-danger">*</span>
+                                            </label>
                                             <SingaporePhoneInput
                                                 name="mobile"
                                                 value={formData.mobile}
