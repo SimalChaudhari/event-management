@@ -110,6 +110,36 @@ export class AuthService {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
   }
 
+  /**
+   * Sanitize user data: convert empty strings to null for optional fields
+   * This prevents enum errors when empty strings are passed to enum fields
+   */
+  private sanitizeUserData(userData: any): any {
+    const sanitized: any = { ...userData };
+    
+    // Convert empty strings to null for enum fields (industry)
+    if (sanitized.industry === '' || sanitized.industry === undefined) {
+      sanitized.industry = null;
+    }
+    
+    // Convert empty strings to null for all optional string fields
+    const optionalStringFields = [
+      'salutation',
+      'company',
+      'designation',
+      'linkedinProfile',
+      'countryCurrency',
+      'profilePicture',
+    ];
+    
+    optionalStringFields.forEach(field => {
+      if (sanitized[field] === '') {
+        sanitized[field] = null;
+      }
+    });
+    
+    return sanitized;
+  }
 
   // Register a new user
   async register(userDto: UserDto): Promise<{ message: string }> {
@@ -167,8 +197,11 @@ export class AuthService {
         ...userData
       } = userDto;
 
+      // Sanitize user data: convert empty strings to null for optional/enum fields
+      const sanitizedUserData = this.sanitizeUserData(userData);
+
       const newUser = this.userRepository.create({
-        ...userData,
+        ...sanitizedUserData,
         password: hashedPassword,
         role: userDto.role || UserRole.User,
         acceptTerms: Boolean(userDto.acceptTerms),
@@ -177,7 +210,7 @@ export class AuthService {
         isVerify: isAdminCreatedUser ? true : false, // Admin-created users are verified by default
       });
 
-      const savedUser = await this.userRepository.save(newUser);
+      const savedUser = (await this.userRepository.save(newUser) as unknown) as UserEntity;
 
       // Create address if address data is provided
       const addressData = AddressUtils.extractAddressData({
@@ -242,6 +275,7 @@ export class AuthService {
         };
       }
     } catch (error) {
+      console.log(error);
       this.handleError(error);
     }
   }
@@ -1093,13 +1127,23 @@ export class AuthService {
       } else {
         // New user - prepare for bulk creation
         const randomPassword = PasswordUtils.generateRandomPassword(12);
-        usersToCreate.push({
+        const userDataToSanitize: any = {
           firstName: userData.firstName,
           lastName: userData.lastName,
           email: userData.email,
           mobile: userData.mobile,
           company: userData.company,
           designation: userData.designation,
+        };
+        // Only include industry if it exists in userData
+        if ('industry' in userData) {
+          userDataToSanitize.industry = (userData as any).industry;
+        }
+        
+        const sanitizedData = this.sanitizeUserData(userDataToSanitize);
+        
+        usersToCreate.push({
+          ...sanitizedData,
           password: await PasswordUtils.hashPassword(randomPassword),
           role: UserRole.User,
           isVerify: true,
@@ -1129,7 +1173,8 @@ export class AuthService {
         // Fallback to individual creation
         for (const userData of usersToCreate) {
           try {
-            const newUser = this.userRepository.create(userData);
+            const sanitizedData = this.sanitizeUserData(userData);
+            const newUser = this.userRepository.create(sanitizedData);
             await this.userRepository.save(newUser);
             newUsersCreated++;
           } catch (error: any) {
@@ -1637,37 +1682,49 @@ export class AuthService {
             const randomPassword = PasswordUtils.generateRandomPassword(12);
             const hashedPassword = await PasswordUtils.hashPassword(randomPassword);
 
-            const newUser = this.userRepository.create({
+            const userDataToSanitize: any = {
               firstName: userData.firstName,
               lastName: userData.lastName,
               email: userData.email,
               mobile: userData.mobile,
+              company: userData.company,
+              designation: userData.designation,
+            };
+            // Only include industry if it exists in userData
+            if ('industry' in userData) {
+              userDataToSanitize.industry = (userData as any).industry;
+            }
+            
+            const sanitizedData = this.sanitizeUserData(userDataToSanitize);
+
+            const newUser = this.userRepository.create({
+              ...sanitizedData,
               password: hashedPassword,
               role: UserRole.User,
               isVerify: true, // Auto-verify CSV uploaded users
               authProvider: AuthProvider.LOCAL,
             });
 
-            const savedUser = await this.userRepository.save(newUser);
+            const savedUser = (await this.userRepository.save(newUser) as unknown) as UserEntity;
             newUsersCreated++;
             passwordsGenerated++;
 
             // Send credentials email
             try {
               const credentialsData: UserCredentialsData = {
-                email: savedUser.email,
-                firstName: savedUser.firstName,
-                lastName: savedUser.lastName,
+                email: userData.email,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
                 password: randomPassword,
               };
 
               const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(credentialsData);
               await this.emailService['transporter'].sendMail(mailOptions);
               emailsSent++;
-              details.push(`New user created and credentials sent: ${savedUser.email}`);
+              details.push(`New user created and credentials sent: ${userData.email}`);
             } catch (emailError) {
               emailsFailed++;
-              details.push(`New user created but failed to send email: ${savedUser.email}`);
+              details.push(`New user created but failed to send email: ${userData.email}`);
               console.error('Error sending credentials email:', emailError);
             }
           }

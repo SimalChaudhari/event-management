@@ -58,7 +58,7 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
 
     $(tableZero).DataTable({
         data: flattenedData || [],
-        // order: [[1, 'desc']], // Sort by created date descending
+        order: [[1, 'asc']], // Sort by created date ascending
         searching: true,
         searchDelay: 500,
         pageLength: 10,

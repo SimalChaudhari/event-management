@@ -51,7 +51,7 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
 
     $(tableZero).DataTable({
         data: data || [],
-        // order: [[0, 'asc']],
+        order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
         pageLength: 10,

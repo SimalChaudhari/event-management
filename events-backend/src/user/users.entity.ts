@@ -86,6 +86,7 @@ export class UserEntity {
     type: 'enum',
     enum: Industry,
     nullable: true,
+    default: null,
   })
   industry?: Industry; // Industry sector
 
