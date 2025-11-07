@@ -5,30 +5,30 @@ import { Injectable } from '@nestjs/common';
 export class EmailService {
   private transporter: nodemailer.Transporter;
   constructor() {
-//     const host = process.env.SMTP_HOST;
-//     const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-//     const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
-//     const user = process.env.SMTP_USER;
-//     const pass = process.env.SMTP_PASS;
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
 
-//     const transportOptions: nodemailer.TransportOptions = {
-//       host,
-//       port,
-//       secure,
-//     } as nodemailer.TransportOptions;
+    const transportOptions: nodemailer.TransportOptions = {
+      host,
+      port,
+      secure,
+    } as nodemailer.TransportOptions;
 
-//     if (user && pass) {
-//       (transportOptions as any).auth = { user, pass };
-//     }
+    if (user && pass) {
+      (transportOptions as any).auth = { user, pass };
+    }
 
-//     this.transporter = nodemailer.createTransport(transportOptions);
-this.transporter = nodemailer.createTransport({
-    service: 'Gmail', // Use your email service
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+    this.transporter = nodemailer.createTransport(transportOptions);
+// this.transporter = nodemailer.createTransport({
+//     service: 'Gmail', // Use your email service
+//     auth: {
+//       user: process.env.SMTP_USER,
+//       pass: process.env.SMTP_PASS,
+//     },
+//   });
 
   }
 
