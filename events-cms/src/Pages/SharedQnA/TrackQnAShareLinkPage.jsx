@@ -123,16 +123,117 @@ const TrackQnAShareLinkPage = () => {
     }
   }, [shareToken]);
 
-  // WebSocket handlers
+  // WebSocket handlers with direct state update (no API call needed)
   const handleQuestionUpdate = useCallback((data) => {
-    // Refresh data when question is updated
-    fetchData(false);
+    console.log('Question update received in TrackQnAShareLinkPage:', data);
+    console.log('Data structure check:', {
+      hasData: !!data,
+      hasDataData: !!(data && data.data),
+      hasType: !!(data && data.type),
+      type: data?.type,
+      eventData: data?.data
+    });
+    
+    if (!data || !data.data || !data.type) {
+      console.warn('Question update data structure is invalid, falling back to API call');
+      // Fallback to API call if data structure is unexpected
+      fetchData(false);
+      return;
+    }
+
+    const { type, data: eventData } = data;
+    const question = eventData?.question;
+    const sessionId = eventData?.sessionId;
+
+    console.log('Extracted from WebSocket:', { type, hasQuestion: !!question, sessionId });
+
+    if (!question || !sessionId) {
+      console.warn('Question or sessionId missing in WebSocket data, falling back to API call');
+      // If question or sessionId is missing, fallback to API call
+      fetchData(false);
+      return;
+    }
+
+    console.log('Proceeding with direct state update for type:', type);
+
+    // Direct state update based on event type
+    // Note: Filter reapplication will happen automatically via useEffect when allQuestionsBySession changes
+    if (type === 'question_created') {
+      console.log('Processing question_created:', question);
+      // Add new question to the correct session
+      setAllQuestionsBySession(prev => {
+        const sessionQuestions = prev[sessionId] || [];
+        // Check if question already exists (avoid duplicates)
+        const exists = sessionQuestions.some(q => q.id === question.id);
+        if (exists) {
+          console.log('Question already exists, skipping duplicate');
+          return prev; // Question already exists
+        }
+        // Ensure question has all required fields with defaults
+        const formattedQuestion = {
+          ...question,
+          status: question.status || 'not_answered',
+          likesCount: question.likesCount || 0,
+          isPinned: question.isPinned || false,
+          isActive: question.isActive !== undefined ? question.isActive : true,
+        };
+        console.log('Adding new question to state (direct update, no API call):', formattedQuestion);
+        // Add new question at the beginning (newest first)
+        return {
+          ...prev,
+          [sessionId]: [formattedQuestion, ...sessionQuestions]
+        };
+      });
+    } else if (type === 'question_updated') {
+      // Update existing question in the correct session
+      setAllQuestionsBySession(prev => {
+        const sessionQuestions = prev[sessionId] || [];
+        // Only update if question exists in this session
+        if (sessionQuestions.some(q => q.id === question.id)) {
+          const updated = sessionQuestions.map(q => 
+            q.id === question.id ? { ...q, ...question } : q
+          );
+          return {
+            ...prev,
+            [sessionId]: updated
+          };
+        }
+        return prev;
+      });
+    } else if (type === 'question_deleted') {
+      // Remove question from the correct session
+      setAllQuestionsBySession(prev => {
+        const sessionQuestions = prev[sessionId] || [];
+        return {
+          ...prev,
+          [sessionId]: sessionQuestions.filter(q => q.id !== question.id)
+        };
+      });
+    } else if (type === 'question_answered') {
+      // Update question status to answered
+      setAllQuestionsBySession(prev => {
+        const sessionQuestions = prev[sessionId] || [];
+        return {
+          ...prev,
+          [sessionId]: sessionQuestions.map(q => 
+            q.id === question.id ? { ...q, status: question.status || 'answered', ...question } : q
+          )
+        };
+      });
+    } else {
+      // Unknown event type, fallback to API call
+      fetchData(false);
+    }
   }, [fetchData]);
 
   const handleSessionUpdate = useCallback((data) => {
-    // Refresh data when session is updated
-    fetchData(false);
-  }, [fetchData]);
+    console.log('Session update received in TrackQnAShareLinkPage:', data);
+    // Session updates usually happen after question updates
+    // If question_update already handled the state update, we don't need to fetch
+    // Only fetch if it's a pure session update (like statistics change without question change)
+    // For now, skip API call to avoid unnecessary refresh after question creation
+    // fetchData(false);
+  }, []);
 
   // Set up WebSocket connection
   useQnaWebSocket(shareToken, handleQuestionUpdate, handleSessionUpdate);
@@ -170,15 +271,39 @@ const TrackQnAShareLinkPage = () => {
           hasChanges = true;
         }
         
-        // Only update allQuestionsBySession if the questions actually changed
+        // Update allQuestionsBySession if the questions actually changed
         const currentQuestions = allQuestionsBySession[session.id] || [];
         const newQuestions = session.questions || [];
         
-        // Compare questions by ID and length to detect changes
-        if (currentQuestions.length !== newQuestions.length ||
-            !currentQuestions.every((q, idx) => q.id === newQuestions[idx]?.id)) {
-          newAllQuestions[session.id] = newQuestions;
+        // Create sets of question IDs for proper comparison (order-independent)
+        const currentQuestionIds = new Set(currentQuestions.map(q => q.id));
+        const newQuestionIds = new Set(newQuestions.map(q => q.id));
+        
+        // Check if questions changed (new questions, removed questions, or data changes)
+        const questionsChanged = 
+          currentQuestionIds.size !== newQuestionIds.size ||
+          ![...currentQuestionIds].every(id => newQuestionIds.has(id)) ||
+          ![...newQuestionIds].every(id => currentQuestionIds.has(id)) ||
+          // Also check if any existing question data changed
+          currentQuestions.some(currentQ => {
+            const newQ = newQuestions.find(q => q.id === currentQ.id);
+            if (!newQ) return true; // Question was removed
+            // Compare important fields
+            return currentQ.status !== newQ.status ||
+                   currentQ.likesCount !== newQ.likesCount ||
+                   currentQ.question !== newQ.question;
+          });
+        
+        if (questionsChanged) {
+          // Always update with fresh questions from API
+          newAllQuestions[session.id] = [...newQuestions];
           hasChanges = true;
+          console.log(`Questions updated for session ${session.id}:`, {
+            oldCount: currentQuestions.length,
+            newCount: newQuestions.length,
+            oldIds: [...currentQuestionIds],
+            newIds: [...newQuestionIds]
+          });
         }
       });
       

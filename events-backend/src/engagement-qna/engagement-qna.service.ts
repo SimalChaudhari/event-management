@@ -115,6 +115,53 @@ export class EngagementQnaService {
         where: { id: askedById },
       });
 
+      // Emit WebSocket event for question creation
+      // Find session share link and emit to session share token room
+      if (savedQuestion.sessionId && this.gateway) {
+        const sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
+          where: { sessionId: savedQuestion.sessionId, isActive: true },
+        });
+
+        if (sessionShareLink && (!sessionShareLink.expiresAt || sessionShareLink.expiresAt > new Date())) {
+          // Emit question update for session share link
+          this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_created', {
+            question: savedQuestion,
+            sessionId: savedQuestion.sessionId,
+            shareToken: sessionShareLink.shareToken
+          });
+          
+          // Also emit session update to refresh statistics
+          this.gateway.emitSessionUpdate(sessionShareLink.shareToken, 'session_updated', {
+            sessionId: savedQuestion.sessionId,
+            shareToken: sessionShareLink.shareToken
+          });
+        }
+
+        // Also find track share link and emit to track share token room
+        if (engagement.trackId) {
+          const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
+            where: { trackId: engagement.trackId, isActive: true },
+          });
+
+          if (trackShareLink && (!trackShareLink.expiresAt || trackShareLink.expiresAt > new Date())) {
+            // Emit question update for track share link
+            this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_created', {
+              question: savedQuestion,
+              sessionId: savedQuestion.sessionId,
+              trackId: engagement.trackId,
+              shareToken: trackShareLink.shareToken
+            });
+            
+            // Also emit session update to refresh statistics
+            this.gateway.emitSessionUpdate(trackShareLink.shareToken, 'session_updated', {
+              sessionId: savedQuestion.sessionId,
+              trackId: engagement.trackId,
+              shareToken: trackShareLink.shareToken
+            });
+          }
+        }
+      }
+
       return {
         ...savedQuestion,
         askedBy: user

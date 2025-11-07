@@ -51,7 +51,7 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
 
     $(tableZero).DataTable({
         data: data || [],
-        order: [[0, 'asc']],
+        order: [[3, 'asc']], // Sort by Created Date column (index 3) to match backend order
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -207,7 +207,7 @@ function sessionsTable(data, handleAddSession, handleEdit, handleDelete, handleV
 
     $(tableZero).DataTable({
         data: data || [],
-        order: [[0, 'asc']],
+        order: [[3, 'asc']], // Sort by Date & Time column (index 3) to match backend order
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -432,7 +432,13 @@ const ProgrammeList = () => {
                 sessionCount: sessions ? sessions.filter(s => s.trackId === track.id).length : 0,
                 eventName: track.event ? track.event.name : 'Unknown Event'
             }));
-            setTableData(tracksWithCount);
+            // Sort by createdAt to match backend order
+            const sortedTracks = [...tracksWithCount].sort((a, b) => {
+                const dateA = new Date(a.createdAt || 0);
+                const dateB = new Date(b.createdAt || 0);
+                return dateA - dateB;
+            });
+            setTableData(sortedTracks);
         } else if (viewMode === 'sessions' && sessions) {
             const sessionsWithTrack = sessions.map(session => {
                 const track = tracks ? tracks.find(t => t.id === session.trackId) : null;
@@ -442,7 +448,19 @@ const ProgrammeList = () => {
                     eventName: track && track.event ? track.event.name : 'Unknown Event'
                 };
             });
-            setTableData(sessionsWithTrack);
+            // Sort by sessionDate and startTime to match backend order
+            const sortedSessions = [...sessionsWithTrack].sort((a, b) => {
+                const dateA = new Date(a.sessionDate || 0);
+                const dateB = new Date(b.sessionDate || 0);
+                if (dateA.getTime() !== dateB.getTime()) {
+                    return dateA - dateB;
+                }
+                // If same date, sort by startTime
+                const timeA = a.startTime || '';
+                const timeB = b.startTime || '';
+                return timeA.localeCompare(timeB);
+            });
+            setTableData(sortedSessions);
         }
     }, [viewMode, tracks, sessions]);
 

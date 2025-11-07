@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Table } from 'react-bootstrap';
 import QuestionRow from './QuestionRow';
 
@@ -15,19 +15,52 @@ const QuestionsTable = ({
   onStatusFilterClick, // Old prop for TrackQnAShareLinkPage
   onResetFilters, 
   onVoteFilterReset,
-  onStatusFilterReset // Old prop for TrackQnAShareLinkPage
+  onStatusFilterReset, // Old prop for TrackQnAShareLinkPage
+  isLoading // Optional prop to track loading state
 }) => {
   // Determine if we're using new version (QnAShareLinkPage) or old version (TrackQnAShareLinkPage)
   const isNewVersion = !!onQuestionClick;
   const colSpan = isNewVersion ? 2 : 4;
   
-  // Dynamic font sizes for QnAShareLinkPage
-  const thFontSize = isNewVersion ? '20px' : '18px';
-  const thIconFontSize = isNewVersion ? '18px' : '16px';
-  const thFontSizeTablet = isNewVersion ? '15px' : '13px';
-  const thIconFontSizeTablet = isNewVersion ? '14px' : '12px';
-  const thFontSizeMobile = isNewVersion ? '13px' : '11px';
+  // Dynamic font sizes for QnAShareLinkPage - using clamp for responsive sizing
+  const thFontSize = isNewVersion ? 'clamp(14px, 3vw, 24px)' : '18px';
+  const thIconFontSize = isNewVersion ? 'clamp(12px, 2.5vw, 22px)' : '16px';
+  const thFontSizeTablet = isNewVersion ? '18px' : '13px';
+  const thIconFontSizeTablet = isNewVersion ? '16px' : '12px';
+  const thFontSizeMobile = isNewVersion ? '14px' : '11px';
   const thIconFontSizeMobile = isNewVersion ? '12px' : '10px';
+  
+  // Ref for scroll container
+  const scrollContainerRef = useRef(null);
+  const hasResetRef = useRef(false);
+  
+  // Reset scroll to top when page loads/refreshes and data is ready
+  useEffect(() => {
+    if (!isNewVersion || isLoading) return;
+    
+    if (scrollContainerRef.current && questions.length > 0 && !hasResetRef.current) {
+      // Reset scroll immediately
+      scrollContainerRef.current.scrollTop = 0;
+      hasResetRef.current = true;
+      
+      // Also reset after a small delay to ensure it sticks
+      const timer = setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, questions.length, isNewVersion]);
+  
+  // Reset the flag when component unmounts (page refresh)
+  useEffect(() => {
+    hasResetRef.current = false;
+    return () => {
+      hasResetRef.current = false;
+    };
+  }, []);
   
   return (
     <div>
@@ -103,14 +136,79 @@ const QuestionsTable = ({
       )}
       <style>
         {`
+          ${isNewVersion ? `
           .table-scroll-container::-webkit-scrollbar {
-            width: 0px;
-            height: 0px;
-            display: none;
+            width: clamp(10px, 1.5vw, 14px);
+            height: clamp(10px, 1.5vw, 14px);
+          }
+          .table-scroll-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+          }
+          .table-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+          }
+          .table-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.7);
           }
           .table-scroll-container {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.1);
+            scroll-behavior: smooth;
+            overflow-y: auto;
+            overflow-x: auto;
+          }
+          ` : `
+          .table-scroll-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          .table-scroll-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+          }
+          .table-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+          }
+          .table-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.7);
+          }
+          .table-scroll-container {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.1);
+            scroll-behavior: smooth;
+            overflow-y: auto;
+            overflow-x: auto;
+          }
+          `}
+          @media (max-width: 600px) {
+            .questions-table {
+              font-size: clamp(10px, 3vw, 14px) !important;
+            }
+            .questions-table th,
+            .questions-table td {
+              padding: clamp(4px, 1.5vw, 8px) clamp(6px, 2vw, 12px) !important;
+            }
+          }
+          @media (max-width: 400px) {
+            .questions-table {
+              font-size: clamp(9px, 3.5vw, 12px) !important;
+            }
+            .questions-table th,
+            .questions-table td {
+              padding: clamp(3px, 1.2vw, 6px) clamp(4px, 1.5vw, 8px) !important;
+            }
+          }
+          @media (max-width: 300px) {
+            .questions-table {
+              font-size: clamp(8px, 4vw, 11px) !important;
+            }
+            .questions-table th,
+            .questions-table td {
+              padding: clamp(2px, 1vw, 5px) clamp(3px, 1.2vw, 6px) !important;
+            }
           }
           .questions-table th {
             font-size: ${thFontSize};
@@ -136,24 +234,53 @@ const QuestionsTable = ({
           }
         `}
       </style>
-      <div className="table-responsive table-scroll-container" style={{ 
-        marginTop: !isNewVersion ? "0" : "20px", 
-        overflowX: "auto", 
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-        height: "auto",
-        minHeight: "auto",
-        maxHeight: "calc(100vh - 500px)",
-        display: "flex",
-        flexDirection: "column"
-      }}>
+      <div 
+        style={{
+          border: isNewVersion ? "clamp(4px, 0.6vw, 1px) solid #71C0BB" : "none",
+          // borderRadius: isNewVersion ? "clamp(10px, 1.2vw, 14px)" : "0",
+          padding: isNewVersion ? "0" : "0",
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: "300px",
+          boxShadow: isNewVersion ? "0 6px 12px rgba(113, 192, 187, 0.2), 0 2px 4px rgba(113, 192, 187, 0.1)" : "none",
+          backgroundColor: isNewVersion ? "#ffffff" : "transparent",
+          overflow: "hidden"
+        }}
+      >
+        <div 
+          ref={(el) => {
+            scrollContainerRef.current = el;
+            // Ensure scroll starts at top when element is created
+            if (el && isNewVersion) {
+              el.scrollTop = 0;
+            }
+          }}
+          className="table-responsive table-scroll-container" 
+          style={{ 
+            marginTop: !isNewVersion ? "0" : "0", 
+            overflowX: "auto", 
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
+            height: isNewVersion ? "calc(100vh - clamp(100px, 15vw, 120px))" : "auto",
+            minHeight: isNewVersion ? "calc(100vh - clamp(100px, 15vw, 120px))" : "auto",
+            maxHeight: isNewVersion ? "calc(100vh - clamp(100px, 15vw, 120px))" : "calc(100vh - 100px)",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: "300px",
+            borderRadius: isNewVersion ? "clamp(8px, 1vw, 12px)" : "0"
+          }}>
         <Table bordered className="questions-table" style={{ 
           borderCollapse: 'separate', 
           borderSpacing: '0',
           width: '100%', 
-          minWidth: '320px',
+          minWidth: '300px',
+          maxWidth: '100%',
           border: "1px solid #D4D6DD",
-          fontSize: isNewVersion ? "clamp(14px, 2vw, 18px)" : "clamp(12px, 2vw, 16px)"
+          fontSize: isNewVersion ? "clamp(12px, 1.5vw, 18px)" : "clamp(12px, 2vw, 16px)",
+          tableLayout: 'auto'
         }}>
         <thead style={{ backgroundColor: "#000", color: "white", position: "sticky", top: 0, zIndex: 10 }}>
           <tr>
@@ -162,12 +289,15 @@ const QuestionsTable = ({
               borderTop: "none",
               borderBottom: "1px solid #D4D6DD",
               borderLeft: "none",
-              padding: "8px 4px", 
+              padding: isNewVersion ? "clamp(6px, 1.5vw, 12px) clamp(8px, 2vw, 16px)" : "8px 4px", 
               backgroundColor: "#000", 
               color: "white",
-              width: isNewVersion ? "85%" : "52%",
-              minWidth: "100px",
-              textAlign: "center"
+              width: isNewVersion ? "auto" : "52%",
+              minWidth: isNewVersion ? "200px" : "100px",
+              textAlign: "center",
+              fontSize: isNewVersion ? "clamp(12px, 2vw, 22px)" : thFontSize,
+              whiteSpace: "normal",
+              wordWrap: "break-word"
             }}>Questions</th>
             <th 
               onClick={onVoteFilterClick}
@@ -176,16 +306,19 @@ const QuestionsTable = ({
                 borderTop: "none",
                 borderBottom: "1px solid #D4D6DD",
                 borderLeft: "1px solid #D4D6DD",
-                padding: "4px 2px", 
+                padding: isNewVersion ? "clamp(6px, 1.2vw, 10px) clamp(8px, 1.5vw, 12px)" : "4px 2px", 
                 backgroundColor: voteFilterActive ? "#71C0BB" : "#000", 
                 color: "white",
-                width: isNewVersion ? "15%" : "8%",
-                minWidth: "35px",
-                maxWidth: "50px",
+                width: isNewVersion ? "auto" : "8%",
+                minWidth: isNewVersion ? "clamp(50px, 10vw, 70px)" : "30px",
+                maxWidth: isNewVersion ? "none" : "40px",
                 textAlign: "center",
                 cursor: "pointer",
                 userSelect: "none",
-                position: "relative"
+                position: "relative",
+                fontSize: isNewVersion ? "clamp(11px, 2vw, 18px)" : thFontSize,
+                whiteSpace: "nowrap",
+                overflow: "visible"
               }}
               title={
                 voteFilterActive === null 
@@ -330,6 +463,7 @@ const QuestionsTable = ({
           )}
         </tbody>
       </Table>
+        </div>
       </div>
     </div>
   );

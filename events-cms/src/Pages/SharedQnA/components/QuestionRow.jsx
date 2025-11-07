@@ -52,7 +52,7 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
             }
           }}
           style={{ 
-          backgroundColor: "#71C0BB",
+          backgroundColor: "#ffffff",
           color: "#000000",
           fontWeight: "bold",
           fontStyle: "italic",
@@ -60,41 +60,47 @@ const QuestionRow = ({ question, onQuestionClick, onAnswer, onEdit, onDelete, on
           borderTop: "1px solid #D4D6DD",
           borderBottom: "1px solid #D4D6DD",
           borderLeft: "none",
-          padding: "6px 12px",
+          padding: "clamp(6px, 1.5vw, 12px) clamp(8px, 2vw, 16px)",
           wordBreak: "break-word",
           wordWrap: "break-word",
+          overflowWrap: "break-word",
           whiteSpace: "normal",
-          lineHeight: "1.4",
+          lineHeight: "clamp(1.3, 1.5vw, 1.6)",
           verticalAlign: "middle",
-          fontSize: "clamp(14px, 2vw, 18px)",
+          fontSize: "clamp(11px, 1.8vw, 18px)",
           textAlign: "start",
           cursor: "pointer",
-          transition: "all 0.2s ease"
+          transition: "all 0.2s ease",
+          width: "auto",
+          minWidth: "200px"
         }}
         onMouseEnter={(e) => {
-          e.target.style.backgroundColor = "#5a9a96";
+          e.target.style.backgroundColor = "#f0f0f0";
           e.target.style.color = "#000000";
         }}
         onMouseLeave={(e) => {
-          e.target.style.backgroundColor = "#71C0BB";
+          e.target.style.backgroundColor = "#ffffff";
           e.target.style.color = "#000000";
         }}
         >
           {question.question}
         </td>
         <td style={{ 
-          backgroundColor: "#71C0BB",
+          backgroundColor: "#ffffff",
           color: "#000000",
           borderRight: "none",
           borderTop: "1px solid #D4D6DD",
           borderBottom: "1px solid #D4D6DD",
           borderLeft: "1px solid #D4D6DD",
-          padding: "4px 1px", 
+          padding: "clamp(6px, 1.2vw, 10px) clamp(8px, 1.5vw, 12px)", 
           textAlign: "center",
           verticalAlign: "middle",
-          fontSize: "clamp(14px, 2vw, 18px)",
+          fontSize: "clamp(11px, 1.8vw, 16px)",
           fontWeight: "600",
-          whiteSpace: "nowrap"
+          whiteSpace: "nowrap",
+          width: "auto",
+          minWidth: "clamp(50px, 10vw, 70px)",
+          maxWidth: "none"
         }}>
           {question.likesCount || 0}
         </td>
