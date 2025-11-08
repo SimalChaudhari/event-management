@@ -272,6 +272,14 @@ export class CsvUploadResponseDto {
 
   @IsOptional()
   sessionId?: string;
+
+  @IsOptional()
+  eventAssociation?: {
+    eventId: string;
+    eventName: string;
+    registrationsCreated: number;
+    registrationsSkipped: number;
+  };
 }
 
 // SSO Provider enum

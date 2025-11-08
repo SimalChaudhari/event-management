@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import { Alert, ProgressBar, Table, Badge } from 'react-bootstrap';
 import { uploadCsvUsers, downloadSampleCsv } from '../../store/actions/userActions';
+import axiosInstance from '../../configs/axiosInstance';
 import { useDispatch } from 'react-redux';
 import '../../styles/csv-upload.css';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
@@ -29,6 +30,73 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
         totalInvalid: 0,
         errors: []
     });
+    const [selectedEventId, setSelectedEventId] = useState('');
+    const [eventOptions, setEventOptions] = useState([]);
+    const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+    const [eventFetchError, setEventFetchError] = useState('');
+
+    const selectedEvent = useMemo(
+        () => eventOptions.find((event) => event.id === selectedEventId) || null,
+        [eventOptions, selectedEventId]
+    );
+
+    const fetchEventOptions = useCallback(async () => {
+        setIsLoadingEvents(true);
+        setEventFetchError('');
+        try {
+            const response = await axiosInstance.get('/events/dropdown-list');
+            const events = Array.isArray(response?.data?.data) ? response.data.data : [];
+            setEventOptions(events);
+            if (events.length === 0) {
+                setEventFetchError('No upcoming events are available for selection.');
+            }
+        } catch (error) {
+            const apiError = error?.response?.data?.message || 'Failed to load events. Please try again.';
+            setEventFetchError(apiError);
+        } finally {
+            setIsLoadingEvents(false);
+        }
+    }, []);
+
+    const formatEventLabel = (event) => {
+        if (!event) return '';
+        const { name, startDate, endDate, location } = event;
+        const toDate = (value) => {
+            if (!value) return null;
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const start = toDate(startDate);
+        const end = toDate(endDate);
+        const formatDate = (date) =>
+            date
+                ? date.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                  })
+                : null;
+
+        const startLabel = formatDate(start);
+        const endLabel = formatDate(end);
+
+        let datePart = '';
+        if (startLabel && endLabel) {
+            datePart = `${startLabel} - ${endLabel}`;
+        } else if (startLabel) {
+            datePart = startLabel;
+        }
+
+        const locationPart = location ? ` • ${location}` : '';
+        return `${name}${datePart ? ` • ${datePart}` : ''}${locationPart}`;
+    };
+
+    useEffect(() => {
+        if (show) {
+            fetchEventOptions();
+        }
+    }, [show, fetchEventOptions]);
 
     const parseCSV = (content) => {
         const lines = content.trim().split('\n');
@@ -220,6 +288,11 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             return;
         }
 
+        if (!selectedEventId) {
+            setErrorMessage('Please choose an event before uploading the CSV.');
+            return;
+        }
+
         if (validationResults.totalValid === 0) {
             setErrorMessage('No valid data found in CSV file. Please check the validation errors below.');
             return;
@@ -242,7 +315,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             }, 200);
 
             // Only upload valid data
-            const result = await dispatch(uploadCsvUsers(validationResults.validRows));
+            const result = await dispatch(
+                uploadCsvUsers(validationResults.validRows, { eventId: selectedEventId })
+            );
             
             clearInterval(progressInterval);
             setUploadProgress(100);
@@ -323,6 +398,9 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             totalInvalid: 0,
             errors: []
         });
+        setSelectedEventId('');
+        setEventOptions([]);
+        setEventFetchError('');
         
         // Reset file input
         if (fileInputRef.current) {
@@ -427,6 +505,59 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                     </div>
                 </div>
 
+                <Form.Group controlId="eventSelection" className="mb-4">
+                    <Form.Label className="font-weight-600">
+                        <i className="feather icon-calendar mr-1"></i>
+                        Associate CSV Users with an Event
+                    </Form.Label>
+                    <div className="d-flex">
+                        <Form.Control
+                            as="select"
+                            value={selectedEventId}
+                            onChange={(e) => {
+                                setSelectedEventId(e.target.value);
+                                if (errorMessage && errorMessage.toLowerCase().includes('event')) {
+                                    setErrorMessage('');
+                                }
+                            }}
+                            disabled={isLoadingEvents}
+                            className="mr-2"
+                        >
+                            <option value="">
+                                {isLoadingEvents ? 'Loading events...' : 'Select an event'}
+                            </option>
+                            {eventOptions.map((event) => (
+                                <option key={event.id} value={event.id}>
+                                    {formatEventLabel(event)}
+                                </option>
+                            ))}
+                        </Form.Control>
+                        <Button
+                            variant="outline-secondary"
+                            onClick={fetchEventOptions}
+                            disabled={isLoadingEvents}
+                            title="Refresh events"
+                        >
+                            {isLoadingEvents ? (
+                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            ) : (
+                                <i className="feather icon-refresh-cw"></i>
+                            )}
+                        </Button>
+                    </div>
+                    {eventFetchError ? (
+                        <small className="text-danger d-block mt-2">{eventFetchError}</small>
+                    ) : selectedEvent ? (
+                        <small className="text-muted d-block mt-2">
+                            Users in this CSV will be linked to <strong>{selectedEvent.name}</strong>
+                        </small>
+                    ) : (
+                        <small className="text-muted d-block mt-2">
+                            Select an event to link all uploaded users.
+                        </small>
+                    )}
+                </Form.Group>
+
                 {errorMessage && (
                     <Alert variant="danger" className="mb-3">
                         <i className="feather icon-alert-triangle mr-1"></i>
@@ -460,6 +591,19 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                                 )}
                             </p>
                         </div>
+                        
+                        {uploadResult.data?.eventAssociation && (
+                            <div className="text-center mt-3">
+                                <Badge variant="light" className="badge-light-primary px-3 py-2">
+                                    <i className="feather icon-map-pin mr-1"></i>
+                                    Linked to: {uploadResult.data.eventAssociation.eventName}
+                                </Badge>
+                                <div className="small text-muted mt-2">
+                                    <strong>{uploadResult.data.eventAssociation.registrationsCreated}</strong> new registrations created •{' '}
+                                    <strong>{uploadResult.data.eventAssociation.registrationsSkipped}</strong> users already linked
+                                </div>
+                            </div>
+                        )}
                         
                         {/* Enterprise-Grade Professional Summary */}
                         {uploadResult.data && (
@@ -691,7 +835,12 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                     <Button 
                         variant="primary" 
                         onClick={handleUpload}
-                        disabled={!selectedFile || isUploading || validationResults.totalValid === 0}
+                        disabled={
+                            !selectedFile ||
+                            isUploading ||
+                            validationResults.totalValid === 0 ||
+                            !selectedEventId
+                        }
                     >
                         {isUploading ? (
                             <>

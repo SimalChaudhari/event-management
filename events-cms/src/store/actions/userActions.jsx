@@ -120,9 +120,18 @@ export const deleteUser = (id) => async (dispatch) => {
 };
 
 // CSV Upload functionality
-export const uploadCsvUsers = (csvData) => async (dispatch) => {
+export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
     try {
         setLoading(dispatch, true);
+
+        const resolvedOptions = typeof options === 'string' ? { eventId: options } : options || {};
+        const { eventId } = resolvedOptions;
+
+        if (!eventId) {
+            const message = 'Event selection is required before uploading the CSV.';
+            toast.error(message);
+            return { success: false, message };
+        }
         
         let response;
         
@@ -131,6 +140,7 @@ export const uploadCsvUsers = (csvData) => async (dispatch) => {
             // Handle file upload
             const formData = new FormData();
             formData.append('csvFile', csvData);
+            formData.append('eventId', eventId);
 
             response = await axiosInstance.post('/auth/upload-csv-users', formData, {
                 headers: {
@@ -140,7 +150,8 @@ export const uploadCsvUsers = (csvData) => async (dispatch) => {
         } else if (Array.isArray(csvData)) {
             // Handle JSON data - send as regular JSON request body
             response = await axiosInstance.post('/auth/upload-csv-users', {
-                users: csvData
+                users: csvData,
+                eventId
             }, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -157,7 +168,11 @@ export const uploadCsvUsers = (csvData) => async (dispatch) => {
         };
 
         if (result.success) {
-            toast.success(result.message);
+            if (result?.data?.eventAssociation?.eventName) {
+                toast.success(`${result.message} (${result.data.eventAssociation.eventName})`);
+            } else {
+                toast.success(result.message);
+            }
             // Refresh user list after successful upload
             await dispatch(userList());
         } else {

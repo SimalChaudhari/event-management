@@ -1,6 +1,12 @@
 import * as crypto from 'crypto';
 import { UserRole } from './../user/users.entity';
 
+// Utility function to normalize email to lowercase for case-insensitive comparison
+export const normalizeEmail = (email: string): string => {
+  if (!email) return email;
+  return email.trim().toLowerCase();
+};
+
 // Utility function to validate if the input is an email or not
 export const validateEmail = (input: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -41,6 +41,7 @@ import { ProgrammeModule } from './programme/programme.module';
 import { EngagementModule } from './engagement/engagement.module';
 import { EngagementQnaModule } from './engagement-qna/engagement-qna.module';
 import { ModeratorModule } from './moderator/moderator.module';
+import { ScheduledPushNotificationModule } from './scheduled-push-notification/scheduled-push-notification.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { ModeratorModule } from './moderator/moderator.module';
     EngagementModule,
     EngagementQnaModule,
     ModeratorModule,
+    ScheduledPushNotificationModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

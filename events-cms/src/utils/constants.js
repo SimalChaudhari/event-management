@@ -141,3 +141,10 @@ export const LOGS_PATHS = {
     LOG_DETAILS: '/logs/:sessionId'
 };
 
+export const PUSH_NOTIFICATION_PATHS = {
+    LIST_NOTIFICATIONS: '/push-notifications',
+    ADD_NOTIFICATION: '/push-notifications/add',
+    EDIT_NOTIFICATION: '/push-notifications/edit',
+    VIEW_NOTIFICATION: '/push-notifications/view'
+};
+

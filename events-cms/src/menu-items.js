@@ -273,6 +273,17 @@ const chartData = {
                         type: 'badge-info'
                     }
                 },
+                {
+                    id: 'push-notifications',
+                    title: 'Push Notifications',
+                    type: 'item',
+                    icon: 'feather icon-bell',
+                    url: '/push-notifications',
+                    badge: {
+                        title: 'NEW',
+                        type: 'badge-success'
+                    }
+                },
             ]
         },
      

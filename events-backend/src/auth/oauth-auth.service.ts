@@ -5,6 +5,7 @@ import { UserEntity, AuthProvider, UserRole } from '../user/users.entity';
 import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
 import { SSOSyncService } from './sso-sync.service';
+import { normalizeEmail } from '../utils/auth.utils';
 
 @Injectable()
 export class OAuthAuthService {
@@ -163,17 +164,20 @@ console.log('tokenData:', tokenData);
       // Get user information
       const userInfo = await this.getUserInfo(tokens.accessToken);
 
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(userInfo.email);
+
       // Check if user exists in database
       let user = await this.userRepository.findOne({
-        where: { email: userInfo.email },
+        where: { email: normalizedEmail },
       });
 
       let isNewUser = false;
 
       if (!user) {
-        // Create new user entry
+        // Create new user entry - store normalized email
         user = this.userRepository.create({
-          email: userInfo.email,
+          email: normalizedEmail, // Store normalized email
           firstName: userInfo.firstName || 'OAuth',
           lastName: userInfo.lastName || 'User',
           mobile: '',

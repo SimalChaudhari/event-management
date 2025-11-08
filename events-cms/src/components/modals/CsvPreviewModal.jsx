@@ -6,7 +6,7 @@ import { Alert, Table, Badge } from 'react-bootstrap';
 import { uploadCsvUsers } from '../../store/actions/userActions';
 import { useDispatch } from 'react-redux';
 
-const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess }) => {
+const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess, selectedEventId = '', selectedEventName = '' }) => {
     const dispatch = useDispatch();
     const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
@@ -43,12 +43,17 @@ const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess }) => {
             return;
         }
 
+        if (!selectedEventId) {
+            setErrorMessage('Please select an event before uploading the CSV.');
+            return;
+        }
+
         setIsUploading(true);
         setErrorMessage('');
         setUploadResult(null);
 
         try {
-            const result = await dispatch(uploadCsvUsers(csvData));
+            const result = await dispatch(uploadCsvUsers(csvData, { eventId: selectedEventId }));
             setUploadResult(result);
 
             if (result.success) {
@@ -109,6 +114,11 @@ const CsvPreviewModal = ({ show, onHide, csvData, onUploadSuccess }) => {
             </Modal.Header>
             
             <Modal.Body>
+                <Alert variant="info" className="mb-3">
+                    <i className="feather icon-calendar mr-1"></i>
+                    Users will be associated with{' '}
+                    <strong>{selectedEventName || 'the selected event'}</strong>
+                </Alert>
                 <div className="mb-4">
                     <h6 className="mb-3">
                         <i className="feather icon-bar-chart-2 mr-1"></i>

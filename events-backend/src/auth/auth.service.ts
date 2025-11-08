@@ -12,6 +12,8 @@ import { Repository, DataSource } from 'typeorm';
 import { UserDto } from './../user/users.dto';
 import { UserEntity, AuthProvider } from './../user/users.entity';
 import { UserRole } from './../user/users.entity';
+import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { Event } from '../event/event.entity';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from 'service/email.service';
@@ -20,6 +22,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { AddressService } from '../user/address.service';
 import { AddressUtils } from '../utils/address.utils';
 import { PasswordUtils } from '../utils/password.utils';
+import { normalizeEmail } from '../utils/auth.utils';
 import { 
   EmailTemplateUtils, 
   UserCredentialsData 
@@ -33,6 +36,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuthAuthService } from './oauth-auth.service';
+import { Type as RegisterEventType } from '../registerEvent/registerEvent.dto';
 
 @Injectable()
 export class AuthService {
@@ -41,6 +45,10 @@ export class AuthService {
   constructor(
     @InjectRepository(UserEntity)
     public userRepository: Repository<UserEntity>,
+    @InjectRepository(RegisterEvent)
+    private readonly registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(Event)
+    private readonly eventRepository: Repository<Event>,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -144,8 +152,10 @@ export class AuthService {
   // Register a new user
   async register(userDto: UserDto): Promise<{ message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(userDto.email || '');
       const existingUser = await this.userRepository.findOne({
-        where: [{ email: userDto.email }],
+        where: [{ email: normalizedEmail }],
       });
 
       if (existingUser) {
@@ -202,6 +212,7 @@ export class AuthService {
 
       const newUser = this.userRepository.create({
         ...sanitizedUserData,
+        email: normalizedEmail, // Store normalized email
         password: hashedPassword,
         role: userDto.role || UserRole.User,
         acceptTerms: Boolean(userDto.acceptTerms),
@@ -290,8 +301,10 @@ export class AuthService {
     verificationCode?: string;
   }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(userDto.email || '');
       const user = await this.userRepository.findOne({
-        where: { email: userDto.email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -423,8 +436,10 @@ export class AuthService {
     message: string;
     data?: Partial<UserEntity>;
   }> {
+    // Normalize email to lowercase for case-insensitive comparison
+    const normalizedEmail = normalizeEmail(email);
     const user = await this.userRepository.findOne({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (user) {
@@ -454,8 +469,10 @@ export class AuthService {
     refreshToken: string;
   }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(userDto.email || '');
       const user = await this.userRepository.findOne({
-        where: { email: userDto.email },
+        where: { email: normalizedEmail },
       });
 
    
@@ -665,8 +682,10 @@ export class AuthService {
     otp: string,
   ): Promise<{ success: boolean; message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(email);
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -709,8 +728,10 @@ export class AuthService {
   // OTP-based forgot password
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(email);
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -744,8 +765,10 @@ export class AuthService {
 
   async resendOTP(email: string): Promise<{ message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(email);
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -785,8 +808,10 @@ export class AuthService {
     newPassword: string,
   ): Promise<{ message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(email);
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -822,8 +847,10 @@ export class AuthService {
   // Method to resend OTP for non-verified users during login
   async resendLoginOTP(email: string): Promise<{ message: string }> {
     try {
+      // Normalize email to lowercase for case-insensitive comparison
+      const normalizedEmail = normalizeEmail(email);
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (!user) {
@@ -868,15 +895,33 @@ export class AuthService {
    * 5. Real-time progress tracking
    * 6. Professional error handling and recovery
    */
-  async uploadCsvUsers(csvData: CsvUserDto[], adminId: string = 'system', fileName: string = 'upload.csv'): Promise<CsvUploadResponseDto> {
+  async uploadCsvUsers(
+    csvData: CsvUserDto[],
+    adminId: string = 'system',
+    fileName: string = 'upload.csv',
+    eventId?: string,
+  ): Promise<CsvUploadResponseDto> {
     try {
       const startTime = Date.now();
       const sessionId = uuidv4();
 
       console.log(`🚀 PROFESSIONAL CSV UPLOAD: Processing ${csvData.length} users...`);
 
+      if (!eventId) {
+        throw new BadRequestException('Event selection is required for CSV upload');
+      }
+
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name'],
+      });
+
+      if (!event) {
+        throw new BadRequestException('Selected event could not be found');
+      }
+
       // Create initial log entry
-      const logEntry = await this.csvUploadLogService.createLogEntry({
+      await this.csvUploadLogService.createLogEntry({
         sessionId,
         adminId,
         fileName,
@@ -914,6 +959,20 @@ export class AuthService {
       const processingTime = Date.now() - startTime;
       const existingUsersSkipped = userProcessingResult.existingUsersCount - userProcessingResult.usersToUpdate.length;
 
+      const normalizedEmails = Array.from(
+        new Set(csvData.map((user) => normalizeEmail(user.email))),
+      );
+
+      const usersForAssociation = await this.userRepository.find({
+        where: normalizedEmails.map((email) => ({ email })),
+        select: ['id'],
+      });
+
+      const eventAssociationResult = await this.associateUsersWithEvent(
+        usersForAssociation.map((user) => user.id),
+        eventId,
+      );
+
       // ==========================================
       // 📊 COMPLETE UPLOAD SUMMARY LOGS
       // ==========================================
@@ -937,6 +996,8 @@ export class AuthService {
           console.log(`  ⚠️  ${skipped}`);
         });
       }
+      console.log(`🎯 Event Associations: ${eventAssociationResult.registrationsCreated} created, ${eventAssociationResult.registrationsSkipped} skipped`);
+      console.log(`🏷️  Event: ${event.name} (${event.id})`);
       console.log(`${'='.repeat(80)}\n`);
 
       // Update CSV upload log entry with user creation completion
@@ -956,16 +1017,17 @@ export class AuthService {
         emailsFailed: 0,
         processingTimeMs: processingTime,
         skippedRecords: userProcessingResult.skippedUsers,
-        summary: emailsToSendCount > 0 
+        summary: `${emailsToSendCount > 0 
           ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (processing in background)` 
           : `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | No emails to send`
+        } | Event: ${event.name} (${eventAssociationResult.registrationsCreated} registrations, ${eventAssociationResult.registrationsSkipped} already registered)`
       });
 
       console.log(`📊 Status: ${uploadStatus} ${emailsToSendCount > 0 ? '(Emails sending in background)' : '(Complete)'}\n`);
 
       // Prepare final response - return immediately without waiting for emails
       const response: CsvUploadResponseDto = {
-        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} credential emails are being sent in background.` : ''}`,
+        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} credential emails are being sent in background.` : ''} Users associated with ${event.name}.`,
         totalProcessed: csvData.length.toString(),
         newUsersCreated: userProcessingResult.newUsersCreated.toString(),
         existingUsersSkipped: existingUsersSkipped.toString(),
@@ -987,7 +1049,13 @@ export class AuthService {
           emailsProcessing: 0,
           status: 'disabled'
         },
-        sessionId: sessionId
+        sessionId: sessionId,
+        eventAssociation: {
+          eventId: event.id,
+          eventName: event.name,
+          registrationsCreated: eventAssociationResult.registrationsCreated,
+          registrationsSkipped: eventAssociationResult.registrationsSkipped,
+        },
       };
 
       return response;
@@ -1069,17 +1137,17 @@ export class AuthService {
     passwordsGenerated: number;
     existingUsersCount: number;
   }> {
-    // Bulk query for existing users
-    const csvEmails = csvData.map(user => user.email);
+    // Bulk query for existing users - normalize emails for case-insensitive comparison
+    const csvEmails = csvData.map(user => normalizeEmail(user.email));
     const existingUsers = await this.userRepository.find({
       where: csvEmails.map(email => ({ email })),
       select: ['id', 'email', 'firstName', 'lastName', 'password']
     });
 
-    // Create lookup map for O(1) performance
+    // Create lookup map for O(1) performance - use normalized emails
     const existingUsersMap = new Map();
     existingUsers.forEach(user => {
-      existingUsersMap.set(user.email, user);
+      existingUsersMap.set(normalizeEmail(user.email), user);
     });
 
     // Prepare bulk operations data
@@ -1091,7 +1159,8 @@ export class AuthService {
 
     // Process each user
     for (const userData of csvData) {
-      const existingUser = existingUsersMap.get(userData.email);
+      const normalizedEmail = normalizeEmail(userData.email);
+      const existingUser = existingUsersMap.get(normalizedEmail);
 
       if (existingUser) {
         // Existing user - update password if needed, and also update company/designation
@@ -1144,6 +1213,7 @@ export class AuthService {
         
         usersToCreate.push({
           ...sanitizedData,
+          email: normalizedEmail, // Store normalized email
           password: await PasswordUtils.hashPassword(randomPassword),
           role: UserRole.User,
           isVerify: true,
@@ -1215,6 +1285,69 @@ export class AuthService {
       skippedUsers,
       passwordsGenerated,
       existingUsersCount: existingUsers.length
+    };
+  }
+
+  private async associateUsersWithEvent(
+    userIds: string[],
+    eventId: string,
+  ): Promise<{ registrationsCreated: number; registrationsSkipped: number }> {
+    const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+
+    if (uniqueUserIds.length === 0) {
+      return { registrationsCreated: 0, registrationsSkipped: 0 };
+    }
+
+    const existingRegistrations = await this.registerEventRepository.find({
+      where: uniqueUserIds.map((userId) => ({ userId, eventId })),
+      select: ['userId'],
+    });
+
+    const alreadyRegisteredIds = new Set(
+      existingRegistrations.map((registration) => registration.userId),
+    );
+
+    const registrationsToCreate = uniqueUserIds
+      .filter((userId) => !alreadyRegisteredIds.has(userId))
+      .map((userId) =>
+        this.registerEventRepository.create({
+          userId,
+          eventId,
+          type: RegisterEventType.Attendee,
+          isCreatedByAdmin: true,
+          isRegister: true,
+        }),
+      );
+
+    let registrationsCreated = 0;
+
+    if (registrationsToCreate.length > 0) {
+      try {
+        await this.registerEventRepository.insert(registrationsToCreate);
+        registrationsCreated = registrationsToCreate.length;
+      } catch (error:any) {
+        console.error(
+          '⚠️  Failed bulk registration insert, attempting individual inserts:',
+          error?.message,
+        );
+
+        for (const registration of registrationsToCreate) {
+          try {
+            await this.registerEventRepository.save(registration);
+            registrationsCreated++;
+          } catch (individualError:any) {
+            console.error(
+              `⚠️  Failed to register user ${registration.userId} for event ${eventId}:`,
+              individualError?.message,
+            );
+          }
+        }
+      }
+    }
+
+    return {
+      registrationsCreated,
+      registrationsSkipped: alreadyRegisteredIds.size,
     };
   }
 
@@ -1637,9 +1770,10 @@ export class AuthService {
         totalProcessed++;
         
         try {
-          // Check if user already exists
+          // Check if user already exists - normalize email for case-insensitive comparison
+          const normalizedEmail = normalizeEmail(userData.email);
           const existingUser = await this.userRepository.findOne({
-            where: { email: userData.email },
+            where: { email: normalizedEmail },
           });
 
           if (existingUser) {
@@ -1699,6 +1833,7 @@ export class AuthService {
 
             const newUser = this.userRepository.create({
               ...sanitizedData,
+              email: normalizedEmail, // Store normalized email
               password: hashedPassword,
               role: UserRole.User,
               isVerify: true, // Auto-verify CSV uploaded users

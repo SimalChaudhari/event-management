@@ -12,7 +12,8 @@ import {
     POLLING_PATHS,
     LOGS_PATHS,
     PROGRAMME_PATHS,
-    ENGAGEMENT_PATHS
+    ENGAGEMENT_PATHS,
+    PUSH_NOTIFICATION_PATHS
 } from './utils/constants.js';
 
 /**
@@ -183,6 +184,17 @@ const settingsComponents = {
 const logsComponents = {
     LogsPage: React.lazy(() => import('./Pages/Logs/LogsPage.jsx')),
     // LogDetailsPage: React.lazy(() => import('./Pages/Logs/LogDetailsPage.jsx'))
+};
+
+/**
+ * Push Notification related components
+ * @type {Object.<string, React.LazyExoticComponent>}
+ */
+const pushNotificationComponents = {
+    List: React.lazy(() => import('./Pages/PushNotifications/PushNotificationsList.jsx')),
+    AddNotification: React.lazy(() => import('./Pages/PushNotifications/AddPushNotificationPage.jsx')),
+    EditNotification: React.lazy(() => import('./Pages/PushNotifications/AddPushNotificationPage.jsx')),
+    ViewNotification: React.lazy(() => import('./Pages/PushNotifications/ViewPushNotificationPage.jsx'))
 };
 
 /**
@@ -550,6 +562,37 @@ const logsRoutes = [
 ];
 
 /**
+ * Push Notification routes configuration
+ * @type {RouteConfig[]}
+ */
+const pushNotificationRoutes = [
+    {
+        path: PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS,
+        exact: true,
+        name: 'Push Notifications',
+        component: pushNotificationComponents.List
+    },
+    {
+        path: PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION,
+        exact: true,
+        name: 'Add Push Notification',
+        component: pushNotificationComponents.AddNotification
+    },
+    {
+        path: PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION + '/:id',
+        exact: true,
+        name: 'Edit Push Notification',
+        component: pushNotificationComponents.EditNotification
+    },
+    {
+        path: PUSH_NOTIFICATION_PATHS.VIEW_NOTIFICATION + '/:id',
+        exact: true,
+        name: 'View Push Notification',
+        component: pushNotificationComponents.ViewNotification
+    }
+];
+
+/**
  * Survey routes configuration
  * @type {RouteConfig[]}
  */
@@ -834,6 +877,7 @@ const routes = [
     // ...moderatorRoutes,
     ...settingsRoutes,
     ...logsRoutes,
+    ...pushNotificationRoutes,
     ...transactionRoutes,
     ...demoRoutes
 ];

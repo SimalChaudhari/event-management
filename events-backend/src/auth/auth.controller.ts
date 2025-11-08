@@ -376,12 +376,13 @@ export class AuthController {
   )
   async uploadCsvUsers(
     @Res() response: Response,
-
-    @Body() body: { users?: CsvUserDto[] },
+    @Body() body: { users?: CsvUserDto[]; eventId?: string; fileName?: string },
     @UploadedFile() file?: Express.Multer.File,
+    @Req() req?: any,
   ) {
     try {
       let csvData: CsvUserDto[] = [];
+      const eventId = body.eventId;
 
       // Handle CSV file upload using professional CSV processor
       if (file) {
@@ -450,7 +451,15 @@ export class AuthController {
         });
       }
 
-      const result = await this.authService.uploadCsvUsers(validUsers);
+      const adminId = req?.user?.id || 'system';
+      const fileName = file?.originalname || body?.fileName || 'csv-upload.json';
+
+      const result = await this.authService.uploadCsvUsers(
+        validUsers,
+        adminId,
+        fileName,
+        eventId,
+      );
       
       return response.status(HttpStatus.OK).json({
         success: true,
@@ -465,7 +474,8 @@ export class AuthController {
           details: result.details,
           skippedUsers: skippedUsers.length > 0 ? skippedUsers : undefined,
           emailStatus: result.emailStatus,
-          sessionId: result.sessionId
+          sessionId: result.sessionId,
+          eventAssociation: result.eventAssociation,
         },
       });
     } catch (error: any) {

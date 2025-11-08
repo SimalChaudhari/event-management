@@ -7,6 +7,8 @@ import { JwtModule } from '@nestjs/jwt';
 import * as dotenv from 'dotenv';
 import { UserEntity } from './../user/users.entity';
 import { AddressEntity } from './../user/address.entity';
+import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { Event } from '../event/event.entity';
 import { EmailService } from './../service/email.service';
 import { AddressService } from './../user/address.service';
 import { ErrorHandlerService } from './../utils/services/error-handler.service';
@@ -20,7 +22,7 @@ import { OAuthAuthService } from './oauth-auth.service';
 dotenv.config(); // Load environment variables
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, AddressEntity]),
+    TypeOrmModule.forFeature([UserEntity, AddressEntity, RegisterEvent, Event]),
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration

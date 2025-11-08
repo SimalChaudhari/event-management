@@ -524,6 +524,37 @@ export class EventService {
     }
   }
 
+  /**
+   * Retrieve a lightweight list of active events for admin dropdowns.
+   * Includes only core identifying fields and excludes past events.
+   */
+  async getEventSummariesForRegistration() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const events = await this.eventRepository
+      .createQueryBuilder('event')
+      .select([
+        'event.id',
+        'event.name',
+        'event.startDate',
+        'event.endDate',
+        'event.location',
+        'event.venue',
+      ])
+      .where('event.endDate >= :today', { today })
+      .orderBy('event.startDate', 'ASC')
+      .getMany();
+
+    return events.map((event) => ({
+      id: event.id,
+      name: event.name,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      location: event.location || event.venue || '',
+    }));
+  }
+
   // Get event attendance count
   async getEventAttendanceCount(eventId: string): Promise<number> {
     try {

@@ -170,6 +170,29 @@ export class EventController {
     }
   }
 
+  @Get('dropdown-list')
+  async getEventDropdownList(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const summaries = await this.eventService.getEventSummariesForRegistration();
+
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Event summaries retrieved successfully',
+        data: summaries,
+        metadata: {
+          count: summaries.length,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event dropdown list retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
   @Put(':id/tab-visibility')
   @Roles(UserRole.Admin)
   async updateTabVisibility(

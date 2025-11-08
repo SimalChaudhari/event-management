@@ -18,6 +18,7 @@ import programmeReducer from './reducer/programmeReducer';
 import engagementReducer from './reducer/engagementReducer';
 import engagementQnaReducer from './reducer/engagementQnaReducer';
 import moderatorReducer from './reducer/moderatorReducer';
+import pushNotificationReducer from './reducer/pushNotificationReducer.jsx';
 import loadingReducer from './reducer/loadingReducer';
 import errorReducer from './reducer/errorReducer';
 import ableReducer from './ableReducer';
@@ -46,6 +47,7 @@ const reducer = combineReducers({
     engagement: engagementReducer,
     engagementQna: engagementQnaReducer,
     moderator: moderatorReducer,
+    pushNotification: pushNotificationReducer,
     loading: loadingReducer,
     error: errorReducer
 });
