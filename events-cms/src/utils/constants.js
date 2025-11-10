@@ -70,6 +70,9 @@ export const EVENT_PATHS = {
 
     // Q&A
     QA: '/events/qa',
+
+    // Public facing pages
+    PUBLIC_EVENT_QR: '/events/participants-qr/:eventId',
 };  
 
 export const MEDIA_MANAGER_PATHS = {

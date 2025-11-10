@@ -429,6 +429,15 @@ const RegisteredEvents = () => {
         setShowExportModal(true);
     };
 
+    const handleGenerateQrClick = () => {
+        if (!selectedEventId) {
+            alert('Please select an event to generate QR codes');
+            return;
+        }
+        const qrPath = EVENT_PATHS.PUBLIC_EVENT_QR.replace(':eventId', selectedEventId);
+        window.open(qrPath, '_blank', 'noopener,noreferrer');
+    };
+
     // Get selected event name for modal
     const selectedEvent = events.find(event => event.id === selectedEventId);
     const selectedEventName = selectedEvent ? selectedEvent.name : '';
@@ -496,14 +505,24 @@ const RegisteredEvents = () => {
                 showUserFilter={true}
                 showEventFilter={true}
                 actionButtons={
-                    <button 
-                        className="btn btn-info d-flex align-items-center" 
-                        onClick={handleExportClick}
-                        disabled={!selectedEventId}
-                    >
-                        <i className="feather icon-download mr-1"></i>
-                        Export Users
-                    </button>
+                    <>
+                        <button
+                            className="btn btn-success d-flex align-items-center"
+                            onClick={handleGenerateQrClick}
+                            disabled={!selectedEventId}
+                        >
+                            <i className="feather icon-grid mr-1"></i>
+                            Generate QR Codes
+                        </button>
+                        <button 
+                            className="btn btn-info d-flex align-items-center" 
+                            onClick={handleExportClick}
+                            disabled={!selectedEventId}
+                        >
+                            <i className="feather icon-download mr-1"></i>
+                            Export Users
+                        </button>
+                    </>
                 }
             />
             

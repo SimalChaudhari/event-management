@@ -50,6 +50,7 @@ const eventComponents = {
     AddRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
     EditRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/AddRegisterEventPage.jsx')),
     ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx')),
+    ParticipantsQr: React.lazy(() => import('./Pages/Events/registered-events/PublicParticipantsQrPage.jsx')),
 
     Gallery: React.lazy(() => import('./Pages/Events/gallery/GalleryPage.jsx')),
     AddGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
@@ -856,6 +857,12 @@ const publicQnaShareRoutes = [
         exact: true,
         name: 'Track Q&A Share Link',
         component: engagementComponents.TrackQnAShareLink
+    },
+    {
+        path: EVENT_PATHS.PUBLIC_EVENT_QR.replace(':eventId', ':eventId'),
+        exact: true,
+        name: 'Event Participants QR',
+        component: eventComponents.ParticipantsQr
     }
 ];
 
