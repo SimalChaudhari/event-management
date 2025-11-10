@@ -14,7 +14,8 @@ import {
     getAllTracks,
     getAllSessions,
     deleteTrack,
-    deleteSession
+    deleteSession,
+    reorderProgrammeTracks
 } from '../../store/actions/programmeActions';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { PROGRAMME_PATHS } from '../../utils/constants';
@@ -22,6 +23,7 @@ import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils'
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
+require('datatables.net-rowreorder');
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -39,7 +41,7 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView, handleViewSessions) {
+function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView, handleViewSessions, handleReorder) {
     let tableZero = '#programme-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -49,9 +51,9 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const tableInstance = $(tableZero).DataTable({
         data: data || [],
-        order: [[3, 'asc']], // Sort by Created Date column (index 3) to match backend order
+        order: [],
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -59,12 +61,31 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
         ],
+        rowReorder: {
+            dataSrc: 'displayOrder',
+            selector: 'td.reorder-handle-column'
+        },
+        processing: true,
         pagingType: 'full_numbers',
         dom:
             "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-track-button ml-2'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
+            {
+                data: 'displayOrder',
+                title: '',
+                width: '5%',
+                orderable: false,
+                className: 'text-center align-middle reorder-handle-column',
+                render: function () {
+                    return `
+                        <span class="drag-handle" title="Drag to reorder" style="cursor: move; display: inline-flex; align-items: center; justify-content: center;">
+                            <i class="feather icon-move"></i>
+                        </span>
+                    `;
+                }
+            },
             {
                 data: 'title',
                 title: 'Track Details',
@@ -160,7 +181,35 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
         }
     });
 
-    $(tableZero).DataTable().page(currentPage).draw(false);
+    tableInstance.page(currentPage).draw(false);
+
+    tableInstance.on('row-reorder', function () {
+        const orderedRows = tableInstance.rows({ order: 'current' }).data().toArray();
+        if (!orderedRows || orderedRows.length === 0) {
+            return;
+        }
+
+        const reorderedItems = orderedRows.map((row, index) => {
+            row.displayOrder = index;
+            return {
+                id: row.id,
+                displayOrder: index
+            };
+        });
+
+        tableInstance.rows().invalidate().draw(false);
+
+        if (typeof handleReorder === 'function') {
+            if (typeof tableInstance.processing === 'function') {
+                tableInstance.processing(true);
+            }
+            Promise.resolve(handleReorder(reorderedItems)).finally(() => {
+                if ($.fn && $.fn.DataTable && $.fn.DataTable.isDataTable(tableZero) && typeof tableInstance.processing === 'function') {
+                    tableInstance.processing(false);
+                }
+            });
+        }
+    });
 
     $(document).off('click', '.view-btn').on('click', '.view-btn', function () {
         const trackId = $(this).data('id');
@@ -193,6 +242,8 @@ function tracksTable(data, handleAddTrack, handleEdit, handleDelete, handleView,
             handleViewSessions(dataTrack);
         }
     });
+
+    return tableInstance;
 }
 
 function sessionsTable(data, handleAddSession, handleEdit, handleDelete, handleView) {
@@ -205,7 +256,7 @@ function sessionsTable(data, handleAddSession, handleEdit, handleDelete, handleV
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const tableInstance = $(tableZero).DataTable({
         data: data || [],
         order: [[3, 'asc']], // Sort by Date & Time column (index 3) to match backend order
         searching: true,
@@ -332,7 +383,7 @@ function sessionsTable(data, handleAddSession, handleEdit, handleDelete, handleV
         }
     });
 
-    $(tableZero).DataTable().page(currentPage).draw(false);
+    tableInstance.page(currentPage).draw(false);
 
     $(document).off('click', '.view-btn').on('click', '.view-btn', function () {
         const sessionId = $(this).data('id');
@@ -363,6 +414,8 @@ function sessionsTable(data, handleAddSession, handleEdit, handleDelete, handleV
         const dataSession = data.find((session) => session.id === sessionId);
         console.log('Session icon clicked for session:', dataSession);
     });
+
+    return tableInstance;
 }
 
 const ProgrammeList = () => {
@@ -377,31 +430,57 @@ const ProgrammeList = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [viewMode, setViewMode] = useState('tracks'); // 'tracks' or 'sessions'
     const [tableData, setTableData] = useState([]);
+    const [isReordering, setIsReordering] = useState(false);
 
     const destroyTable = () => {
-        if (currentTable || $.fn.DataTable.isDataTable('#programme-data-table')) {
-            $('#programme-data-table').off('click', '.delete-btn');
-            $('#programme-data-table').off('click', '.edit-btn');
-            $('#programme-data-table').off('click', '.view-btn');
-            $('#programme-data-table').DataTable().destroy();
-            setCurrentTable(null);
+        const tableSelector = '#programme-data-table';
+        $(document).off('click', '.delete-btn');
+        $(document).off('click', '.edit-btn');
+        $(document).off('click', '.view-btn');
+        $(document).off('click', '.session-btn');
+        $(tableSelector).off('row-reorder');
+
+        if ($.fn && $.fn.DataTable && $.fn.DataTable.isDataTable(tableSelector)) {
+            $(tableSelector).DataTable().destroy();
+        }
+
+        setCurrentTable(null);
+    };
+
+    const handleReorder = async (items) => {
+        if (!Array.isArray(items) || items.length === 0 || isReordering) {
+            return;
+        }
+
+        setIsReordering(true);
+        try {
+            const result = await dispatch(reorderProgrammeTracks(items));
+            if (!result?.error) {
+                await dispatch(getAllTracks());
+            }
+        } catch (error) {
+            console.error('Error reordering tracks:', error);
+        } finally {
+            setIsReordering(false);
         }
     };
 
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(tableData) && tableData.length >= 0) {
+            let table = null;
             if (viewMode === 'tracks') {
-                tracksTable(
+                table = tracksTable(
                     tableData,
                     handleAddTrack,
                     handleEditTrack,
                     handleDeleteTrack,
                     handleViewTrack,
-                    handleViewTrackSessions
+                    handleViewTrackSessions,
+                    handleReorder
                 );
             } else {
-                sessionsTable(
+                table = sessionsTable(
                     tableData,
                     handleAddSession,
                     handleEditSession,
@@ -409,6 +488,7 @@ const ProgrammeList = () => {
                     handleViewSession
                 );
             }
+            setCurrentTable(table || null);
         }
     };
 
@@ -427,15 +507,21 @@ const ProgrammeList = () => {
 
     useEffect(() => {
         if (viewMode === 'tracks' && tracks) {
-            const tracksWithCount = tracks.map(track => ({
+            const tracksWithCount = tracks.map((track, index) => ({
                 ...track,
+                displayOrder: typeof track.displayOrder === 'number' ? track.displayOrder : index,
                 sessionCount: sessions ? sessions.filter(s => s.trackId === track.id).length : 0,
                 eventName: track.event ? track.event.name : 'Unknown Event'
             }));
-            // Sort by createdAt to match backend order
+            // Sort by displayOrder and fallback to createdAt
             const sortedTracks = [...tracksWithCount].sort((a, b) => {
-                const dateA = new Date(a.createdAt || 0);
-                const dateB = new Date(b.createdAt || 0);
+                const orderA = Number.isFinite(a.displayOrder) ? a.displayOrder : Number.MAX_SAFE_INTEGER;
+                const orderB = Number.isFinite(b.displayOrder) ? b.displayOrder : Number.MAX_SAFE_INTEGER;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
                 return dateA - dateB;
             });
             setTableData(sortedTracks);
@@ -569,6 +655,7 @@ const ProgrammeList = () => {
                                     <tr>
                                         {viewMode === 'tracks' ? (
                                             <>
+                                                <th style={{ width: '40px' }}></th>
                                                 <th>Track Details</th>
                                                 <th>Event</th>
                                                 <th>Status</th>

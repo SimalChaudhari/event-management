@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { EngagementService } from './engagement.service';
-import { CreateEngagementDto, UpdateEngagementDto } from './engagement.dto';
+import { CreateEngagementDto, UpdateEngagementDto, UpdateEngagementOrderDto } from './engagement.dto';
 
 import { UserRole } from '../user/users.entity';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -50,6 +50,30 @@ export class EngagementController {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: error.message || 'Failed to create/update engagement',
+      });
+    }
+  }
+
+  /**
+   * Update engagement display order
+   */
+  @Put('reorder')
+  @Roles(UserRole.Admin)
+  async reorderEngagements(
+    @Body(new ValidationPipe({ transform: true, whitelist: true })) updateOrderDto: UpdateEngagementOrderDto,
+    @Res() response: Response,
+  ) {
+    try {
+      await this.engagementService.reorderEngagements(updateOrderDto.items);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Engagement order updated successfully',
+      });
+    } catch (error: any) {
+      const statusCode = error.status || HttpStatus.BAD_REQUEST;
+      return response.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to update engagement order',
       });
     }
   }

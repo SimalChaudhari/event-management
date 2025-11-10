@@ -18,6 +18,9 @@ export class ProgrammeTrack {
   @Column()
   eventId!: string;
 
+  @Column({ type: 'int', default: 0 })
+  displayOrder!: number;
+
   @Column({ type: 'varchar', length: 255 })
   title!: string;
 

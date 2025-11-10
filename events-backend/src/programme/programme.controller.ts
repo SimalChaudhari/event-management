@@ -1,4 +1,4 @@
-import {
+import { 
   Controller,
   Post,
   Get,
@@ -10,6 +10,7 @@ import {
   UseGuards,
   Request,
   HttpStatus,
+  ValidationPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ProgrammeService } from './programme.service';
@@ -18,6 +19,7 @@ import {
   UpdateProgrammeTrackDto,
   CreateProgrammeSessionDto,
   UpdateProgrammeSessionDto,
+  UpdateProgrammeTrackOrderDto,
 } from './programme.dto';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
@@ -58,6 +60,32 @@ export class ProgrammeController {
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Create Programme Track', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Put('tracks/reorder')
+  @Roles(UserRole.Admin)
+  async reorderTracks(
+    @Body(new ValidationPipe({ transform: true, whitelist: true })) updateOrderDto: UpdateProgrammeTrackOrderDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      await this.programmeService.reorderTracks(updateOrderDto.items);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme track order updated successfully',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Reorder Programme Tracks', req.user?.id);
       throw error;
     }
   }

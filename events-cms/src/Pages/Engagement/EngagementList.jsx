@@ -7,7 +7,7 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { getAllEngagements, deleteEngagement, toggleEngagementStatus } from '../../store/actions/engagementActions';
+import { getAllEngagements, deleteEngagement, toggleEngagementStatus, reorderEngagements } from '../../store/actions/engagementActions';
 import { getAllTracks } from '../../store/actions/programmeActions';
 import { useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
@@ -18,8 +18,9 @@ import FilterComponent from '../../components/common/FilterComponent';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
+require('datatables.net-rowreorder');
 
-function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleToggleStatus, handleSessions) {
+function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleToggleStatus, handleSessions, handleReorder) {
     let tableZero = '#engagements-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -43,10 +44,22 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
                     sessionsCount: track.sessionsCount || track.sessions?.length || 0,
                     isFirstTrack: index === 0,
                     totalSessionsCount: eventGroup.totalSessionsCount,
-                    statistics: eventGroup.statistics
+                    statistics: eventGroup.statistics,
+                    displayOrder: typeof track.displayOrder === 'number' ? track.displayOrder : index
                 });
             });
         }
+    });
+
+    flattenedData.sort((a, b) => {
+        const orderA = Number.isFinite(a.displayOrder) ? a.displayOrder : Number.MAX_SAFE_INTEGER;
+        const orderB = Number.isFinite(b.displayOrder) ? b.displayOrder : Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+        const createdA = new Date(a.createdAt).getTime();
+        const createdB = new Date(b.createdAt).getTime();
+        return createdA - createdB;
     });
 
     // Preserve the current page
@@ -56,9 +69,9 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const tableInstance = $(tableZero).DataTable({
         data: flattenedData || [],
-        order: [[1, 'asc']], // Sort by created date ascending
+        order: [],
         searching: true,
         searchDelay: 500,
         pageLength: 10,
@@ -66,12 +79,31 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
         ],
+        rowReorder: {
+            dataSrc: 'displayOrder',
+            selector: 'td.reorder-handle-column'
+        },
+        processing: true,
         pagingType: 'full_numbers',
         dom:
             "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-engagement-button ml-2'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
+            {
+                data: 'displayOrder',
+                title: '',
+                width: '5%',
+                orderable: false,
+                className: 'text-center align-middle reorder-handle-column',
+                render: function () {
+                    return `
+                        <span class="drag-handle" title="Drag to reorder" style="cursor: move; display: inline-flex; align-items: center; justify-content: center;">
+                            <i class="feather icon-move"></i>
+                        </span>
+                    `;
+                }
+            },
             {
                 data: null,
                 title: 'Track',
@@ -178,7 +210,8 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
                 });
 
             // Restore the previous page
-            $(tableZero).DataTable().page(currentPage).draw('page');
+            const api = new $.fn.dataTable.Api(settings);
+            api.page(currentPage).draw('page');
         },
         drawCallback: function (settings) {
             // Attach event listeners after each draw
@@ -220,7 +253,39 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
         }
     });
 
-    $(tableZero).DataTable().page(currentPage).draw(false);
+    tableInstance.on('row-reorder', function (e, diff) {
+        if (!diff || diff.length === 0) {
+            return;
+        }
+
+        const reorderedItems = diff.map((item) => {
+            const rowData = tableInstance.row(item.node).data();
+            const newOrderValue = item.newPosition;
+            if (rowData) {
+                rowData.displayOrder = newOrderValue;
+            }
+            return {
+                id: rowData?.engagementId,
+                displayOrder: newOrderValue
+            };
+        }).filter((item) => item.id);
+
+        tableInstance.rows().invalidate().draw(false);
+
+        if (typeof handleReorder === 'function') {
+            if (typeof tableInstance.processing === 'function') {
+                tableInstance.processing(true);
+            }
+            Promise.resolve(handleReorder(reorderedItems)).finally(() => {
+                if ($.fn.DataTable.isDataTable(tableZero) && typeof tableInstance.processing === 'function') {
+                    tableInstance.processing(false);
+                }
+            });
+        }
+    });
+
+    tableInstance.page(currentPage).draw(false);
+    return tableInstance;
 }
 
 const EngagementList = () => {
@@ -236,6 +301,7 @@ const EngagementList = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedEventId, setSelectedEventId] = useState('');
     const [filteredEngagements, setFilteredEngagements] = useState([]);
+    const [isReordering, setIsReordering] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -275,8 +341,39 @@ const EngagementList = () => {
             $('#engagements-data-table').off('click', '.view-btn');
             $('#engagements-data-table').off('click', '.sessions-btn');
             $('#engagements-data-table').off('click', '.toggle-status-badge');
+            $('#engagements-data-table').off('row-reorder');
             currentTable.destroy();
             setCurrentTable(null);
+        }
+    };
+
+    const handleReorder = async (items) => {
+        if (!Array.isArray(items) || items.length === 0 || isReordering) {
+            return;
+        }
+
+        const uniqueItemsMap = new Map();
+        items.forEach((item) => {
+            if (item?.id && typeof item.displayOrder === 'number' && !uniqueItemsMap.has(item.id)) {
+                uniqueItemsMap.set(item.id, item);
+            }
+        });
+
+        const payload = Array.from(uniqueItemsMap.values());
+        if (payload.length === 0) {
+            return;
+        }
+
+        setIsReordering(true);
+        try {
+            const result = await dispatch(reorderEngagements(payload));
+            if (!result?.error) {
+                await dispatch(getAllEngagements());
+            }
+        } catch (error) {
+            console.error('Error reordering engagements:', error);
+        } finally {
+            setIsReordering(false);
         }
     };
 
@@ -290,7 +387,8 @@ const EngagementList = () => {
                 handleDelete,
                 handleView,
                 handleToggleStatus,
-                handleSessions
+                handleSessions,
+                handleReorder
             );
             setCurrentTable(table);
         }
@@ -422,7 +520,7 @@ const EngagementList = () => {
                 <Col>
                     <Card>
                         <Card.Header>
-                            <Card.Title as="h5">Engagement Management</Card.Title>
+                            <Card.Title as="h5">Engagement Management </Card.Title>
                         </Card.Header>
                         <Card.Body>
                             {loading ? (

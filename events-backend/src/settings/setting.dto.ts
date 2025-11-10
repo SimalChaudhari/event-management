@@ -61,6 +61,26 @@ export class CreateLogoDto {
     readonly hyperlink?: string;
 }
 
+export class UpdateAppVersionDto {
+    @IsOptional()
+    @IsString()
+    readonly appVersionAndroid?: string;
+
+    @IsOptional()
+    @IsString()
+    readonly appVersionIOS?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly enableForceUpdate?: boolean;
+}
+
+export class AppVersionResponseDto {
+    appVersionAndroid!: string;
+    appVersionIOS!: string;
+    enableForceUpdate!: boolean;
+}
+
 // DTO for creating permission templates (admin only)
 export class CreatePermissionTemplateDto {
     @IsNotEmpty()

@@ -278,15 +278,36 @@ export class UserUtils {
       return [];
     }
 
-    return programmeTracks.map(track => ({
-      ...track,
-      sessions: track.sessions?.map((session: any) => ({
-        ...session,
-        speakers: session.speakers?.map((speaker: any) => 
-          this.getBasicSpeakerInfo(speaker)
-        ) || []
-      })) || []
-    }));
+    return programmeTracks
+      .slice()
+      .sort((a, b) => {
+        const orderA =
+          typeof a.displayOrder === 'number' && Number.isFinite(a.displayOrder)
+            ? a.displayOrder
+            : Number.MAX_SAFE_INTEGER;
+        const orderB =
+          typeof b.displayOrder === 'number' && Number.isFinite(b.displayOrder)
+            ? b.displayOrder
+            : Number.MAX_SAFE_INTEGER;
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+        return createdA - createdB;
+      })
+      .map((track) => ({
+        ...track,
+        sessions:
+          track.sessions?.map((session: any) => ({
+            ...session,
+            speakers:
+              session.speakers
+                ?.map((speaker: any) => this.getBasicSpeakerInfo(speaker)) || [],
+          })) || [],
+      }));
   }
 
   /**
@@ -358,6 +379,7 @@ export class UserUtils {
         engagementId: engagement.id,
         trackId: engagement.trackId,
         isActive: engagement.isActive,
+        displayOrder: engagement.displayOrder,
         sessionIds: engagement.sessionIds, // Include sessionIds
         createdAt: engagement.createdAt,
         updatedAt: engagement.updatedAt,
@@ -391,6 +413,17 @@ export class UserUtils {
       };
 
       eventData.programmeTracks.push(track);
+      eventData.programmeTracks.sort((a: any, b: any) => {
+        const orderA = a.displayOrder ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.displayOrder ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        const createdA = new Date(a.createdAt).getTime();
+        const createdB = new Date(b.createdAt).getTime();
+        return createdA - createdB;
+      });
       eventData.totalSessionsCount += track.sessionsCount;
 
       // Merge statistics

@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsDateString, IsArray, IsUUID, MinLength, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsDateString, IsArray, IsUUID, MinLength, MaxLength, IsInt, Min, ValidateNested } from 'class-validator';
 
 export class CreateProgrammeTrackDto {
   @IsString()
@@ -112,6 +113,7 @@ export class ProgrammeTrackResponseDto {
   title!: string;
   description?: string;
   isActive!: boolean;
+  displayOrder!: number;
   createdAt!: Date;
   updatedAt!: Date;
   sessions?: ProgrammeSessionResponseDto[];
@@ -119,6 +121,22 @@ export class ProgrammeTrackResponseDto {
     id: string;
     name: string;
   };
+}
+
+export class ReorderProgrammeTrackItemDto {
+  @IsUUID()
+  id!: string;
+
+  @IsInt()
+  @Min(0)
+  displayOrder!: number;
+}
+
+export class UpdateProgrammeTrackOrderDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReorderProgrammeTrackItemDto)
+  items!: ReorderProgrammeTrackItemDto[];
 }
 
 export class ProgrammeSessionResponseDto {

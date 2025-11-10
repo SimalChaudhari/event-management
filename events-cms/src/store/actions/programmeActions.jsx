@@ -291,3 +291,16 @@ export const deleteSession = (sessionId) => async (dispatch) => {
     }
 };
 
+// Reorder programme tracks
+export const reorderProgrammeTracks = (items) => async () => {
+    try {
+        const response = await axiosInstance.put('/programme/tracks/reorder', { items });
+        toast.success(response.data.message || 'Programme track order updated successfully!');
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update programme track order';
+        toast.error(errorMessage);
+        return { error: true, message: errorMessage };
+    }
+};
+

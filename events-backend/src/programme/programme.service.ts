@@ -13,6 +13,7 @@ import {
   UpdateProgrammeSessionDto,
   ProgrammeTrackResponseDto,
   ProgrammeSessionResponseDto,
+  ReorderProgrammeTrackItemDto,
 } from './programme.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserUtils } from '../utils/user.utils';
@@ -47,6 +48,8 @@ export class ProgrammeService {
         ...createTrackDto,
         isActive: createTrackDto.isActive !== undefined ? createTrackDto.isActive : true,
       });
+
+      track.displayOrder = await this.getNextTrackDisplayOrderValue();
 
       const savedTrack = await this.programmeTrackRepository.save(track);
       return this.mapTrackToResponseDto(savedTrack);
@@ -106,7 +109,7 @@ export class ProgrammeService {
       const tracks = await this.programmeTrackRepository.find({
         where: { eventId },
         relations: ['sessions', 'sessions.speakers'],
-        order: { createdAt: 'ASC' },
+        order: { displayOrder: 'ASC', createdAt: 'ASC' },
       });
 
       return tracks.map(track => this.mapTrackToResponseDto(track));
@@ -120,7 +123,7 @@ export class ProgrammeService {
     try {
       const tracks = await this.programmeTrackRepository.find({
         relations: ['event', 'sessions', 'sessions.speakers'],
-        order: { createdAt: 'ASC' },
+        order: { displayOrder: 'ASC', createdAt: 'ASC' },
       });
 
       return tracks.map(track => this.mapTrackToResponseDto(track));
@@ -128,6 +131,44 @@ export class ProgrammeService {
       this.errorHandler.logError(error, 'Get All Programme Tracks', '');
       throw error;
     }
+  }
+
+  async reorderTracks(orderItems: ReorderProgrammeTrackItemDto[]): Promise<void> {
+    if (!orderItems || orderItems.length === 0) {
+      return;
+    }
+
+    const sortedItems = [...orderItems].sort((a, b) => a.displayOrder - b.displayOrder);
+    const ids = sortedItems.map(item => item.id);
+    const tracks = await this.programmeTrackRepository.find({
+      where: { id: In(ids) },
+    });
+
+    if (tracks.length !== ids.length) {
+      const found = new Set(tracks.map(track => track.id));
+      const missing = ids.filter(id => !found.has(id));
+      throw new NotFoundException(`Programme track(s) not found: ${missing.join(', ')}`);
+    }
+
+    const orderMap = new Map(sortedItems.map(item => [item.id, item.displayOrder]));
+    tracks.forEach(track => {
+      const newOrder = orderMap.get(track.id);
+      if (newOrder !== undefined) {
+        track.displayOrder = newOrder;
+      }
+    });
+
+    await this.programmeTrackRepository.save(tracks);
+  }
+
+  private async getNextTrackDisplayOrderValue(): Promise<number> {
+    const result = await this.programmeTrackRepository
+      .createQueryBuilder('track')
+      .select('COALESCE(MAX(track.displayOrder), -1)', 'max')
+      .getRawOne<{ max: string }>();
+
+    const maxOrder = result?.max !== undefined ? Number(result.max) : -1;
+    return Number.isFinite(maxOrder) ? maxOrder + 1 : 0;
   }
 
   // Session Management
@@ -342,6 +383,7 @@ export class ProgrammeService {
       title: track.title,
       description: track.description,
       isActive: track.isActive,
+    displayOrder: track.displayOrder,
       createdAt: track.createdAt,
       updatedAt: track.updatedAt,
       sessions: track.sessions ? track.sessions.map(session => this.mapSessionToResponseDto(session)) : undefined,

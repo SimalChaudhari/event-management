@@ -2,7 +2,11 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Engagement } from './engagement.entity';
-import { CreateEngagementDto, UpdateEngagementDto } from './engagement.dto';
+import {
+  CreateEngagementDto,
+  UpdateEngagementDto,
+  ReorderEngagementItemDto,
+} from './engagement.dto';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { UserUtils } from '../utils/user.utils';
 import { EngagementQnaQuestion } from '../engagement-qna/engagement-qna.entity';
@@ -85,7 +89,45 @@ export class EngagementService {
 
     // Create new engagement if one doesn't exist
     const engagement = this.engagementRepository.create(createEngagementDto);
+    engagement.displayOrder = await this.getNextDisplayOrderValue();
     return await this.engagementRepository.save(engagement);
+  }
+
+  private async getNextDisplayOrderValue(): Promise<number> {
+    const result = await this.engagementRepository
+      .createQueryBuilder('engagement')
+      .select('COALESCE(MAX(engagement.displayOrder), -1)', 'max')
+      .getRawOne<{ max: string }>();
+
+    const maxOrder = result?.max !== undefined ? Number(result.max) : -1;
+    return Number.isFinite(maxOrder) ? maxOrder + 1 : 0;
+  }
+
+  async reorderEngagements(orderItems: ReorderEngagementItemDto[]): Promise<void> {
+    if (!orderItems || orderItems.length === 0) {
+      return;
+    }
+
+    const ids = orderItems.map(item => item.id);
+    const engagements = await this.engagementRepository.find({
+      where: { id: In(ids) },
+    });
+
+    if (engagements.length !== ids.length) {
+      const foundIds = new Set(engagements.map(engagement => engagement.id));
+      const missing = ids.filter(id => !foundIds.has(id));
+      throw new NotFoundException(`Engagement(s) not found: ${missing.join(', ')}`);
+    }
+
+    const orderMap = new Map(orderItems.map(item => [item.id, item.displayOrder]));
+    engagements.forEach(engagement => {
+      const newOrder = orderMap.get(engagement.id);
+      if (newOrder !== undefined) {
+        engagement.displayOrder = newOrder;
+      }
+    });
+
+    await this.engagementRepository.save(engagements);
   }
 
   /**
@@ -232,7 +274,7 @@ export class EngagementService {
   async getAllEngagements(): Promise<any[]> {
     const engagements = await this.engagementRepository.find({
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { createdAt: 'ASC' },
+      order: { displayOrder: 'ASC', createdAt: 'ASC' },
     });
 
     // Get statistics for each engagement
@@ -274,7 +316,7 @@ export class EngagementService {
         } 
       },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', createdAt: 'DESC' },
     });
 
     // Get statistics for each engagement
@@ -456,7 +498,7 @@ export class EngagementService {
     const engagements = await this.engagementRepository.find({
       where: { trackId },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', createdAt: 'DESC' },
     });
 
     // Get statistics for each engagement
@@ -585,7 +627,7 @@ export class EngagementService {
     const engagements = await this.engagementRepository.find({
       where: { isActive: true },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', createdAt: 'DESC' },
     });
 
     // Get statistics for each engagement

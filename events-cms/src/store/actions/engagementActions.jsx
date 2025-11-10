@@ -235,3 +235,16 @@ export const deleteEngagement = (id) => async (dispatch) => {
     }
 };
 
+// Reorder engagements
+export const reorderEngagements = (items) => async () => {
+    try {
+        const response = await axiosInstance.put('/engagements/reorder', { items });
+        toast.success(response.data.message || 'Engagement order updated successfully!');
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update engagement order';
+        toast.error(errorMessage);
+        return { error: true, message: errorMessage };
+    }
+};
+

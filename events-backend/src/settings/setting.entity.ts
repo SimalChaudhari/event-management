@@ -3,6 +3,27 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Unique, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { GeneralNotificationType } from '../types/notification.types';
 
+@Entity('app_version_settings')
+export class AppVersionSetting {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column({ name: 'app_version_android', type: 'varchar', length: 50, default: '1.0.0' })
+    appVersionAndroid!: string;
+
+    @Column({ name: 'app_version_ios', type: 'varchar', length: 50, default: '1.0.0' })
+    appVersionIOS!: string;
+
+    @Column({ name: 'enable_force_update', type: 'boolean', default: false })
+    enableForceUpdate!: boolean;
+
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @UpdateDateColumn()
+    updatedAt!: Date;
+}
+
 @Entity('privacy_policies')
 export class PrivacyPolicy {
     @PrimaryGeneratedColumn('uuid')

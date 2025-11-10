@@ -11,6 +11,7 @@ import {
   Request,
   HttpStatus,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { EngagementQnaService } from './engagement-qna.service';
@@ -49,6 +50,13 @@ export class EngagementQnaController {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
+  private extractUserId(req: any): string | undefined {
+    if (!req?.user) {
+      return undefined;
+    }
+    return req.user.id ?? req.user.sub ?? req.user.userId ?? req.user._id;
+  }
+
   // 3. Like/Unlike Question (Registered users only)
   // @Public()
   @Post('like')
@@ -59,7 +67,11 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
-      const result = await this.engagementQnaService.toggleLike(likeDto, req.user?.id);
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to like a question');
+      }
+      const result = await this.engagementQnaService.toggleLike(likeDto, userId);
 
       const successResponse: SuccessResponse = {
         success: result.success,
@@ -67,14 +79,14 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           timestamp: new Date().toISOString(),
-          userId: req.user?.id,
+          userId,
           voteCount: result.data?.likesCount || 0,
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Toggle question like', req.user?.id);
+      this.errorHandler.logError(error, 'Toggle question like', this.extractUserId(req));
       throw error;
     }
   }
@@ -88,6 +100,7 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
+      const userId = this.extractUserId(req);
       if (!query.engagementId && !query.sessionId) {
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
@@ -95,12 +108,12 @@ export class EngagementQnaController {
           data: null,
           metadata: {
             timestamp: new Date().toISOString(),
-            userId: req.user?.id,
+            userId,
           },
         });
       }
 
-      const result = await this.engagementQnaService.getQuestions(query, req.user?.id);
+      const result = await this.engagementQnaService.getQuestions(query, userId);
 
       const successResponse: SuccessResponse = {
         success: result.success,
@@ -108,13 +121,13 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           ...result.metadata,
-          userId: req.user?.id,
+          userId,
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get Engagement Q&A questions', req.user?.id);
+      this.errorHandler.logError(error, 'Get Engagement Q&A questions', this.extractUserId(req));
       throw error;
     }
   }
@@ -309,7 +322,8 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
-      const question = await this.engagementQnaService.getQuestionById(id, req.user?.id);
+      const userId = this.extractUserId(req);
+      const question = await this.engagementQnaService.getQuestionById(id, userId);
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -318,14 +332,14 @@ export class EngagementQnaController {
         metadata: {
           timestamp: new Date().toISOString(),
           questionId: id,
-          userId: req.user?.id,
+          userId,
           voteCount: question.likesCount,
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Get question by ID', req.user?.id);
+      this.errorHandler.logError(error, 'Get question by ID', this.extractUserId(req));
       throw error;
     }
   }
@@ -338,9 +352,13 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to create a question');
+      }
       const result = await this.engagementQnaService.createQuestion(
         createDto,
-        req.user?.id,
+        userId,
       );
 
       const successResponse: SuccessResponse = {
@@ -349,14 +367,14 @@ export class EngagementQnaController {
         data: result,
         metadata: {
           timestamp: new Date().toISOString(),
-          askedBy: req.user?.id,
+          askedBy: userId,
           engagementId: createDto.engagementId,
         },
       };
 
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Create Engagement Q&A question', req.user?.id);
+      this.errorHandler.logError(error, 'Create Engagement Q&A question', this.extractUserId(req));
       throw error;
     }
   }
@@ -372,10 +390,14 @@ export class EngagementQnaController {
     try {
       const isAdmin = req.user?.role === UserRole.Admin;
       const isModerator = req.user?.role === UserRole.Moderator;
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to update a question');
+      }
       const result = await this.engagementQnaService.updateQuestion(
         id,
         updateDto,
-        req.user?.id,
+        userId,
         isAdmin,
         isModerator,
       );
@@ -386,7 +408,7 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           timestamp: new Date().toISOString(),
-          updatedBy: req.user?.id,
+          updatedBy: userId,
           isAdmin: isAdmin,
           isModerator: isModerator,
         },
@@ -394,7 +416,7 @@ export class EngagementQnaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Update question', req.user?.id);
+      this.errorHandler.logError(error, 'Update question', this.extractUserId(req));
       throw error;
     }
   }
@@ -409,15 +431,19 @@ export class EngagementQnaController {
     try {
       const isAdmin = req.user?.role === UserRole.Admin;
       const isModerator = req.user?.role === UserRole.Moderator;
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to delete a question');
+      }
   
-      const result = await this.engagementQnaService.deleteQuestion(id, req.user?.id, isAdmin, isModerator);
+      const result = await this.engagementQnaService.deleteQuestion(id, userId, isAdmin, isModerator);
 
       const successResponse: SuccessResponse = {
         success: result.success,
         message: result.message,
         metadata: {
           timestamp: new Date().toISOString(),
-          deletedBy: req.user?.id,
+          deletedBy: userId,
           isAdmin: isAdmin,
           isModerator: isModerator,
         },
@@ -425,7 +451,7 @@ export class EngagementQnaController {
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Delete question', req.user?.id);
+      this.errorHandler.logError(error, 'Delete question', this.extractUserId(req));
       throw error;
     }
   }
@@ -440,10 +466,14 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to answer a question');
+      }
       const result = await this.engagementQnaService.answerQuestion(
         id,
         answerDto,
-        req.user?.id,
+        userId,
       );
 
       const successResponse: SuccessResponse = {
@@ -452,14 +482,14 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           timestamp: new Date().toISOString(),
-          answeredBy: req.user?.id,
+          answeredBy: userId,
           isUpdated: result.data?.isUpdated || false,
         },
       };
 
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Answer question', req.user?.id);
+      this.errorHandler.logError(error, 'Answer question', this.extractUserId(req));
       throw error;
     }
   }
@@ -473,6 +503,10 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to generate a share link');
+      }
       const result = await this.engagementQnaService.generateShareLink(generateDto);
 
       const successResponse: SuccessResponse = {
@@ -481,14 +515,14 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           timestamp: new Date().toISOString(),
-          generatedBy: req.user?.id,
+          generatedBy: userId,
           sessionId: generateDto.sessionId,
         },
       };
 
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Generate share link', req.user?.id);
+      this.errorHandler.logError(error, 'Generate share link', this.extractUserId(req));
       throw error;
     }
   }
@@ -502,6 +536,10 @@ export class EngagementQnaController {
     @Request() req: any,
   ) {
     try {
+      const userId = this.extractUserId(req);
+      if (!userId) {
+        throw new UnauthorizedException('Authentication required to generate a track share link');
+      }
       const result = await this.engagementQnaService.generateTrackShareLink(generateDto);
 
       const successResponse: SuccessResponse = {
@@ -510,14 +548,14 @@ export class EngagementQnaController {
         data: result.data,
         metadata: {
           timestamp: new Date().toISOString(),
-          generatedBy: req.user?.id,
+          generatedBy: userId,
           trackId: generateDto.trackId,
         },
       };
 
       return response.status(HttpStatus.CREATED).json(successResponse);
     } catch (error: any) {
-      this.errorHandler.logError(error, 'Generate track share link', req.user?.id);
+      this.errorHandler.logError(error, 'Generate track share link', this.extractUserId(req));
       throw error;
     }
   }

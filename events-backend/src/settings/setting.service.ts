@@ -11,6 +11,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import {
+  AppVersionSetting,
   Banner,
   BannerEvent,
   Logo,
@@ -29,12 +30,14 @@ import {
   EventNotificationRead,
 } from './event-notification.entity';
 import {
+  AppVersionResponseDto,
   CreateBannerDto,
   CreateBannerEventDto,
   CreateLogoDto,
   CreatePrivacyPolicyDto,
   CreateTermsConditionsDto,
   CreatePermissionTemplateDto,
+  UpdateAppVersionDto,
   UpdateUserPermissionDto,
   UserPermissionWithTemplate,
   RegisterDeviceTokenDto,
@@ -58,6 +61,95 @@ import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import { NotificationUtil } from '../utils/notification.util';
 import * as fs from 'fs';
 import * as path from 'path';
+
+const DEFAULT_ANDROID_VERSION =
+  process.env.DEFAULT_APP_VERSION_ANDROID || '1.0.0';
+const DEFAULT_IOS_VERSION =
+  process.env.DEFAULT_APP_VERSION_IOS || '1.0.0';
+const DEFAULT_FORCE_UPDATE =
+  (process.env.DEFAULT_ENABLE_FORCE_UPDATE || 'false').toLowerCase() === 'true';
+
+// App version
+
+@Injectable()
+export class AppVersionService {
+  constructor(
+    @InjectRepository(AppVersionSetting)
+    private readonly appVersionRepository: Repository<AppVersionSetting>,
+  ) {}
+
+  private async getOrCreateSetting(): Promise<AppVersionSetting> {
+    let setting = await this.appVersionRepository.findOne({
+      order: { createdAt: 'ASC' },
+    });
+
+    if (!setting) {
+      setting = this.appVersionRepository.create({
+        appVersionAndroid: DEFAULT_ANDROID_VERSION,
+        appVersionIOS: DEFAULT_IOS_VERSION,
+        enableForceUpdate: DEFAULT_FORCE_UPDATE,
+      });
+      setting = await this.appVersionRepository.save(setting);
+    }
+
+    return setting;
+  }
+
+  private toResponse(setting: AppVersionSetting): AppVersionResponseDto {
+    return {
+      appVersionAndroid: setting.appVersionAndroid,
+      appVersionIOS: setting.appVersionIOS,
+      enableForceUpdate: setting.enableForceUpdate,
+    };
+  }
+
+  async getLatestVersion(): Promise<AppVersionResponseDto> {
+    try {
+      const setting = await this.getOrCreateSetting();
+      return this.toResponse(setting);
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        'Error retrieving app version details',
+        error.message,
+      );
+    }
+  }
+
+  async updateAppVersion(
+    updateAppVersionDto: UpdateAppVersionDto,
+  ): Promise<{ message: string; data: AppVersionResponseDto }> {
+    try {
+      const setting = await this.getOrCreateSetting();
+
+      if (updateAppVersionDto.appVersionAndroid !== undefined) {
+        setting.appVersionAndroid = updateAppVersionDto.appVersionAndroid;
+      }
+
+      if (updateAppVersionDto.appVersionIOS !== undefined) {
+        setting.appVersionIOS = updateAppVersionDto.appVersionIOS;
+      }
+
+      if (updateAppVersionDto.enableForceUpdate !== undefined) {
+        setting.enableForceUpdate = updateAppVersionDto.enableForceUpdate;
+      }
+
+      const savedSetting = await this.appVersionRepository.save(setting);
+
+      return {
+        message: 'App version updated successfully',
+        data: this.toResponse(savedSetting),
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error updating app version details',
+        error.message,
+      );
+    }
+  }
+}
 
 // Privacy policy
 

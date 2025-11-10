@@ -19,6 +19,7 @@ import {
   Request,
 } from '@nestjs/common';
 import {
+  AppVersionService,
   PrivacyPolicyService,
   TermsConditionsService,
   BannerService,
@@ -49,6 +50,8 @@ import {
   SendAdvertNotificationDto,
   CreateAdvertNotificationFormDto,
   UpdateAdvertNotificationFormDto,
+  UpdateAppVersionDto,
+  AppVersionResponseDto,
 } from './setting.dto';
 import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, Logo, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -62,6 +65,25 @@ import { GetUser } from '../jwt/get-user.decorator';
 import { UserEntity } from '../user/users.entity';
 import { RolesGuard } from '../jwt/roles.guard';
 import { Roles } from '../jwt/roles.decorator';
+
+@Controller('api/app-version')
+export class AppVersionController {
+  constructor(private readonly appVersionService: AppVersionService) {}
+
+  @Get()
+  async getLatestVersions(): Promise<AppVersionResponseDto> {
+    return this.appVersionService.getLatestVersion();
+  }
+
+  @Patch()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async updateAppVersion(
+    @Body() updateAppVersionDto: UpdateAppVersionDto,
+  ): Promise<{ message: string; data: AppVersionResponseDto }> {
+    return this.appVersionService.updateAppVersion(updateAppVersionDto);
+  }
+}
 
 @Controller('api/privacy-policies')
 export class PrivacyPolicyController {
