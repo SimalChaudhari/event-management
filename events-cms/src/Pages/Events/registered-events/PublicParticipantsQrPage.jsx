@@ -98,7 +98,7 @@ const PublicParticipantsQrPage = () => {
     if (loading && !isSearching) {
       return (
         <tr>
-          <td colSpan={7} className="text-center py-5">
+          <td colSpan={6} className="text-center py-5">
             <Spinner animation="border" role="status" variant="primary" />
             <div className="mt-3 text-muted">Fetching participants...</div>
           </td>
@@ -109,7 +109,7 @@ const PublicParticipantsQrPage = () => {
     if (!participants.length) {
       return (
         <tr>
-          <td colSpan={7} className="text-center py-5">
+          <td colSpan={6} className="text-center py-5">
             <div className="text-muted">
               No participants found. Adjust your search criteria or try again later.
             </div>
@@ -135,8 +135,22 @@ const PublicParticipantsQrPage = () => {
         <tr key={participant.registrationId}>
           <td className="text-center text-muted">{index + 1}</td>
           <td>
-            <div className="font-weight-semibold">{fullName}</div>
+            <div className="d-flex align-items-center flex-wrap">
+              <div className="font-weight-semibold mr-2 mb-2 mb-sm-0">{fullName}</div>
+            </div>
             <div className="small text-muted">{participant.email || 'N/A'}</div>
+          </td>
+          <td className="text-center">
+            <Button
+              variant="light"
+              size="sm"
+              className="d-inline-flex align-items-center"
+              onClick={() => handleOpenQrModal(participant)}
+              disabled={!participant.participantUid}
+            >
+              <i className="feather icon-grid mr-2" />
+              View QR
+            </Button>
           </td>
           <td>
             <div>{participant.company || 'N/A'}</div>
@@ -148,22 +162,6 @@ const PublicParticipantsQrPage = () => {
             </Badge>
           </td>
           <td className="text-muted small">{registeredDate}</td>
-          <td className="text-center">
-            <span className="badge badge-light py-2 px-3 text-monospace">
-              {participant.participantUid || '—'}
-            </span>
-          </td>
-          <td className="text-right">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              className="d-inline-flex align-items-center"
-              onClick={() => handleOpenQrModal(participant)}
-            >
-              <i className="feather icon-smartphone mr-2" />
-              Generate QR
-            </Button>
-          </td>
         </tr>
       );
     });
@@ -180,15 +178,11 @@ const PublicParticipantsQrPage = () => {
             >
               Live Event Check-in
             </span>
-            <span className="text-muted">Event ID: {eventId}</span>
+       
           </div>
           <h2 className="mb-2" style={{ fontWeight: 600, color: '#2c3e50' }}>
             Participant QR Directory
           </h2>
-          <p className="text-muted mb-0" style={{ maxWidth: 520 }}>
-            Share this secure page with on-site staff to quickly verify attendees. Use search to locate
-            participants and generate their individual QR codes for scanning.
-          </p>
         </Col>
        
       </Row>
@@ -251,14 +245,11 @@ const PublicParticipantsQrPage = () => {
                   <th className="text-center text-muted small" style={{ width: 60 }}>
                     #
                   </th>
-                    <th>Participant</th>
-                    <th>Organisation</th>
-                    <th>Type</th>
-                    <th className="text-muted small">Registered On</th>
-                    <th className="text-center">UID</th>
-                    <th className="text-right" style={{ width: 160 }}>
-                      Actions
-                    </th>
+                  <th>Participant</th>
+                  <th className="text-center">QR</th>
+                  <th>Organisation</th>
+                  <th>Type</th>
+                  <th className="text-muted small">Registered On</th>
                 </tr>
               </thead>
               <tbody>{tableContent}</tbody>
