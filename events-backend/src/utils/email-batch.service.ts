@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EmailService } from '../service/email.service';
-import { EmailTemplateUtils, UserCredentialsData } from './email-templates.utils';
+import { EmailTemplateUtils, EmailTemplatePayload } from './email-templates.utils';
 import { CsvUploadLogService } from '../logs/csv-upload-log.service';
 
 export interface EmailBatchConfig {
@@ -17,7 +17,7 @@ export interface EmailBatchResult {
   emailsFailed: number;
   emailsRetried: number;
   processingTimeMs: number;
-  failedEmails: UserCredentialsData[];
+  failedEmails: EmailTemplatePayload[];
   success: boolean;
   message: string;
 }
@@ -52,7 +52,7 @@ export class EmailBatchService {
    * Send emails in professional batches with proper error handling
    */
   async sendEmailsInBatches(
-    emailsToSend: UserCredentialsData[],
+    emailsToSend: EmailTemplatePayload[],
     sessionId: string,
     config: Partial<EmailBatchConfig> = {},
     onProgress?: (progress: EmailProgress) => void
@@ -63,7 +63,7 @@ export class EmailBatchService {
     let emailsSent = 0;
     let emailsFailed = 0;
     let emailsRetried = 0;
-    const failedEmails: UserCredentialsData[] = [];
+    const failedEmails: EmailTemplatePayload[] = [];
 
     try {
       console.log(`🚀 EMAIL BATCH SERVICE: Starting professional email sending`);
@@ -120,16 +120,16 @@ export class EmailBatchService {
    * Process emails in professional batches
    */
   private async processEmailBatches(
-    emailsToSend: UserCredentialsData[],
+    emailsToSend: EmailTemplatePayload[],
     config: EmailBatchConfig,
     sessionId: string,
     onProgress?: (progress: EmailProgress) => void,
-    onBatchComplete?: (sent: number, failed: number, failedList: UserCredentialsData[]) => void
+    onBatchComplete?: (sent: number, failed: number, failedList: EmailTemplatePayload[]) => void
   ): Promise<void> {
     const totalBatches = Math.ceil(emailsToSend.length / config.batchSize);
     let totalSent = 0;
     let totalFailed = 0;
-    const allFailedEmails: UserCredentialsData[] = [];
+    const allFailedEmails: EmailTemplatePayload[] = [];
 
     for (let i = 0; i < emailsToSend.length; i += config.batchSize) {
       const batch = emailsToSend.slice(i, i + config.batchSize);
@@ -169,22 +169,22 @@ export class EmailBatchService {
    * Process a single batch of emails
    */
   private async processBatch(
-    batch: UserCredentialsData[],
+    batch: EmailTemplatePayload[],
     startEmailNumber: number,
     totalEmails: number,
     delayBetweenEmails: number,
     onProgress?: (progress: EmailProgress) => void
-  ): Promise<{ sent: number; failed: number; failedEmails: UserCredentialsData[] }> {
+  ): Promise<{ sent: number; failed: number; failedEmails: EmailTemplatePayload[] }> {
     let sent = 0;
     let failed = 0;
-    const failedEmails: UserCredentialsData[] = [];
+    const failedEmails: EmailTemplatePayload[] = [];
 
     for (let j = 0; j < batch.length; j++) {
       const emailData = batch[j];
       const emailNumber = startEmailNumber + j;
 
       try {
-        const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(emailData);
+        const mailOptions = EmailTemplateUtils.getEmailOptions(emailData);
         await this.emailService['transporter'].sendMail(mailOptions);
         sent++;
         console.log(`✅ Email ${emailNumber}/${totalEmails} sent to ${emailData.email}`);
@@ -222,7 +222,7 @@ export class EmailBatchService {
    * Retry failed emails with proper error handling
    */
   private async retryFailedEmails(
-    failedEmails: UserCredentialsData[],
+    failedEmails: EmailTemplatePayload[],
     config: EmailBatchConfig,
     sessionId: string
   ): Promise<{ sent: number; failed: number; retried: number }> {
@@ -237,7 +237,7 @@ export class EmailBatchService {
 
     for (const emailData of failedEmails) {
       try {
-        const mailOptions = EmailTemplateUtils.getUserCredentialsEmailOptions(emailData);
+        const mailOptions = EmailTemplateUtils.getEmailOptions(emailData);
         await this.emailService['transporter'].sendMail(mailOptions);
         retrySent++;
         console.log(`✅ RETRY SUCCESS: Email sent to ${emailData.email}`);

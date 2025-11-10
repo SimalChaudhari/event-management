@@ -25,13 +25,16 @@ import { PasswordUtils } from '../utils/password.utils';
 import { normalizeEmail } from '../utils/auth.utils';
 import { 
   EmailTemplateUtils, 
-  UserCredentialsData 
+  UserCredentialsData,
+  UserQRCodeEmailData,
+  EmailTemplatePayload,
 } from '../utils/email-templates.utils';
 import { CsvUserDto, CsvUploadResponseDto } from '../validation/auth.validation';
 import { CsvUploadLogService } from '../logs/csv-upload-log.service';
 import { EmailBatchService } from '../utils/email-batch.service';
 import { CsvProcessorService } from '../utils/csv-processor.service';
 import { csvUploadConfig } from '../utils/csv-upload.config';
+import { QRCodeUtils } from '../utils/qr-code.utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -932,29 +935,6 @@ export class AuthService {
 
       // Step 1: Process users (create/update)
       const userProcessingResult = await this.processUsersFromCsv(csvData);
-      
-      // Step 2: Send emails in BACKGROUND (don't wait for them)
-      let emailsToSendCount = 0;
-      if (csvUploadConfig.isEmailSendingEnabled() && userProcessingResult.emailsToSend.length > 0) {
-        emailsToSendCount = userProcessingResult.emailsToSend.length;
-        console.log(`📧 Scheduling ${emailsToSendCount} emails to be sent in background...`);
-        
-        // Get email configuration based on provider
-        const emailConfig = csvUploadConfig.getEmailBatchConfig();
-        
-        // Send emails asynchronously in background (NO AWAIT - don't wait for completion)
-        this.sendEmailsInBackground(
-          userProcessingResult.emailsToSend,
-          sessionId,
-          emailConfig
-        ).then(() => {
-          console.log(`✅ Background email sending completed for session ${sessionId}`);
-        }).catch((error) => {
-          console.error(`❌ Background email sending failed for session ${sessionId}:`, error);
-        });
-        
-        console.log(`✅ Emails scheduled for background processing, continuing with response...`);
-      }
 
       const processingTime = Date.now() - startTime;
       const existingUsersSkipped = userProcessingResult.existingUsersCount - userProcessingResult.usersToUpdate.length;
@@ -965,13 +945,43 @@ export class AuthService {
 
       const usersForAssociation = await this.userRepository.find({
         where: normalizedEmails.map((email) => ({ email })),
-        select: ['id'],
+        select: ['id', 'email', 'firstName', 'lastName'],
       });
 
       const eventAssociationResult = await this.associateUsersWithEvent(
         usersForAssociation.map((user) => user.id),
         eventId,
       );
+
+      // Prepare QR email payloads for all processed users
+      const qrEmailPayloads = await this.prepareQrEmailPayloads(
+        usersForAssociation,
+        userProcessingResult.emailsToNotify,
+        event.name,
+      );
+
+      // Step 2: Send emails in BACKGROUND (don't wait for them)
+      let emailsToSendCount = 0;
+      if (csvUploadConfig.isEmailSendingEnabled() && qrEmailPayloads.length > 0) {
+        emailsToSendCount = qrEmailPayloads.length;
+        console.log(`📧 Scheduling ${emailsToSendCount} QR emails to be sent in background...`);
+        
+        // Get email configuration based on provider
+        const emailConfig = csvUploadConfig.getEmailBatchConfig();
+        
+        // Send emails asynchronously in background (NO AWAIT - don't wait for completion)
+        this.sendEmailsInBackground(
+          qrEmailPayloads,
+          sessionId,
+          emailConfig
+        ).then(() => {
+          console.log(`✅ Background QR email sending completed for session ${sessionId}`);
+        }).catch((error) => {
+          console.error(`❌ Background QR email sending failed for session ${sessionId}:`, error);
+        });
+        
+        console.log(`✅ QR emails scheduled for background processing, continuing with response...`);
+      }
 
       // ==========================================
       // 📊 COMPLETE UPLOAD SUMMARY LOGS
@@ -988,7 +998,7 @@ export class AuthService {
       console.log(`⏭️  Existing Users Skipped: ${existingUsersSkipped}`);
       console.log(`🔐 Passwords Generated: ${userProcessingResult.passwordsGenerated}`);
       console.log(`\n--- EMAIL STATISTICS ---`);
-      console.log(`📧 Total Emails to Send: ${emailsToSendCount}`);
+      console.log(`📧 Total QR Emails to Send: ${emailsToSendCount}`);
       console.log(`📮 Email Status: ${emailsToSendCount > 0 ? 'Sending in Background' : 'Disabled'}`);
       if (userProcessingResult.skippedUsers.length > 0) {
         console.log(`\n--- SKIPPED USERS ---`);
@@ -1018,7 +1028,7 @@ export class AuthService {
         processingTimeMs: processingTime,
         skippedRecords: userProcessingResult.skippedUsers,
         summary: `${emailsToSendCount > 0 
-          ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (processing in background)` 
+          ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (QR processing in background)` 
           : `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | No emails to send`
         } | Event: ${event.name} (${eventAssociationResult.registrationsCreated} registrations, ${eventAssociationResult.registrationsSkipped} already registered)`
       });
@@ -1027,7 +1037,7 @@ export class AuthService {
 
       // Prepare final response - return immediately without waiting for emails
       const response: CsvUploadResponseDto = {
-        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} credential emails are being sent in background.` : ''} Users associated with ${event.name}.`,
+        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} QR code emails are being sent in background.` : ''} Users associated with ${event.name}.`,
         totalProcessed: csvData.length.toString(),
         newUsersCreated: userProcessingResult.newUsersCreated.toString(),
         existingUsersSkipped: existingUsersSkipped.toString(),
@@ -1070,7 +1080,7 @@ export class AuthService {
    * Send emails in background without blocking the response
    */
   private async sendEmailsInBackground(
-    emailsToSend: UserCredentialsData[],
+    emailsToSend: EmailTemplatePayload[],
     sessionId: string,
     emailConfig: any
   ): Promise<void> {
@@ -1132,7 +1142,7 @@ export class AuthService {
   private async processUsersFromCsv(csvData: CsvUserDto[]): Promise<{
     newUsersCreated: number;
     usersToUpdate: Array<{id: string, password: string}>;
-    emailsToSend: UserCredentialsData[];
+    emailsToNotify: Array<{ email: string; firstName: string; lastName: string }>;
     skippedUsers: string[];
     passwordsGenerated: number;
     existingUsersCount: number;
@@ -1153,7 +1163,7 @@ export class AuthService {
     // Prepare bulk operations data
     const usersToCreate: any[] = [];
     const usersToUpdate: Array<{id: string, password: string, company?: string, designation?: string}> = [];
-    const emailsToSend: UserCredentialsData[] = [];
+    const emailsToNotify: Array<{ email: string; firstName: string; lastName: string }> = [];
     const skippedUsers: string[] = [];
     let passwordsGenerated = 0;
 
@@ -1161,6 +1171,14 @@ export class AuthService {
     for (const userData of csvData) {
       const normalizedEmail = normalizeEmail(userData.email);
       const existingUser = existingUsersMap.get(normalizedEmail);
+
+      if (userData.email) {
+        emailsToNotify.push({
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+        });
+      }
 
       if (existingUser) {
         // Existing user - update password if needed, and also update company/designation
@@ -1171,12 +1189,6 @@ export class AuthService {
             password: await PasswordUtils.hashPassword(randomPassword),
             company: userData.company,
             designation: userData.designation
-          });
-          emailsToSend.push({
-            email: existingUser.email,
-            firstName: existingUser.firstName,
-            lastName: existingUser.lastName,
-            password: randomPassword,
           });
           passwordsGenerated++;
         } else {
@@ -1218,12 +1230,6 @@ export class AuthService {
           role: UserRole.User,
           isVerify: true,
           authProvider: AuthProvider.LOCAL,
-        });
-        emailsToSend.push({
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          password: randomPassword,
         });
         passwordsGenerated++;
       }
@@ -1281,11 +1287,61 @@ export class AuthService {
     return {
       newUsersCreated,
       usersToUpdate,
-      emailsToSend,
+      emailsToNotify,
       skippedUsers,
       passwordsGenerated,
       existingUsersCount: existingUsers.length
     };
+  }
+
+  private async prepareQrEmailPayloads(
+    users: Array<{ id: string; email: string; firstName: string; lastName: string }>,
+    emailsToNotify: Array<{ email: string; firstName: string; lastName: string }>,
+    eventName: string,
+  ): Promise<UserQRCodeEmailData[]> {
+    const userMap = new Map<string, { id: string; email: string; firstName: string; lastName: string }>();
+    users.forEach((user) => {
+      userMap.set(normalizeEmail(user.email), user);
+    });
+
+    const uniqueEmailMap = new Map<string, { email: string; firstName: string; lastName: string }>();
+    emailsToNotify.forEach((entry) => {
+      if (!entry.email) {
+        return;
+      }
+      const normalized = normalizeEmail(entry.email);
+      if (!uniqueEmailMap.has(normalized)) {
+        uniqueEmailMap.set(normalized, entry);
+      }
+    });
+
+    const payloads: UserQRCodeEmailData[] = [];
+
+    for (const [normalizedEmail, entry] of uniqueEmailMap.entries()) {
+      const user = userMap.get(normalizedEmail);
+      if (!user) {
+        console.warn(`⚠️ No user found for QR email: ${entry.email}`);
+        continue;
+      }
+
+      try {
+        const qrCodeBuffer = await QRCodeUtils.generateQRCodeBuffer(user.id);
+        const qrCodeCid = `user-qr-${user.id}@events`;
+        payloads.push({
+          email: user.email,
+          firstName: user.firstName || entry.firstName || '',
+          lastName: user.lastName || entry.lastName || '',
+          eventName,
+          qrCodeCid,
+          qrCodeBuffer,
+          qrCodeFilename: `qr-${user.id}.png`,
+        });
+      } catch (error) {
+        console.error(`❌ Failed to generate QR code for ${entry.email}:`, error);
+      }
+    }
+
+    return payloads;
   }
 
   private async associateUsersWithEvent(

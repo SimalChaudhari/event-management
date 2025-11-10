@@ -21,6 +21,18 @@ export interface UserCredentialsData {
   password: string;
 }
 
+export interface UserQRCodeEmailData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  eventName: string;
+  qrCodeCid: string;
+  qrCodeBuffer: Buffer;
+  qrCodeFilename?: string;
+}
+
+export type EmailTemplatePayload = UserCredentialsData | UserQRCodeEmailData;
+
 export interface RoleSwitchCodeData {
   email: string;
   firstName: string;
@@ -226,6 +238,95 @@ export class EmailTemplateUtils {
       subject: 'Welcome to Our Event Platform - Account Created',
       html: this.generateUserCredentialsTemplate(data),
     };
+  }
+
+  /**
+   * Generate HTML template for user QR code email
+   * @param data User QR code email data
+   * @returns HTML email template
+   */
+  static generateUserQRCodeTemplate(data: UserQRCodeEmailData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
+          <h2 style="color: #333; text-align: center;">🎉 You're Registered!</h2>
+          <p style="color: #555; font-size: 16px;">
+              Dear <strong>${data.firstName} ${data.lastName}</strong>,
+          </p>
+          <p style="color: #555; font-size: 16px;">
+              Thank you for registering for <strong>${data.eventName}</strong>. Please present the QR code below when you arrive at the venue.
+          </p>
+
+          <div style="
+              background-color: #ffffff;
+              border: 1px solid #e0e0e0;
+              padding: 20px;
+              margin: 20px auto;
+              border-radius: 8px;
+              text-align: center;
+              max-width: 360px;
+          ">
+              <h3 style="margin: 0 0 15px 0; color: #333;">Your Event QR Code</h3>
+              <img src="cid:${data.qrCodeCid}" alt="Event QR Code" style="width: 100%; max-width: 300px; height: auto; border-radius: 4px; border: 1px solid #ccc;" />
+          </div>
+
+          <p style="color: #555; font-size: 14px;">
+              Keep this email handy or take a screenshot for quick access during entry.
+          </p>
+
+          <p style="color: #555; font-size: 14px;">
+              We look forward to seeing you at <strong>${data.eventName}</strong>!
+          </p>
+
+          <p style="color: #555; font-size: 14px;">
+              Best regards,<br>
+              <strong>Event Platform Team</strong>
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="color: #888; font-size: 12px; text-align: center;">
+              This is an automated email. Please do not reply to this message.
+          </p>
+      </div>
+    `;
+  }
+
+  /**
+   * Get email options for user QR code email
+   * @param data User QR code email data
+   * @returns Email options object
+   */
+  static getUserQRCodeEmailOptions(data: UserQRCodeEmailData) {
+    return {
+      from: process.env.SMTP_USER,
+      to: data.email,
+      subject: `Your QR Code for ${data.eventName}`,
+      html: this.generateUserQRCodeTemplate(data),
+      attachments: [
+        {
+          filename: data.qrCodeFilename || 'event-qr.png',
+          content: data.qrCodeBuffer,
+          cid: data.qrCodeCid,
+          contentType: 'image/png',
+        },
+      ],
+    };
+  }
+
+  /**
+   * Resolve email options for supported payloads
+   * @param data Email payload
+   * @returns Email options object
+   */
+  static getEmailOptions(data: EmailTemplatePayload) {
+    if ('password' in data) {
+      return this.getUserCredentialsEmailOptions(data);
+    }
+
+    if ('qrCodeBuffer' in data) {
+      return this.getUserQRCodeEmailOptions(data);
+    }
+
+    throw new Error('Unsupported email template payload');
   }
 
   /**
