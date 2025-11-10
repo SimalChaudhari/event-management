@@ -79,9 +79,12 @@ export class AppVersionService {
   ) {}
 
   private async getOrCreateSetting(): Promise<AppVersionSetting> {
-    let setting = await this.appVersionRepository.findOne({
+    const existingSettings = await this.appVersionRepository.find({
       order: { createdAt: 'ASC' },
+      take: 1,
     });
+
+    let setting = existingSettings[0];
 
     if (!setting) {
       setting = this.appVersionRepository.create({
