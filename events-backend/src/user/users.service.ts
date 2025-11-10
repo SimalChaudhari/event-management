@@ -167,6 +167,7 @@ export class UserService {
       await this.userRepository.remove(user);
       return { message: 'User deleted successfully' };
     } catch (error) {
+      console.log("error",error);
       if (
         error instanceof ResourceNotFoundException ||
         error instanceof ForeignKeyConstraintException

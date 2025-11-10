@@ -228,3 +228,41 @@ export class RegisterEventController {
     }
   }
 }
+
+@Controller('api/public/events')
+export class PublicRegisterEventController {
+  constructor(
+    private readonly registerEventService: RegisterEventService,
+    private readonly errorHandler: ErrorHandlerService,
+  ) {}
+
+  @Get(':eventId/participants')
+  async getPublicParticipants(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Query('search') search?: string,
+  ) {
+    try {
+      const participants =
+        await this.registerEventService.getPublicParticipants(eventId, search);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Participants retrieved successfully',
+        data: participants ?? [],
+        metadata: {
+          total: participants?.length ?? 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(
+        error,
+        'Public event participants retrieval',
+      );
+      throw error;
+    }
+  }
+}

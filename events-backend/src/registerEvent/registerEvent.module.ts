@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { RegisterEvent } from './registerEvent.entity';
 import { RegisterEventService } from './registerEvent.service';
-import { RegisterEventController } from './registerEvent.controller';
+import { PublicRegisterEventController, RegisterEventController } from './registerEvent.controller';
 import { AdminInfo } from './admin-info.entity';
 import { AdminInfoService } from './admin-info.service';
 import { AdminInfoController } from './admin-info.controller';
@@ -33,7 +33,7 @@ import { EngagementModule } from '../engagement/engagement.module';
         }),
     ],
     providers: [RegisterEventService, AdminInfoService, ErrorHandlerService, EventNotificationService, NotificationUtil],
-    controllers: [RegisterEventController, AdminInfoController],
+    controllers: [RegisterEventController, PublicRegisterEventController, AdminInfoController],
     exports: [RegisterEventService, AdminInfoService], // Export the service to be used in other modules
 })
 export class RegisterEventModule {}

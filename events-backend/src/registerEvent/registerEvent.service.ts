@@ -32,6 +32,19 @@ import { AdminInfo } from './admin-info.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { EngagementService } from '../engagement/engagement.service';
 
+export interface PublicParticipantDto {
+  registrationId: string;
+  participantUid: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company: string;
+  designation: string;
+  type: string | undefined;
+  status: string | undefined;
+  createdAt: Date;
+}
+
 @Injectable()
 export class RegisterEventService {
   constructor(
@@ -762,4 +775,49 @@ export class RegisterEventService {
     }
   }
 
+  async getPublicParticipants(
+    eventId: string,
+    search?: string,
+  ): Promise<PublicParticipantDto[]> {
+    try {
+      const queryBuilder = this.registerEventRepository
+        .createQueryBuilder('registerEvent')
+        .leftJoinAndSelect('registerEvent.user', 'user')
+        .where('registerEvent.eventId = :eventId', { eventId })
+        .andWhere('registerEvent.isRegister = :isRegister', {
+          isRegister: true,
+        });
+
+      if (search) {
+        const normalizedSearch = `%${search.toLowerCase()}%`;
+        queryBuilder.andWhere(
+          `(LOWER(user.email) LIKE :search OR LOWER(CONCAT(COALESCE(user.firstName, ''), ' ', COALESCE(user.lastName, ''))) LIKE :search)`,
+          { search: normalizedSearch },
+        );
+      }
+
+      const registrations = await queryBuilder
+        .orderBy('LOWER(user.firstName)', 'ASC')
+        .addOrderBy('LOWER(user.lastName)', 'ASC')
+        .getMany();
+
+      return registrations.map((registration) => ({
+        registrationId: registration.id,
+        participantUid: registration.user?.id ?? null,
+        firstName: registration.user?.firstName ?? '',
+        lastName: registration.user?.lastName ?? '',
+        email: registration.user?.email ?? '',
+        company: registration.user?.company ?? '',
+        designation: registration.user?.designation ?? '',
+        type: registration.type,
+        status: registration.status,
+        createdAt: registration.createdAt,
+      }));
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(
+        error,
+        'Get public event participants',
+      );
+    }
+  }
 }
