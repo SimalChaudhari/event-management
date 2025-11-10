@@ -26,7 +26,25 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
     };
 
     // Render individual speaker card
-    const renderSpeakerCard = (speaker) => (
+    const formatSessionDate = (dateString) => {
+        if (!dateString) {
+            return '';
+        }
+        const parsed = new Date(dateString);
+        if (Number.isNaN(parsed.getTime())) {
+            return dateString;
+        }
+        return parsed.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const renderSpeakerCard = (speaker) => {
+        const hasSpeakingSessions = Array.isArray(speaker.speakingSessions) && speaker.speakingSessions.length > 0;
+
+        return (
         <div key={speaker.id} className="col-12 col-sm-6 col-md-6 col-lg-4 mb-4">
             <div className="speaker-card h-100" style={{
                 backgroundColor: 'white',
@@ -180,41 +198,77 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                         )}
 
                         {/* Speaking Time */}
-                        {(speaker.speakingStartTime || speaker.speakingEndTime) && (
+                        {(speaker.speakingStartTime || speaker.speakingEndTime || hasSpeakingSessions) && (
                             <div className="mb-3">
                                 <div className="d-flex align-items-center mb-2">
                                     <i className="fas fa-clock text-primary" style={{ marginRight: '8px', flexShrink: 0 }}></i>
-                                    <span className="fw-bold text-dark fs-6" style={{ flexShrink: 0 }}>Speaking Time:</span>
+                                    <span className="fw-bold text-dark fs-6" style={{ flexShrink: 0 }}>
+                                        {hasSpeakingSessions ? 'Speaking Schedule:' : 'Speaking Time:'}
+                                    </span>
                                 </div>
-                                <div style={{ marginLeft: '24px' }}>
-                                    <div className="d-flex align-items-center flex-wrap gap-2">
-                                        {speaker.speakingStartTime && (
-                                            <div className="badge bg-light text-dark border" style={{ 
-                                                fontSize: '13px',
-                                                fontWeight: '500',
-                                                padding: '6px 12px',
-                                                borderRadius: '8px'
-                                            }}>
-                                                <i className="fas fa-play-circle text-success me-1"></i>
-                                                {speaker.speakingStartTime}
+                                {hasSpeakingSessions ? (
+                                    <div style={{ marginLeft: '24px', display: 'grid', gap: '8px' }}>
+                                        {speaker.speakingSessions.map((session, index) => (
+                                            <div
+                                                key={`${session.sessionId || index}`}
+                                                className="border rounded px-3 py-2 bg-light"
+                                                style={{ fontSize: '13px', lineHeight: 1.4 }}
+                                            >
+                                                <div className="d-flex justify-content-between flex-wrap">
+                                                    <span className="text-dark fw-semibold">
+                                                        {session.sessionTitle || 'Session'}
+                                                    </span>
+                                                    {(session.startTime || session.endTime) && (
+                                                        <span className="text-muted">
+                                                            {session.startTime ? session.startTime : '--'}
+                                                            {(session.startTime || session.endTime) && ' – '}
+                                                            {session.endTime ? session.endTime : '--'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-muted">
+                                                    {formatSessionDate(session.sessionDate)}
+                                                    {session.trackTitle ? ` · ${session.trackTitle}` : ''}
+                                                </div>
+                                                {session.venue && (
+                                                    <div className="text-muted">
+                                                        Venue: {session.venue}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        {speaker.speakingStartTime && speaker.speakingEndTime && (
-                                            <span className="text-muted">→</span>
-                                        )}
-                                        {speaker.speakingEndTime && (
-                                            <div className="badge bg-light text-dark border" style={{ 
-                                                fontSize: '13px',
-                                                fontWeight: '500',
-                                                padding: '6px 12px',
-                                                borderRadius: '8px'
-                                            }}>
-                                                <i className="fas fa-stop-circle text-danger me-1"></i>
-                                                {speaker.speakingEndTime}
-                                            </div>
-                                        )}
+                                        ))}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div style={{ marginLeft: '24px' }}>
+                                        <div className="d-flex align-items-center flex-wrap gap-2">
+                                            {speaker.speakingStartTime && (
+                                                <div className="badge bg-light text-dark border" style={{ 
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '8px'
+                                                }}>
+                                                    <i className="fas fa-play-circle text-success me-1"></i>
+                                                    {speaker.speakingStartTime}
+                                                </div>
+                                            )}
+                                            {speaker.speakingStartTime && speaker.speakingEndTime && (
+                                                <span className="text-muted">→</span>
+                                            )}
+                                            {speaker.speakingEndTime && (
+                                                <div className="badge bg-light text-dark border" style={{ 
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '8px'
+                                                }}>
+                                                    <i className="fas fa-stop-circle text-danger me-1"></i>
+                                                    {speaker.speakingEndTime}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -267,6 +321,7 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
             </div>
         </div>
     );
+    };
 
     // Sort speakers alphabetically by name
     const sortedSpeakers = [...speakers].sort((a, b) => {

@@ -32,6 +32,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from '../utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { EventSpeakerUtils } from '../utils/event-speaker.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { EmailService } from '../service/email.service';
 import { EmailUtils } from '../utils/email.utils';
@@ -331,13 +332,8 @@ export class EventService {
             }));
           }
 
-          const speakers =
-          event?.eventSpeakers?.map((es) => ({
-            ...UserUtils.getBasicSpeakerInfo(es.speaker),
-            speakingStartTime: es.speakingStartTime,
-            speakingEndTime: es.speakingEndTime,
-          })) || [];
-          
+          const speakers = EventSpeakerUtils.buildSpeakerSchedule(event);
+
 
           const {
             eventSpeakers,
@@ -662,14 +658,13 @@ export class EventService {
       // Get engagements for this event - pass isUserFacing=true for user-facing API
       const engagements = await UserUtils.getEngagementsByEventId(id, this.eventRepository, this.engagementRepository, true);
 
+      const speakerSchedule = EventSpeakerUtils.buildSpeakerSchedule(event);
+
       const eventResponse = {
         ...eventFilteredData,
         color: getEventColor(event.type),
-        speakers: eventSpeakers.map((es) => ({
-          ...UserUtils.getBasicSpeakerInfo(es.speaker),
-          speakingStartTime: es.speakingStartTime,
-          speakingEndTime: es.speakingEndTime,
-        })),
+        speakers: speakerSchedule,
+        speakersData: speakerSchedule,
         categories: category?.map((ec) => ec.category) || [],
         documents: formattedDocuments, // New formatted documents
         eventStamps: {
@@ -1387,7 +1382,6 @@ export class EventService {
       // Continue with event deletion even if file deletion fails
     }
   }
-
 
   private checkGlobalSearchMatch(event: any, keyword: string): {
     hasMatch: boolean;

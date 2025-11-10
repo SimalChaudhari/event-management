@@ -25,6 +25,7 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { SurveyUtils } from 'utils/survey-utils';
 import { UserUtils } from '../utils/user.utils';
+import { EventSpeakerUtils } from '../utils/event-speaker.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
 import { AdminInfo } from './admin-info.entity';
@@ -283,12 +284,9 @@ export class RegisterEventService {
             isFavorite = !!favorite;
           }
 
-          const speakers =
-            registerEvent.event?.eventSpeakers?.map((es) => ({
-              ...UserUtils.getBasicSpeakerInfo(es.speaker),
-              speakingStartTime: es.speakingStartTime,
-              speakingEndTime: es.speakingEndTime,
-            })) || [];
+          const speakers = EventSpeakerUtils.buildSpeakerSchedule(
+            registerEvent.event,
+          );
           const categories =
             registerEvent.event?.category?.map((ec) => ec.category) || [];
 
@@ -318,6 +316,7 @@ export class RegisterEventService {
             registerEventId: registerEvent.id, // Add registerEventId inside event object
             color: getEventColor(registerEvent.event?.type),
             speakers,
+            speakersData: speakers,
             categories,
             documents: formattedDocuments,
             engagements: engagements,
@@ -501,13 +500,10 @@ export class RegisterEventService {
           )
         : null;
 
-      // Extract only speakers
-      const speakers =
-        registerEvent.event?.eventSpeakers?.map((es) => ({
-          ...UserUtils.getBasicSpeakerInfo(es.speaker),
-          speakingStartTime: es.speakingStartTime,
-          speakingEndTime: es.speakingEndTime,
-        })) || [];
+      // Extract speaker schedule
+      const speakers = EventSpeakerUtils.buildSpeakerSchedule(
+        registerEvent.event,
+      );
       const categories =
         registerEvent.event?.category?.map((ec) => ec.category) || [];
 
@@ -549,6 +545,7 @@ export class RegisterEventService {
         registerEventId: registerEvent.id, // Add registerEventId inside event object
         color: getEventColor(registerEvent.event?.type),
         speakers,
+        speakersData: speakers,
         categories,
         documents: formattedDocuments,
         programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
