@@ -329,9 +329,24 @@ const TrackQnAShareLinkPage = () => {
       
       // Check if questions are actually different
       const currentQuestions = currentSession.questions || [];
-      if (currentQuestions.length === filteredQuestions.length &&
-          currentQuestions.every((q, idx) => q.id === filteredQuestions[idx]?.id)) {
-        return prevSessions; // No change, return previous state
+      const hasChanges =
+        currentQuestions.length !== filteredQuestions.length ||
+        currentQuestions.some((q, idx) => {
+          const newQuestion = filteredQuestions[idx];
+          if (!newQuestion) return true;
+          
+          return (
+            q.id !== newQuestion.id ||
+            q.likesCount !== newQuestion.likesCount ||
+            q.status !== newQuestion.status ||
+            q.question !== newQuestion.question ||
+            q.isPinned !== newQuestion.isPinned ||
+            q.isActive !== newQuestion.isActive
+          );
+        });
+      
+      if (!hasChanges) {
+        return prevSessions; // No change detected
       }
       
       return prevSessions.map(s => 

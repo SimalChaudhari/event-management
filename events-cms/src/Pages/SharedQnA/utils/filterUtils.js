@@ -25,19 +25,35 @@ export const applyFiltersToQuestions = (allQuestions, voteFilter, statusFilter) 
     remaining = statusRemaining;
   }
 
-  // Apply vote sorting
-  const sortByVotes = (questions) => {
-    if (voteFilter === 'desc') {
-      // Descending: high to low (2, 1, 0)
-      return [...questions].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
-    } else if (voteFilter === 'asc') {
-      // Ascending: low to high (0, 1, 2)
-      return [...questions].sort((a, b) => (a.likesCount || 0) - (b.likesCount || 0));
-    }
-    return questions;
+  const isAscending = voteFilter === 'asc';
+
+  const sortQuestions = (questions) => {
+    return [...questions].sort((a, b) => {
+      const aPinned = !!a.isPinned;
+      const bPinned = !!b.isPinned;
+
+      if (aPinned !== bPinned) {
+        return aPinned ? -1 : 1;
+      }
+
+      const aVotes = a.likesCount || 0;
+      const bVotes = b.likesCount || 0;
+
+      if (aVotes !== bVotes) {
+        return isAscending ? aVotes - bVotes : bVotes - aVotes;
+      }
+
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+      if (aCreated !== bCreated) {
+        return isAscending ? aCreated - bCreated : bCreated - aCreated;
+      }
+
+      return 0;
+    });
   };
 
-  // Combine filtered first, then remaining
-  return [...sortByVotes(filtered), ...sortByVotes(remaining)];
+  return [...sortQuestions(filtered), ...sortQuestions(remaining)];
 };
 

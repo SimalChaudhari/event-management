@@ -533,21 +533,15 @@ export class EngagementQnaService {
         },
       });
 
+      let liked = true;
+      let message = 'Question liked successfully';
+
       if (existingLike) {
         // Unlike
         await this.engagementQnaLikeRepository.remove(existingLike);
         question.likesCount = Math.max(0, question.likesCount - 1);
-        await this.engagementQnaQuestionRepository.save(question);
-
-        return {
-          success: true,
-          message: 'Question unliked successfully',
-          data: {
-            questionId: likeDto.questionId,
-            liked: false,
-            likesCount: question.likesCount,
-          },
-        };
+        liked = false;
+        message = 'Question unliked successfully';
       } else {
         // Like
         const like = new EngagementQnaLike();
@@ -556,24 +550,82 @@ export class EngagementQnaService {
         await this.engagementQnaLikeRepository.save(like);
 
         question.likesCount += 1;
-        await this.engagementQnaQuestionRepository.save(question);
-
-        return {
-          success: true,
-          message: 'Question liked successfully',
-          data: {
-            questionId: likeDto.questionId,
-            liked: true,
-            likesCount: question.likesCount,
-          },
-        };
       }
+
+      const savedQuestion = await this.engagementQnaQuestionRepository.save(
+        question,
+      );
+
+      // Emit websocket updates for real-time vote count changes
+      await this.emitQuestionUpdateToShareLinks(savedQuestion.id);
+
+      return {
+        success: true,
+        message,
+        data: {
+          questionId: likeDto.questionId,
+          liked,
+          likesCount: savedQuestion.likesCount,
+        },
+      };
     } catch (error: any) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
       }
       this.errorHandler.logError(error, 'Toggle question like');
       this.errorHandler.handleDatabaseError(error, 'Question like toggle');
+    }
+  }
+
+  private async emitQuestionUpdateToShareLinks(questionId: string) {
+    if (!this.gateway) {
+      return;
+    }
+
+    try {
+      const question = await this.engagementQnaQuestionRepository.findOne({
+        where: { id: questionId },
+        relations: ['engagement', 'engagement.track'],
+      });
+
+      if (!question) {
+        return;
+      }
+
+      const sessionShareLinks =
+        await this.engagementQnaShareLinkRepository.find({
+          where: { sessionId: question.sessionId, isActive: true },
+        });
+
+      for (const shareLink of sessionShareLinks) {
+        this.gateway.emitQuestionUpdate(shareLink.shareToken, 'question_updated', {
+          question,
+          sessionId: question.sessionId,
+          shareToken: shareLink.shareToken,
+        });
+      }
+
+      const trackId = question.engagement?.trackId;
+      if (trackId) {
+        const trackShareLinks =
+          await this.engagementQnaTrackShareLinkRepository.find({
+            where: { trackId, isActive: true },
+          });
+
+        for (const trackShareLink of trackShareLinks) {
+          this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_updated', {
+            question,
+            sessionId: question.sessionId,
+            trackId,
+            shareToken: trackShareLink.shareToken,
+          });
+        }
+      }
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'Emit question update after like toggle',
+      );
     }
   }
 
@@ -601,6 +653,8 @@ export class EngagementQnaService {
 
       Object.assign(question, updateDto);
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
+
+      await this.emitQuestionUpdateToShareLinks(savedQuestion.id);
 
       return {
         success: true,
