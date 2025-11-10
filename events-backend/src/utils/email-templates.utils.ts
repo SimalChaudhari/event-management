@@ -144,7 +144,7 @@ export class EmailTemplateUtils {
    */
   static getSpeakerCredentialsEmailOptions(data: SpeakerCredentialsData) {
     return {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Speaker Account Created',
       html: this.generateSpeakerCredentialsTemplate(data),
@@ -233,7 +233,7 @@ export class EmailTemplateUtils {
    */
   static getUserCredentialsEmailOptions(data: UserCredentialsData) {
     return {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Account Created',
       html: this.generateUserCredentialsTemplate(data),
@@ -297,7 +297,7 @@ export class EmailTemplateUtils {
    */
   static getUserQRCodeEmailOptions(data: UserQRCodeEmailData) {
     return {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL,
       to: data.email,
       subject: `Your QR Code for ${data.eventName}`,
       html: this.generateUserQRCodeTemplate(data),
@@ -399,7 +399,7 @@ export class EmailTemplateUtils {
 
   static getExhibitorCredentialsEmailOptions(data: ExhibitorCredentialsData) {
     return {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Exhibitor Account Created',
       html: `
@@ -612,7 +612,7 @@ export class EmailTemplateUtils {
    */
   static getRoleSwitchEmailOptions(data: RoleSwitchCodeData) {
     return {
-      from: process.env.SMTP_USER,
+      from: process.env.FROM_EMAIL,
       to: data.email,
       subject: 'Role Switch Verification Code - Event Platform',
       html: this.generateRoleSwitchTemplate(data),

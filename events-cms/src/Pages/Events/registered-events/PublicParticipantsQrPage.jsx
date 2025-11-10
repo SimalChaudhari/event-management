@@ -188,23 +188,32 @@ const PublicParticipantsQrPage = () => {
       </Row>
 
       <Card className="shadow-sm">
-        <Card.Header className="bg-white border-0 py-3">
+        <Card.Header
+          className="border-0 py-3"
+          style={{ backgroundColor: '#4680ff', color: '#fff' }}
+        >
           <Row className="align-items-center">
             <Col md={6}>
-              <div className="text-muted text-uppercase mb-1" style={{ letterSpacing: '0.08em' }}>
+              <div
+                className="text-uppercase mb-1"
+                style={{ letterSpacing: '0.08em', color: 'rgba(255, 255, 255, 0.75)' }}
+              >
                 Participant Overview
               </div>
               <div className="d-flex align-items-baseline">
                 <h4 className="mb-0 mr-3" style={{ fontWeight: 600 }}>
                   {totalCount}
                 </h4>
-                <span className="text-muted">total registrations</span>
+                <span style={{ color: 'rgba(255, 255, 255, 0.75)' }}>total registrations</span>
               </div>
             </Col>
             <Col md={6} className="mt-3 mt-md-0">
               <Form>
                 <InputGroup className="align-items-stretch">
-                  <InputGroup.Text className="bg-light border-right-0">
+                  <InputGroup.Text
+                    className="border-right-0"
+                    style={{ backgroundColor: '#000', color: '#fff' }}
+                  >
                     <i className="feather icon-search" />
                   </InputGroup.Text>
                   <Form.Control
@@ -213,12 +222,14 @@ const PublicParticipantsQrPage = () => {
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     className="border-left-0 shadow-none"
+                    style={{ backgroundColor: '#fff' }}
                   />
                   <Button
-                    variant="primary"
+                    variant="dark"
                     onClick={() => fetchParticipants(searchTerm)}
                     disabled={isSearching}
                     className="d-flex align-items-center"
+                    style={{ backgroundColor: '#000', borderColor: '#000' }}
                   >
                     {isSearching ? (
                       <>
