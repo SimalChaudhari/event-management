@@ -38,23 +38,33 @@ export class UserScheduledPushNotificationController {
   }
 
   @Patch(':deliveryId/read')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async markNotificationRead(
     @Req() req: any,
     @Param('deliveryId') deliveryId: string,
-  ): Promise<void> {
+  ): Promise<{ message: string; success: boolean }> {
     const userId = req.user?.id;
     await this.scheduledNotificationService.markUserNotificationRead(
       deliveryId,
       userId,
     );
+    return {
+      message: 'Notification marked as read',
+      success: true,
+    };
   }
 
   @Patch('mark-all/read')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async markAllNotificationsRead(@Req() req: any): Promise<void> {
+  @HttpCode(HttpStatus.OK)
+  async markAllNotificationsRead(
+    @Req() req: any,
+  ): Promise<{ message: string; success: boolean }> {
     const userId = req.user?.id;
     await this.scheduledNotificationService.markAllUserNotificationsRead(userId);
+    return {
+      message: 'All notifications marked as read',
+      success: true,
+    };
   }
 }
 
