@@ -945,7 +945,7 @@ export class AuthService {
 
       const usersForAssociation = await this.userRepository.find({
         where: normalizedEmails.map((email) => ({ email })),
-        select: ['id', 'email', 'firstName', 'lastName'],
+        select: ['id', 'email', 'firstName', 'lastName', 'salutation'],
       });
 
       const eventAssociationResult = await this.associateUsersWithEvent(
@@ -1142,7 +1142,7 @@ export class AuthService {
   private async processUsersFromCsv(csvData: CsvUserDto[]): Promise<{
     newUsersCreated: number;
     usersToUpdate: Array<{id: string, password: string}>;
-    emailsToNotify: Array<{ email: string; firstName: string; lastName: string }>;
+    emailsToNotify: Array<{ email: string; firstName: string; lastName: string; salutation?: string }>;
     skippedUsers: string[];
     passwordsGenerated: number;
     existingUsersCount: number;
@@ -1162,8 +1162,8 @@ export class AuthService {
 
     // Prepare bulk operations data
     const usersToCreate: any[] = [];
-    const usersToUpdate: Array<{id: string, password: string, company?: string, designation?: string}> = [];
-    const emailsToNotify: Array<{ email: string; firstName: string; lastName: string }> = [];
+    const usersToUpdate: Array<{id: string, password: string, company?: string, designation?: string, salutation?: string}> = [];
+    const emailsToNotify: Array<{ email: string; firstName: string; lastName: string; salutation?: string }> = [];
     const skippedUsers: string[] = [];
     let passwordsGenerated = 0;
 
@@ -1177,6 +1177,7 @@ export class AuthService {
           email: userData.email,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          salutation: userData.salutation,
         });
       }
 
@@ -1188,17 +1189,19 @@ export class AuthService {
             id: existingUser.id,
             password: await PasswordUtils.hashPassword(randomPassword),
             company: userData.company,
-            designation: userData.designation
+            designation: userData.designation,
+            salutation: userData.salutation,
           });
           passwordsGenerated++;
         } else {
-          // User exists and has password - still update company/designation if provided
-          if (userData.company || userData.designation) {
+          // User exists and has password - still update company/designation/salutation if provided
+          if (userData.company || userData.designation || userData.salutation) {
             usersToUpdate.push({
               id: existingUser.id,
               password: existingUser.password, // Keep existing password
               company: userData.company,
-              designation: userData.designation
+              designation: userData.designation,
+              salutation: userData.salutation,
             });
           } else {
             // User exists and has password - skip
@@ -1213,6 +1216,7 @@ export class AuthService {
           lastName: userData.lastName,
           email: userData.email,
           mobile: userData.mobile,
+          salutation: userData.salutation,
           company: userData.company,
           designation: userData.designation,
         };
@@ -1275,6 +1279,7 @@ export class AuthService {
           // Update company and designation if provided
           if (updateData.company !== undefined) updateFields.company = updateData.company;
           if (updateData.designation !== undefined) updateFields.designation = updateData.designation;
+          if (updateData.salutation !== undefined) updateFields.salutation = updateData.salutation;
           
           return this.userRepository.update({ id: updateData.id }, updateFields);
         });
@@ -1295,16 +1300,16 @@ export class AuthService {
   }
 
   private async prepareQrEmailPayloads(
-    users: Array<{ id: string; email: string; firstName: string; lastName: string }>,
-    emailsToNotify: Array<{ email: string; firstName: string; lastName: string }>,
+    users: Array<{ id: string; email: string; firstName: string; lastName: string; salutation?: string }>,
+    emailsToNotify: Array<{ email: string; firstName: string; lastName: string; salutation?: string }>,
     eventName: string,
   ): Promise<UserQRCodeEmailData[]> {
-    const userMap = new Map<string, { id: string; email: string; firstName: string; lastName: string }>();
+    const userMap = new Map<string, { id: string; email: string; firstName: string; lastName: string; salutation?: string }>();
     users.forEach((user) => {
       userMap.set(normalizeEmail(user.email), user);
     });
 
-    const uniqueEmailMap = new Map<string, { email: string; firstName: string; lastName: string }>();
+    const uniqueEmailMap = new Map<string, { email: string; firstName: string; lastName: string; salutation?: string }>();
     emailsToNotify.forEach((entry) => {
       if (!entry.email) {
         return;
@@ -1331,6 +1336,7 @@ export class AuthService {
           email: user.email,
           firstName: user.firstName || entry.firstName || '',
           lastName: user.lastName || entry.lastName || '',
+          salutation: user.salutation || entry.salutation,
           eventName,
           qrCodeCid,
           qrCodeBuffer,

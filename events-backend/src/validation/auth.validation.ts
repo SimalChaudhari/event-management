@@ -226,6 +226,10 @@ export class CsvUserDto {
 
   @IsOptional()
   @IsString()
+  salutation?: string;
+
+  @IsOptional()
+  @IsString()
   company?: string;
 
   @IsOptional()

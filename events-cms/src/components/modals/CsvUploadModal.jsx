@@ -9,6 +9,8 @@ import { useDispatch } from 'react-redux';
 import '../../styles/csv-upload.css';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
+const SALUTATION_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Miss', 'Mdm', 'Dr', 'Prof'];
+
 const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
     const dispatch = useDispatch();
     const fileInputRef = useRef(null);
@@ -39,6 +41,26 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
         () => eventOptions.find((event) => event.id === selectedEventId) || null,
         [eventOptions, selectedEventId]
     );
+
+    const normalizeSalutation = (value) => {
+        if (!value) return '';
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+        const withoutTrailingDot = trimmed.replace(/\.+$/, '');
+        const match = SALUTATION_OPTIONS.find(
+            (option) => option.toLowerCase() === withoutTrailingDot.toLowerCase()
+        );
+        if (match) {
+            return match;
+        }
+
+        // Title-case the salutation as a fallback (e.g. "professor" -> "Professor")
+        return withoutTrailingDot
+            .toLowerCase()
+            .split(/\s+/)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    };
 
     const fetchEventOptions = useCallback(async () => {
         setIsLoadingEvents(true);
@@ -127,6 +149,11 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                 mobile: values[headers.indexOf('mobile')],
             };
 
+            const salutationIndex = headers.indexOf('salutation');
+            if (salutationIndex >= 0 && values[salutationIndex]) {
+                user.salutation = normalizeSalutation(values[salutationIndex]);
+            }
+
             // Add optional fields if present in headers
             const companyIndex = headers.findIndex(h => ['company', 'company_name', 'organization', 'org'].includes(h));
             if (companyIndex >= 0 && values[companyIndex]) {
@@ -175,6 +202,10 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             // Validate mobile format using Singapore validation
             if (row.mobile && !isValidMobile(row.mobile)) {
                 rowErrors.push('Invalid Singapore mobile number. Must be 8 digits starting with 8 or 9');
+            }
+
+            if (row.salutation && row.salutation.trim() !== '') {
+                row.salutation = normalizeSalutation(row.salutation);
             }
 
             if (rowErrors.length === 0) {
@@ -491,7 +522,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                             <strong>Required Columns:</strong> firstName, lastName, email, mobile
                         </p>
                         <p className="mb-2">
-                            <strong>Optional Columns:</strong> company, designation
+                            <strong>Optional Columns:</strong> salutation (Mr, Ms, Mrs, Miss, Mdm, Dr, Prof or your preferred title), company, designation
                         </p>
                         <p className="mb-2">
                             <strong>Mobile Format:</strong> Singapore mobile numbers (8 digits starting with 8 or 9)
@@ -895,6 +926,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                             <thead>
                                 <tr>
                                     <th style={{ width: '60px', padding: '15px 8px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">#</th>
+                                    <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Salutation</th>
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">First Name</th>
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Last Name</th>
                                     <th style={{ padding: '15px 12px', backgroundColor: '#4680ff' }} className="text-center text-white fw-bold">Email</th>
@@ -929,6 +961,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                                             }}
                                         >
                                             <td style={{ padding: '12px 8px' }} className="text-center fw-bold text-muted">{index + 1}</td>
+                                            <td style={{ padding: '12px' }} className="fw-medium">{row.salutation || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.firstName || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.lastName || <span className="text-muted">N/A</span>}</td>
                                             <td style={{ padding: '12px' }} className="fw-medium">{row.email || <span className="text-muted">N/A</span>}</td>

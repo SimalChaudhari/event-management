@@ -197,6 +197,10 @@ export const downloadSampleCsv = () => async (dispatch) => {
         // Create sample data with headers and example values
         const sampleFields = [
             {
+                header: 'salutation',
+                values: ['Mr', 'Ms', 'Prof']
+            },
+            {
                 header: 'firstName',
                 values: ['John', 'Jane', 'Mike']
             },

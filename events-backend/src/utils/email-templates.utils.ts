@@ -1,6 +1,7 @@
 // src/utils/email-templates.utils.ts
 
 export interface SpeakerCredentialsData {
+  salutation?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -8,6 +9,7 @@ export interface SpeakerCredentialsData {
 }
 
 export interface ExhibitorCredentialsData {
+  salutation?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -25,10 +27,14 @@ export interface UserQRCodeEmailData {
   email: string;
   firstName: string;
   lastName: string;
+  salutation?: string;
   eventName: string;
   qrCodeCid: string;
   qrCodeBuffer: Buffer;
   qrCodeFilename?: string;
+  eventInfoImageCid?: string;
+  eventInfoImageBuffer?: Buffer;
+  eventInfoImageFilename?: string;
 }
 
 export type EmailTemplatePayload = UserCredentialsData | UserQRCodeEmailData;
@@ -144,7 +150,7 @@ export class EmailTemplateUtils {
    */
   static getSpeakerCredentialsEmailOptions(data: SpeakerCredentialsData) {
     return {
-      from: process.env.FROM_EMAIL,
+      from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Speaker Account Created',
       html: this.generateSpeakerCredentialsTemplate(data),
@@ -233,7 +239,7 @@ export class EmailTemplateUtils {
    */
   static getUserCredentialsEmailOptions(data: UserCredentialsData) {
     return {
-      from: process.env.FROM_EMAIL,
+      from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Account Created',
       html: this.generateUserCredentialsTemplate(data),
@@ -248,14 +254,26 @@ export class EmailTemplateUtils {
   static generateUserQRCodeTemplate(data: UserQRCodeEmailData): string {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
-          <h2 style="color: #333; text-align: center;">🎉 You're Registered!</h2>
+       <h3 style="color: #333; text-align:left;">Get ready for ISCA Conference 2025</h3>
+     
           <p style="color: #555; font-size: 16px;">
-              Dear <strong>${data.firstName} ${data.lastName}</strong>,
-          </p>
-          <p style="color: #555; font-size: 16px;">
-              Thank you for registering for <strong>${data.eventName}</strong>. Please present the QR code below when you arrive at the venue.
+              ${
+                data.salutation && data.salutation.trim()
+                  ? `Dear ${data.salutation.trim()} ${data.lastName},`
+                  : `Dear ${data.lastName},`
+              }
           </p>
 
+          <p style="color: #555; font-size: 16px;">
+              <b>Just 1 more day to go – the countdown to ISCA Conference 2025 is on!</b>
+          </p>
+
+           <p style="color: #555; font-size: 16px;">
+           The QR code below will be used for your event day registration on 12 November. Please save it and have it ready when you arrive at the venue.
+          </p>
+
+              <br>
+              <br>
           <div style="
               background-color: #ffffff;
               border: 1px solid #e0e0e0;
@@ -269,22 +287,37 @@ export class EmailTemplateUtils {
               <img src="cid:${data.qrCodeCid}" alt="Event QR Code" style="width: 100%; max-width: 300px; height: auto; border-radius: 4px; border: 1px solid #ccc;" />
           </div>
 
-          <p style="color: #555; font-size: 14px;">
-              Keep this email handy or take a screenshot for quick access during entry.
+         <p style="color: #555; font-size: 16px;">
+          For a seamless experience, here are some key details and tips:
+         </p>
+
+          <div style="height: 2px;"></div>
+
+          <div style="
+              margin: 30px auto 20px;
+              max-width: 560px;
+              border-radius: 10px;
+              overflow: hidden;
+              border: 1px solid #e0e0e0;
+          ">
+              <img src="https://events.isca.org.sg:3000/image.png" alt="ISCA Conference 2025 - What to Expect" style="display: block; width: 100%; height: auto;" />
+          </div>
+
+          <div style="height: 2px;"></div>
+              
+          <p style="color: #555; font-size: 16px;">
+             We look forward to hosting you at ISCA Conference 2025!
           </p>
 
-          <p style="color: #555; font-size: 14px;">
-              We look forward to seeing you at <strong>${data.eventName}</strong>!
+          <p style="color: #555; font-size: 16px;">
+            For any enquiries, contact us at <a href="mailto:membership@isca.org.sg">membership@isca.org.sg</a>.
           </p>
 
-          <p style="color: #555; font-size: 14px;">
-              Best regards,<br>
-              <strong>Event Platform Team</strong>
-          </p>
-
-          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-          <p style="color: #888; font-size: 12px; text-align: center;">
-              This is an automated email. Please do not reply to this message.
+          <p style="color: #555; font-size: 16px;">
+             Regards,<br>
+              <strong>Terence Lam </strong><br>
+              Director<br>
+              Advocacy and Professional Standards
           </p>
       </div>
     `;
@@ -297,9 +330,9 @@ export class EmailTemplateUtils {
    */
   static getUserQRCodeEmailOptions(data: UserQRCodeEmailData) {
     return {
-      from: process.env.FROM_EMAIL,
+      from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
-      subject: `Your QR Code for ${data.eventName}`,
+      subject: `ISCA Conference 2025 – Your Registration & Event Guide Inside`,
       html: this.generateUserQRCodeTemplate(data),
       attachments: [
         {
@@ -308,6 +341,18 @@ export class EmailTemplateUtils {
           cid: data.qrCodeCid,
           contentType: 'image/png',
         },
+        ...(data.eventInfoImageCid && data.eventInfoImageBuffer
+          ? [
+              {
+                filename:
+                  data.eventInfoImageFilename ||
+                  'isca-conference-2025-what-to-expect.png',
+                content: data.eventInfoImageBuffer,
+                cid: data.eventInfoImageCid,
+                contentType: 'image/png',
+              },
+            ]
+          : []),
       ],
     };
   }
@@ -399,14 +444,18 @@ export class EmailTemplateUtils {
 
   static getExhibitorCredentialsEmailOptions(data: ExhibitorCredentialsData) {
     return {
-      from: process.env.FROM_EMAIL,
+      from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
       subject: 'Welcome to Our Event Platform - Exhibitor Account Created',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
             <h2 style="color: #333; text-align: center;">🏢 Welcome Exhibitor!</h2>
             <p style="color: #555; font-size: 16px;">
-                Dear <strong>${data.firstName} ${data.lastName}</strong>,
+                ${
+                  data.salutation && data.salutation.trim()
+                    ? `Dear <strong>${data.salutation.trim()} ${data.lastName}</strong>,`
+                    : `Dear <strong>${data.firstName} ${data.lastName}</strong>,`
+                }
             </p>
             <p style="color: #555; font-size: 16px;">
                 Welcome to our event platform! Your exhibitor account has been created successfully. Here are your login credentials:
@@ -612,7 +661,7 @@ export class EmailTemplateUtils {
    */
   static getRoleSwitchEmailOptions(data: RoleSwitchCodeData) {
     return {
-      from: process.env.FROM_EMAIL,
+      from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
       subject: 'Role Switch Verification Code - Event Platform',
       html: this.generateRoleSwitchTemplate(data),
