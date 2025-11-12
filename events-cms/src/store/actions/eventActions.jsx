@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST } from '../constants/actionTypes';
 
 // Helper function to dispatch loading state
 const setEventLoading = (dispatch, loading) => {
@@ -514,6 +514,57 @@ export const updateEventTabVisibility = (eventId, tabVisibilitySettings) => asyn
         const errorMessage = error?.response?.data?.message || 'Failed to update tab visibility';
         toast.error(errorMessage);
         return false;
+    }
+};
+
+// Get countries list
+export const getCountries = () => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        const response = await axiosInstance.get('countries');
+        return response.data || [];
+    } catch (error) {
+        console.error('Error fetching countries:', error);
+        toast.error('Failed to fetch countries');
+        return [];
+    } finally {
+        setEventLoading(dispatch, false);
+    }
+};
+
+// Get speakers list for event form
+export const getSpeakersForEvent = () => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        const response = await axiosInstance.get('users/speakers/get');
+        if (response.data.success) {
+            return response.data.data || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching speakers:', error);
+        toast.error('Failed to fetch speakers');
+        return [];
+    } finally {
+        setEventLoading(dispatch, false);
+    }
+};
+
+// Get categories list for event form
+export const getCategoriesForEvent = () => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        const response = await axiosInstance.get('categories/get');
+        if (response.data.success) {
+            return response.data.data || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching categories:', error);
+        toast.error('Failed to fetch categories');
+        return [];
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 

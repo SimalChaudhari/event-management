@@ -63,13 +63,13 @@ const chartData = {
                             id: 'all-events',
                             title: 'All Events',
                             type: 'item',
-                            url: '/events/event-list'
+                            url: '/events'
                         },
                         {
                             id: 'upcoming-events',
                             title: 'Upcoming Events',
                             type: 'item',
-                            url: '/events/upcoming',
+                            url: '/upcoming',
                             badge: {
                                 title: 'NEW',
                                 type: 'badge-danger'
@@ -79,7 +79,7 @@ const chartData = {
                             id: 'registered-events',
                             title: 'Registered Events',
                             type: 'item',
-                            url: '/events/registered'
+                            url: '/registered'
                         }
                     ]
                 },

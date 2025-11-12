@@ -374,6 +374,18 @@ const eventRoutes = [
         name: 'Upcoming Events',
         component: eventComponents.Upcoming
     },
+    {
+        path: EVENT_PATHS.EDIT_UPCOMING_EVENT + '/:id',
+        exact: true,
+        name: 'Edit Upcoming Event',
+        component: eventComponents.AddEvent
+    },
+    {
+        path: EVENT_PATHS.VIEW_UPCOMING_EVENT + '/:id',
+        exact: true,
+        name: 'View Upcoming Event',
+        component: eventComponents.ViewEvent
+    },
 
     // Registered Events
     {

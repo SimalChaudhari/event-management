@@ -417,7 +417,7 @@ const RegisteredEvents = () => {
 
     // Add handler for Add Register Event button
     const handleAddRegisterEvent = () => {
-        navigate(`/events/add-register-event`);
+        navigate(EVENT_PATHS.ADD_REGISTER_EVENT);
     };
 
     // Handle export button click

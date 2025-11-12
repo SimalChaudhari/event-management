@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
 import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
-import { EXHIBITOR_PATHS } from '../../../../utils/constants';
+import { EVENT_PATHS, EXHIBITOR_PATHS } from '../../../../utils/constants';
 import EventBasicComponent from '../../../../components/events/EventBasicComponent';
 import EventLocationComponent from '../../../../components/events/EventLocationComponent';
 import EventSpeakersComponent from '../../../../components/events/EventSpeakersComponent';
@@ -411,7 +411,7 @@ const ViewEventPage = () => {
                                 Manage Tabs
                             </Button>
 
-                            <Button variant="secondary" onClick={() => navigate('/events/event-list')}>
+                            <Button variant="secondary" onClick={() => navigate(EVENT_PATHS.LIST_EVENTS)}>
                                 <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
                                 Back
                             </Button>

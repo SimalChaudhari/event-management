@@ -9,25 +9,17 @@ import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { eventDelete, upcomingEventList } from '../../../store/actions/eventActions';
 import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import FilterComponent from '../../../components/common/FilterComponent';
 import useEventFilter from '../../../hooks/useEventFilter';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
-
-const formatTime = (time) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-};
 
 function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
     let tableZero = '#data-table-zero';
@@ -245,18 +237,14 @@ const UpcomingEvents = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.upcomingEvents?.events);
     const [showModal, setShowModal] = React.useState(false);
+    const [editData, setEditData] = React.useState(null);
 
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
+    const navigate = useNavigate();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
-    const [editData, setEditData] = React.useState(null);
-
-    const [viewData, setViewData] = React.useState(null); // State for user data to view
-    const [showConfirmModal, setShowConfirmModal] = React.useState(false);
 
     // Use reusable event filter hook for upcoming events with initial filter
     const {
@@ -270,9 +258,8 @@ const UpcomingEvents = () => {
     } = useEventFilter(upcomingEventList, { upcoming: true });
 
     const handleView = useCallback((data) => {
-        setViewData(data);
-        setShowViewModal(true);
-    }, []);
+        navigate(`${EVENT_PATHS.VIEW_UPCOMING_EVENT}/${data.id}`);
+    }, [navigate]);
 
     const destroyTable = useCallback(() => {
         if (currentTable) {
@@ -288,9 +275,8 @@ const UpcomingEvents = () => {
     }, []);
 
     const handleEdit = useCallback((data) => {
-        setEditData(data);
-        setShowModal(true);
-    }, []);
+        navigate(`${EVENT_PATHS.EDIT_UPCOMING_EVENT}/${data.id}`);
+    }, [navigate]);
     
     const handleDelete = useCallback((eventId) => {
         setItemToDelete({ id: eventId });

@@ -216,7 +216,7 @@ const ViewModeratorPage = () => {
                                     <Button
                                         variant="outline-primary"
                                         size="sm"
-                                        onClick={() => navigate(`/events/view-event/${assignment.event?.id}`)}
+                                        onClick={() => navigate(`${EVENT_PATHS.VIEW_EVENT}/${assignment.event?.id}`)}
                                     >
                                         <i className="feather icon-eye mr-1"></i>
                                         View

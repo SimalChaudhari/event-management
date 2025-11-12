@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createRegisterEvent, eventList, adminUpdateRegisterEvent, registerEventById } from '../../../store/actions/eventActions';
 import { userList } from '../../../store/actions/userActions';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 const AddRegisterEventPage = () => {
     const dispatch = useDispatch();
@@ -102,7 +103,7 @@ const AddRegisterEventPage = () => {
                     });
                 }
 
-                navigate('/events/registered');
+                navigate(EVENT_PATHS.REGISTERED_EVENTS);
             }
         } catch (err) {
             setLoading(false);
@@ -112,7 +113,7 @@ const AddRegisterEventPage = () => {
     };
 
     const handleCancel = () => {
-        navigate('/events/registered');
+        navigate(EVENT_PATHS.REGISTERED_EVENTS);
     };
 
     return (

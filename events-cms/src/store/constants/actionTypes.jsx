@@ -69,6 +69,9 @@ export const CREATE_CATEGORY = 'CREATE_CATEGORY';
 export const UPDATE_CATEGORY = 'UPDATE_CATEGORY';
 export const DELETE_CATEGORY = 'DELETE_CATEGORY';
 
+// Country Action Types
+export const COUNTRY_LIST = 'COUNTRY_LIST';
+
 // Speaker Action Types
 export const CREATE_SPEAKER = 'CREATE_SPEAKER';
 export const UPDATE_SPEAKER = 'UPDATE_SPEAKER';

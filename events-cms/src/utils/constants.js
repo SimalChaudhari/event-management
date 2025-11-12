@@ -41,19 +41,22 @@ export const EXHIBITOR_PATHS = {
 
 export const EVENT_PATHS = {
     // Events
-    LIST_EVENTS: '/events/event-list',
+    LIST_EVENTS: '/events',
     ADD_EVENT: '/events/add-event',
     EDIT_EVENT: '/events/edit-event',
     VIEW_EVENT: '/events/view-event',
 
     // Upcoming Events
-    UPCOMING_EVENTS: '/events/upcoming',
+    UPCOMING_EVENTS: '/upcoming',
+    ADD_UPCOMING_EVENT: '/upcoming/add-upcoming-event',
+    EDIT_UPCOMING_EVENT: '/upcoming/edit-upcoming-event',
+    VIEW_UPCOMING_EVENT: '/upcoming/view-upcoming-event',
 
     // Registered Events
-    REGISTERED_EVENTS: '/events/registered',
-    ADD_REGISTER_EVENT: '/events/add-register-event',
-    EDIT_REGISTER_EVENT: '/events/edit-register-event',
-    VIEW_REGISTER_EVENT: '/events/view-register-event',
+    REGISTERED_EVENTS: '/registered',
+    ADD_REGISTER_EVENT: '/registered/add-register-event',
+    EDIT_REGISTER_EVENT: '/registered/edit-register-event',
+    VIEW_REGISTER_EVENT: '/registered/view-register-event',
 
     // Categories
     CATEGORIES: '/categories',

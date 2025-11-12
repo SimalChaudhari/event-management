@@ -10,6 +10,7 @@ import { updateQuestionStatus } from '../../../store/actions/qaActions';
 import ImageModalComponent from '../../../components/events/ImageModalComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../../assets/css/event.css';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 const ViewQuestionPage = () => {
     const { eventId, questionId } = useParams();
@@ -65,7 +66,7 @@ const ViewQuestionPage = () => {
     }, [dispatch, events]);
 
     const handleBack = useCallback(() => {
-        navigate(`/events/qa/${eventId}`);
+        navigate(`${EVENT_PATHS.QA}/${eventId}`);
     }, [navigate, eventId]);
 
     const handleStatusUpdate = useCallback(

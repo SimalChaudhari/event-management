@@ -11,6 +11,7 @@ import DeleteQuestionModal from './components/DeleteQuestionModal';
 import * as $ from 'jquery';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../../assets/css/event.css';
+import { EVENT_PATHS } from '../../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -388,7 +389,7 @@ const QAPage = () => {
     }, [dispatch, events]);
 
     const handleBack = useCallback(() => {
-        navigate('/events/event-list');
+        navigate(EVENT_PATHS.LIST_EVENTS);
     }, [navigate]);
 
     const handleAnswer = useCallback((question) => {
@@ -401,7 +402,7 @@ const QAPage = () => {
 
     const handleView = useCallback((question) => {
         console.log('View question:', question);
-        navigate(`/events/qa/${eventId}/view/${question.id}`);
+        navigate(`${EVENT_PATHS.QA}/${eventId}/view/${question.id}`);
     }, [navigate, eventId]);
 
     const handleDelete = useCallback((question) => {

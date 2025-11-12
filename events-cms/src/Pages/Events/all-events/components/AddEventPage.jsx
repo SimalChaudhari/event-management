@@ -11,10 +11,12 @@ import {
     exhibitorGet,
     removeEventFloorPlan,
     removeEventBackgroundImage,
-    removeEventStampImage
+    removeEventStampImage,
+    getCountries,
+    getSpeakersForEvent,
+    getCategoriesForEvent
 } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
-import axiosInstance from '../../../../configs/axiosInstance';
 import 'leaflet/dist/leaflet.css';
 import SpeakerFormModal from '../components/SpeakerFormSidebar';
 import CategoryFormModal from '../components/CategoryFormModal';
@@ -23,86 +25,6 @@ import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../../utils/constants';
-
-// DocumentNameInput component को main component के बाहर define करें
-const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
-    const [localError, setLocalError] = useState('');
-
-    // Validation function
-    const validateDocumentName = (name, allNames, currentIndex) => {
-        if (!name || name.trim() === '') {
-            return { isValid: true, error: '' };
-        }
-
-        if (name.trim().length < 2) {
-            return {
-                isValid: false,
-                error: 'Document name should be at least 2 characters'
-            };
-        }
-
-        const duplicateIndex = allNames.findIndex(
-            (docName, idx) => idx !== currentIndex && docName && docName.trim().toLowerCase() === name.trim().toLowerCase()
-        );
-
-        if (duplicateIndex !== -1) {
-            return {
-                isValid: false,
-                error: 'Document name already exists'
-            };
-        }
-
-        return { isValid: true, error: '' };
-    };
-
-    const handleNameChange = (e) => {
-        const newName = e.target.value;
-
-        // Update parent component
-        onNameChange(index, newName);
-
-        // Validate only if there's content
-        if (newName.trim()) {
-            // We'll handle validation in parent to avoid state issues
-            setLocalError('');
-        } else {
-            setLocalError('');
-        }
-    };
-
-    return (
-        <div style={{ width: '100%' }}>
-            <input
-                type="text"
-                value={documentName || ''}
-                onChange={handleNameChange}
-                placeholder="Enter document name (optional)"
-                style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    border: `1px solid ${localError ? '#dc3545' : '#ddd'}`,
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    marginBottom: localError ? '2px' : '4px',
-                    backgroundColor: localError ? '#fff5f5' : '#fff'
-                }}
-            />
-            {localError && (
-                <div
-                    style={{
-                        fontSize: '11px',
-                        color: '#dc3545',
-                        marginBottom: '4px',
-                        fontStyle: 'italic'
-                    }}
-                >
-                    {localError}
-                </div>
-            )}
-        </div>
-    );
-};
 
 // Main component
 function AddEventPage() {
@@ -188,7 +110,7 @@ function AddEventPage() {
 
     // Add loading state for form submission
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     // Add loading state for speaker modal
     const [isSpeakerLoading, setIsSpeakerLoading] = useState(false);
 
@@ -247,7 +169,6 @@ function AddEventPage() {
                         let exhibitorDescription = '';
                         let exhibitorIds = [];
                         if (editData.exhibitors) {
-                          
                             exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
                             exhibitorDescription = editData?.exhibitors?.exhibitorDescription || '';
                         }
@@ -609,22 +530,22 @@ function AddEventPage() {
     useEffect(() => {
         const fetchCountry = async () => {
             try {
-                const response = await axiosInstance.get('countries');
-                if (response) {
-                    setCountryList(response.data);
+                const countries = await dispatch(getCountries());
+                if (countries && countries.length > 0) {
+                    setCountryList(countries);
                 }
             } catch (error) {
                 console.error('Error fetching countries:', error);
             }
         };
         fetchCountry();
-    }, []);
+    }, [dispatch]);
 
     const fetchSpeakers = async () => {
         try {
-            const response = await axiosInstance.get('users/speakers/get');
-            if (response.data.success) {
-                setSpeakerList(response.data.data);
+            const speakers = await dispatch(getSpeakersForEvent());
+            if (speakers && speakers.length > 0) {
+                setSpeakerList(speakers);
             }
         } catch (error) {
             console.error('Error fetching speakers:', error);
@@ -633,25 +554,33 @@ function AddEventPage() {
 
     const fetchCategories = async () => {
         try {
-            const response = await axiosInstance.get('categories/get');
-            if (response.data.success) {
-                setCategoryList(response.data.data);
+            const categories = await dispatch(getCategoriesForEvent());
+            if (categories && categories.length > 0) {
+                setCategoryList(categories);
             }
         } catch (error) {
             console.error('Error fetching categories:', error);
         }
     };
 
+    const fetchExhibitors = async () => {
+        try {
+            const response = await dispatch(exhibitorGet());
+            setExhibitorList(response.data);
+        } catch (error) {
+            // Error handling without console
+        }
+    };
     useEffect(() => {
         fetchSpeakers();
         fetchCategories();
         fetchExhibitors();
-    }, []);
+    }, [dispatch]);
 
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
         const selectedIds = selectedOptions.map((option) => option.value);
-        
+
         setFormData((prev) => ({
             ...prev,
             speakerIds: selectedIds
@@ -811,7 +740,7 @@ function AddEventPage() {
             const success = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
             if (success) {
                 fetchEvent();
-                navigate('/events/event-list');
+                navigate(EVENT_PATHS.LIST_EVENTS);
                 resetFormData();
             }
         } catch (error) {
@@ -1037,22 +966,13 @@ function AddEventPage() {
         }
     };
 
-    const fetchExhibitors = async () => {
-        try {
-            const response = await dispatch(exhibitorGet());
-            setExhibitorList(response.data);
-        } catch (error) {
-            // Error handling without console
-        }
-    };
-
     const handleNavigate = () => {
-        navigate(EVENT_PATHS.LIST_EVENTS);
+        navigate(-1);
     };
 
     // Document name change handler - updated version
     const handleDocumentNameChange = (index, newName) => {
-        // FormData में documentNames को update करें
+    
         setFormData((prev) => {
             const updatedNames = [...prev.documentNames];
             updatedNames[index] = newName;
@@ -2373,7 +2293,8 @@ function AddEventPage() {
                                         <div className="form-group fill">
                                             <Badge bg="info">
                                                 {' '}
-                                                <span>Background Image (Optional) </span> {backgroundImagePreview ? 'Selected' : 'Not Selected'}
+                                                <span>Background Image (Optional) </span>{' '}
+                                                {backgroundImagePreview ? 'Selected' : 'Not Selected'}
                                             </Badge>
                                             <div
                                                 className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
@@ -2406,13 +2327,17 @@ function AddEventPage() {
                                                         <Button
                                                             variant="danger"
                                                             size="sm"
-                                                            onClick={id ? handleRemoveBackgroundImage : () => {
-                                                                setFormData((prev) => ({
-                                                                    ...prev,
-                                                                    backgroundImage: null
-                                                                }));
-                                                                setBackgroundImagePreview(null);
-                                                            }}
+                                                            onClick={
+                                                                id
+                                                                    ? handleRemoveBackgroundImage
+                                                                    : () => {
+                                                                          setFormData((prev) => ({
+                                                                              ...prev,
+                                                                              backgroundImage: null
+                                                                          }));
+                                                                          setBackgroundImagePreview(null);
+                                                                      }
+                                                            }
                                                             style={{ marginRight: '10px' }}
                                                         >
                                                             Remove Background Image
