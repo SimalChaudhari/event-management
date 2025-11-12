@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { EmailService } from '../service/email.service';
 import { EmailTemplateUtils, EmailTemplatePayload } from './email-templates.utils';
 import { CsvUploadLogService } from '../logs/csv-upload-log.service';
+import {
+  EmailLogDetails,
+  EmailRecipientLog,
+  EmailAttemptLog,
+} from '../logs/csv-upload-log.types';
 
 export interface EmailBatchConfig {
   batchSize: number;
@@ -16,10 +21,19 @@ export interface EmailBatchResult {
   emailsSent: number;
   emailsFailed: number;
   emailsRetried: number;
+  emailsPending: number;
   processingTimeMs: number;
-  failedEmails: EmailTemplatePayload[];
+  recipients: EmailRecipientLog[];
+  failedRecipients: EmailRecipientLog[];
+  logDetails: EmailLogDetails;
   success: boolean;
   message: string;
+}
+
+interface FailedEmailRecord {
+  index: number;
+  payload: EmailTemplatePayload;
+  errorMessage?: string;
 }
 
 export interface EmailProgress {
@@ -48,6 +62,72 @@ export class EmailBatchService {
     private readonly csvUploadLogService: CsvUploadLogService,
   ) {}
 
+  private initializeRecipientLogs(emails: EmailTemplatePayload[]): EmailRecipientLog[] {
+    return emails.map((payload) => ({
+      email: payload.email,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      salutation: 'salutation' in payload ? payload.salutation : undefined,
+      status: 'pending',
+      success: false,
+      attempts: [],
+      retried: false,
+    }));
+  }
+
+  private recordEmailAttempt(
+    recipient: EmailRecipientLog,
+    status: EmailAttemptLog['status'],
+    errorMessage?: string,
+  ): void {
+    const timestamp = new Date().toISOString();
+    const attemptIndex = recipient.attempts.length + 1;
+    const attempt: EmailAttemptLog = {
+      attempt: attemptIndex,
+      status,
+      timestamp,
+      errorMessage,
+    };
+
+    recipient.attempts.push(attempt);
+    recipient.lastUpdatedAt = timestamp;
+
+    if (attemptIndex > 1) {
+      recipient.retried = true;
+    }
+
+    if (status === 'sent') {
+      recipient.status = attemptIndex > 1 ? 'retried' : 'sent';
+      recipient.success = true;
+    } else {
+      recipient.status = 'failed';
+      recipient.success = false;
+    }
+  }
+
+  private calculateEmailTotals(
+    recipientLogs: EmailRecipientLog[],
+  ): { sent: number; failed: number; pending: number } {
+    let sent = 0;
+    let failed = 0;
+    let pending = 0;
+
+    recipientLogs.forEach((recipient) => {
+      if (recipient.status === 'sent' || (recipient.status === 'retried' && recipient.success)) {
+        sent += 1;
+      } else if (recipient.status === 'failed') {
+        failed += 1;
+      } else if (recipient.status === 'pending' || recipient.status === 'retried') {
+        // 'retried' but not successful yet counts as pending
+        if (!recipient.success) {
+          pending += 1;
+        }
+      }
+    });
+
+    return { sent, failed, pending };
+  }
+
   /**
    * Send emails in professional batches with proper error handling
    */
@@ -59,49 +139,68 @@ export class EmailBatchService {
   ): Promise<EmailBatchResult> {
     const startTime = Date.now();
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+    const recipientLogs = this.initializeRecipientLogs(emailsToSend);
+
     let emailsSent = 0;
     let emailsFailed = 0;
     let emailsRetried = 0;
-    const failedEmails: EmailTemplatePayload[] = [];
 
     try {
       console.log(`🚀 EMAIL BATCH SERVICE: Starting professional email sending`);
       console.log(`📧 Configuration: ${finalConfig.batchSize} emails/batch, ${finalConfig.delayBetweenEmails}ms delay, ${finalConfig.delayBetweenBatches/1000}s between batches`);
 
       // Send emails in batches
-      const result = await this.processEmailBatches(
+      const batchOutcome = await this.processEmailBatches(
         emailsToSend,
         finalConfig,
-        sessionId,
+        recipientLogs,
         onProgress,
-        (sent, failed, failedList) => {
-          emailsSent = sent;
-          emailsFailed = failed;
-          failedEmails.push(...failedList);
-        }
       );
 
+      emailsSent = batchOutcome.sent;
+      emailsFailed = batchOutcome.failed;
+
       // Retry failed emails if any
-      if (failedEmails.length > 0 && finalConfig.maxRetries > 0) {
-        console.log(`🔄 Retrying ${failedEmails.length} failed emails...`);
-        const retryResult = await this.retryFailedEmails(failedEmails, finalConfig, sessionId);
+      if (batchOutcome.failedEmails.length > 0 && finalConfig.maxRetries > 0) {
+        console.log(`🔄 Retrying ${batchOutcome.failedEmails.length} failed emails...`);
+        const retryResult = await this.retryFailedEmails(batchOutcome.failedEmails, finalConfig, recipientLogs);
         emailsRetried = retryResult.retried;
         emailsSent += retryResult.sent;
         emailsFailed = retryResult.failed;
       }
 
       const processingTime = Date.now() - startTime;
+      const pendingCount = recipientLogs.filter(recipient => recipient.status === 'pending').length;
+      const failedRecipients = recipientLogs.filter(recipient => recipient.status === 'failed');
+      emailsFailed = failedRecipients.length;
+
+      const logDetails: EmailLogDetails = {
+        totals: {
+          total: emailsToSend.length,
+          sent: emailsSent,
+          failed: emailsFailed,
+          pending: pendingCount,
+          retried: emailsRetried,
+        },
+        processingTimeMs: processingTime,
+        emailSendingEnabled: emailsToSend.length > 0,
+        batchConfig: finalConfig,
+        completedAt: new Date().toISOString(),
+        recipients: recipientLogs,
+      };
       
       const batchResult: EmailBatchResult = {
         totalEmails: emailsToSend.length,
         emailsSent,
         emailsFailed,
         emailsRetried,
+        emailsPending: pendingCount,
         processingTimeMs: processingTime,
-        failedEmails: emailsToSend.filter((_, index) => index >= emailsSent + emailsFailed),
-        success: emailsFailed === 0,
-        message: this.generateResultMessage(emailsSent, emailsFailed, emailsRetried, processingTime)
+        recipients: recipientLogs,
+        failedRecipients,
+        logDetails,
+        success: failedRecipients.length === 0 && pendingCount === 0,
+        message: this.generateResultMessage(emailsSent, failedRecipients.length, emailsRetried, processingTime, pendingCount)
       };
 
       // Update logs with final result
@@ -122,14 +221,13 @@ export class EmailBatchService {
   private async processEmailBatches(
     emailsToSend: EmailTemplatePayload[],
     config: EmailBatchConfig,
-    sessionId: string,
+    recipientLogs: EmailRecipientLog[],
     onProgress?: (progress: EmailProgress) => void,
-    onBatchComplete?: (sent: number, failed: number, failedList: EmailTemplatePayload[]) => void
-  ): Promise<void> {
+  ): Promise<{ sent: number; failed: number; failedEmails: FailedEmailRecord[] }> {
     const totalBatches = Math.ceil(emailsToSend.length / config.batchSize);
     let totalSent = 0;
     let totalFailed = 0;
-    const allFailedEmails: EmailTemplatePayload[] = [];
+    const failedRecords: FailedEmailRecord[] = [];
 
     for (let i = 0; i < emailsToSend.length; i += config.batchSize) {
       const batch = emailsToSend.slice(i, i + config.batchSize);
@@ -140,22 +238,19 @@ export class EmailBatchService {
       // Process current batch
       const batchResult = await this.processBatch(
         batch,
-        i + 1, // starting email number
+        i,
         emailsToSend.length,
         config.delayBetweenEmails,
+        config.batchSize,
+        recipientLogs,
         onProgress
       );
 
       totalSent += batchResult.sent;
       totalFailed += batchResult.failed;
-      allFailedEmails.push(...batchResult.failedEmails);
+      failedRecords.push(...batchResult.failedEmails);
 
-      console.log(`✅ Batch ${batchNumber}/${totalBatches} completed: ${totalSent} total sent, ${totalFailed} total failed`);
-
-      // Call progress callback
-      if (onBatchComplete) {
-        onBatchComplete(totalSent, totalFailed, allFailedEmails);
-      }
+   
 
       // Delay between batches (except for the last batch)
       if (i + config.batchSize < emailsToSend.length) {
@@ -163,6 +258,12 @@ export class EmailBatchService {
         await this.delay(config.delayBetweenBatches);
       }
     }
+
+    return {
+      sent: totalSent,
+      failed: totalFailed,
+      failedEmails: failedRecords,
+    };
   }
 
   /**
@@ -170,34 +271,40 @@ export class EmailBatchService {
    */
   private async processBatch(
     batch: EmailTemplatePayload[],
-    startEmailNumber: number,
+    batchStartIndex: number,
     totalEmails: number,
     delayBetweenEmails: number,
+    batchSize: number,
+    recipientLogs: EmailRecipientLog[],
     onProgress?: (progress: EmailProgress) => void
-  ): Promise<{ sent: number; failed: number; failedEmails: EmailTemplatePayload[] }> {
+  ): Promise<{ sent: number; failed: number; failedEmails: FailedEmailRecord[] }> {
     let sent = 0;
     let failed = 0;
-    const failedEmails: EmailTemplatePayload[] = [];
+    const failedEmails: FailedEmailRecord[] = [];
 
     for (let j = 0; j < batch.length; j++) {
       const emailData = batch[j];
-      const emailNumber = startEmailNumber + j;
+      const overallIndex = batchStartIndex + j;
+      const emailNumber = overallIndex + 1;
+      const recipientLog = recipientLogs[overallIndex];
 
       try {
         const mailOptions = EmailTemplateUtils.getEmailOptions(emailData);
         await this.emailService['transporter'].sendMail(mailOptions);
+        this.recordEmailAttempt(recipientLog, 'sent');
         sent++;
         console.log(`✅ Email ${emailNumber}/${totalEmails} sent to ${emailData.email}`);
 
         // Call progress callback
         if (onProgress) {
+          const totals = this.calculateEmailTotals(recipientLogs);
           onProgress({
-            currentBatch: Math.floor((emailNumber - 1) / 15) + 1,
-            totalBatches: Math.ceil(totalEmails / 15),
+            currentBatch: Math.floor(overallIndex / batchSize) + 1,
+            totalBatches: Math.ceil(totalEmails / batchSize),
             currentEmail: emailNumber,
             totalEmails,
-            emailsSent: sent,
-            emailsFailed: failed,
+            emailsSent: totals.sent,
+            emailsFailed: totals.failed,
             status: 'sending',
             estimatedTimeRemaining: this.calculateEstimatedTime(totalEmails, emailNumber, delayBetweenEmails)
           });
@@ -205,7 +312,12 @@ export class EmailBatchService {
 
       } catch (error: any) {
         failed++;
-        failedEmails.push(emailData);
+        this.recordEmailAttempt(recipientLog, 'failed', error?.message);
+        failedEmails.push({
+          index: overallIndex,
+          payload: emailData,
+          errorMessage: error?.message,
+        });
         console.error(`❌ Email ${emailNumber}/${totalEmails} failed for ${emailData.email}: ${error.message}`);
       }
 
@@ -222,10 +334,10 @@ export class EmailBatchService {
    * Retry failed emails with proper error handling
    */
   private async retryFailedEmails(
-    failedEmails: EmailTemplatePayload[],
+    failedEmails: FailedEmailRecord[],
     config: EmailBatchConfig,
-    sessionId: string
-  ): Promise<{ sent: number; failed: number; retried: number }> {
+    recipientLogs: EmailRecipientLog[],
+  ): Promise<{ sent: number; failed: number; retried: number; failedRecords: FailedEmailRecord[] }> {
     console.log(`🔄 Retrying ${failedEmails.length} failed emails after ${config.retryDelay / 1000} seconds...`);
     
     // Wait before retrying
@@ -234,20 +346,31 @@ export class EmailBatchService {
     let retrySent = 0;
     let retryFailed = 0;
     const retryDelay = 2000; // 2 seconds between retry attempts
+    const remainingFailed: FailedEmailRecord[] = [];
 
-    for (const emailData of failedEmails) {
+    for (const failedRecord of failedEmails) {
+      const { payload, index } = failedRecord;
+      const recipientLog = recipientLogs[index];
+
       try {
-        const mailOptions = EmailTemplateUtils.getEmailOptions(emailData);
+        const mailOptions = EmailTemplateUtils.getEmailOptions(payload);
         await this.emailService['transporter'].sendMail(mailOptions);
+        this.recordEmailAttempt(recipientLog, 'sent');
         retrySent++;
-        console.log(`✅ RETRY SUCCESS: Email sent to ${emailData.email}`);
+        console.log(`✅ RETRY SUCCESS: Email sent to ${payload.email}`);
         
         // Delay between retry attempts
         await this.delay(retryDelay);
         
       } catch (error: any) {
+        this.recordEmailAttempt(recipientLog, 'failed', error?.message);
         retryFailed++;
-        console.error(`❌ RETRY FAILED: ${emailData.email}: ${error.message}`);
+        console.error(`❌ RETRY FAILED: ${payload.email}: ${error.message}`);
+        remainingFailed.push({
+          index,
+          payload,
+          errorMessage: error?.message,
+        });
         await this.delay(retryDelay);
       }
     }
@@ -257,7 +380,8 @@ export class EmailBatchService {
     return {
       sent: retrySent,
       failed: retryFailed,
-      retried: failedEmails.length
+      retried: failedEmails.length,
+      failedRecords: remainingFailed,
     };
   }
 
@@ -266,25 +390,25 @@ export class EmailBatchService {
    */
   private async updateEmailLogs(sessionId: string, result: EmailBatchResult): Promise<void> {
     try {
+      const status = result.success
+        ? 'completed'
+        : result.emailsPending > 0
+          ? 'processing'
+          : result.emailsSent > 0
+            ? 'partial'
+            : 'failed';
+
       await this.csvUploadLogService.updateLogEntry(sessionId, {
         emailsSent: result.emailsSent,
         emailsFailed: result.emailsFailed,
-        emailsPending: 0,
+        emailsPending: result.emailsPending,
         processingTimeMs: result.processingTimeMs,
-        emailDetails: {
-          totalEmails: result.totalEmails,
-          emailsSent: result.emailsSent,
-          emailsFailed: result.emailsFailed,
-          emailsRetried: result.emailsRetried,
-          processingTimeMs: result.processingTimeMs,
-          success: result.success,
-          status: 'completed'
-        },
+        emailDetails: result.logDetails,
         summary: result.message,
-        status: result.success ? 'completed' : 'partial'
+        status,
       });
       
-      console.log(`📝 Professional logs updated: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
+      console.log(`📝 Professional logs updated: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.emailsPending} pending`);
     } catch (logError) {
       console.error(`❌ Failed to update professional logs:`, logError);
     }
@@ -293,7 +417,13 @@ export class EmailBatchService {
   /**
    * Generate professional result message
    */
-  private generateResultMessage(sent: number, failed: number, retried: number, processingTime: number): string {
+  private generateResultMessage(
+    sent: number,
+    failed: number,
+    retried: number,
+    processingTime: number,
+    pending: number,
+  ): string {
     const minutes = Math.floor(processingTime / 60000);
     const seconds = Math.floor((processingTime % 60000) / 1000);
     
@@ -305,6 +435,10 @@ export class EmailBatchService {
     
     if (retried > 0) {
       message += ` (${retried} retried)`;
+    }
+    
+    if (pending > 0) {
+      message += `, ${pending} pending`;
     }
     
     message += ` in ${minutes}m ${seconds}s using professional batch processing`;

@@ -3,11 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CsvUploadLogEntity } from './csv-upload-log.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { CsvUploadLogView, EmailLogDetails } from './csv-upload-log.types';
+
+type JsonParsable = string | object | undefined | null;
 
 export interface CsvUploadLogData {
   sessionId?: string;
   adminId: string;
   fileName: string;
+  originalFileName?: string;
   totalRecords: number;
   recordsProcessed?: number;
   recordsFailed?: number;
@@ -21,10 +25,10 @@ export interface CsvUploadLogData {
   emailsPending?: number;
   status?: 'processing' | 'completed' | 'failed' | 'partial';
   processingTimeMs?: number;
-  errorDetails?: any;
-  skippedRecords?: any[];
-  failedRecords?: any[];
-  emailDetails?: any;
+  errorDetails?: JsonParsable;
+  skippedRecords?: JsonParsable;
+  failedRecords?: JsonParsable;
+  emailDetails?: EmailLogDetails | string;
   emailSendingEnabled?: boolean;
   summary?: string;
 }
@@ -36,6 +40,93 @@ export class CsvUploadLogService {
     private csvUploadLogRepository: Repository<CsvUploadLogEntity>,
   ) {}
 
+  private safeParseJson<T = any>(value: JsonParsable): T | null {
+    if (!value) {
+      return null;
+    }
+
+    if (typeof value === 'object') {
+      return value as T;
+    }
+
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as T;
+      } catch (error) {
+        console.warn('[CsvUploadLogService] Failed to parse JSON field:', error);
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  private normalizeJsonField(value: JsonParsable): string | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      console.warn('[CsvUploadLogService] Failed to stringify JSON field:', error);
+      return undefined;
+    }
+  }
+
+  private enhanceLog(log: CsvUploadLogEntity): CsvUploadLogView {
+    const errorDetails = this.safeParseJson(log.errorDetails);
+    const skippedRecords = this.safeParseJson<any[]>(log.skippedRecords) ?? [];
+    const failedRecords = this.safeParseJson<any[]>(log.failedRecords) ?? [];
+    const emailDetails = this.safeParseJson<EmailLogDetails>(log.emailDetails);
+
+    const defaultEmailTotals = {
+      total: log.emailsTotal,
+      sent: log.emailsSent,
+      failed: log.emailsFailed,
+      pending: log.emailsPending,
+      retried: emailDetails?.totals?.retried ?? 0,
+      sendingEnabled: log.emailSendingEnabled,
+    };
+
+    return {
+      id: log.id,
+      sessionId: log.sessionId,
+      adminId: log.adminId,
+      fileName: log.fileName,
+      totalRecords: log.totalRecords,
+      recordsProcessed: log.recordsProcessed,
+      recordsFailed: log.recordsFailed,
+      recordsSkipped: log.recordsSkipped,
+      newUsersCreated: log.newUsersCreated,
+      existingUsersUpdated: log.existingUsersUpdated,
+      passwordsGenerated: log.passwordsGenerated,
+      emailsTotal: log.emailsTotal,
+      emailsSent: log.emailsSent,
+      emailsFailed: log.emailsFailed,
+      emailsPending: log.emailsPending,
+      status: log.status,
+      processingTimeMs: log.processingTimeMs,
+      emailSendingEnabled: log.emailSendingEnabled,
+      summary: log.summary ?? undefined,
+      createdAt: log.createdAt.toISOString(),
+      updatedAt: log.updatedAt.toISOString(),
+      fileDetails: {
+        originalName: log.fileName,
+        totalRecords: log.totalRecords,
+      },
+      emailSummary: defaultEmailTotals,
+      emailDetails: emailDetails ?? null,
+      errorDetails,
+      skippedRecords,
+      failedRecords,
+    };
+  }
+
   /**
    * Create initial log entry when CSV upload starts
    */
@@ -45,7 +136,8 @@ export class CsvUploadLogService {
     const logEntry = this.csvUploadLogRepository.create({
       sessionId,
       adminId: data.adminId,
-      fileName: data.fileName,
+      fileName: data.originalFileName || data.fileName,
+     
       totalRecords: data.totalRecords,
       recordsProcessed: data.recordsProcessed || 0,
       recordsFailed: data.recordsFailed || 0,
@@ -59,10 +151,10 @@ export class CsvUploadLogService {
       emailsPending: data.emailsPending || 0,
       status: data.status || 'processing',
       processingTimeMs: data.processingTimeMs || 0,
-      errorDetails: data.errorDetails ? JSON.stringify(data.errorDetails) : undefined,
-      skippedRecords: data.skippedRecords ? JSON.stringify(data.skippedRecords) : undefined,
-      failedRecords: data.failedRecords ? JSON.stringify(data.failedRecords) : undefined,
-      emailDetails: data.emailDetails ? JSON.stringify(data.emailDetails) : undefined,
+      errorDetails: this.normalizeJsonField(data.errorDetails),
+      skippedRecords: this.normalizeJsonField(data.skippedRecords),
+      failedRecords: this.normalizeJsonField(data.failedRecords),
+      emailDetails: this.normalizeJsonField(data.emailDetails),
       emailSendingEnabled: data.emailSendingEnabled || false,
       summary: data.summary || undefined,
     });
@@ -81,6 +173,9 @@ export class CsvUploadLogService {
     }
 
     // Update fields
+    if (updates.fileName !== undefined) logEntry.fileName = updates.fileName;
+    if (updates.originalFileName !== undefined) logEntry.fileName = updates.originalFileName;
+
     if (updates.recordsProcessed !== undefined) logEntry.recordsProcessed = updates.recordsProcessed;
     if (updates.recordsFailed !== undefined) logEntry.recordsFailed = updates.recordsFailed;
     if (updates.recordsSkipped !== undefined) logEntry.recordsSkipped = updates.recordsSkipped;
@@ -92,71 +187,44 @@ export class CsvUploadLogService {
     if (updates.emailsPending !== undefined) logEntry.emailsPending = updates.emailsPending;
     if (updates.status !== undefined) logEntry.status = updates.status;
     if (updates.processingTimeMs !== undefined) logEntry.processingTimeMs = updates.processingTimeMs;
-    if (updates.errorDetails !== undefined) logEntry.errorDetails = JSON.stringify(updates.errorDetails);
-    if (updates.skippedRecords !== undefined) logEntry.skippedRecords = JSON.stringify(updates.skippedRecords);
-    if (updates.failedRecords !== undefined) logEntry.failedRecords = JSON.stringify(updates.failedRecords);
-    if (updates.emailDetails !== undefined) logEntry.emailDetails = JSON.stringify(updates.emailDetails);
+    if (updates.errorDetails !== undefined) logEntry.errorDetails = this.normalizeJsonField(updates.errorDetails);
+    if (updates.skippedRecords !== undefined) logEntry.skippedRecords = this.normalizeJsonField(updates.skippedRecords);
+    if (updates.failedRecords !== undefined) logEntry.failedRecords = this.normalizeJsonField(updates.failedRecords);
+    if (updates.emailDetails !== undefined) logEntry.emailDetails = this.normalizeJsonField(updates.emailDetails);
     if (updates.summary !== undefined) logEntry.summary = updates.summary;
 
     return await this.csvUploadLogRepository.save(logEntry);
   }
 
   /**
-   * Get all logs with pagination
+   * Get all logs sorted by creation date (most recent first)
    */
-  async getLogs(page: number = 1, limit: number = 20): Promise<{
-    logs: CsvUploadLogEntity[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const [logs, total] = await this.csvUploadLogRepository.findAndCount({
+  async getLogs(): Promise<CsvUploadLogView[]> {
+    const logs = await this.csvUploadLogRepository.find({
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
-    return {
-      logs,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return logs.map((log) => this.enhanceLog(log));
   }
 
   /**
    * Get specific log by session ID
    */
-  async getLogBySessionId(sessionId: string): Promise<CsvUploadLogEntity | null> {
-    return await this.csvUploadLogRepository.findOne({ where: { sessionId } });
+  async getLogBySessionId(sessionId: string): Promise<CsvUploadLogView | null> {
+    const log = await this.csvUploadLogRepository.findOne({ where: { sessionId } });
+    return log ? this.enhanceLog(log) : null;
   }
 
   /**
-   * Get logs by admin ID
+   * Get logs by admin ID sorted by creation date (most recent first)
    */
-  async getLogsByAdmin(adminId: string, page: number = 1, limit: number = 20): Promise<{
-    logs: CsvUploadLogEntity[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const [logs, total] = await this.csvUploadLogRepository.findAndCount({
+  async getLogsByAdmin(adminId: string): Promise<CsvUploadLogView[]> {
+    const logs = await this.csvUploadLogRepository.find({
       where: { adminId },
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
-    return {
-      logs,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return logs.map((log) => this.enhanceLog(log));
   }
 
   /**
@@ -173,6 +241,97 @@ export class CsvUploadLogService {
       .execute();
 
     return result.affected || 0;
+  }
+
+  /**
+   * Delete all logs
+   */
+  async deleteAllLogs(): Promise<number> {
+    const result = await this.csvUploadLogRepository
+      .createQueryBuilder()
+      .delete()
+      .execute();
+
+    return result.affected || 0;
+  }
+
+  /**
+   * Export email recipient details for a specific session
+   */
+  async exportEmailRecipients(sessionId: string): Promise<string> {
+    const log = await this.getLogBySessionId(sessionId);
+
+    if (!log) {
+      throw new Error(`Log entry not found for session: ${sessionId}`);
+    }
+
+    const recipients = log.emailDetails?.recipients ?? [];
+
+    if (recipients.length === 0) {
+      const headers = [
+        'Session ID',
+        'Message',
+      ];
+
+      return [headers, [log.sessionId, 'No email recipients recorded for this session']]
+        .map((row) =>
+          row
+            .map((field) => `"${String(field ?? '').replace(/"/g, '""')}"`)
+            .join(','),
+        )
+        .join('\n');
+    }
+
+    const headers = [
+      'Session ID',
+      'Email',
+      'First Name',
+      'Last Name',
+      'Salutation',
+      'Status',
+      'Success',
+      'Retried',
+      'Attempt Count',
+      'Attempts Detail',
+      'Last Updated At',
+      'Notes',
+    ];
+
+    const csvRows = recipients.map((recipient) => {
+      const attemptsDetail = recipient.attempts
+        ?.map(
+          (attempt) =>
+            `#${attempt.attempt}: ${attempt.status} @ ${attempt.timestamp}${
+              attempt.errorMessage ? ` (error: ${attempt.errorMessage})` : ''
+            }`,
+        )
+        .join(' | ');
+
+      return [
+        log.sessionId,
+        recipient.email,
+        recipient.firstName ?? '',
+        recipient.lastName ?? '',
+        recipient.salutation ?? '',
+        recipient.status,
+        recipient.success ? 'Yes' : 'No',
+        recipient.retried ? 'Yes' : 'No',
+        recipient.attempts?.length ?? 0,
+        attemptsDetail ?? '',
+        recipient.lastUpdatedAt ?? '',
+        recipient.notes ?? '',
+      ];
+    });
+
+    const csvContent = [headers, ...csvRows]
+      .map((row) =>
+        row
+          .map((field) => `"${String(field ?? '').replace(/"/g, '""')}"`)
+          .join(','),
+      )
+      .join('\n');
+
+    return csvContent;
   }
 
   /**
@@ -240,6 +399,8 @@ export class CsvUploadLogService {
       .orderBy('log.createdAt', 'DESC')
       .getMany();
 
+    const enhancedLogs = logs.map((log) => this.enhanceLog(log));
+
     // Generate CSV content
     const headers = [
       'Session ID',
@@ -264,10 +425,10 @@ export class CsvUploadLogService {
       'Updated At'
     ];
 
-    const csvRows = logs.map(log => [
+    const csvRows = enhancedLogs.map(log => [
       log.sessionId,
       log.adminId,
-      log.fileName,
+      log.fileDetails.originalName,
       log.totalRecords,
       log.recordsProcessed,
       log.recordsSkipped,
@@ -283,8 +444,8 @@ export class CsvUploadLogService {
       log.processingTimeMs,
       log.emailSendingEnabled ? 'Yes' : 'No',
       log.summary || '',
-      log.createdAt.toISOString(),
-      log.updatedAt.toISOString()
+      log.createdAt,
+      log.updatedAt
     ]);
 
     // Combine headers and rows
@@ -304,6 +465,7 @@ export class CsvUploadLogService {
         sessionId: 'sample-session-1',
         adminId: 'admin-1',
         fileName: 'sample-users-1.csv',
+      
         totalRecords: 10,
         recordsProcessed: 8,
         recordsSkipped: 2,
@@ -319,11 +481,24 @@ export class CsvUploadLogService {
         processingTimeMs: 1500,
         emailSendingEnabled: true,
         summary: 'Successfully processed 8 out of 10 records. 6 new users created, 2 existing users updated.',
+        emailDetails: {
+          totals: {
+            total: 6,
+            sent: 5,
+            failed: 1,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 1500,
+          emailSendingEnabled: true,
+          recipients: [],
+        } as EmailLogDetails,
       },
       {
         sessionId: 'sample-session-2',
         adminId: 'admin-2',
         fileName: 'sample-users-2.csv',
+     
         totalRecords: 25,
         recordsProcessed: 20,
         recordsSkipped: 5,
@@ -339,11 +514,24 @@ export class CsvUploadLogService {
         processingTimeMs: 3200,
         emailSendingEnabled: true,
         summary: 'Successfully processed 20 out of 25 records. 15 new users created, 5 existing users updated.',
+        emailDetails: {
+          totals: {
+            total: 15,
+            sent: 12,
+            failed: 3,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 3200,
+          emailSendingEnabled: true,
+          recipients: [],
+        } as EmailLogDetails,
       },
       {
         sessionId: 'sample-session-3',
         adminId: 'admin-1',
         fileName: 'sample-users-3.csv',
+       
         totalRecords: 5,
         recordsProcessed: 3,
         recordsSkipped: 2,
@@ -359,11 +547,24 @@ export class CsvUploadLogService {
         processingTimeMs: 800,
         emailSendingEnabled: true,
         summary: 'Successfully processed 3 out of 5 records. 3 new users created.',
+        emailDetails: {
+          totals: {
+            total: 3,
+            sent: 3,
+            failed: 0,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 800,
+          emailSendingEnabled: true,
+          recipients: [],
+        } as EmailLogDetails,
       },
       {
         sessionId: 'sample-session-4',
         adminId: 'admin-3',
         fileName: 'sample-users-4.csv',
+      
         totalRecords: 50,
         recordsProcessed: 45,
         recordsSkipped: 5,
@@ -379,11 +580,24 @@ export class CsvUploadLogService {
         processingTimeMs: 5500,
         emailSendingEnabled: true,
         summary: 'Successfully processed 45 out of 50 records. 40 new users created, 5 existing users updated.',
+        emailDetails: {
+          totals: {
+            total: 40,
+            sent: 35,
+            failed: 5,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 5500,
+          emailSendingEnabled: true,
+          recipients: [],
+        } as EmailLogDetails,
       },
       {
         sessionId: 'sample-session-5',
         adminId: 'admin-2',
         fileName: 'sample-users-5.csv',
+      
         totalRecords: 15,
         recordsProcessed: 10,
         recordsSkipped: 5,
@@ -399,6 +613,18 @@ export class CsvUploadLogService {
         processingTimeMs: 2100,
         emailSendingEnabled: true,
         summary: 'Partially processed 10 out of 15 records. 8 new users created, 2 existing users updated.',
+        emailDetails: {
+          totals: {
+            total: 8,
+            sent: 6,
+            failed: 2,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 2100,
+          emailSendingEnabled: true,
+          recipients: [],
+        } as EmailLogDetails,
       },
     ];
 

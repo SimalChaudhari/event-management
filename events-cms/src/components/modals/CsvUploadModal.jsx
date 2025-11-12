@@ -347,7 +347,10 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
 
             // Only upload valid data
             const result = await dispatch(
-                uploadCsvUsers(validationResults.validRows, { eventId: selectedEventId })
+                uploadCsvUsers(validationResults.validRows, {
+                    eventId: selectedEventId,
+                    fileName: selectedFile?.name,
+                })
             );
             
             clearInterval(progressInterval);

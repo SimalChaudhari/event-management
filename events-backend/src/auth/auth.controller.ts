@@ -18,6 +18,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { UserService } from '../user/users.service';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -46,6 +47,7 @@ import {
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly userService: UserService,
   ) {}
 
   @Post('register')
@@ -453,12 +455,13 @@ export class AuthController {
 
       const adminId = req?.user?.id || 'system';
       const fileName = file?.originalname || body?.fileName || 'csv-upload.json';
-
+  
       const result = await this.authService.uploadCsvUsers(
         validUsers,
         adminId,
         fileName,
         eventId,
+   
       );
       
       return response.status(HttpStatus.OK).json({
@@ -597,49 +600,46 @@ export class AuthController {
         };
       }
 
-      // Step 2: Try direct bulk delete first
-      console.log(`🗑️ Attempting bulk delete of ${allUsers.length} users...`);
-      
-      try {
-        const userIds = allUsers.map(user => user.id);
-        const result = await this.authService.userRepository.delete(userIds);
-        
-        const deletedCount = result.affected || 0;
-        
-        return {
-          success: true,
-          message: `Successfully deleted ${deletedCount} users out of ${allUsers.length}`,
-          deletedCount: deletedCount,
-          skippedCount: allUsers.length - deletedCount,
-          statusCode: 200,
-        };
+      // Step 2: Delete users individually using UserService to handle related data cleanup
+      console.log(`🗑️ Deleting ${allUsers.length} users with dependency cleanup...`);
 
-      } catch (bulkError: any) {
-        console.log(`⚠️ Bulk delete failed, trying individual deletes...`);
-        
-        let deletedCount = 0;
-        let skippedCount = 0;
-        
-        // Individual delete with error handling
-        for (const user of allUsers) {
-          try {
-            await this.authService.userRepository.delete(user.id);
-            deletedCount++;
-            console.log(`✅ Deleted user: ${user.email}`);
-          } catch (deleteError: any) {
-            skippedCount++;
-            console.log(`⏭️ Skipped ${user.email} - has foreign key dependencies`);
-          }
+      let deletedCount = 0;
+      const failedUsers: {
+        id: string;
+        email: string;
+        reason: string;
+      }[] = [];
+
+      for (const user of allUsers) {
+        try {
+          await this.userService.delete(user.id);
+          deletedCount++;
+          console.log(`✅ Deleted user: ${user.email}`);
+        } catch (deleteError: any) {
+          const reason =
+            deleteError?.message || 'Deletion failed due to unexpected error';
+          failedUsers.push({
+            id: user.id,
+            email: user.email,
+            reason,
+          });
+          console.log(
+            `⏭️ Skipped ${user.email} - ${reason}`,
+          );
         }
-        
-        return {
-          success: true,
-          message: `Deleted ${deletedCount} users, skipped ${skippedCount} users (foreign key constraints)`,
-          deletedCount: deletedCount,
-          skippedCount: skippedCount,
-          statusCode: 200,
-        };
       }
+
+      return {
+        success: failedUsers.length === 0,
+        message:
+          failedUsers.length === 0
+            ? `Deleted all ${deletedCount} users successfully`
+            : `Deleted ${deletedCount} users, failed to delete ${failedUsers.length}`,
+        deletedCount,
+        skippedCount: failedUsers.length,
+        failedUsers,
+        statusCode: failedUsers.length === 0 ? 200 : 207,
+      };
 
     } catch (error: any) {
       console.error('❌ Delete all users API error:', error);

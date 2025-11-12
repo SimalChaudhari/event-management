@@ -28,32 +28,36 @@ const setError = (dispatch, error) => {
 
 // Get all logs with pagination and filters
 export const getLogs = (params = {}) => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
-
         const queryParams = new URLSearchParams();
-        
-        // Add pagination
-        queryParams.append('page', params.page || '1');
-        queryParams.append('limit', params.limit || '20');
-        
-        // Add filters
+
         if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
         if (params.dateTo) queryParams.append('dateTo', params.dateTo);
         if (params.status) queryParams.append('status', params.status);
         if (params.adminId) queryParams.append('adminId', params.adminId);
         if (params.fileName) queryParams.append('fileName', params.fileName);
 
-        const response = await axiosInstance.get(`/logs/csv-upload?${queryParams}`);
-        
+        const queryString = queryParams.toString();
+        const url = queryString ? `/logs/csv-upload?${queryString}` : '/logs/csv-upload';
+
+        const response = await axiosInstance.get(url);
+
+        const data = response?.data;
+        const logsData = Array.isArray(data) ? data : data?.logs || [];
+        const total = Array.isArray(data) ? logsData.length : data?.total || logsData.length;
+        const resolvedLimit = logsData.length || 1;
+        const page = 1;
+        const totalPages = 1;
+
         dispatch({
             type: LOGS_LIST,
             payload: {
-                logs: response.data.logs || [],
-                total: response.data.total || 0,
-                page: response.data.page || 1,
-                limit: response.data.limit || 20,
-                totalPages: response.data.totalPages || 1
+                logs: logsData,
+                total,
+                page,
+                limit: resolvedLimit,
+                totalPages
             }
         });
         
@@ -63,13 +67,15 @@ export const getLogs = (params = {}) => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Get specific log by session ID
 export const getLogById = (sessionId) => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
 
         const response = await axiosInstance.get(`/logs/csv-upload/session/${sessionId}`);
         
@@ -84,28 +90,32 @@ export const getLogById = (sessionId) => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return null;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Get logs by admin ID
-export const getLogsByAdmin = (adminId, params = {}) => async (dispatch) => {
+export const getLogsByAdmin = (adminId) => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
+        const response = await axiosInstance.get(`/logs/csv-upload/admin/${adminId}`);
 
-        const queryParams = new URLSearchParams();
-        queryParams.append('page', params.page || '1');
-        queryParams.append('limit', params.limit || '20');
+        const data = response?.data;
+        const logsData = Array.isArray(data) ? data : data?.logs || [];
+        const total = Array.isArray(data) ? logsData.length : data?.total || logsData.length;
+        const resolvedLimit = logsData.length || 1;
+        const page = 1;
+        const totalPages = 1;
 
-        const response = await axiosInstance.get(`/logs/csv-upload/admin/${adminId}?${queryParams}`);
-        
         dispatch({
             type: LOGS_LIST,
             payload: {
-                logs: response.data.logs || [],
-                total: response.data.total || 0,
-                page: response.data.page || 1,
-                limit: response.data.limit || 20,
-                totalPages: response.data.totalPages || 1
+                logs: logsData,
+                total,
+                page,
+                limit: resolvedLimit,
+                totalPages
             }
         });
         
@@ -115,13 +125,15 @@ export const getLogsByAdmin = (adminId, params = {}) => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Get logs statistics
 export const getLogsStatistics = () => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
 
         const response = await axiosInstance.get('/logs/csv-upload/statistics');
         
@@ -136,13 +148,15 @@ export const getLogsStatistics = () => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return null;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Create sample logs for testing
 export const createSampleLogs = () => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
 
         const response = await axiosInstance.get('/logs/csv-upload/create-sample');
         
@@ -162,13 +176,15 @@ export const createSampleLogs = () => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 
 // Export logs to CSV
 export const exportLogs = (filters = {}) => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
 
         const queryParams = new URLSearchParams();
         if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
@@ -191,20 +207,61 @@ export const exportLogs = (filters = {}) => async (dispatch) => {
         window.URL.revokeObjectURL(url);
 
         toast.success('Logs exported successfully');
-        setLoading(dispatch, false);
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to export logs';
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
+};
+
+// Export recipients for a specific log
+export const exportLogRecipients = (sessionId) => async (dispatch) => {
+  if (!sessionId) {
+    toast.error('Session ID is required to export recipients');
+    return false;
+  }
+
+  try {
+    const response = await axiosInstance.get(
+      `/logs/csv-upload/session/${sessionId}/recipients/export`,
+      {
+        responseType: 'blob',
+      },
+    );
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute(
+      'download',
+      `csv-upload-recipients-${sessionId}-${new Date()
+        .toISOString()
+        .split('T')[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    toast.success('Recipient email report exported successfully');
+    return true;
+  } catch (error) {
+    const errorMessage =
+      error?.response?.data?.message ||
+      'Failed to export email recipients for this session';
+    toast.error(errorMessage);
+    return false;
+  }
 };
 
 // Cleanup old logs
 export const cleanupOldLogs = (days = 30) => async (dispatch) => {
+    setLoading(dispatch, true);
     try {
-        setLoading(dispatch, true);
 
         const response = await axiosInstance.get(`/logs/csv-upload/cleanup?days=${days}`);
         
@@ -219,6 +276,8 @@ export const cleanupOldLogs = (days = 30) => async (dispatch) => {
         setError(dispatch, errorMessage);
         toast.error(errorMessage);
         return false;
+    } finally {
+        setLoading(dispatch, false);
     }
 };
 

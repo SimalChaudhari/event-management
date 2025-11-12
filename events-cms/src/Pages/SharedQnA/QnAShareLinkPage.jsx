@@ -29,6 +29,83 @@ const QnAShareLinkPage = () => {
   const [allQuestions, setAllQuestions] = useState([]); // Store all questions for filtering
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const getFullscreenElement = useCallback(() => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+    return (
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement ||
+      null
+    );
+  }, []);
+
+  const enterFullscreen = useCallback(() => {
+    if (typeof document === "undefined") {
+      return Promise.reject(new Error("Fullscreen API not available"));
+    }
+
+    const element = document.documentElement;
+
+    if (element.requestFullscreen) {
+      return element.requestFullscreen();
+    }
+    if (element.webkitRequestFullscreen) {
+      element.webkitRequestFullscreen();
+      return Promise.resolve();
+    }
+    if (element.mozRequestFullScreen) {
+      element.mozRequestFullScreen();
+      return Promise.resolve();
+    }
+    if (element.msRequestFullscreen) {
+      element.msRequestFullscreen();
+      return Promise.resolve();
+    }
+
+    return Promise.reject(new Error("Fullscreen API not supported"));
+  }, []);
+
+  const exitFullscreen = useCallback(() => {
+    if (typeof document === "undefined") {
+      return Promise.resolve();
+    }
+
+    if (document.exitFullscreen) {
+      return document.exitFullscreen();
+    }
+    if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+      return Promise.resolve();
+    }
+    if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+      return Promise.resolve();
+    }
+    if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+      return Promise.resolve();
+    }
+
+    return Promise.resolve();
+  }, []);
+
+  const isFullscreenApiSupported = useCallback(() => {
+    if (typeof document === "undefined") {
+      return false;
+    }
+    const element = document.documentElement;
+    return !!(
+      element &&
+      (element.requestFullscreen ||
+        element.webkitRequestFullscreen ||
+        element.mozRequestFullScreen ||
+        element.msRequestFullscreen)
+    );
+  }, []);
+
   // Define fetchData before using it in useEffect
   const fetchData = useCallback(async (isInitialLoad = false) => {
     try {
@@ -315,39 +392,58 @@ const QnAShareLinkPage = () => {
 
   // Fullscreen functionality
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch(err => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
-    } else {
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      }).catch(err => {
-        console.error('Error attempting to exit fullscreen:', err);
-      });
+    if (typeof document === "undefined") {
+      return;
     }
-  }, []);
+
+    if (!isFullscreenApiSupported()) {
+      toast.info("Fullscreen is not supported on this device.");
+      return;
+    }
+
+    if (!getFullscreenElement()) {
+      enterFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+        })
+        .catch(err => {
+          console.error("Error attempting to enable fullscreen:", err);
+          setIsFullscreen(false);
+        });
+    } else {
+      exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+        })
+        .catch(err => {
+          console.error("Error attempting to exit fullscreen:", err);
+        });
+    }
+  }, [enterFullscreen, exitFullscreen, getFullscreenElement, isFullscreenApiSupported]);
 
   // Handle fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!getFullscreenElement());
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    const eventNames = [
+      'fullscreenchange',
+      'webkitfullscreenchange',
+      'mozfullscreenchange',
+      'MSFullscreenChange'
+    ];
+
+    eventNames.forEach(eventName => {
+      document.addEventListener(eventName, handleFullscreenChange);
+    });
 
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      eventNames.forEach(eventName => {
+        document.removeEventListener(eventName, handleFullscreenChange);
+      });
     };
-  }, []);
+  }, [getFullscreenElement]);
 
   // Handle F11 key for fullscreen
   useEffect(() => {
@@ -366,19 +462,24 @@ const QnAShareLinkPage = () => {
 
   // Auto-enter fullscreen on initial load (optional - can be removed if not desired)
   useEffect(() => {
-    if (!loading && session && !document.fullscreenElement) {
-      // Small delay to ensure page is rendered
-      const timer = setTimeout(() => {
-        if (document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(err => {
-            // Ignore errors (user might have blocked fullscreen or browser doesn't support it)
-            console.log('Fullscreen not available:', err);
-          });
-        }
-      }, 500);
-      return () => clearTimeout(timer);
+    if (loading || !session || getFullscreenElement()) {
+      return;
     }
-  }, [loading, session]);
+
+    if (!isFullscreenApiSupported()) {
+      return;
+    }
+
+    // Small delay to ensure page is rendered
+    const timer = setTimeout(() => {
+      enterFullscreen().catch(err => {
+        // Ignore errors (user might have blocked fullscreen or browser doesn't support it)
+        console.log('Fullscreen not available:', err);
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [enterFullscreen, getFullscreenElement, isFullscreenApiSupported, loading, session]);
 
   if (loading) {
     return (

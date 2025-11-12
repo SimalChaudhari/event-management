@@ -27,7 +27,6 @@ export class SurveyUtils {
       });
 
       if (!survey) {
-        console.log(`❌ No survey found for eventId: ${eventId}`);
         return null;
       }
 

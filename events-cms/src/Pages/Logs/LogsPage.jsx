@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -8,24 +8,29 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import * as $ from 'jquery';
-import { getLogs, clearLogsError } from '../../store/actions/logsActions';
+import { getLogs, clearLogsError, exportLogRecipients } from '../../store/actions/logsActions';
 import '../../assets/css/event.css';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function logsTable(data, handleRefresh, handleViewDetails) {
+
+function logsTable(
+    data,
+    handleRefresh,
+    handleViewDetails,
+    handleExport,
+    { initialPage = 0, onPageChange } = {}
+) {
     console.log('logsTable called with data:', data);
     console.log('Data length:', data?.length);
 
     let tableZero = '#logs-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = 0;
-    if ($.fn.DataTable.isDataTable(tableZero)) {
-        currentPage = $(tableZero).DataTable().page();
-        $(tableZero).DataTable().clear().destroy();
+    const existingTable = $.fn.DataTable.isDataTable(tableZero) ? $(tableZero).DataTable() : null;
+    if (existingTable) {
+        existingTable.destroy();
     }
 
     $(tableZero).DataTable({
@@ -39,6 +44,7 @@ function logsTable(data, handleRefresh, handleViewDetails) {
             [5, 10, 25, 50, 'All']
         ],
         pagingType: 'full_numbers',
+        paging: true,
         dom:
             "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'refresh-button ml-2'>>>" +
             "<'row'<'col-sm-12'tr>>" +
@@ -120,6 +126,21 @@ function logsTable(data, handleRefresh, handleViewDetails) {
                     return `<span class="font-weight-bold">${duration}</span>`;
                 }
             },
+            {
+                data: 'sessionId',
+                title: 'Action',
+                render: function (data, type, row) {
+                    return `
+                        <button 
+                            class="btn btn-sm btn-outline-primary export-btn" 
+                            data-session="${row.sessionId}"
+                        >
+                            Export
+                        </button>
+                    `;
+                }
+            }
+            
         
         ],
         initComplete: function (settings, json) {
@@ -137,11 +158,32 @@ function logsTable(data, handleRefresh, handleViewDetails) {
         }
     });
 
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
+    const tableElement = $(tableZero);
+    const tableInstance = tableElement.DataTable();
+
+    tableInstance.on('page.dt', function () {
+        if (typeof onPageChange === 'function') {
+            onPageChange(tableInstance.page());
+        }
+    });
+
+    if (initialPage > 0) {
+        tableInstance.page(initialPage).draw('page');
+    }
+
+    tableElement.off('click', '.export-btn').on('click', '.export-btn', function () {
+        const sessionId = $(this).data('session');
+    
+        if (!sessionId) {
+            console.error("Session ID is missing!");
+            return;
+        }
+    
+        handleExport(sessionId);
+    });
 
     // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
+    tableElement.off('click', '.view-btn').on('click', '.view-btn', function () {
         const logId = $(this).data('id');
 
         const logData = data.find((log) => log.id === logId);
@@ -153,7 +195,7 @@ function logsTable(data, handleRefresh, handleViewDetails) {
         }
     });
 
-    return $(tableZero).DataTable();
+    return tableInstance;
 }
 
 const LogsPage = () => {
@@ -161,12 +203,13 @@ const LogsPage = () => {
     const navigate = useNavigate();
 
     // Redux state
-    const { logs, pagination, loading, error } = useSelector((state) => {
+    const { logs, error } = useSelector((state) => {
         console.log('Redux state.logs:', state.logs);
         return state.logs;
     });
 
-    const [currentTable, setCurrentTable] = useState(null);
+    const tableRef = useRef(null);
+    const currentPageRef = useRef(0);
 
     const handleLogClick = useCallback(
         (log) => {
@@ -177,42 +220,42 @@ const LogsPage = () => {
     );
 
     const handleRefreshLogs = useCallback(() => {
-        dispatch(
-            getLogs({
-                page: 1,
-                limit: 1000
-            })
-        );
+        dispatch(getLogs());
     }, [dispatch]);
 
+    const handleExport = useCallback(
+        (sessionId) => {
+            dispatch(exportLogRecipients(sessionId));
+        },
+        [dispatch]
+    );
+    
+
     const destroyTable = useCallback(() => {
-        if (currentTable) {
+        if (tableRef.current) {
+            if (tableRef.current.page) {
+                currentPageRef.current = tableRef.current.page();
+            }
             $('#logs-data-table').off('click', '.view-btn');
-            currentTable.destroy();
-            setCurrentTable(null);
+            $('#logs-data-table').off('click', '.export-btn');
+            tableRef.current.destroy();
+            tableRef.current = null;
         }
-    }, [currentTable]);
+    }, []);
+    
 
     useEffect(() => {
         console.log('Fetching logs data...');
-        dispatch(
-            getLogs({
-                page: 1,
-                limit: 1000 // Get all logs for DataTables
-            })
-        );
+        dispatch(getLogs());
     }, [dispatch]);
 
     // Clear error and destroy table when component unmounts
     useEffect(() => {
         return () => {
             dispatch(clearLogsError());
-            if (currentTable) {
-                $('#logs-data-table').off('click', '.view-btn');
-                currentTable.destroy();
-            }
+            destroyTable();
         };
-    }, [dispatch, currentTable]);
+    }, [dispatch, destroyTable]);
 
     // Initialize table when logs data changes
     useEffect(() => {
@@ -220,31 +263,20 @@ const LogsPage = () => {
         console.log('Logs length:', logs?.length);
 
         if (logs && logs.length >= 0) {
-            // Destroy existing table first
-            if (currentTable) {
-                $('#logs-data-table').off('click', '.view-btn');
-                currentTable.destroy();
-            }
+            destroyTable();
 
-            // Create new table
             console.log('Creating table with logs:', logs);
-            const table = logsTable(logs, handleRefreshLogs, handleLogClick);
-            setCurrentTable(table);
+            const table = logsTable(logs, handleRefreshLogs, handleLogClick, handleExport, {
+                initialPage: currentPageRef.current,
+                onPageChange: (page) => {
+                    currentPageRef.current = page;
+                }
+            });
+            tableRef.current = table;
         }
-    }, [logs, handleRefreshLogs, handleLogClick]);
+    }, [logs, handleRefreshLogs, handleLogClick, handleExport, destroyTable]);
 
-    console.log('Rendering LogsPage - loading:', loading, 'error:', error, 'logs:', logs);
-
-    if (loading) {
-        return (
-            <div className="text-center py-5">
-                <div className="spinner-border" role="status">
-                    <span className="sr-only">Loading...</span>
-                </div>
-                <p className="mt-3">Loading logs...</p>
-            </div>
-        );
-    }
+    console.log('Rendering LogsPage - error:', error, 'logs:', logs);
 
     if (error) {
         return (
@@ -270,7 +302,7 @@ const LogsPage = () => {
                                         <th>Users Created</th>
                                         <th>Emails Sent</th>
                                         <th>Duration</th>
-                                      
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                             </Table>

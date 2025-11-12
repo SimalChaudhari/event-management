@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ErrorHandlerService } from './services/error-handler.service';
+import { LoggerService } from './services/logger.service';
 import { SurveyUtils } from './survey-utils';
 import { EmailUtils } from './email.utils';
 import { EventValidationUtils } from './validateEvents';
@@ -18,7 +19,7 @@ import { UserEntity } from '../user/users.entity';
   imports: [
     TypeOrmModule.forFeature([Survey, SurveySession, SurveyResponse, Event, QnaQuestion, QnaLike, UserEntity]),
   ],
-  providers: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils, QnaUtils],
-  exports: [ErrorHandlerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils, QnaUtils],
+  providers: [ErrorHandlerService, LoggerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils, QnaUtils],
+  exports: [ErrorHandlerService, LoggerService, SurveyUtils, EmailUtils, EventValidationUtils, EventQueryBuilderUtils, GlobalSearchUtils, FileUploadUtils, AgendaUtils, QnaUtils],
 })
 export class UtilsModule {} 

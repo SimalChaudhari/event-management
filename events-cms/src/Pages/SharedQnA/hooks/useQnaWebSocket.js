@@ -12,6 +12,21 @@ import { API_URL } from '../../../configs/env';
 export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate, onModalStateChange) => {
   const socketRef = useRef(null);
   const isConnectedRef = useRef(false);
+  const questionUpdateRef = useRef(onQuestionUpdate);
+  const sessionUpdateRef = useRef(onSessionUpdate);
+  const modalStateChangeRef = useRef(onModalStateChange);
+
+  useEffect(() => {
+    questionUpdateRef.current = onQuestionUpdate;
+  }, [onQuestionUpdate]);
+
+  useEffect(() => {
+    sessionUpdateRef.current = onSessionUpdate;
+  }, [onSessionUpdate]);
+
+  useEffect(() => {
+    modalStateChangeRef.current = onModalStateChange;
+  }, [onModalStateChange]);
 
   useEffect(() => {
     if (!shareToken) {
@@ -57,24 +72,27 @@ export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate, o
     // Question update handlers
     socket.on('question_update', (data) => {
       console.log('Question update received:', data);
-      if (onQuestionUpdate) {
-        onQuestionUpdate(data);
+      const handler = questionUpdateRef.current;
+      if (handler) {
+        handler(data);
       }
     });
 
     // Session update handlers
     socket.on('session_update', (data) => {
       console.log('Session update received:', data);
-      if (onSessionUpdate) {
-        onSessionUpdate(data);
+      const handler = sessionUpdateRef.current;
+      if (handler) {
+        handler(data);
       }
     });
 
     // Modal state change handlers
     socket.on('modal_state_change', (data) => {
       console.log('Modal state change received:', data);
-      if (onModalStateChange) {
-        onModalStateChange(data);
+      const handler = modalStateChangeRef.current;
+      if (handler) {
+        handler(data);
       }
     });
 
@@ -86,7 +104,7 @@ export const useQnaWebSocket = (shareToken, onQuestionUpdate, onSessionUpdate, o
         socketRef.current = null;
       }
     };
-  }, [shareToken, onQuestionUpdate, onSessionUpdate, onModalStateChange]);
+  }, [shareToken]);
 
   // Function to emit modal state change
   const emitModalStateChange = (modalType, action, questionData = null) => {

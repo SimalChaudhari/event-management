@@ -1,6 +1,7 @@
-import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Delete, Res, Query } from '@nestjs/common';
 import { CsvUploadLogService } from './csv-upload-log.service';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { Response } from 'express';
 
 @Controller('api/logs/csv-upload')
 @UseGuards(JwtAuthGuard)
@@ -8,17 +9,11 @@ export class CsvUploadLogController {
   constructor(private readonly csvUploadLogService: CsvUploadLogService) {}
 
   /**
-   * Get all CSV upload logs with pagination
+   * Get all CSV upload logs ordered by creation date
    */
   @Get()
-  async getLogs(
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '20',
-  ) {
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 20;
-    
-    return await this.csvUploadLogService.getLogs(pageNum, limitNum);
+  async getLogs() {
+    return await this.csvUploadLogService.getLogs();
   }
 
   /**
@@ -30,18 +25,30 @@ export class CsvUploadLogController {
   }
 
   /**
+   * Export email recipients for a specific session
+   */
+  @Get('session/:sessionId/recipients/export')
+  async exportRecipients(
+    @Param('sessionId') sessionId: string,
+    @Res() res: Response,
+  ) {
+    const csvContent = await this.csvUploadLogService.exportEmailRecipients(sessionId);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="csv-upload-recipients-${sessionId}.csv"`,
+    );
+
+    return res.send(csvContent);
+  }
+
+  /**
    * Get logs by admin ID
    */
   @Get('admin/:adminId')
-  async getLogsByAdmin(
-    @Param('adminId') adminId: string,
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '20',
-  ) {
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 20;
-    
-    return await this.csvUploadLogService.getLogsByAdmin(adminId, pageNum, limitNum);
+  async getLogsByAdmin(@Param('adminId') adminId: string) {
+    return await this.csvUploadLogService.getLogsByAdmin(adminId);
   }
 
   /**
@@ -62,6 +69,19 @@ export class CsvUploadLogController {
     
     return {
       message: `Cleaned up ${deletedCount} log entries older than ${daysNum} days`,
+      deletedCount,
+    };
+  }
+
+  /**
+   * Delete all logs
+   */
+  @Delete()
+  async deleteAllLogs() {
+    const deletedCount = await this.csvUploadLogService.deleteAllLogs();
+
+    return {
+      message: `Deleted ${deletedCount} log entries`,
       deletedCount,
     };
   }

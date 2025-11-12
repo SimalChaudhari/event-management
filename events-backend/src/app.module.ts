@@ -29,6 +29,7 @@ import { ExhibitorModule } from 'exhibitor/exhibitor.module';
 import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.module';
 import { SurveyModule } from 'survey/survey.module';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
+import { LoggerService } from './utils/services/logger.service';
 import { PollingModule } from 'polling/polling.module';
 import { QnaModule } from 'qna/qna.module';
 import { ChatModule } from './chat/chat.module';
@@ -88,6 +89,7 @@ import { ScheduledPushNotificationModule } from './scheduled-push-notification/s
   providers: [
     AppService,
     ErrorHandlerService,
+    LoggerService,
     // {
     //   provide: APP_FILTER,
     //   useClass: GlobalExceptionFilter,

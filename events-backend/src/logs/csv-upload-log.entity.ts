@@ -14,6 +14,7 @@ export class CsvUploadLogEntity {
   @Column({ type: 'varchar', length: 255 })
   fileName!: string; // Original CSV file name
 
+
   @Column({ type: 'int' })
   totalRecords!: number; // Total records in CSV
 

@@ -13,7 +13,8 @@ import {
     PROMOTIONAL_OFFER_LOADING,
     ENGAGEMENT_LOADING,
     PROGRAMME_LOADING,
-    PUSH_NOTIFICATION_LOADING
+    PUSH_NOTIFICATION_LOADING,
+    LOGS_LOADING
 } from '../constants/actionTypes';
 
 const initialState = {
@@ -31,6 +32,7 @@ const initialState = {
     engagement: false,
     programme: false,
     pushNotification: false,
+    logs: false,
     global: false
 };
 
@@ -42,6 +44,12 @@ const loadingReducer = (state = initialState, { type, payload } = {}) => {
             newState = {
                 ...state,
                 user: payload
+            };
+            break;
+        case LOGS_LOADING:
+            newState = {
+                ...state,
+                logs: payload
             };
             break;
         
@@ -148,8 +156,8 @@ const loadingReducer = (state = initialState, { type, payload } = {}) => {
     }
     
     // Calculate global loading state - true if any individual loading is true
-    const { user, event, order, speaker, exhibitor, banner, gallery, category, settings, withdraw, auth, engagement, programme, pushNotification } = newState;
-    newState.global = user || event || order || speaker || exhibitor || banner || gallery || category || settings || withdraw || auth || engagement || programme || pushNotification;
+    const { user, event, order, speaker, exhibitor, banner, gallery, category, settings, withdraw, auth, engagement, programme, pushNotification, logs } = newState;
+    newState.global = user || event || order || speaker || exhibitor || banner || gallery || category || settings || withdraw || auth || engagement || programme || pushNotification || logs;
     
     return newState;
 };

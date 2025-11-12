@@ -43,19 +43,22 @@ const logsReducer = (state = initialState, { type, payload } = {}) => {
                 error: null
             };
 
-        case LOGS_LIST:
+        case LOGS_LIST: {
+            const total = payload.total ?? payload.logs?.length ?? 0;
+            const limit = payload.limit ?? (payload.logs?.length || 1);
             return {
                 ...state,
-                logs: payload.logs,
+                logs: payload.logs ?? [],
                 pagination: {
-                    total: payload.total,
-                    page: payload.page,
-                    limit: payload.limit,
-                    totalPages: payload.totalPages
+                    total,
+                    page: payload.page ?? 1,
+                    limit,
+                    totalPages: payload.totalPages ?? Math.max(1, Math.ceil(total / (limit || 1))),
                 },
                 loading: false,
                 error: null
             };
+        }
 
         case LOG_BY_ID:
             return {

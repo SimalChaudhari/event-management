@@ -125,7 +125,7 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
         setLoading(dispatch, true);
 
         const resolvedOptions = typeof options === 'string' ? { eventId: options } : options || {};
-        const { eventId } = resolvedOptions;
+        const { eventId, fileName } = resolvedOptions;
 
         if (!eventId) {
             const message = 'Event selection is required before uploading the CSV.';
@@ -141,6 +141,11 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
             const formData = new FormData();
             formData.append('csvFile', csvData);
             formData.append('eventId', eventId);
+            if (fileName) {
+                formData.append('fileName', fileName);
+            } else if (csvData?.name) {
+                formData.append('fileName', csvData.name);
+            }
 
             response = await axiosInstance.post('/auth/upload-csv-users', formData, {
                 headers: {
@@ -151,7 +156,8 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
             // Handle JSON data - send as regular JSON request body
             response = await axiosInstance.post('/auth/upload-csv-users', {
                 users: csvData,
-                eventId
+                eventId,
+                fileName: fileName || undefined,
             }, {
                 headers: {
                     'Content-Type': 'application/json',

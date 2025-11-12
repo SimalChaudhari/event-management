@@ -6,6 +6,7 @@ import { ValidationPipe } from 'validation/validation.pipe';
 import { GlobalExceptionFilter } from 'utils/global-exception.filter';
 import { Logger } from '@nestjs/common';
 import * as fs from 'fs';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   try {
@@ -33,6 +34,10 @@ async function bootstrap() {
     }
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule, { httpsOptions });
+
+    // Increase payload limits to support large CSV uploads
+    app.use(json({ limit: '20mb' }));
+    app.use(urlencoded({ extended: true, limit: '20mb' }));
 
     app.useGlobalFilters(new GlobalExceptionFilter());
     // app.useGlobalPipes(new ValidationPipe());

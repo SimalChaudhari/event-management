@@ -31,6 +31,7 @@ import {
 } from '../utils/email-templates.utils';
 import { CsvUserDto, CsvUploadResponseDto } from '../validation/auth.validation';
 import { CsvUploadLogService } from '../logs/csv-upload-log.service';
+import { EmailLogDetails, EmailRecipientLog } from '../logs/csv-upload-log.types';
 import { EmailBatchService } from '../utils/email-batch.service';
 import { CsvProcessorService } from '../utils/csv-processor.service';
 import { csvUploadConfig } from '../utils/csv-upload.config';
@@ -903,6 +904,7 @@ export class AuthService {
     adminId: string = 'system',
     fileName: string = 'upload.csv',
     eventId?: string,
+  
   ): Promise<CsvUploadResponseDto> {
     try {
       const startTime = Date.now();
@@ -928,6 +930,8 @@ export class AuthService {
         sessionId,
         adminId,
         fileName,
+        originalFileName: fileName,
+    
         totalRecords: csvData.length,
         status: 'processing',
         emailSendingEnabled: csvUploadConfig.isEmailSendingEnabled(),
@@ -960,6 +964,20 @@ export class AuthService {
         event.name,
       );
 
+      let recipientSnapshot: EmailRecipientLog[] = [];
+      if (qrEmailPayloads.length > 0) {
+        recipientSnapshot = qrEmailPayloads.map((payload) => ({
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          salutation: 'salutation' in payload ? payload.salutation : undefined,
+          status: 'pending',
+          success: false,
+          attempts: [],
+          retried: false,
+        }));
+      }
+
       // Step 2: Send emails in BACKGROUND (don't wait for them)
       let emailsToSendCount = 0;
       if (csvUploadConfig.isEmailSendingEnabled() && qrEmailPayloads.length > 0) {
@@ -980,42 +998,36 @@ export class AuthService {
           console.error(`❌ Background QR email sending failed for session ${sessionId}:`, error);
         });
         
-        console.log(`✅ QR emails scheduled for background processing, continuing with response...`);
-      }
+            }
 
-      // ==========================================
-      // 📊 COMPLETE UPLOAD SUMMARY LOGS
-      // ==========================================
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`📊 CSV UPLOAD COMPLETE SUMMARY - Session: ${sessionId}`);
-      console.log(`${'='.repeat(80)}`);
-      console.log(`⏱️  Processing Time: ${processingTime}ms (${(processingTime/1000).toFixed(2)}s)`);
-      console.log(`📁 File: ${fileName}`);
-      console.log(`📝 Total Records in CSV: ${csvData.length}`);
-      console.log(`\n--- USER CREATION STATISTICS ---`);
-      console.log(`✅ New Users Created: ${userProcessingResult.newUsersCreated}`);
-      console.log(`🔄 Existing Users Updated: ${userProcessingResult.usersToUpdate.length}`);
-      console.log(`⏭️  Existing Users Skipped: ${existingUsersSkipped}`);
-      console.log(`🔐 Passwords Generated: ${userProcessingResult.passwordsGenerated}`);
-      console.log(`\n--- EMAIL STATISTICS ---`);
-      console.log(`📧 Total QR Emails to Send: ${emailsToSendCount}`);
-      console.log(`📮 Email Status: ${emailsToSendCount > 0 ? 'Sending in Background' : 'Disabled'}`);
       if (userProcessingResult.skippedUsers.length > 0) {
         console.log(`\n--- SKIPPED USERS ---`);
         userProcessingResult.skippedUsers.forEach(skipped => {
           console.log(`  ⚠️  ${skipped}`);
         });
       }
-      console.log(`🎯 Event Associations: ${eventAssociationResult.registrationsCreated} created, ${eventAssociationResult.registrationsSkipped} skipped`);
-      console.log(`🏷️  Event: ${event.name} (${event.id})`);
-      console.log(`${'='.repeat(80)}\n`);
+    
 
       // Update CSV upload log entry with user creation completion
       // Status: 'users_created' if emails pending, 'completed' if no emails to send
       const uploadStatus = emailsToSendCount > 0 ? 'processing' : 'completed';
       
+      const initialEmailDetails: EmailLogDetails | undefined = emailsToSendCount > 0 ? {
+        totals: {
+          total: emailsToSendCount,
+          sent: 0,
+          failed: 0,
+          pending: emailsToSendCount,
+          retried: 0,
+        },
+        processingTimeMs: processingTime,
+        emailSendingEnabled: csvUploadConfig.isEmailSendingEnabled(),
+        recipients: recipientSnapshot,
+      } : undefined;
+
       await this.csvUploadLogService.updateLogEntry(sessionId, {
         status: uploadStatus,
+      
         recordsProcessed: csvData.length,
         newUsersCreated: userProcessingResult.newUsersCreated,
         existingUsersUpdated: userProcessingResult.usersToUpdate.length,
@@ -1027,13 +1039,14 @@ export class AuthService {
         emailsFailed: 0,
         processingTimeMs: processingTime,
         skippedRecords: userProcessingResult.skippedUsers,
+        emailDetails: initialEmailDetails,
         summary: `${emailsToSendCount > 0 
           ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (QR processing in background)` 
           : `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | No emails to send`
         } | Event: ${event.name} (${eventAssociationResult.registrationsCreated} registrations, ${eventAssociationResult.registrationsSkipped} already registered)`
       });
 
-      console.log(`📊 Status: ${uploadStatus} ${emailsToSendCount > 0 ? '(Emails sending in background)' : '(Complete)'}\n`);
+ 
 
       // Prepare final response - return immediately without waiting for emails
       const response: CsvUploadResponseDto = {
@@ -1096,21 +1109,22 @@ export class AuthService {
       console.log(`\n📧 Email Sending Complete - ${emailResult.emailsSent}/${emailResult.totalEmails} sent (${((emailResult.emailsSent / emailResult.totalEmails) * 100).toFixed(1)}% success)`);
       
       // Update CSV upload log entry with email completion status - NOW STATUS BECOMES 'COMPLETED'
-      const finalStatus = emailResult.success ? 'completed' : 'partial';
+      const finalStatus = emailResult.success
+        ? 'completed'
+        : emailResult.emailsPending > 0
+          ? 'processing'
+          : emailResult.emailsSent > 0
+            ? 'partial'
+            : 'failed';
       
       await this.csvUploadLogService.updateLogEntry(sessionId, {
         emailsSent: emailResult.emailsSent,
         emailsFailed: emailResult.emailsFailed,
-        emailsPending: 0, // All emails processed
+        emailsPending: emailResult.emailsPending,
+        processingTimeMs: emailResult.processingTimeMs,
         status: finalStatus, // NOW COMPLETED!
-        emailDetails: {
-          sent: emailResult.emailsSent,
-          failed: emailResult.emailsFailed,
-          retried: emailResult.emailsRetried || 0,
-          processingTimeMs: emailResult.processingTimeMs,
-          successRate: ((emailResult.emailsSent / emailResult.totalEmails) * 100).toFixed(1) + '%',
-          completedAt: new Date().toISOString()
-        }
+        emailDetails: emailResult.logDetails,
+        summary: emailResult.message,
       });
       
       console.log(`🎉 Status: ${finalStatus.toUpperCase()} - Background processing finished\n`);
@@ -1120,14 +1134,51 @@ export class AuthService {
       
       // Update log entry with error status
       try {
+        const failureTimestamp = new Date().toISOString();
+        const failureMessage = error instanceof Error ? error.message : 'Unknown error';
+        const failureRecipients: EmailRecipientLog[] = emailsToSend.map((payload) => ({
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+              status: 'failed',
+          success: false,
+          attempts: [
+            {
+              attempt: 1,
+              status: 'failed',
+              timestamp: failureTimestamp,
+              errorMessage: failureMessage,
+            },
+          ],
+          retried: false,
+          lastUpdatedAt: failureTimestamp,
+          notes: 'Email batch aborted due to error',
+        }));
+
+        const failureDetails: EmailLogDetails = {
+          totals: {
+            total: emailsToSend.length,
+            sent: 0,
+            failed: emailsToSend.length,
+            pending: 0,
+            retried: 0,
+          },
+          processingTimeMs: 0,
+          emailSendingEnabled: csvUploadConfig.isEmailSendingEnabled(),
+          completedAt: failureTimestamp,
+          recipients: failureRecipients,
+        };
+
         await this.csvUploadLogService.updateLogEntry(sessionId, {
           status: 'failed',
           emailsFailed: emailsToSend.length,
           emailsPending: 0,
+          emailDetails: failureDetails,
+          summary: `Email batch failed: ${failureMessage}`,
           errorDetails: {
             type: 'email_sending_failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            failedAt: new Date().toISOString()
+            message: failureMessage,
+            failedAt: failureTimestamp
           }
         });
       } catch (updateError) {
@@ -1177,7 +1228,7 @@ export class AuthService {
           email: userData.email,
           firstName: userData.firstName,
           lastName: userData.lastName,
-          salutation: userData.salutation,
+         
         });
       }
 
@@ -1190,7 +1241,7 @@ export class AuthService {
             password: await PasswordUtils.hashPassword(randomPassword),
             company: userData.company,
             designation: userData.designation,
-            salutation: userData.salutation,
+         
           });
           passwordsGenerated++;
         } else {
