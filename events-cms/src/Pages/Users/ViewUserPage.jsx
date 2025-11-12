@@ -133,7 +133,7 @@ const ViewUserPage = () => {
                         </div>
                         <Button 
                             variant="outline-secondary" 
-                            onClick={() => navigate('/users')}
+                            onClick={() => navigate(-1)}
                             style={{ 
                                 borderRadius: '8px',
                                 padding: '8px 16px',

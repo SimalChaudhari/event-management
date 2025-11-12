@@ -21,6 +21,13 @@ export { FileUploadUtils, FileUploadConfig } from './filesUploadFormat/file-uplo
 // User utilities
 export { UserUtils } from './user.utils';
 
+// User deletion utilities
+export {
+  deleteUserRelatedData,
+  deleteProfilePicture,
+  UserDeletionOptions,
+} from './user-deletion.utils';
+
 // Exhibitor utilities
 export { ExhibitorUtils } from './exhibitor.utils';
 

@@ -13,19 +13,19 @@ import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH, DUMMY_PATH_USER } from '../../configs/env';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
+function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView, restoreTablePage) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
     // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Clean up existing table and event listeners
+    let currentPage = 0;
     if ($.fn.DataTable.isDataTable(tableZero)) {
+        currentPage = $(tableZero).DataTable().page();
         $(tableZero).DataTable().clear().destroy();
     }
 
@@ -34,7 +34,7 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
         order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
-        pageLength: 10,
+        pageLength: 5,
         lengthMenu: [
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
@@ -146,8 +146,12 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
         }
     });
 
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
+    const dataTableInstance = $(tableZero).DataTable();
+
+    // Restore the current page using the hook function
+    if (typeof restoreTablePage === 'function') {
+        restoreTablePage(dataTableInstance, currentPage);
+    }
 
     // Attach event listeners for actions
     $(document).on('click', '.view-btn', function () {
@@ -170,6 +174,8 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView) {
         const speakerId = $(this).data('id');
         handleDelete(speakerId);
     });
+
+    return dataTableInstance;
 }
 
 const Speakers = () => {
@@ -184,6 +190,8 @@ const Speakers = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const navigate = useNavigate();
 
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+
     const [showViewModal, setShowViewModal] = React.useState(false);
     const [editData, setEditData] = React.useState(null);
     const [viewData, setViewData] = React.useState(null);
@@ -194,6 +202,7 @@ const Speakers = () => {
 
     const destroyTable = () => {
         if (currentTable) {
+            currentTable.off('page.dt');
             $('#data-table-zero').off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
@@ -203,8 +212,12 @@ const Speakers = () => {
     const initializeTable = () => {
         destroyTable();
         if (Array.isArray(speakers) && speakers.length >= 0) {
-            const table = atable(speakers, handleAddSpeaker, handleEdit, handleDelete, handleView);
+            const table = atable(speakers, handleAddSpeaker, handleEdit, handleDelete, handleView, restoreTablePage);
             setCurrentTable(table);
+            // Check and adjust page if current page is now empty (after deletion)
+            if (table && typeof checkAndAdjustPage === 'function') {
+                checkAndAdjustPage(table);
+            }
         }
     };
 
@@ -236,13 +249,23 @@ const Speakers = () => {
 
         setIsDeleting(true);
         try {
-            await dispatch(deleteSpeaker(itemToDelete.id));
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-            destroyTable();
-            await dispatch(speakerList());
+            const result = await dispatch(deleteSpeaker(itemToDelete.id));
+            // Only close modal if delete was successful
+            // deleteSpeaker already calls speakerList() internally, which will trigger table reinitialization
+            if (result === true) {
+                setShowDeleteModal(false);
+                setItemToDelete(null);
+                // Table will be automatically reinitialized when speakers data updates via useEffect
+            } else {
+                setShowDeleteModal(false);
+                // Delete failed - keep table intact
+                // Error message is already shown via toast in the action
+            }
         } catch (error) {
             console.error('Delete failed:', error);
+            setShowDeleteModal(false);
+            // Don't destroy table on error
+            // The error message should be shown to the user
         } finally {
             setIsDeleting(false);
         }

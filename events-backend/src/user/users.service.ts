@@ -5,26 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as fs from 'fs';
-import path from 'path';
 import { In, Not, Repository } from 'typeorm';
-import { ChatMessage, ChatParticipant, ChatThread } from '../chat/chat.entity';
-import { RegisterEvent } from '../registerEvent/registerEvent.entity';
-import { FavoriteEvent } from '../favorite-event/favorite-event.entity';
-import { EventAgenda } from '../agenda/agenda.entity';
-import { EventSpeaker } from '../event/event-speaker.entity';
-import { ScheduledPushNotificationDelivery } from '../scheduled-push-notification/scheduled-push-notification-delivery.entity';
-import {
-  AdvertNotificationRead,
-  NotificationHistory,
-  PushNotification,
-  UserPermissions,
-} from '../settings/setting.entity';
-import {
-  EngagementQnaLike,
-  EngagementQnaQuestion,
-} from '../engagement-qna/engagement-qna.entity';
-import { ExhibitorStamp } from '../attendance/exhibitor-stamp.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { EmailService } from '../service/email.service';
 import { PasswordUtils } from '../utils/password.utils';
@@ -44,9 +25,11 @@ import { UserUtils } from 'utils';
 import { QRCodeUtils } from '../utils/qr-code.utils';
 import { AddressService } from './address.service';
 import { AddressUtils } from '../utils/address.utils';
-import { AddressEntity } from './address.entity';
-import { SpeakerProfile } from './speaker-profile.entity';
 import { UserEntity, UserRole } from './users.entity';
+import {
+  deleteUserRelatedData,
+  deleteProfilePicture,
+} from '../utils/user-deletion.utils';
 
 @Injectable()
 export class UserService {
@@ -143,105 +126,26 @@ export class UserService {
         throw new ResourceNotFoundException('User', id);
       }
 
-      const profilePicturePath = user.profilePicture
-        ? path.resolve(user.profilePicture)
-        : null;
-
-      // Remove programme session speaker join entries
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from('programme_session_speakers')
-        .where('"speakerId" = :id', { id })
-        .execute();
-
-      // Clear chat related data
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(ChatMessage)
-        .where('senderID = :id OR receiverID = :id', { id })
-        .execute();
-
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(ChatParticipant)
-        .where('userID = :id', { id })
-        .execute();
-
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(ChatThread)
-        .where('userID = :id OR receiverID = :id', { id })
-        .execute();
-
-      // Engagement QnA dependencies
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(EngagementQnaLike)
-        .where('userId = :id', { id })
-        .execute();
-
-      await queryRunner.manager
-        .createQueryBuilder()
-        .update(EngagementQnaQuestion)
-        .set({ answeredBy: null })
-        .where('answeredBy = :id', { id })
-        .execute();
-
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(EngagementQnaQuestion)
-        .where('askedById = :id', { id })
-        .execute();
-
-      // Notification & permissions data
-      await queryRunner.manager.delete(UserPermissions, { userId: id });
-      await queryRunner.manager.delete(PushNotification, { userId: id });
-      await queryRunner.manager.delete(NotificationHistory, { userId: id });
-      await queryRunner.manager.delete(AdvertNotificationRead, {
-        userId: id,
-      });
-      await queryRunner.manager.delete(ScheduledPushNotificationDelivery, {
-        userId: id,
-      });
-
-      // Event & registration related data
-      await queryRunner.manager.delete(RegisterEvent, { userId: id });
-      await queryRunner.manager.delete(FavoriteEvent, { userId: id });
-      await queryRunner.manager.delete(EventSpeaker, { speakerId: id });
-      await queryRunner.manager
-        .createQueryBuilder()
-        .delete()
-        .from(EventAgenda)
-        .where('userId = :id OR createdBy = :id', { id })
-        .execute();
-      await queryRunner.manager.delete(AddressEntity, { userId: id });
-      await queryRunner.manager.delete(SpeakerProfile, { userId: id });
-      await queryRunner.manager.delete(ExhibitorStamp, { attendeeId: id });
-
-      // Remove the user record (cascades handle remaining relations)
-      await queryRunner.manager.delete(UserEntity, { id });
+      // Delete all user-related data using utility function
+      const profilePicturePath = await deleteUserRelatedData(
+        queryRunner,
+        id,
+        {
+          includePollData: false,
+          errorContext: 'User deletion',
+          profilePictureContext: 'User Profile Picture Deletion',
+        },
+      );
 
       await queryRunner.commitTransaction();
 
-      if (profilePicturePath) {
-        try {
-          if (fs.existsSync(profilePicturePath)) {
-            fs.unlinkSync(profilePicturePath);
-          }
-        } catch (fileError) {
-          this.errorHandler.logError(
-            fileError,
-            'User Profile Picture Deletion',
-            id,
-          );
-        }
-      }
+      // Delete profile picture from filesystem after successful transaction
+      await deleteProfilePicture(
+        profilePicturePath,
+        id,
+        this.errorHandler,
+        'User Profile Picture Deletion',
+      );
 
       return { message: 'User deleted successfully' };
     } catch (error) {
@@ -558,69 +462,51 @@ export class UserService {
   }
 
   async deleteSpeaker(id: string): Promise<{ message: string }> {
+    const queryRunner =
+      this.userRepository.manager.connection.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      const speaker = await this.userRepository.findOne({
+      const speaker = await queryRunner.manager.findOne(UserEntity, {
         where: { id, role: UserRole.Speaker },
       });
+
       if (!speaker) {
         throw new ResourceNotFoundException('Speaker', id);
       }
 
-      // Check if speaker is associated with any events
-      const relatedEventsCount = await this.errorHandler.getRelatedDataCount(
-        this.userRepository.manager.getRepository('EventSpeaker'),
-        { speakerId: id },
-        'Speaker Events',
+      // Delete all speaker-related data using utility function (including poll data)
+      const profilePicturePath = await deleteUserRelatedData(
+        queryRunner,
+        id,
+        {
+          includePollData: true,
+          errorContext: 'Speaker deletion',
+          profilePictureContext: 'Speaker Profile Picture Deletion',
+        },
       );
 
-      if (relatedEventsCount > 0) {
-        throw new ForeignKeyConstraintException(
-          'Speaker',
-          'Event',
-          relatedEventsCount,
-          'delete',
-        );
-      }
+      await queryRunner.commitTransaction();
 
-      // Delete profile picture from filesystem if exists
-      if (speaker.profilePicture) {
-        try {
-          const filePath = path.resolve(speaker.profilePicture);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (fileError) {
-          this.errorHandler.logError(
-            fileError,
-            'Speaker Profile Picture Deletion',
-            id,
-          );
-          // Continue with speaker deletion even if file deletion fails
-        }
-      }
+      // Delete profile picture from filesystem after successful transaction
+      await deleteProfilePicture(
+        profilePicturePath,
+        id,
+        this.errorHandler,
+        'Speaker Profile Picture Deletion',
+      );
 
-      // Delete speaker profile if exists (CASCADE should handle this, but explicit deletion for better error handling)
-      try {
-        await this.speakerProfileService.deleteProfile(id);
-      } catch (profileError) {
-        this.errorHandler.logError(
-          profileError,
-          'Speaker Profile Deletion',
-          id,
-        );
-        // Continue with speaker deletion even if profile deletion fails
-      }
-
-      await this.userRepository.remove(speaker);
       return { message: 'Speaker deleted successfully' };
     } catch (error) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof ForeignKeyConstraintException
-      ) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof ResourceNotFoundException) {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Speaker deletion');
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -949,3 +835,4 @@ export class UserService {
     }
   }
 }
+

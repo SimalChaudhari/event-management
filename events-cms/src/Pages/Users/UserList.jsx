@@ -5,7 +5,6 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import Form from 'react-bootstrap/Form';
 import { useSelector } from 'react-redux';
 import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
@@ -17,11 +16,20 @@ import { useNavigate } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
 import UserFilterComponent from '../../components/common/UserFilterComponent';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handleViewUser, handleExportUsers) {
+function userTable(
+    data,
+    handleAddUser,
+    handleEditUser,
+    handleDeleteUser,
+    handleViewUser,
+    handleExportUsers,
+    restoreTablePage
+) {
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -35,7 +43,7 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const dataTableInstance = $(tableZero).DataTable({
         data: validData,
         rowId: 'id', // Explicitly set the row ID field
         order: [[0, 'asc']],
@@ -209,8 +217,12 @@ function userTable(data, handleAddUser, handleEditUser, handleDeleteUser, handle
         }
     });
 
-    // Restore the current page
-    $(tableZero).DataTable().page(currentPage).draw('page');
+    // Restore the current page using the hook function
+    if (typeof restoreTablePage === 'function') {
+        restoreTablePage(dataTableInstance, currentPage);
+    }
+
+    return dataTableInstance;
 }
 
 const UserList = () => {
@@ -225,6 +237,8 @@ const UserList = () => {
     const [isExporting, setIsExporting] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
     const [roleFilter, setRoleFilter] = useState('all');
+
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
 
     const handleViewUser = (userData) => {
         navigate(`${USER_PATHS.VIEW_USER}/${userData.id}`);
@@ -304,6 +318,7 @@ const UserList = () => {
 
     const destroyTable = () => {
         if (currentTable) {
+            currentTable.off('page.dt');
             $('#user-data-table').off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
@@ -321,9 +336,14 @@ const UserList = () => {
                     handleEditUser,
                     handleDeleteUser,
                     handleViewUser,
-                    handleExportUsers
+                    handleExportUsers,
+                    restoreTablePage
                 );
                 setCurrentTable(table);
+                // Check and adjust page if current page is now empty (after deletion)
+                if (table && typeof checkAndAdjustPage === 'function') {
+                    checkAndAdjustPage(table);
+                }
             } catch (error) {
                 console.error('Error initializing user table:', error);
               

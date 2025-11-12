@@ -10,8 +10,8 @@ import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 const AddUserPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams(); // Edit mode 
-    const { error, userByID } = useSelector(state => state.user); // Use state.user as per store structure
+    const { id } = useParams(); // Edit mode
+    const { error, userByID } = useSelector((state) => state.user); // Use state.user as per store structure
     const [loading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         firstName: '',
@@ -61,17 +61,18 @@ const AddUserPage = () => {
     useEffect(() => {
         if (id && userByID) {
             const editData = userByID;
-            
+
             // Get default/first address from addresses array
-            const defaultAddress = editData.addresses && editData.addresses.length > 0 
-                ? editData.addresses.find(addr => addr.isDefault) || editData.addresses[0]
-                : {};
-            
+            const defaultAddress =
+                editData.addresses && editData.addresses.length > 0
+                    ? editData.addresses.find((addr) => addr.isDefault) || editData.addresses[0]
+                    : {};
+
             setFormData({
                 firstName: editData.firstName || '',
                 lastName: editData.lastName || '',
                 email: editData.email || '',
-              
+
                 mobile: editData.mobile || '',
                 role: editData.role || 'user',
                 salutation: editData.salutation || '',
@@ -96,7 +97,7 @@ const AddUserPage = () => {
                 linkedinProfile: editData.linkedinProfile || '',
                 profilePicture: null
             });
-            
+
             if (editData.profilePicture) {
                 setImagePreview(`${API_URL}/${editData.profilePicture.replace(/\\/g, '/')}`);
             } else {
@@ -107,14 +108,14 @@ const AddUserPage = () => {
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
-        
+
         if (type === 'file') {
             const file = files[0];
             setFormData((prev) => ({
                 ...prev,
                 [name]: file
             }));
-            
+
             // Image preview
             if (file) {
                 const reader = new FileReader();
@@ -149,12 +150,10 @@ const AddUserPage = () => {
                 setIsLoading(true);
                 response = await dispatch(editUser(id, formDataToSend));
                 setIsLoading(false);
-
             } else {
                 setIsLoading(true);
                 response = await dispatch(createUser(formDataToSend));
                 setIsLoading(false);
-
             }
 
             if (response) {
@@ -163,7 +162,7 @@ const AddUserPage = () => {
                         firstName: '',
                         lastName: '',
                         email: '',
-                     
+
                         mobile: '',
                         role: 'user',
                         salutation: '',
@@ -181,7 +180,7 @@ const AddUserPage = () => {
                         landmark: '',
                         addressLabel: '',
                         deliveryInstructions: '',
-                    
+
                         acceptTerms: false,
                         companyName: '',
                         position: '',
@@ -204,6 +203,10 @@ const AddUserPage = () => {
         navigate(`${USER_PATHS.LIST_USERS}`);
     };
 
+    const handleBack = () => {
+        navigate(-1);
+    };
+
     return (
         <Container fluid>
             <div className="row">
@@ -212,11 +215,8 @@ const AddUserPage = () => {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit User' : 'Add User'}</h4>
-                                <Button 
-                                    variant="secondary" 
-                                    onClick={handleCancel}
-                                >
-                                    <i style={{marginRight: '10px'}} className="fas fa-arrow-left me-2"></i>
+                                <Button variant="secondary" onClick={handleBack}>
+                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>
                             </div>
@@ -225,7 +225,8 @@ const AddUserPage = () => {
                             {/* Show error if any */}
                             {error && (
                                 <Alert variant="danger" className="mb-3">
-                                    <strong>Error: </strong>{error}
+                                    <strong>Error: </strong>
+                                    {error}
                                 </Alert>
                             )}
 
@@ -279,10 +280,10 @@ const AddUserPage = () => {
                                             />
                                         </div>
                                     </Col>
-                                    
+
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                        <label className="floating-label" htmlFor="moible">
+                                            <label className="floating-label" htmlFor="moible">
                                                 Mobile<span className="text-danger">*</span>
                                             </label>
                                             <SingaporePhoneInput
@@ -392,10 +393,14 @@ const AddUserPage = () => {
                                                 <option value="Healthcare & Medical">Healthcare & Medical</option>
                                                 <option value="Hospitality & Tourism">Hospitality & Tourism</option>
                                                 <option value="Human Resources & Recruitment">Human Resources & Recruitment</option>
-                                                <option value="Information & Communication Technology">Information & Communication Technology</option>
+                                                <option value="Information & Communication Technology">
+                                                    Information & Communication Technology
+                                                </option>
                                                 <option value="Insurance & Superannuation">Insurance & Superannuation</option>
                                                 <option value="Legal">Legal</option>
-                                                <option value="Manufacturing, Transport & Logistics">Manufacturing, Transport & Logistics</option>
+                                                <option value="Manufacturing, Transport & Logistics">
+                                                    Manufacturing, Transport & Logistics
+                                                </option>
                                                 <option value="Marketing & Communications">Marketing & Communications</option>
                                                 <option value="Mining, Resources & Energy">Mining, Resources & Energy</option>
                                                 <option value="Real Estate & Property">Real Estate & Property</option>
@@ -591,13 +596,13 @@ const AddUserPage = () => {
                                                 onChange={handleChange}
                                                 accept="image/*"
                                             />
-                                            
+
                                             {/* Image Preview */}
                                             {imagePreview && (
                                                 <div className="mt-3 text-start">
-                                                    <img 
-                                                        src={imagePreview} 
-                                                        alt="Profile Preview" 
+                                                    <img
+                                                        src={imagePreview}
+                                                        alt="Profile Preview"
                                                         style={{
                                                             width: '120px',
                                                             height: '120px',
@@ -664,7 +669,7 @@ const AddUserPage = () => {
                                             </Col>
                                         </>
                                     )}
-                                    
+
                                     <Col sm={6}>
                                         <div className="form-group">
                                             <div className="custom-control custom-switch">
@@ -682,7 +687,7 @@ const AddUserPage = () => {
                                             </div>
                                         </div>
                                     </Col>
-                                      <Col sm={6}>
+                                    <Col sm={6}>
                                         <div className="form-group">
                                             <div className="custom-control custom-switch">
                                                 <input
@@ -700,31 +705,25 @@ const AddUserPage = () => {
                                         </div>
                                     </Col>
                                 </Row>
-                                
+
                                 {/* Form Actions */}
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button 
-                                                variant="danger" 
-                                                onClick={handleCancel}
-                                                disabled={loading}
-                                            >
+                                            <Button variant="danger" onClick={handleCancel} disabled={loading}>
                                                 Cancel
                                             </Button>
-                                            <Button 
-                                                variant="primary" 
+                                            <Button
+                                                variant="primary"
                                                 type="submit"
-                                                disabled={loading || !formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() }
+                                                disabled={
+                                                    loading ||
+                                                    !formData.firstName.trim() ||
+                                                    !formData.lastName.trim() ||
+                                                    !formData.email.trim()
+                                                }
                                             >
-                                                {loading ? (
-                                                    <>
-                                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                                        {id ? 'Updating...' : 'Creating...'}
-                                                    </>
-                                                ) : (
-                                                    id ? 'Update User' : 'Create User'
-                                                )}
+                                                {loading ? <>{id ? 'Updating...' : 'Creating...'}</> : id ? 'Update User' : 'Create User'}
                                             </Button>
                                         </div>
                                     </div>
@@ -738,4 +737,4 @@ const AddUserPage = () => {
     );
 };
 
-export default AddUserPage; 
+export default AddUserPage;
