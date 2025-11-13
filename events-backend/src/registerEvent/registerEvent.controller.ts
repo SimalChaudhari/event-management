@@ -165,7 +165,7 @@ export class RegisterEventController {
       // Apply tab visibility filtering to events in the result
       if (result?.data && Array.isArray(result.data)) {
         // Each item in result.data has structure: { event: EventObject, user: UserObject, ... }
-        const filteredData = result.data.map(item => {
+        const filteredData = result.data.map((item) => {
           if (item.event) {
             return {
               ...item,
@@ -173,7 +173,7 @@ export class RegisterEventController {
             };
           }
           return item;
-        });
+        }) as typeof result.data;
         result.data = filteredData;
       }
       
