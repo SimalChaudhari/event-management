@@ -140,9 +140,27 @@ const AddUserPage = () => {
         try {
             const formDataToSend = new FormData();
             Object.keys(formData).forEach((key) => {
-                if (formData[key] !== null) {
-                    formDataToSend.append(key, formData[key]);
+                const value = formData[key];
+                // Skip null values
+                if (value === null) {
+                    return;
                 }
+                // For optional enum fields (like industry), convert empty strings to null
+                // Empty strings cause enum validation errors even though the field is optional
+                if (key === 'industry' && (value === '' || value === undefined)) {
+                    // Don't append empty industry - backend will use null/default
+                    return;
+                }
+                // For other optional string fields, skip empty strings
+                const optionalFields = ['salutation', 'company', 'designation', 'linkedinProfile', 
+                                       'street', 'city', 'state', 'postalCode', 'country', 
+                                       'apartment', 'landmark', 'addressLabel', 'deliveryInstructions',
+                                       'companyName', 'position', 'description'];
+                if (optionalFields.includes(key) && value === '') {
+                    // Skip empty optional fields
+                    return;
+                }
+                formDataToSend.append(key, value);
             });
 
             let response;

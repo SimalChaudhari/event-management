@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal, Form } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
@@ -24,12 +24,55 @@ const ViewEventPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const [eventData, setEventData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Get user role from Redux state
     const { authUser } = useSelector((state) => state.auth);
     const isAdmin = authUser?.role === 'admin';
+
+    // Get current event page from URL for passing to speaker component
+    // This should be read once when component mounts to preserve it
+    const [eventPageFromUrl, setEventPageFromUrl] = useState(null);
+    
+    useEffect(() => {
+        // Capture page parameter from URL when component mounts or URL changes
+        // This ensures we preserve the page number even if the URL query params change
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            setEventPageFromUrl(pageParam);
+        } else {
+            // Also check location.state as fallback
+            if (location.state?.page) {
+                setEventPageFromUrl(location.state.page);
+            }
+        }
+    }, [location.search, location.state]);
+
+    // Custom handleBack that uses the captured page parameter
+    // This ensures we always have the page number even if URL changes
+    const handleBack = useCallback(() => {
+        // Priority: captured page from state > URL > location.state > null
+        // We prioritize the captured state because it was set when the component mounted
+        // and might be more reliable than the current URL
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageFromUrl = urlParams.get('page');
+        const currentPage = eventPageFromUrl || pageFromUrl || location.state?.page;
+        
+        if (currentPage) {
+            navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${currentPage}`);
+        } else {
+            navigate(EVENT_PATHS.LIST_EVENTS);
+        }
+    }, [navigate, eventPageFromUrl, location.search, location.state]);
+
+    // Get current event page from URL for passing to speaker component
+    const getEventPage = () => {
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        return urlParams.get('page') || eventPageFromUrl;
+    };
 
     // Separate modal states for different image types
     const [showEventImageModal, setShowEventImageModal] = useState(false);
@@ -411,7 +454,7 @@ const ViewEventPage = () => {
                                 Manage Tabs
                             </Button>
 
-                            <Button variant="secondary" onClick={() => navigate(EVENT_PATHS.LIST_EVENTS)}>
+                            <Button variant="secondary" onClick={handleBack}>
                                 <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
                                 Back
                             </Button>
@@ -640,6 +683,8 @@ const ViewEventPage = () => {
                                     <EventSpeakersComponent
                                         speakers={eventData?.speakers}
                                         handleSpeakerImageClick={handleSpeakerImageClick}
+                                        eventId={id}
+                                        eventPage={getEventPage()}
                                     />
                                 </Tab.Pane>
                             )}

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button, Row, Col, Card, Badge, Container, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
-import { useDispatch } from 'react-redux';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import store from '../../../../store/store';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FetchEventData } from '../fetchEvents/FetchEventApi';
 import {
     createEvent,
@@ -14,7 +15,8 @@ import {
     removeEventStampImage,
     getCountries,
     getSpeakersForEvent,
-    getCategoriesForEvent
+    getCategoriesForEvent,
+    eventList
 } from '../../../../store/actions/eventActions';
 import { API_URL } from '../../../../configs/env';
 import 'leaflet/dist/leaflet.css';
@@ -25,13 +27,24 @@ import { createSpeaker } from '../../../../store/actions/speakerActions';
 import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../../utils/constants';
+import useTableNavigation from '../../../../hooks/useTableNavigation';
 
 // Main component
 function AddEventPage() {
     const dispatch = useDispatch();
     const { id } = useParams(); // Edit mode
+    const navigate = useNavigate();
+    const location = useLocation();
     const { fetchEvent } = FetchEventData();
     const [display, setDisplay] = useState(null);
+    
+    // Get events from Redux to calculate page for new events
+    const events = useSelector((state) => state.event?.event?.events);
+    
+    // Store the page number from where we came from (for edit mode)
+    const previousPageRef = useRef(null);
+    // Store the original event date to detect if date changed during edit
+    const originalEventDateRef = useRef(null);
 
     const [speakerList, setSpeakerList] = useState([]);
     const [categoryList, setCategoryList] = useState([]);
@@ -51,7 +64,6 @@ function AddEventPage() {
         documentNames: [], // Add this new field
         type: 'Physical',
         price: '',
-        currency: '',
         speakerIds: [],
         categoryIds: [],
         latitude: '',
@@ -78,7 +90,6 @@ function AddEventPage() {
     // Modal states
     const [showSidebar, setShowSidebar] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
-    const navigate = useNavigate();
     const [newSpeaker, setNewSpeaker] = useState({
         firstName: '',
         lastName: '',
@@ -114,6 +125,32 @@ function AddEventPage() {
     // Add loading state for speaker modal
     const [isSpeakerLoading, setIsSpeakerLoading] = useState(false);
 
+    // Add loading states for dropdowns
+    const [isLoadingSpeakers, setIsLoadingSpeakers] = useState(false);
+    const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+    const [isLoadingExhibitors, setIsLoadingExhibitors] = useState(false);
+    const [isLoadingCountries, setIsLoadingCountries] = useState(false);
+
+    // Track if data has been loaded to prevent multiple fetches
+    const [speakersLoaded, setSpeakersLoaded] = useState(false);
+    const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+    const [exhibitorsLoaded, setExhibitorsLoaded] = useState(false);
+    const [countriesLoaded, setCountriesLoaded] = useState(false);
+
+    // Use refs to track in-flight requests (prevents race conditions better than state)
+    const fetchingSpeakersRef = useRef(false);
+    const fetchingCategoriesRef = useRef(false);
+    const fetchingExhibitorsRef = useRef(false);
+    const fetchingCountriesRef = useRef(false);
+    const countriesFetchedOnMountRef = useRef(false);
+    const eventDataLoadedRef = useRef(false);
+    const currentEventIdRef = useRef(null);
+    // Use refs to track loaded state (prevents stale closures in callbacks)
+    const speakersLoadedRef = useRef(false);
+    const categoriesLoadedRef = useRef(false);
+    const exhibitorsLoadedRef = useRef(false);
+    const countriesLoadedRef = useRef(false);
+
     // Fetch current location
     const getCurrentLocation = () => {
         if (navigator.geolocation) {
@@ -139,181 +176,351 @@ function AddEventPage() {
         getCurrentLocation();
     }, []);
 
-    // Load edit data if id exists
+    // Fetch functions - now called on demand when dropdowns open
+    // Using refs to prevent race conditions and multiple simultaneous calls
+    const fetchSpeakers = React.useCallback(async () => {
+        // Check refs to prevent race conditions (refs are synchronous and don't cause re-renders)
+        if (fetchingSpeakersRef.current) return;
+        if (speakersLoadedRef.current) return;
+
+        // Set refs synchronously to prevent race conditions
+        fetchingSpeakersRef.current = true;
+        setIsLoadingSpeakers(true);
+        try {
+            const speakers = await dispatch(getSpeakersForEvent());
+            // Always set the list and loaded flags, even if empty array
+            const speakersList = Array.isArray(speakers) ? speakers : [];
+            setSpeakerList(speakersList);
+            setSpeakersLoaded(true);
+            speakersLoadedRef.current = true; // Update ref synchronously
+        } catch (error) {
+            console.error('Error fetching speakers:', error);
+            // Even on error, set loaded to true to prevent infinite retries
+            setSpeakersLoaded(true);
+            speakersLoadedRef.current = true;
+        } finally {
+            setIsLoadingSpeakers(false);
+            fetchingSpeakersRef.current = false;
+        }
+    }, [dispatch]); // Stable callback - only depends on dispatch
+
+    const fetchCategories = React.useCallback(async () => {
+        // Check refs to prevent race conditions
+        if (fetchingCategoriesRef.current) return;
+        if (categoriesLoadedRef.current) return;
+
+        fetchingCategoriesRef.current = true;
+        setIsLoadingCategories(true);
+        try {
+            const categories = await dispatch(getCategoriesForEvent());
+            const categoriesList = Array.isArray(categories) ? categories : [];
+            setCategoryList(categoriesList);
+            setCategoriesLoaded(true);
+            categoriesLoadedRef.current = true;
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+            setCategoriesLoaded(true);
+            categoriesLoadedRef.current = true;
+        } finally {
+            setIsLoadingCategories(false);
+            fetchingCategoriesRef.current = false;
+        }
+    }, [dispatch]); // Stable callback
+
+    const fetchExhibitors = React.useCallback(async () => {
+        // Check refs to prevent race conditions
+        if (fetchingExhibitorsRef.current) return;
+        if (exhibitorsLoadedRef.current) return;
+
+        fetchingExhibitorsRef.current = true;
+        setIsLoadingExhibitors(true);
+        try {
+            const response = await dispatch(exhibitorGet());
+            const exhibitorsList = Array.isArray(response?.data) ? response.data : [];
+            setExhibitorList(exhibitorsList);
+            setExhibitorsLoaded(true);
+            exhibitorsLoadedRef.current = true;
+        } catch (error) {
+            // Error handling without console
+            setExhibitorsLoaded(true);
+            exhibitorsLoadedRef.current = true;
+        } finally {
+            setIsLoadingExhibitors(false);
+            fetchingExhibitorsRef.current = false;
+        }
+    }, [dispatch]); // Stable callback
+
+    const fetchCountries = React.useCallback(async () => {
+        // Check refs to prevent race conditions
+        if (fetchingCountriesRef.current) return;
+        if (countriesLoadedRef.current) return;
+
+        fetchingCountriesRef.current = true;
+        setIsLoadingCountries(true);
+        try {
+            const countries = await dispatch(getCountries());
+            const countriesList = Array.isArray(countries) ? countries : [];
+            setCountryList(countriesList);
+            setCountriesLoaded(true);
+            countriesLoadedRef.current = true;
+        } catch (error) {
+            console.error('Error fetching countries:', error);
+            setCountriesLoaded(true);
+            countriesLoadedRef.current = true;
+        } finally {
+            setIsLoadingCountries(false);
+            fetchingCountriesRef.current = false;
+        }
+    }, [dispatch]); // Stable callback
+
+    // Fetch countries on mount since it's a small static list and needed for the dropdown
+    // Using ref to track mount fetch to prevent multiple calls
+    useEffect(() => {
+        if (!countriesFetchedOnMountRef.current) {
+            countriesFetchedOnMountRef.current = true;
+            fetchCountries();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty deps - only run on mount
+
+    // Capture the page number from URL when entering edit mode
     useEffect(() => {
         if (id) {
-            const loadEventData = async () => {
-                try {
-                    const response = await dispatch(eventById(id));
-
-                    if (response?.data) {
-                        const editData = response.data;
-
-                        // Handle speakers data
-                        let speakerIds = [];
-                        if (editData.speakers) {
-                            speakerIds = editData.speakers.map((speaker) => speaker.id);
-                        } else if (editData.speakersData) {
-                            speakerIds = editData.speakersData.map((speaker) => speaker.id);
-                        }
-
-                        // Handle categories data
-                        let categoryIds = [];
-                        if (editData.categories) {
-                            categoryIds = editData.categories.map((category) => category.id);
-                        } else if (editData.categoriesData) {
-                            categoryIds = editData.categoriesData.map((category) => category.id);
-                        }
-
-                        // Handle exhibitors
-                        let exhibitorDescription = '';
-                        let exhibitorIds = [];
-                        if (editData.exhibitors) {
-                            exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
-                            exhibitorDescription = editData?.exhibitors?.exhibitorDescription || '';
-                        }
-
-                        // Handle images
-                        let imagesData = [];
-                        let previewUrls = [];
-                        if (editData.images) {
-                            if (typeof editData.images === 'string') {
-                                imagesData = [editData.images];
-                                previewUrls = [`${API_URL}/${editData.images.replace(/\\/g, '/')}`];
-                            } else if (Array.isArray(editData.images)) {
-                                imagesData = editData.images;
-                                previewUrls = editData.images.map((img) => {
-                                    if (typeof img === 'string') {
-                                        if (img.startsWith('http')) {
-                                            return img;
-                                        }
-                                        return `${API_URL}/${img.replace(/\\/g, '/')}`;
-                                    }
-                                    return img;
-                                });
-                            }
-                        }
-
-                        // Handle documents - updated to handle new structure
-                        let documentsData = [];
-                        let documentNamesData = [];
-                        let documentPreviewUrls = [];
-
-                        if (editData.documents) {
-                            if (Array.isArray(editData.documents)) {
-                                // Check if documents are in new format with name and document properties
-                                if (editData.documents.length > 0 && editData.documents[0].hasOwnProperty('name')) {
-                                    // New format: array of objects with name and document
-                                    documentsData = editData.documents.map((doc) => doc.document);
-                                    documentNamesData = editData.documents.map((doc) => doc.name);
-                                    documentPreviewUrls = editData.documents.map((doc) => {
-                                        if (doc.document.startsWith('http')) {
-                                            return doc.document;
-                                        }
-                                        return `${API_URL}/${doc.document.replace(/\\/g, '/')}`;
-                                    });
-                                } else {
-                                    // Old format: array of document paths only
-                                    documentsData = editData.documents;
-                                    documentNamesData = editData.documents.map((doc, index) => `Document ${index + 1}`);
-                                    documentPreviewUrls = editData.documents.map((doc) => {
-                                        if (doc.startsWith('http')) {
-                                            return doc;
-                                        }
-                                        return `${API_URL}/${doc.replace(/\\/g, '/')}`;
-                                    });
-                                }
-                            }
-                        }
-
-                        // Handle floor plan
-                        let floorPlanData = null;
-                        let floorPlanPreviewUrl = null;
-                        if (editData.floorPlan) {
-                            if (typeof editData.floorPlan === 'string') {
-                                floorPlanData = editData.floorPlan;
-                                floorPlanPreviewUrl = `${API_URL}/${editData.floorPlan.replace(/\\/g, '/')}`;
-                            }
-                        }
-
-                        // Handle background image
-                        let backgroundImageData = null;
-                        let backgroundImagePreviewUrl = null;
-                        if (editData.backgroundImage) {
-                            if (typeof editData.backgroundImage === 'string') {
-                                backgroundImageData = editData.backgroundImage;
-                                backgroundImagePreviewUrl = `${API_URL}/${editData.backgroundImage.replace(/\\/g, '/')}`;
-                            }
-                        }
-
-                        // Handle event stamps - Updated to match API response structure
-                        let eventStampDescription = '';
-                        let eventStampImagesData = [];
-                        let eventStampImagePreviewUrls = [];
-
-                        if (editData.eventStamps) {
-                            // Handle event stamp description
-                            eventStampDescription = editData.eventStamps.description || '';
-
-                            // Handle event stamp images
-                            if (editData.eventStamps.images && Array.isArray(editData.eventStamps.images)) {
-                                eventStampImagesData = editData.eventStamps.images;
-                                eventStampImagePreviewUrls = editData.eventStamps.images.map((img) => {
-                                    if (typeof img === 'string') {
-                                        if (img.startsWith('http')) {
-                                            return img;
-                                        }
-                                        return `${API_URL}/${img.replace(/\\/g, '/')}`;
-                                    }
-                                    return img;
-                                });
-                            }
-                        }
-
-                        const formDataToSet = {
-                            name: editData.name || '',
-                            description: editData.description || '',
-                            startDate: editData.startDate ? editData.startDate.split('T')[0] : '',
-                            startTime: editData.startTime || '',
-                            endDate: editData.endDate ? editData.endDate.split('T')[0] : '',
-                            endTime: editData.endTime || '',
-                            location: editData.location || '',
-                            venue: editData.venue || '',
-                            latitude: editData.latitude || '',
-                            longitude: editData.longitude || '',
-                            country: editData.country || '',
-                            images: imagesData,
-                            documents: documentsData,
-                            documentNames: documentNamesData,
-                            type: editData.type || 'Physical',
-                            price: editData.price || '',
-                            currency: editData.currency || '',
-                            speakerIds: speakerIds,
-                            categoryIds: categoryIds,
-                            floorPlan: floorPlanData,
-                            backgroundImage: backgroundImageData,
-                            exhibitorIds: exhibitorIds,
-                            exhibitorDescription: exhibitorDescription,
-                            eventStampDescription: eventStampDescription,
-                            eventStampImages: eventStampImagesData
-                        };
-
-                        setFormData(formDataToSet);
-                        setImagePreviewUrls(previewUrls);
-                        setDocumentPreviewUrls(documentPreviewUrls);
-                        setDocumentNames(documentNamesData);
-                        setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
-
-                        setFloorPlanPreview(floorPlanPreviewUrl);
-                        setBackgroundImagePreview(backgroundImagePreviewUrl);
-                    }
-                } catch (error) {
-                    console.error('Error loading event data:', error);
+            // Get page parameter from URL if it exists
+            const urlParams = new URLSearchParams(location.search);
+            const pageParam = urlParams.get('page');
+            if (pageParam) {
+                previousPageRef.current = parseInt(pageParam, 10);
+            } else {
+                // Also check if page is in location state (from navigation)
+                if (location.state?.page) {
+                    previousPageRef.current = location.state.page;
                 }
-            };
-            loadEventData();
+            }
         }
-    }, [id, dispatch]);
+    }, [id, location.search, location.state]);
+
+    // Load edit data if id exists
+    useEffect(() => {
+        // Only run if id exists
+        if (!id) {
+            // Reset ref when id is cleared
+            eventDataLoadedRef.current = false;
+            currentEventIdRef.current = null;
+            return;
+        }
+
+        // Reset ref when id changes
+        if (currentEventIdRef.current !== id) {
+            eventDataLoadedRef.current = false;
+            currentEventIdRef.current = id;
+        }
+
+        // Only fetch if not already loaded for this id
+        // Set ref synchronously BEFORE async call to prevent React Strict Mode double calls
+        if (eventDataLoadedRef.current) return;
+        eventDataLoadedRef.current = true;
+
+        const loadEventData = async () => {
+            try {
+                const response = await dispatch(eventById(id));
+
+                if (response?.data) {
+                    const editData = response.data;
+
+                    // Load dropdown data if there are selected values (for proper display)
+                    // Note: Countries are already fetched on mount, so we don't need to fetch again
+                    // Only fetch if data exists - the fetch functions have their own guards
+                    if (editData.speakers || editData.speakersData) {
+                        fetchSpeakers();
+                    }
+                    if (editData.categories || editData.categoriesData) {
+                        fetchCategories();
+                    }
+                    if (editData.exhibitors) {
+                        fetchExhibitors();
+                    }
+                    // Removed fetchCountries() here since it's already fetched on mount
+
+                    // Handle speakers data
+                    let speakerIds = [];
+                    if (editData.speakers) {
+                        speakerIds = editData.speakers.map((speaker) => speaker.id);
+                    } else if (editData.speakersData) {
+                        speakerIds = editData.speakersData.map((speaker) => speaker.id);
+                    }
+
+                    // Handle categories data
+                    let categoryIds = [];
+                    if (editData.categories) {
+                        categoryIds = editData.categories.map((category) => category.id);
+                    } else if (editData.categoriesData) {
+                        categoryIds = editData.categoriesData.map((category) => category.id);
+                    }
+
+                    // Handle exhibitors
+                    let exhibitorDescription = '';
+                    let exhibitorIds = [];
+                    if (editData.exhibitors) {
+                        exhibitorIds = editData.exhibitors?.exhibitors?.map((exhibitor) => String(exhibitor.id)); // Convert to string
+                        exhibitorDescription = editData?.exhibitors?.exhibitorDescription || '';
+                    }
+
+                    // Handle images
+                    let imagesData = [];
+                    let previewUrls = [];
+                    if (editData.images) {
+                        if (typeof editData.images === 'string') {
+                            imagesData = [editData.images];
+                            previewUrls = [`${API_URL}/${editData.images.replace(/\\/g, '/')}`];
+                        } else if (Array.isArray(editData.images)) {
+                            imagesData = editData.images;
+                            previewUrls = editData.images.map((img) => {
+                                if (typeof img === 'string') {
+                                    if (img.startsWith('http')) {
+                                        return img;
+                                    }
+                                    return `${API_URL}/${img.replace(/\\/g, '/')}`;
+                                }
+                                return img;
+                            });
+                        }
+                    }
+
+                    // Handle documents - updated to handle new structure
+                    let documentsData = [];
+                    let documentNamesData = [];
+                    let documentPreviewUrls = [];
+
+                    if (editData.documents) {
+                        if (Array.isArray(editData.documents)) {
+                            // Check if documents are in new format with name and document properties
+                            if (editData.documents.length > 0 && editData.documents[0].hasOwnProperty('name')) {
+                                // New format: array of objects with name and document
+                                documentsData = editData.documents.map((doc) => doc.document);
+                                documentNamesData = editData.documents.map((doc) => doc.name);
+                                documentPreviewUrls = editData.documents.map((doc) => {
+                                    if (doc.document.startsWith('http')) {
+                                        return doc.document;
+                                    }
+                                    return `${API_URL}/${doc.document.replace(/\\/g, '/')}`;
+                                });
+                            } else {
+                                // Old format: array of document paths only
+                                documentsData = editData.documents;
+                                documentNamesData = editData.documents.map((doc, index) => `Document ${index + 1}`);
+                                documentPreviewUrls = editData.documents.map((doc) => {
+                                    if (doc.startsWith('http')) {
+                                        return doc;
+                                    }
+                                    return `${API_URL}/${doc.replace(/\\/g, '/')}`;
+                                });
+                            }
+                        }
+                    }
+
+                    // Handle floor plan
+                    let floorPlanData = null;
+                    let floorPlanPreviewUrl = null;
+                    if (editData.floorPlan) {
+                        if (typeof editData.floorPlan === 'string') {
+                            floorPlanData = editData.floorPlan;
+                            floorPlanPreviewUrl = `${API_URL}/${editData.floorPlan.replace(/\\/g, '/')}`;
+                        }
+                    }
+
+                    // Handle background image
+                    let backgroundImageData = null;
+                    let backgroundImagePreviewUrl = null;
+                    if (editData.backgroundImage) {
+                        if (typeof editData.backgroundImage === 'string') {
+                            backgroundImageData = editData.backgroundImage;
+                            backgroundImagePreviewUrl = `${API_URL}/${editData.backgroundImage.replace(/\\/g, '/')}`;
+                        }
+                    }
+
+                    // Handle event stamps - Updated to match API response structure
+                    let eventStampDescription = '';
+                    let eventStampImagesData = [];
+                    let eventStampImagePreviewUrls = [];
+
+                    if (editData.eventStamps) {
+                        // Handle event stamp description
+                        eventStampDescription = editData.eventStamps.description || '';
+
+                        // Handle event stamp images
+                        if (editData.eventStamps.images && Array.isArray(editData.eventStamps.images)) {
+                            eventStampImagesData = editData.eventStamps.images;
+                            eventStampImagePreviewUrls = editData.eventStamps.images.map((img) => {
+                                if (typeof img === 'string') {
+                                    if (img.startsWith('http')) {
+                                        return img;
+                                    }
+                                    return `${API_URL}/${img.replace(/\\/g, '/')}`;
+                                }
+                                return img;
+                            });
+                        }
+                    }
+
+                    const formDataToSet = {
+                        name: editData.name || '',
+                        description: editData.description || '',
+                        startDate: editData.startDate ? editData.startDate.split('T')[0] : '',
+                        startTime: editData.startTime || '',
+                        endDate: editData.endDate ? editData.endDate.split('T')[0] : '',
+                        endTime: editData.endTime || '',
+                        location: editData.location || '',
+                        venue: editData.venue || '',
+                        latitude: editData.latitude || '',
+                        longitude: editData.longitude || '',
+                        country: editData.country || '',
+                        images: imagesData,
+                        documents: documentsData,
+                        documentNames: documentNamesData,
+                        type: editData.type || 'Physical',
+                        price: editData.price || '',
+                        speakerIds: speakerIds,
+                        categoryIds: categoryIds,
+                        floorPlan: floorPlanData,
+                        backgroundImage: backgroundImageData,
+                        exhibitorIds: exhibitorIds,
+                        exhibitorDescription: exhibitorDescription,
+                        eventStampDescription: eventStampDescription,
+                        eventStampImages: eventStampImagesData
+                    };
+
+                    // Store the original event date to detect if it changes during edit
+                    originalEventDateRef.current = formDataToSet.startDate;
+
+                    setFormData(formDataToSet);
+                    setImagePreviewUrls(previewUrls);
+                    setDocumentPreviewUrls(documentPreviewUrls);
+                    setDocumentNames(documentNamesData);
+                    setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
+
+                    setFloorPlanPreview(floorPlanPreviewUrl);
+                    setBackgroundImagePreview(backgroundImagePreviewUrl);
+                }
+            } catch (error) {
+                console.error('Error loading event data:', error);
+                // Reset ref on error only if it's still the same id
+                if (currentEventIdRef.current === id) {
+                    eventDataLoadedRef.current = false;
+                }
+            }
+        };
+        
+        loadEventData();
+        
+        // Cleanup function
+        return () => {
+            // Only reset if id changed (not on unmount)
+            if (currentEventIdRef.current !== id) {
+                eventDataLoadedRef.current = false;
+            }
+        };
+    }, [id, dispatch]); // Only depend on id and dispatch - fetch functions have their own guards
 
     // Image removal function
     const handleRemoveImage = async (indexToRemove) => {
@@ -506,7 +713,6 @@ function AddEventPage() {
             documentNames: [], // Add this
             type: 'Physical',
             price: '',
-            currency: '',
             speakerIds: [],
             categoryIds: [],
             latitude: '',
@@ -526,56 +732,23 @@ function AddEventPage() {
         setEventStampImagePreviewUrls([]);
     };
 
-    // Load countries, speakers, and categories
-    useEffect(() => {
-        const fetchCountry = async () => {
-            try {
-                const countries = await dispatch(getCountries());
-                if (countries && countries.length > 0) {
-                    setCountryList(countries);
-                }
-            } catch (error) {
-                console.error('Error fetching countries:', error);
-            }
-        };
-        fetchCountry();
-    }, [dispatch]);
-
-    const fetchSpeakers = async () => {
-        try {
-            const speakers = await dispatch(getSpeakersForEvent());
-            if (speakers && speakers.length > 0) {
-                setSpeakerList(speakers);
-            }
-        } catch (error) {
-            console.error('Error fetching speakers:', error);
-        }
-    };
-
-    const fetchCategories = async () => {
-        try {
-            const categories = await dispatch(getCategoriesForEvent());
-            if (categories && categories.length > 0) {
-                setCategoryList(categories);
-            }
-        } catch (error) {
-            console.error('Error fetching categories:', error);
-        }
-    };
-
-    const fetchExhibitors = async () => {
-        try {
-            const response = await dispatch(exhibitorGet());
-            setExhibitorList(response.data);
-        } catch (error) {
-            // Error handling without console
-        }
-    };
-    useEffect(() => {
+    // Handlers for dropdown open events
+    const handleSpeakerDropdownOpen = () => {
+        setSpeakerDropdownOpen(true);
         fetchSpeakers();
+    };
+
+    const handleCategoryDropdownOpen = () => {
+        setCategoryDropdownOpen(true);
         fetchCategories();
+    };
+
+    const handleExhibitorDropdownOpen = () => {
+        setExhibitorDropdownOpen(true);
         fetchExhibitors();
-    }, [dispatch]);
+    };
+
+    // Removed handleCountryDropdownFocus - countries are now fetched on mount
 
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
@@ -737,10 +910,113 @@ function AddEventPage() {
         }
 
         try {
-            const success = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
-            if (success) {
-                fetchEvent();
-                navigate(EVENT_PATHS.LIST_EVENTS);
+            const result = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
+            if (result && result.success) {
+                // Redux store is already updated by the action, no need to fetch again
+                if (id) {
+                    // For edit mode, check if the event date was changed
+                    const originalDate = originalEventDateRef.current;
+                    const newDate = formData.startDate;
+                    
+                    // Parse dates for comparison
+                    const parseDate = (dateValue) => {
+                        if (!dateValue) return new Date(0);
+                        const dateStr = String(dateValue);
+                        const parts = dateStr.split('T')[0].split('-');
+                        if (parts.length === 3) {
+                            return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+                        }
+                        return new Date(dateStr);
+                    };
+                    
+                    const originalDateObj = parseDate(originalDate);
+                    const newDateObj = parseDate(newDate);
+                    
+                    // If date changed, refresh events list and calculate which page the updated event will appear on
+                    if (originalDate !== newDate) {
+                        // Refresh events list to get updated and sorted data from backend
+                        await dispatch(eventList());
+                        
+                        // Get updated events directly from Redux store (bypassing useSelector delay)
+                        const state = store.getState();
+                        const updatedEvents = state.event?.event?.events || [];
+                        
+                        const pageLength = 5;
+                        
+                        // Count how many events have a startDate >= updated event's date (newer or equal)
+                        // Since events are sorted descending (newest first), these events will appear before the updated event
+                        let eventsBeforeUpdatedEvent = 0;
+                        if (Array.isArray(updatedEvents)) {
+                            // Filter out the current event being edited from the count
+                            eventsBeforeUpdatedEvent = updatedEvents.filter((event) => {
+                                // Exclude the current event being edited
+                                if (event.id === id) return false;
+                                if (!event.startDate) return false;
+                                const eventDate = parseDate(event.startDate);
+                                // Count events that are newer than or equal to the updated event's date
+                                return eventDate.getTime() >= newDateObj.getTime();
+                            }).length;
+                        }
+                        
+                        // Calculate page number (1-indexed for URL)
+                        const pageNumber = Math.floor(eventsBeforeUpdatedEvent / pageLength) + 1;
+                        
+                        // Navigate to the page where the updated event appears
+                        // Example: If Nov 18 is updated to Dec 2, and there are 0 events with dates >= Dec 2,
+                        // the updated event will be at index 0, which is page 1
+                        navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${pageNumber}`);
+                    } else {
+                        // Date didn't change, preserve the page number if we were editing from a specific page
+                        if (previousPageRef.current) {
+                            navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${previousPageRef.current}`);
+                        } else {
+                            navigate(EVENT_PATHS.LIST_EVENTS);
+                        }
+                    }
+                } else {
+                    // For create mode, calculate which page the new event will appear on
+                    // Events are sorted by startDate descending (newest first)
+                    // Page length is 5 events per page
+                    const pageLength = 5;
+                    
+                    // Parse the new event's date
+                    const parseDate = (dateValue) => {
+                        if (!dateValue) return new Date(0);
+                        const dateStr = String(dateValue);
+                        const parts = dateStr.split('T')[0].split('-');
+                        if (parts.length === 3) {
+                            return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+                        }
+                        return new Date(dateStr);
+                    };
+                    
+                    const newEventDate = parseDate(formData.startDate);
+                    
+                    // Count how many existing events have a startDate >= new event's date (newer or equal)
+                    // Since events are sorted descending (newest first), these events will appear before the new event
+                    // The new event will be inserted at this position
+                    let eventsBeforeNewEvent = 0;
+                    if (Array.isArray(events)) {
+                        eventsBeforeNewEvent = events.filter((event) => {
+                            if (!event.startDate) return false;
+                            const eventDate = parseDate(event.startDate);
+                            // Count events that are newer than or equal to the new event's date
+                            // These will appear before the new event in the sorted list
+                            return eventDate.getTime() >= newEventDate.getTime();
+                        }).length;
+                    }
+                    
+                    // The new event will be inserted at position eventsBeforeNewEvent (0-indexed)
+                    // After insertion, the new event will be at index eventsBeforeNewEvent
+                    // Calculate page number (1-indexed for URL)
+                    // Page = Math.floor(index / pageLength) + 1
+                    const pageNumber = Math.floor(eventsBeforeNewEvent / pageLength) + 1;
+                    
+                    // Navigate to the page where the new event appears
+                    // Example: If Nov 30 is created and there are 10 events with dates >= Nov 30,
+                    // the new event will be at index 10, which is page 3 (10 / 5 = 2, +1 = page 3)
+                    navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${pageNumber}`);
+                }
                 resetFormData();
             }
         } catch (error) {
@@ -795,9 +1071,10 @@ function AddEventPage() {
         });
 
         try {
-            const success = await dispatch(createSpeaker(formDataToSend));
-            if (success) {
-                fetchSpeakers();
+            const createdSpeaker = await dispatch(createSpeaker(formDataToSend));
+            if (createdSpeaker) {
+                // Add the new speaker to local state directly (no need to fetch all speakers)
+                setSpeakerList((prev) => [createdSpeaker, ...prev]);
                 setNewSpeaker({
                     firstName: '',
                     lastName: '',
@@ -819,9 +1096,12 @@ function AddEventPage() {
 
     const handleAddCategory = async () => {
         try {
-            const success = await dispatch(createCategory(newCategory));
-            if (success) {
-                fetchCategories();
+            const result = await dispatch(createCategory(newCategory));
+            if (result && result.success) {
+                // Add the new category to local state directly (no need to fetch all categories)
+                if (result.category) {
+                    setCategoryList((prev) => [result.category, ...prev]);
+                }
                 setNewCategory({
                     name: '',
                     description: ''
@@ -966,13 +1246,24 @@ function AddEventPage() {
         }
     };
 
+    // Use reusable table navigation hook for back navigation with page preservation
+    const { handleBack } = useTableNavigation({
+        tableRef: null, // Not needed for back navigation
+        listPath: EVENT_PATHS.LIST_EVENTS,
+        viewPath: EVENT_PATHS.VIEW_EVENT,
+        editPath: EVENT_PATHS.EDIT_EVENT,
+        addPath: EVENT_PATHS.ADD_EVENT
+    });
+
     const handleNavigate = () => {
-        navigate(-1);
+        // Use the reusable handleBack function which preserves page from URL or location state
+        const urlParams = new URLSearchParams(location.search);
+        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+        handleBack(currentPage);
     };
 
     // Document name change handler - updated version
     const handleDocumentNameChange = (index, newName) => {
-    
         setFormData((prev) => {
             const updatedNames = [...prev.documentNames];
             updatedNames[index] = newName;
@@ -1034,7 +1325,7 @@ function AddEventPage() {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="name">
-                                                Name
+                                                Name <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -1047,27 +1338,65 @@ function AddEventPage() {
                                             />
                                         </div>
                                     </Col>
-
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="price">
-                                                Price
+                                            <label className="floating-label" htmlFor="type">
+                                                Type
                                             </label>
-                                            <input
-                                                type="number"
-                                                className="form-control"
-                                                name="price"
-                                                value={formData.price}
-                                                onChange={handleChange}
-                                                placeholder="Event Price"
-                                            />
+                                            <select className="form-control" name="type" value={formData.type} onChange={handleChange}>
+                                                <option value="Physical">Physical</option>
+                                                <option value="Virtual">Virtual</option>
+                                            </select>
+                                        </div>
+                                    </Col>
+                                    <Col sm={12}>
+                                        <div className="form-group fill" style={{ position: 'relative' }}>
+                                            <label
+                                                className="floating-label"
+                                                htmlFor="price"
+                                                style={{
+                                                    zIndex: 10,
+                                                    position: 'absolute',
+                                                    backgroundColor: 'white',
+                                                    paddingRight: '4px',
+                                                    paddingLeft: '2px'
+                                                }}
+                                            >
+                                                Price <span style={{ color: 'red' }}>*</span>
+                                            </label>
+                                            <div className="input-group" style={{ position: 'relative', zIndex: 1, marginTop: '8px' }}>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    name="price"
+                                                    value={formData.price}
+                                                    onChange={handleChange}
+                                                    placeholder="0.00"
+                                                    step="0.01"
+                                                    min="0"
+                                                />
+                                                <span
+                                                    className="input-group-text border-start-0"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        color: 'white',
+                                                        fontWeight: '600',
+                                                        backgroundColor: '#0066cc',
+                                                        minWidth: '60px',
+                                                        justifyContent: 'center',
+                                                        padding: '0.5rem 0.75rem'
+                                                    }}
+                                                >
+                                                    SGD
+                                                </span>
+                                            </div>
                                         </div>
                                     </Col>
 
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="startDate">
-                                                Start Date
+                                                Start Date <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="date"
@@ -1082,7 +1411,7 @@ function AddEventPage() {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="startTime">
-                                                Start Time
+                                                Start Time <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="time"
@@ -1097,7 +1426,7 @@ function AddEventPage() {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="endDate">
-                                                End Date
+                                                End Date <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="date"
@@ -1112,7 +1441,7 @@ function AddEventPage() {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="endTime">
-                                                End Time
+                                                End Time <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="time"
@@ -1125,7 +1454,32 @@ function AddEventPage() {
                                         </div>
                                     </Col>
 
-                                    <Col sm={6}>
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="country">
+                                                Country
+                                            </label>
+                                            <select
+                                                id="country"
+                                                name="country"
+                                                className="form-control"
+                                                value={formData.country}
+                                                onChange={handleChange}
+                                                disabled={isLoadingCountries}
+                                            >
+                                                <option value="" disabled>
+                                                    {isLoadingCountries ? 'Loading countries...' : 'Select Country'}
+                                                </option>
+                                                {countryList.map((country) => (
+                                                    <option key={country.code} value={country.name}>
+                                                        {country.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={3}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="latitude">
                                                 Latitude
@@ -1165,7 +1519,7 @@ function AddEventPage() {
                                             </div>
                                         </div>
                                     </Col>
-                                    <Col sm={6}>
+                                    <Col sm={3}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="longitude">
                                                 Longitude
@@ -1206,7 +1560,7 @@ function AddEventPage() {
                                         </div>
                                     </Col>
 
-                                    <Col sm={4}>
+                                    <Col sm={3}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="location">
                                                 Location
@@ -1220,8 +1574,9 @@ function AddEventPage() {
                                                 placeholder="Event Location"
                                             />
                                         </div>
-                                    </Col>
-                                    <Col sm={4}>
+                                    </Col> 
+
+                                    <Col sm={3}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="venue">
                                                 Venue
@@ -1236,57 +1591,11 @@ function AddEventPage() {
                                             />
                                         </div>
                                     </Col>
-                                    <Col sm={4}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="country">
-                                                Country
-                                            </label>
-                                            <select
-                                                id="country"
-                                                name="country"
-                                                className="form-control"
-                                                value={formData.country}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="" disabled>
-                                                    Select Country
-                                                </option>
-                                                {countryList.map((country) => (
-                                                    <option key={country.code} value={country.name}>
-                                                        {country.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </Col>
 
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="type">
-                                                Type
-                                            </label>
-                                            <select className="form-control" name="type" value={formData.type} onChange={handleChange}>
-                                                <option value="Physical">Physical</option>
-                                                <option value="Virtual">Virtual</option>
-                                            </select>
-                                        </div>
-                                    </Col>
+                               
 
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="currency">
-                                                Currency
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                name="currency"
-                                                value={formData.currency}
-                                                onChange={handleChange}
-                                                placeholder="Currency"
-                                            />
-                                        </div>
-                                    </Col>
+                                    
+                                   
 
                                     <Col sm={12}>
                                         <div className="form-group fill">
@@ -1315,8 +1624,15 @@ function AddEventPage() {
                                                     options={speakerOptions}
                                                     value={selectedSpeakerOptions}
                                                     onChange={handleSpeakerSelect}
-                                                    placeholder={id ? 'Update speakers...' : 'Choose speakers...'}
-                                                    onMenuOpen={() => setSpeakerDropdownOpen(true)}
+                                                    placeholder={
+                                                        isLoadingSpeakers
+                                                            ? 'Loading speakers...'
+                                                            : id
+                                                            ? 'Update speakers...'
+                                                            : 'Choose speakers...'
+                                                    }
+                                                    isLoading={isLoadingSpeakers}
+                                                    onMenuOpen={handleSpeakerDropdownOpen}
                                                     onMenuClose={() => setSpeakerDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({
@@ -1348,7 +1664,7 @@ function AddEventPage() {
                                                     style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
                                                     onClick={() => setShowSidebar(true)}
                                                 >
-                                                    Add Speaker
+                                                    Add
                                                 </Button>
                                             )}
                                         </div>
@@ -1387,8 +1703,15 @@ function AddEventPage() {
                                                     options={categoryOptions}
                                                     value={selectedCategoryOptions}
                                                     onChange={handleCategorySelect}
-                                                    placeholder={id ? 'Update categories...' : 'Choose categories...'}
-                                                    onMenuOpen={() => setCategoryDropdownOpen(true)}
+                                                    placeholder={
+                                                        isLoadingCategories
+                                                            ? 'Loading categories...'
+                                                            : id
+                                                            ? 'Update categories...'
+                                                            : 'Choose categories...'
+                                                    }
+                                                    isLoading={isLoadingCategories}
+                                                    onMenuOpen={handleCategoryDropdownOpen}
                                                     onMenuClose={() => setCategoryDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({
@@ -1420,7 +1743,7 @@ function AddEventPage() {
                                                     style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
                                                     onClick={() => setShowCategoryModal(true)}
                                                 >
-                                                    Add Category
+                                                    Add
                                                 </Button>
                                             )}
                                         </div>
@@ -1443,8 +1766,9 @@ function AddEventPage() {
                                                             value: exhibitor.id
                                                         }))}
                                                     onChange={handleExhibitorSelect}
-                                                    placeholder="Choose exhibitors..."
-                                                    onMenuOpen={() => setExhibitorDropdownOpen(true)}
+                                                    placeholder={isLoadingExhibitors ? 'Loading exhibitors...' : 'Choose exhibitors...'}
+                                                    isLoading={isLoadingExhibitors}
+                                                    onMenuOpen={handleExhibitorDropdownOpen}
                                                     onMenuClose={() => setExhibitorDropdownOpen(false)}
                                                     styles={{
                                                         control: (base) => ({

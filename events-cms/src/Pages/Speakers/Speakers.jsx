@@ -14,22 +14,22 @@ import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationMo
 import { API_URL, DUMMY_PATH, DUMMY_PATH_USER } from '../../configs/env';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../hooks/useTableNavigation';
+import { SPEAKER_PATHS } from '../../utils/constants';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView, restoreTablePage) {
+function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTablePage) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = 0;
+    // Destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        currentPage = $(tableZero).DataTable().page();
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const dataTableInstance = $(tableZero).DataTable({
         data: data || [],
         order: [[0, 'asc']],
         searching: true,
@@ -141,24 +141,43 @@ function atable(data, handleAddSpeaker, handleEdit, handleDelete, handleView, re
                     </button>
                 `);
 
-                $('#addSpeakerBtn').on('click', handleAddSpeaker);
+                $('#addSpeakerBtn').on('click', handleAdd);
             }
-        }
+
+            // Restore the current page using the hook function after table is fully initialized
+            // This sets up the page change listener and restores page from URL if needed
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                // Always call restoreTablePage - it will check if page needs to be changed
+                // and will set up the page change listener to sync URL on pagination
+                restoreTablePage(api);
+            }
+        },
+        responsive: true
     });
-
-    const dataTableInstance = $(tableZero).DataTable();
-
-    // Restore the current page using the hook function
-    if (typeof restoreTablePage === 'function') {
-        restoreTablePage(dataTableInstance, currentPage);
-    }
 
     // Attach event listeners for actions
     $(document).on('click', '.view-btn', function () {
         const speakerId = $(this).data('id');
         const dataSpeaker = data.find((speaker) => speaker.id === speakerId);
         if (dataSpeaker) {
-            handleView(dataSpeaker);
+            // Get current page from DataTable instance before navigating
+            // This ensures we always have the correct page number
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    // DataTable uses 0-based indexing, URL uses 1-based
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                // DataTable page info not available, fallback to URL
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            // Always pass the page parameter if available
+            handleView(dataSpeaker, currentPage);
         }
     });
 
@@ -189,60 +208,72 @@ const Speakers = () => {
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const navigate = useNavigate();
+    const tableRef = React.useRef(null);
 
+    // Use pagination persistence hook
     const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
 
-    const [showViewModal, setShowViewModal] = React.useState(false);
-    const [editData, setEditData] = React.useState(null);
-    const [viewData, setViewData] = React.useState(null);
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: SPEAKER_PATHS.LIST_SPEAKERS,
+        viewPath: SPEAKER_PATHS.VIEW_SPEAKER,
+        editPath: SPEAKER_PATHS.EDIT_SPEAKER,
+        addPath: SPEAKER_PATHS.ADD_SPEAKER
+    });
 
-    const handleView = (data) => {
-        navigate(`/speakers/view-speaker/${data.id}`);
-    };
-
-    const destroyTable = () => {
-        if (currentTable) {
-            currentTable.off('page.dt');
+    const destroyTable = React.useCallback(() => {
+        if (tableRef.current) {
+            tableRef.current.off('page.dt');
             $('#data-table-zero').off('click', '.delete-btn');
-            currentTable.destroy();
+            tableRef.current.destroy();
+            tableRef.current = null;
             setCurrentTable(null);
         }
-    };
+    }, []);
 
-    const initializeTable = () => {
-        destroyTable();
-        if (Array.isArray(speakers) && speakers.length >= 0) {
-            const table = atable(speakers, handleAddSpeaker, handleEdit, handleDelete, handleView, restoreTablePage);
-            setCurrentTable(table);
-            // Check and adjust page if current page is now empty (after deletion)
-            if (table && typeof checkAndAdjustPage === 'function') {
-                checkAndAdjustPage(table);
-            }
-        }
-    };
-
-    useEffect(() => {
-        dispatch(speakerList());
-        return () => destroyTable();
-    }, [dispatch]);
-
-    useEffect(() => {
-        initializeTable();
-        return () => destroyTable();
-    }, [speakers]);
-
-    const handleAddSpeaker = () => {
-        navigate(`/speakers/add-speaker`);
-    };
-
-    const handleEdit = (data) => {
-        navigate(`/speakers/edit-speaker/${data.id}`);  
-    };
-
-    const handleDelete = (speakerId) => {
+    const handleDelete = React.useCallback((speakerId) => {
         setItemToDelete({ id: speakerId });
         setShowDeleteModal(true);
-    };
+    }, []);
+
+    const initializeTable = React.useCallback(() => {
+        destroyTable();
+        if (Array.isArray(speakers) && speakers.length >= 0) {
+            // Only initialize table when speakers change, not when page changes
+            // This prevents flickering when user clicks next/previous page
+            // Note: restoreTablePage is NOT in dependencies to prevent reinitialization when URL changes
+            // It's captured via closure and will always have the latest version
+            const table = atable(speakers, handleAdd, handleEdit, handleDelete, handleView, restoreTablePage);
+            tableRef.current = table;
+            setCurrentTable(table);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [speakers, destroyTable, handleAdd, handleEdit, handleDelete, handleView]);
+
+    useEffect(() => {
+        // Only fetch if speakers are not already loaded in Redux
+        // This prevents unnecessary API calls when navigating back after create/update/delete
+        // Since create/update/delete already update Redux, we don't need to fetch again
+        if (!speakers || speakers.length === 0) {
+            dispatch(speakerList());
+        }
+        return () => destroyTable();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Initialize table when speakers change
+    // Note: We don't include location.search in dependencies to avoid reinitializing on every page change
+    // The restoreTablePage function in initComplete handles page restoration from URL
+    useEffect(() => {
+        if (speakers) {
+            initializeTable();
+        }
+        return () => {
+            destroyTable();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [speakers]);
 
     const handleConfirmDelete = async () => {
         if (!itemToDelete) return;
@@ -250,8 +281,7 @@ const Speakers = () => {
         setIsDeleting(true);
         try {
             const result = await dispatch(deleteSpeaker(itemToDelete.id));
-            // Only close modal if delete was successful
-            // deleteSpeaker already calls speakerList() internally, which will trigger table reinitialization
+            // deleteSpeaker already updates Redux directly, no need to call speakerList()
             if (result === true) {
                 setShowDeleteModal(false);
                 setItemToDelete(null);

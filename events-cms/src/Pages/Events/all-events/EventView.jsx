@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -18,34 +17,54 @@ import { EVENT_PATHS } from '../../../utils/constants';
 import { getAllGalleries } from '../../../store/actions/galleryActions';
 import FilterComponent from '../../../components/common/FilterComponent';
 import useEventFilter from '../../../hooks/useEventFilter';
+import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-const formatTime = (time) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-};
-
-function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA) {
+function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Clean up existing table and event listeners
+    // Destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const dataTableInstance = $(tableZero).DataTable({
         data: data || [],
-        order: [[0, 'asc']],
+        rowId: 'id', // Explicitly set the row ID field
+        ordering: true, // Allow column sorting
+        order: [[4, 'desc']], // Sort by Event Date column (index 4) in descending order (newest first)
+        // Backend already sorts the data, but DataTable will maintain this order on initial load
+        // Configure date sorting to handle YYYY-MM-DD format correctly
+        columnDefs: [
+            {
+                targets: 4, // Event Date column (index 4)
+                type: 'num', // Use numeric type for proper date comparison
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        // Return timestamp for sorting - ensures Dec 1, 2 come before Nov 28, 30
+                        if (row.startDate) {
+                            const dateStr = String(row.startDate);
+                            const parts = dateStr.split('T')[0].split('-');
+                            if (parts.length === 3) {
+                                const year = parseInt(parts[0], 10);
+                                const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+                                const day = parseInt(parts[2], 10);
+                                // Use UTC to avoid timezone issues
+                                return new Date(Date.UTC(year, month, day)).getTime();
+                            }
+                            return new Date(row.startDate).getTime();
+                        }
+                        return 0;
+                    }
+                    // For display, use the formatted date
+                    return formatDateTimeForTable(row.startDate, row.startTime);
+                }
+            }
+        ],
         searching: true,
         searchDelay: 500,
         pageLength: 5,
@@ -157,9 +176,10 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
                 }
             },
             {
-                data: null,
+                data: 'startDate', // Use startDate for sorting
                 title: 'Event Date',
                 render: function (data, type, row) {
+                    // Display formatting is handled by columnDefs render function
                     return formatDateTimeForTable(row.startDate, row.startTime);
                 }
             },
@@ -235,20 +255,43 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
                     </button>
                 `);
 
-                $('#addEventBtn').on('click', handleAddEvent);
+                $('#addEventBtn').on('click', handleAdd);
             }
-        }
-    });
 
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
+            // Restore the current page using the hook function after table is fully initialized
+            // This sets up the page change listener and restores page from URL if needed
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                // Always call restoreTablePage - it will check if page needs to be changed
+                // and will set up the page change listener to sync URL on pagination
+                restoreTablePage(api);
+            }
+        },
+        responsive: true
+    });
 
     // Attach event listeners for actions
     $(document).on('click', '.btn-icon', function () {
         const eventId = $(this).data('id');
         const dataEvent = data.find((user) => user.id === eventId);
         if (dataEvent) {
-            handleView(dataEvent);
+            // Get current page from DataTable instance before navigating
+            // This ensures we always have the correct page number
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    // DataTable uses 0-based indexing, URL uses 1-based
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                // DataTable page info not available, fallback to URL
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            // Always pass the page parameter if available
+            handleView(dataEvent, currentPage);
         }
     });
 
@@ -280,56 +323,47 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView, hand
             handleQA(dataEvent);
         }
     });
+
+    return dataTableInstance;
 }
 
 const EventView = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.event?.events);
 
-    const [showModal, setShowModal] = React.useState(false);
-
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    const [showViewModal, setShowViewModal] = React.useState(false); // State for view modal
-    const [editData, setEditData] = React.useState(null);
-
-    const [viewData, setViewData] = React.useState(null); // State for user data to view
-    const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const navigate = useNavigate();
+    const tableRef = useRef(null);
 
     // Use reusable event filter hook
     const { selectedEventId, allEvents, loadingDropdowns, activeFilters, applyFilters, clearFilters, handleEventChange } =
         useEventFilter(eventList);
 
-    const handleView = useCallback(
-        (data) => {
-            navigate(`/events/view-event/${data.id}`);
-        },
-        [navigate]
-    );
+    // Use pagination persistence hook
+    const { initialPage, restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: EVENT_PATHS.LIST_EVENTS,
+        viewPath: EVENT_PATHS.VIEW_EVENT,
+        editPath: EVENT_PATHS.EDIT_EVENT,
+        addPath: EVENT_PATHS.ADD_EVENT
+    });
 
     const destroyTable = useCallback(() => {
-        if (currentTable) {
+        if (tableRef.current) {
+            tableRef.current.off('page.dt');
             $('#data-table-zero').off('click', '.delete-btn');
-            currentTable.destroy();
+            tableRef.current.destroy();
+            tableRef.current = null;
             setCurrentTable(null);
         }
-    }, [currentTable]);
-
-    const handleAddEvent = useCallback(() => {
-        navigate('/events/add-event');
-    }, [navigate]);
-
-    const handleEdit = useCallback(
-        (data) => {
-            navigate(`/events/edit-event/${data.id}`);
-        },
-        [navigate]
-    );
+    }, []);
 
     const handleDelete = useCallback((eventId) => {
         setItemToDelete({ id: eventId });
@@ -366,28 +400,79 @@ const EventView = () => {
     const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
-            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA);
+            // Sort events by startDate in descending order (newest first) to match backend sorting
+            // This ensures Dec 7, 6, 5, 4, 2, 1 show before Nov 30, 29, 28, etc.
+            const sortedEvents = [...events].sort((a, b) => {
+                const parseDate = (dateValue) => {
+                    if (!dateValue) return new Date(0);
+                    if (dateValue instanceof Date) return dateValue;
+                    const dateStr = String(dateValue);
+                    const parts = dateStr.split('T')[0].split('-');
+                    if (parts.length === 3) {
+                        // Create date in UTC to avoid timezone issues
+                        return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+                    }
+                    return new Date(dateStr);
+                };
+                
+                const dateA = parseDate(a.startDate);
+                const dateB = parseDate(b.startDate);
+                
+                // Compare dates in descending order (newest first)
+                const dateComparison = dateB.getTime() - dateA.getTime();
+                if (dateComparison !== 0) {
+                    return dateComparison;
+                }
+                
+                // If dates are the same, sort by time (newest time first)
+                const timeA = a.startTime || '00:00:00';
+                const timeB = b.startTime || '00:00:00';
+                return timeB.localeCompare(timeA);
+            });
+            
+            // Only initialize table when events change, not when page changes
+            // This prevents flickering when user clicks next/previous page
+            // Note: restoreTablePage is NOT in dependencies to prevent reinitialization when URL changes
+            // It's captured via closure and will always have the latest version
+            const table = atable(sortedEvents, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage);
+            tableRef.current = table;
             setCurrentTable(table);
         }
-    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [events, destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
 
+    // Load events only once on mount - check Redux first
     useEffect(() => {
-        dispatch(eventList());
-        return destroyTable;
-    }, [dispatch, destroyTable]);
+        // Check if events already exist in Redux
+        if (!events || events.length === 0) {
+            dispatch(eventList());
+        }
+        return () => {
+            destroyTable();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
+    // Initialize table when events change
+    // Note: We don't include location.search in dependencies to avoid reinitializing on every page change
+    // The restoreTablePage function in initComplete handles page restoration from URL
     useEffect(() => {
-        initializeTable();
-        return destroyTable;
-    }, [initializeTable, destroyTable]);
+        if (events) {
+            initializeTable();
+        }
+        return () => {
+            destroyTable();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [events]);
 
     useEffect(() => {
         return () => {
-            if (currentTable) {
-                resetFilters(currentTable);
+            if (tableRef.current) {
+                resetFilters(tableRef.current);
             }
         };
-    }, [location.pathname, currentTable]);
+    }, [location.pathname]);
 
     const handleConfirmDelete = useCallback(async () => {
         if (!itemToDelete) return;
@@ -397,14 +482,13 @@ const EventView = () => {
             await dispatch(eventDelete(itemToDelete.id));
             setShowDeleteModal(false);
             setItemToDelete(null);
-            destroyTable();
-            await dispatch(eventList());
+            // Redux state is updated directly in the action, useEffect will handle table recreation
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {
             setIsDeleting(false);
         }
-    }, [itemToDelete, dispatch, destroyTable]);
+    }, [itemToDelete, dispatch]);
 
     const handleClose = useCallback(() => {
         if (!isDeleting) {

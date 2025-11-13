@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -236,8 +235,8 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
 const UpcomingEvents = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.upcomingEvents?.events);
-    const [showModal, setShowModal] = React.useState(false);
-    const [editData, setEditData] = React.useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [editData, setEditData] = useState(null);
 
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
@@ -245,6 +244,7 @@ const UpcomingEvents = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const tableRef = useRef(null);
 
     // Use reusable event filter hook for upcoming events with initial filter
     const {
@@ -262,12 +262,13 @@ const UpcomingEvents = () => {
     }, [navigate]);
 
     const destroyTable = useCallback(() => {
-        if (currentTable) {
+        if (tableRef.current) {
             $('#data-table-zero').off('click', '.delete-btn');
-            currentTable.destroy();
+            tableRef.current.destroy();
+            tableRef.current = null;
             setCurrentTable(null);
         }
-    }, [currentTable]);
+    }, []);
 
     const handleAddEvent = useCallback(() => {
         setEditData(null);
@@ -288,27 +289,41 @@ const UpcomingEvents = () => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
             const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView);
+            tableRef.current = table;
             setCurrentTable(table);
         }
     }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView]);
 
+    // Load upcoming events only once on mount - check Redux first
     useEffect(() => {
-        dispatch(upcomingEventList());
-        return destroyTable;
-    }, [dispatch, destroyTable]);
+        // Check if events already exist in Redux
+        if (!events || events.length === 0) {
+            dispatch(upcomingEventList());
+        }
+        return () => {
+            destroyTable();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
+    // Initialize table when events change
     useEffect(() => {
-        initializeTable();
-        return destroyTable;
-    }, [initializeTable, destroyTable]);
+        if (events) {
+            initializeTable();
+        }
+        return () => {
+            destroyTable();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [events]);
 
     useEffect(() => {
         return () => {
-            if (currentTable) {
-                resetFilters(currentTable);
+            if (tableRef.current) {
+                resetFilters(tableRef.current);
             }
         };
-    }, [location.pathname, currentTable]);
+    }, [location.pathname]);
 
  
 
@@ -322,7 +337,7 @@ const UpcomingEvents = () => {
             setShowDeleteModal(false);
             setItemToDelete(null);
             destroyTable();
-            await dispatch(upcomingEventList());
+            // Redux state is updated directly in the action, no need to refetch
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {

@@ -46,50 +46,72 @@ export const speakerById = (id) => async (dispatch) => {
 // Create new speaker
 export const createSpeaker = (data) => async (dispatch) => {
     try {
-        
+        setSpeakerLoading(dispatch, true);
         const response = await axiosInstance.post('/users/speakers/create', data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Speaker created successfully!');
-            // Refresh the speaker list
-            await dispatch(speakerList());
-            return true;
+            // Update Redux store directly with the new speaker
+            const newSpeaker = response.data.data || response.data;
+            dispatch({
+                type: CREATE_SPEAKER,
+                payload: newSpeaker
+            });
+            return newSpeaker;
         }
-        return true;
+        return null;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to create speaker';
         toast.error(errorMessage);
-    } 
-    return false;
+        return null;
+    } finally {
+        setSpeakerLoading(dispatch, false);
+    }
 };
 
 // Update speaker
 export const updateSpeaker = (id, data) => async (dispatch) => {
     try {
+        setSpeakerLoading(dispatch, true);
         const response = await axiosInstance.put(`/users/speakers/update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Speaker updated successfully!');
-            // Refresh the speaker list
-            await dispatch(speakerList());
-            return true;
+            // Update Redux store directly with the updated speaker
+            const updatedSpeaker = response.data.data || response.data;
+            // Ensure the speaker object has the id
+            const speakerWithId = { ...updatedSpeaker, id: id };
+            dispatch({
+                type: UPDATE_SPEAKER,
+                payload: speakerWithId
+            });
+            return speakerWithId;
         }
+        return null;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update speaker';
         toast.error(errorMessage);
+        return null;
+    } finally {
+        setSpeakerLoading(dispatch, false);
     }
-    return false;
 };
 
 // Delete speaker
 export const deleteSpeaker = (id) => async (dispatch) => {
     try {
+        setSpeakerLoading(dispatch, true);
         await axiosInstance.delete(`/users/speakers/delete/${id}`);
         toast.success('Speaker deleted successfully!');
-        // Refresh the speaker list
-        await dispatch(speakerList());
+        // Update Redux store directly by removing the speaker
+        dispatch({
+            type: DELETE_SPEAKER,
+            payload: id
+        });
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete speaker';
         toast.error(errorMessage);
+        return false;
+    } finally {
+        setSpeakerLoading(dispatch, false);
     }
-    return false;
 };

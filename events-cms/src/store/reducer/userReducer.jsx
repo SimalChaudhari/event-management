@@ -43,16 +43,39 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
             };
 
         case UPDATE_USER:
+            // Only update if payload is valid and has an id
+            if (!payload || !payload.id) {
+                return state;
+            }
+            // Convert ids to strings for consistent comparison
+            const updateId = String(payload.id);
+            // Check if user exists in the list
+            const userIndex = state.user.findIndex(u => String(u.id) === updateId);
+            if (userIndex === -1) {
+                // User doesn't exist, add it instead
+                return {
+                    ...state,
+                    user: [payload, ...state.user],
+                    loading: false
+                };
+            }
+            // Update the existing user
             return {
                 ...state,
-                user: state.user.map((user) => (user.id === payload.id ? payload : user)),
+                user: state.user.map((user) => (String(user.id) === updateId ? payload : user)),
                 loading: false
             };
 
         case DELETE_USER:
+            // Only delete if payload (id) is valid
+            if (!payload) {
+                return state;
+            }
+            // Convert id to string for consistent comparison
+            const deleteId = String(payload);
             return {
                 ...state,
-                user: state.user.filter((user) => user.id !== payload),
+                user: state.user.filter((user) => String(user.id) !== deleteId),
                 loading: false
             };
 

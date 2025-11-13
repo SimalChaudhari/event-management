@@ -124,7 +124,7 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
                 $('.add-category-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addCategoryBtn">
                         <i class="feather icon-plus mr-1"></i>
-                        Add Category
+                        Add
                     </button>
                 `);
 
@@ -194,9 +194,15 @@ const Categories = () => {
     };
 
     useEffect(() => {
-        dispatch(categoryList());
+        // Only fetch if categories are not already loaded in Redux
+        // This prevents unnecessary API calls when navigating back after create/update/delete
+        // Since create/update/delete already update Redux, we don't need to fetch again
+        if (!categories || categories.length === 0) {
+            dispatch(categoryList());
+        }
         return () => destroyTable();
-    }, [dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         initializeTable();
@@ -225,7 +231,7 @@ const Categories = () => {
             setShowDeleteModal(false);
             setItemToDelete(null);
             destroyTable();
-            await dispatch(categoryList());
+            // No need to call categoryList() - deleteCategory already updates Redux directly
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {

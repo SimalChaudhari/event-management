@@ -73,12 +73,21 @@ export const createUser = (userData) => async (dispatch) => {
 export const editUser = (id, userData) => async (dispatch) => {
     try {
         const response = await axiosInstance.put(`/users/update/${id}`, userData);
-        dispatch({
-            type: UPDATE_USER,
-            payload: response.data?.data
-        });
-        toast.success('User updated successfully');
-        return response?.data;
+        if (response && response.status >= 200 && response.status < 300) {
+            const updatedUser = response.data?.data || response.data;
+            // Ensure the user object has the id (convert to string for consistency)
+            if (updatedUser) {
+                updatedUser.id = String(updatedUser.id || id);
+                // Only dispatch if we have a valid user object with id
+                dispatch({
+                    type: UPDATE_USER,
+                    payload: updatedUser
+                });
+            }
+            toast.success('User updated successfully');
+            return updatedUser || response?.data;
+        }
+        return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to update user';
         toast.error(errorMessage);
@@ -105,16 +114,17 @@ export const removeProfilePicture = () => async (dispatch) => {
 export const deleteUser = (id) => async (dispatch) => {
     try {
         await axiosInstance.delete(`/users/delete/${id}`);
+        // Convert id to string for consistent comparison in reducer
+        const userIdToDelete = String(id);
         dispatch({
             type: DELETE_USER,
-            payload: id
+            payload: userIdToDelete
         });
         toast.success('User deleted successfully');
         return true;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete user';
         toast.error(errorMessage);
-
         return false;
     }
 };

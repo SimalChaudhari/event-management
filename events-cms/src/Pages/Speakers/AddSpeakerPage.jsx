@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { createSpeaker, updateSpeaker, speakerById } from '../../store/actions/speakerActions';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
+import { SPEAKER_PATHS } from '../../utils/constants';
+import useTableNavigation from '../../hooks/useTableNavigation';
 
 const AddSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams(); // Edit mode के लिए
+
+    // Store the page number from where we came from (for edit mode)
+    const previousPageRef = React.useRef(null);
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -24,6 +30,23 @@ const AddSpeakerPage = () => {
     });
     const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
+
+    // Capture the page number from URL when entering edit mode
+    useEffect(() => {
+        if (id) {
+            // Get page parameter from URL if it exists
+            const urlParams = new URLSearchParams(location.search);
+            const pageParam = urlParams.get('page');
+            if (pageParam) {
+                previousPageRef.current = parseInt(pageParam, 10);
+            } else {
+                // Also check if page is in location state (from navigation)
+                if (location.state?.page) {
+                    previousPageRef.current = location.state.page;
+                }
+            }
+        }
+    }, [id, location.search, location.state]);
 
     // Load edit data if id exists
     useEffect(() => {
@@ -90,6 +113,15 @@ const AddSpeakerPage = () => {
         }
     };
 
+    // Use reusable table navigation hook for back navigation with page preservation
+    const { handleBack } = useTableNavigation({
+        tableRef: null, // Not needed for back navigation
+        listPath: SPEAKER_PATHS.LIST_SPEAKERS,
+        viewPath: SPEAKER_PATHS.VIEW_SPEAKER,
+        editPath: SPEAKER_PATHS.EDIT_SPEAKER,
+        addPath: SPEAKER_PATHS.ADD_SPEAKER
+    });
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -105,7 +137,10 @@ const AddSpeakerPage = () => {
             if (id) {
                 const response = await dispatch(updateSpeaker(id, submitData));
                 if (response) {
-                    navigate('/speakers');
+                    // Preserve the page number if we were editing from a specific page
+                    const urlParams = new URLSearchParams(location.search);
+                    const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+                    handleBack(currentPage);
                 }
             } else {
                 const response = await dispatch(createSpeaker(submitData));
@@ -123,7 +158,10 @@ const AddSpeakerPage = () => {
                     });
                     setImagePreview(null);
 
-                    navigate('/speakers');
+                    // Use the reusable handleBack function which preserves page from URL
+                    const urlParams = new URLSearchParams(location.search);
+                    const currentPage = urlParams.get('page');
+                    handleBack(currentPage);
                 }
             }
         } catch (error) {
@@ -134,7 +172,10 @@ const AddSpeakerPage = () => {
     };
 
     const handleCancel = () => {
-        navigate('/speakers');
+        // Use the reusable handleBack function which preserves page from URL or location state
+        const urlParams = new URLSearchParams(location.search);
+        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+        handleBack(currentPage);
     };
 
     return (
@@ -145,7 +186,7 @@ const AddSpeakerPage = () => {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Speaker' : 'Add Speaker'}</h4>
-                                <Button variant="secondary" onClick={handleCancel}>
+                                <Button variant="secondary" onClick={handleCancel} disabled={loading}>
                                     <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>

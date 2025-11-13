@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useDispatch } from 'react-redux';
-import { eventList, upcomingEventList, getAllEventsForFilter } from '../store/actions/eventActions';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
+import { eventList, upcomingEventList } from '../store/actions/eventActions';
 
 /**
  * Reusable hook for event name filtering
@@ -13,6 +13,27 @@ import { eventList, upcomingEventList, getAllEventsForFilter } from '../store/ac
 const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
     const dispatch = useDispatch();
     
+    // Get events from Redux store - use main events list for filter dropdown
+    // For eventList: use state.event?.event?.events
+    // For upcomingEventList: use state.event?.upcomingEvents
+    const isUpcoming = eventAction === upcomingEventList;
+    
+    // Use a stable selector - get raw events from Redux
+    const eventsFromReduxRaw = useSelector((state) => {
+        if (isUpcoming) {
+            return state.event?.upcomingEvents?.events || state.event?.upcomingEvents || [];
+        }
+        return state.event?.event?.events || [];
+    });
+    
+    // Create a stable string representation of event IDs for comparison
+    const eventsIdString = useMemo(() => {
+        if (!Array.isArray(eventsFromReduxRaw)) {
+            return '';
+        }
+        return eventsFromReduxRaw.map(e => e?.id).filter(Boolean).sort().join(',');
+    }, [eventsFromReduxRaw]);
+    
     // Memoize initial filters to prevent unnecessary re-renders
     const memoizedInitialFilters = useMemo(() => initialFilters, [JSON.stringify(initialFilters)]);
     
@@ -22,23 +43,9 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
     
     // Filter states
     const [selectedEventId, setSelectedEventId] = useState('');
-    const [allEvents, setAllEvents] = useState([]);
+    const [allEvents, setAllEvents] = useState(Array.isArray(eventsFromReduxRaw) ? eventsFromReduxRaw : []);
     const [loadingDropdowns, setLoadingDropdowns] = useState(false);
     const [activeFilters, setActiveFilters] = useState({});
-
-    // Load all events for dropdown
-    const loadEventsForDropdown = useCallback(async () => {
-        setLoadingDropdowns(true);
-        try {
-            const eventsData = await dispatch(getAllEventsForFilter());
-            setAllEvents(eventsData || []);
-        } catch (error) {
-            console.error('Error loading events for dropdown:', error);
-            setAllEvents([]);
-        } finally {
-            setLoadingDropdowns(false);
-        }
-    }, [dispatch]);
 
     // Apply event name filter
     const applyFilters = useCallback(async (filterOverrides = {}) => {
@@ -100,10 +107,26 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
         setSelectedEventId(eventId);
     }, []);
 
-    // Initialize dropdown data - only run once
+    // Use ref to track previous event IDs to prevent unnecessary updates
+    const prevEventsIdStringRef = useRef('');
+    const prevEventsRef = useRef([]);
+    
+    // Sync with Redux state when it changes - NO API CALL, only use Redux data
     useEffect(() => {
-        loadEventsForDropdown();
-    }, [loadEventsForDropdown]);
+        // Only update if the actual event IDs have changed (not just the reference)
+        if (eventsIdString !== prevEventsIdStringRef.current) {
+            if (eventsFromReduxRaw && Array.isArray(eventsFromReduxRaw) && eventsFromReduxRaw.length > 0) {
+                setAllEvents(eventsFromReduxRaw);
+                setLoadingDropdowns(false);
+            } else {
+                setAllEvents([]);
+            }
+            prevEventsIdStringRef.current = eventsIdString;
+            prevEventsRef.current = eventsFromReduxRaw;
+        }
+        // Only depend on eventsIdString - the actual events array is captured via closure
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [eventsIdString]);
 
     // Memoize return object to prevent unnecessary re-renders
     const returnValue = useMemo(() => ({
@@ -117,7 +140,6 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
         applyFilters,
         clearFilters,
         handleEventChange,
-        loadEventsForDropdown,
         
         // For direct state updates if needed
         setSelectedEventId,
@@ -129,8 +151,7 @@ const useEventFilter = (eventAction = eventList, initialFilters = {}) => {
         activeFilters,
         applyFilters,
         clearFilters,
-        handleEventChange,
-        loadEventsForDropdown
+        handleEventChange
     ]);
 
     return returnValue;

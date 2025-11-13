@@ -263,9 +263,7 @@ const UserList = () => {
             try {
                 await deleteUserData(userIdToDelete);
                 setShowConfirmModal(false);
-                setIsLoading(false);
-                // Refresh data with current filter after deletion
-                await fetchData(roleFilter === 'all' ? null : roleFilter);
+                // deleteUserData already updates Redux directly, no need to fetch again
             } catch (error) {
                 console.error('Error deleting user:', error);
             }
@@ -290,7 +288,8 @@ const UserList = () => {
 
     const handleCsvUploadSuccess = async () => {
         setShowCsvUploadModal(false);
-        // Refresh data with current filter after upload
+        // CSV upload adds multiple users, so we need to fetch the updated list
+        // (unlike single create/update/delete which update Redux directly)
         await fetchData(roleFilter === 'all' ? null : roleFilter);
     };
 
@@ -354,8 +353,14 @@ const UserList = () => {
     };
 
     useEffect(() => {
-        fetchData(roleFilter === 'all' ? null : roleFilter);
+        // Only fetch if users are not already loaded in Redux
+        // This prevents unnecessary API calls when navigating back after create/update/delete
+        // Since create/update/delete already update Redux, we don't need to fetch again
+        if (!user || user.length === 0) {
+            fetchData(roleFilter === 'all' ? null : roleFilter);
+        }
         return () => destroyTable();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

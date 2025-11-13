@@ -78,11 +78,10 @@ const usePersistedTablePage = (paramName = 'page') => {
     /**
      * Restores the DataTable page from URL and sets up page change listener
      * @param {any} dataTableInstance - The DataTable instance
-     * @param {number} currentPage - Fallback page if URL page is invalid (default: 0)
      * @returns {any} The DataTable instance
      */
     const restoreTablePage = useCallback(
-        (dataTableInstance, currentPage = 0) => {
+        (dataTableInstance) => {
             if (!dataTableInstance) {
                 return dataTableInstance;
             }
@@ -96,7 +95,7 @@ const usePersistedTablePage = (paramName = 'page') => {
             const currentSearch = window.location.search || location.search;
             const params = new URLSearchParams(currentSearch);
             const pageParam = parseInt(params.get(paramName), 10);
-            let targetPage = currentPage;
+            let targetPage = 0; // Default to page 0 if no page param in URL
             if (!Number.isNaN(pageParam) && pageParam >= 1) {
                 targetPage = pageParam - 1; // Convert 1-based URL to 0-based DataTable index
             }
@@ -107,9 +106,10 @@ const usePersistedTablePage = (paramName = 'page') => {
                 targetPage = Math.max(totalPages - 1, 0);
             }
             
-            // Restore the page if there are pages available
-            if (totalPages > 0 && targetPage >= 0 && targetPage < totalPages) {
-                // Restore immediately - DataTable should be ready at this point
+            // Restore the page if there are pages available and it's different from current
+            const currentTablePage = pageInfo ? pageInfo.page : 0;
+            if (totalPages > 0 && targetPage >= 0 && targetPage < totalPages && currentTablePage !== targetPage) {
+                // Only change page if it's different - this prevents unnecessary redraws
                 dataTableInstance.page(targetPage).draw('page');
             }
 

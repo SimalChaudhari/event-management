@@ -313,6 +313,20 @@ export class EventService {
         return true; // Include today's events and upcoming events
       });
 
+      // Sort events by startDate in descending order (newest first)
+      // Events on Nov 14, 13, 12 will show as 14, 13, 12
+      // Dec 6, 5, 4, 1 should show before Nov 30, 29, 28
+      filteredEvents.sort((a, b) => {
+        // Create date objects and normalize to midnight (ignore time component)
+        const dateA = new Date(a.startDate);
+        dateA.setHours(0, 0, 0, 0);
+        const dateB = new Date(b.startDate);
+        dateB.setHours(0, 0, 0, 0);
+        
+        // Compare dates in descending order (newest first)
+        return dateB.getTime() - dateA.getTime();
+      });
+
       const eventsWithAttendance = await Promise.all(
         filteredEvents.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
@@ -480,6 +494,19 @@ export class EventService {
           // Remove the searchResult and hasGlobalMatch properties for cleaner response
           const { searchResult, hasGlobalMatch, ...cleanEvent } = event as any;
           return cleanEvent;
+        });
+
+        // Sort events by startDate in descending order (newest first)
+        // Dec 6, 5, 4, 1 should show before Nov 30, 29, 28
+        completeEvents.sort((a, b) => {
+          // Create date objects and normalize to midnight (ignore time component)
+          const dateA = new Date(a.startDate);
+          dateA.setHours(0, 0, 0, 0);
+          const dateB = new Date(b.startDate);
+          dateB.setHours(0, 0, 0, 0);
+          
+          // Compare dates in descending order (newest first)
+          return dateB.getTime() - dateA.getTime();
         });
 
         return {

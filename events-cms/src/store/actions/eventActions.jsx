@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST, CREATE_EVENT, UPDATE_EVENT } from '../constants/actionTypes';
 
 // Helper function to dispatch loading state
 const setEventLoading = (dispatch, loading) => {
@@ -10,7 +10,7 @@ const setEventLoading = (dispatch, loading) => {
     });
 };
 
-export const eventList = (filters = {}) => async (dispatch) => {
+export const eventList = (filters = {}) => async (dispatch, getState) => {
     try {
         setEventLoading(dispatch, true);
         // Build query parameters
@@ -52,10 +52,23 @@ export const eventList = (filters = {}) => async (dispatch) => {
         const url = queryString ? `/events?${queryString}` : '/events';
         
         const response = await axiosInstance.get(url);
+        const eventsData = response.data;
+        
         dispatch({
             type: EVENT_LIST,
-            payload: response.data // Assuming response contains the customers data
+            payload: eventsData // Assuming response contains the customers data
         });
+        
+        // Also store events for filter dropdown if not already stored
+        const state = getState();
+        if (!state.event?.eventFilterList || state.event.eventFilterList.length === 0) {
+            const filterEvents = eventsData?.events || eventsData || [];
+            dispatch({
+                type: EVENT_FILTER_LIST,
+                payload: Array.isArray(filterEvents) ? filterEvents : []
+            });
+        }
+        
         return true;
     } catch (error) {
         // Check if error response exists and handle error message
@@ -148,15 +161,36 @@ export const createEvent = (data) => async (dispatch) => {
        
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Event registered successfully!');
-            return true;
+            
+            // Get the created event data from response or fetch full details
+            let createdEvent = response.data?.data;
+            
+            // If response doesn't have full event details, fetch it
+            if (createdEvent?.id && (!createdEvent.speakers && !createdEvent.categories)) {
+                const eventId = createdEvent.id;
+                const eventResponse = await axiosInstance.get(`/events/${eventId}`);
+                createdEvent = eventResponse.data?.data || eventResponse.data;
+            }
+            
+            // Update Redux store directly with the new event
+            if (createdEvent?.id) {
+                dispatch({
+                    type: CREATE_EVENT,
+                    payload: createdEvent
+                });
+                
+                return { success: true, event: createdEvent };
+            }
+            
+            return { success: true };
         }
-        return true;
+        return { success: false };
     } catch (error) {
         // Check if error response exists and handle error message
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+        return { success: false };
     }
-    return false; // Return false for any errors
 };
 
 export const editEvent = (id, data) => async (dispatch) => {
@@ -166,14 +200,35 @@ export const editEvent = (id, data) => async (dispatch) => {
         // Check if the response is successful
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Event updated successfully!');
-            return true; // Indicate successful update
+            
+            // Get the updated event data from response or fetch full details
+            let updatedEvent = response.data?.data;
+            
+            // If response doesn't have full event details, fetch it
+            if (!updatedEvent || (!updatedEvent.speakers && !updatedEvent.categories)) {
+                const eventResponse = await axiosInstance.get(`/events/${id}`);
+                updatedEvent = eventResponse.data?.data || eventResponse.data;
+            }
+            
+            // Update Redux store directly with the updated event
+            if (updatedEvent?.id) {
+                dispatch({
+                    type: UPDATE_EVENT,
+                    payload: updatedEvent
+                });
+                
+                return { success: true, event: updatedEvent };
+            }
+            
+            return { success: true };
         }
+        return { success: false };
     } catch (error) {
         // Handle errors appropriately
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
+        return { success: false };
     }
-    return false; // Return false for any errors or unsuccessful attempts
 };
 
 export const participatedEvents = (filters = {}) => async (dispatch) => {
@@ -234,6 +289,11 @@ export const registerEventById = (id) => async (dispatch) => {
 export const eventDelete = (id) => async (dispatch) => {
     try {
         await axiosInstance.delete(`/events/delete/${id}`);
+        // Update Redux state directly without refetching
+        dispatch({
+            type: EVENT_DELETE,
+            payload: id
+        });
         toast.success('Event deleted successfully!');
         return true;
     } catch (error) {
@@ -329,14 +389,14 @@ export const galleryList = () => async (dispatch) => {
 
 export const exhibitorGet = () => async (dispatch) => {
     try {
-        setEventLoading(dispatch, true);
+        // setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/exhibitors');
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
     } finally {
-        setEventLoading(dispatch, false);
+        // setEventLoading(dispatch, false);
     }
 };
 
@@ -446,11 +506,28 @@ export const getAllUsersForFilter = () => async (dispatch) => {
 };
 
 // Get all events for dropdown filter
-export const getAllEventsForFilter = () => async (dispatch) => {
+export const getAllEventsForFilter = () => async (dispatch, getState) => {
     try {
+        // Check if events already exist in Redux
+        const state = getState();
+        const existingEvents = state.event?.eventFilterList;
+        
+        if (existingEvents && existingEvents.length > 0) {
+            // Return existing events from Redux
+            return existingEvents;
+        }
+
         setEventLoading(dispatch, true);
         const response = await axiosInstance.get('/events');
-        return response.data?.events || [];
+        const events = response.data?.events || [];
+        
+        // Store in Redux for future use
+        dispatch({
+            type: EVENT_FILTER_LIST,
+            payload: events
+        });
+        
+        return events;
     } catch (error) {
         console.error('Error fetching events for filter:', error);
         return [];
@@ -520,7 +597,7 @@ export const updateEventTabVisibility = (eventId, tabVisibilitySettings) => asyn
 // Get countries list
 export const getCountries = () => async (dispatch) => {
     try {
-        setEventLoading(dispatch, true);
+        // setEventLoading(dispatch, true);
         const response = await axiosInstance.get('countries');
         return response.data || [];
     } catch (error) {
@@ -528,14 +605,14 @@ export const getCountries = () => async (dispatch) => {
         toast.error('Failed to fetch countries');
         return [];
     } finally {
-        setEventLoading(dispatch, false);
+        // setEventLoading(dispatch, false);
     }
 };
 
 // Get speakers list for event form
 export const getSpeakersForEvent = () => async (dispatch) => {
     try {
-        setEventLoading(dispatch, true);
+        // setEventLoading(dispatch, true);
         const response = await axiosInstance.get('users/speakers/get');
         if (response.data.success) {
             return response.data.data || [];
@@ -546,14 +623,14 @@ export const getSpeakersForEvent = () => async (dispatch) => {
         toast.error('Failed to fetch speakers');
         return [];
     } finally {
-        setEventLoading(dispatch, false);
+        // setEventLoading(dispatch, false);
     }
 };
 
 // Get categories list for event form
 export const getCategoriesForEvent = () => async (dispatch) => {
     try {
-        setEventLoading(dispatch, true);
+        // setEventLoading(dispatch, true);
         const response = await axiosInstance.get('categories/get');
         if (response.data.success) {
             return response.data.data || [];
@@ -564,7 +641,7 @@ export const getCategoriesForEvent = () => async (dispatch) => {
         toast.error('Failed to fetch categories');
         return [];
     } finally {
-        setEventLoading(dispatch, false);
+        // setEventLoading(dispatch, false);
     }
 };
 
