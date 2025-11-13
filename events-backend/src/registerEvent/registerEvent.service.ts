@@ -202,6 +202,9 @@ export class RegisterEventService {
           );
         }
 
+        // Sort by event startDate in descending order (newest first)
+        queryBuilder.orderBy('event.startDate', 'DESC');
+
         registerEvents = await queryBuilder.getMany();
       } else {
         // Normal user can only see their own registered events
@@ -237,6 +240,9 @@ export class RegisterEventService {
             { eventFilter: `%${filters.eventFilter}%` }
           );
         }
+
+        // Sort by event startDate in descending order (newest first)
+        queryBuilder.orderBy('event.startDate', 'DESC');
 
         registerEvents = await queryBuilder.getMany();
       }
@@ -395,6 +401,19 @@ export class RegisterEventService {
           };
         }),
       );
+
+      // Sort registrations by event startDate in descending order (newest first)
+      // Similar to how events are sorted in event service
+      registerEventsWithAttendance.sort((a, b) => {
+        // Create date objects and normalize to midnight (ignore time component)
+        const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
+        dateA.setHours(0, 0, 0, 0);
+        const dateB = b.event?.startDate ? new Date(b.event.startDate) : new Date(0);
+        dateB.setHours(0, 0, 0, 0);
+        
+        // Compare dates in descending order (newest first)
+        return dateB.getTime() - dateA.getTime();
+      });
 
       return {
         success: true,

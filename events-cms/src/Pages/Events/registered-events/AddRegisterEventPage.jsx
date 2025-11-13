@@ -33,7 +33,7 @@ const AddRegisterEventPage = () => {
         isCreatedByAdmin: true
     });
 
-    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false); // For form submission
     const [currentUser, setCurrentUser] = useState(null);
     const [currentEvent, setCurrentEvent] = useState(null);
 
@@ -47,7 +47,6 @@ const AddRegisterEventPage = () => {
         if (id) {
             const loadRegisterEventData = async () => {
                 try {
-                    setLoading(true);
                     const response = await dispatch(registerEventById(id));
                     if (response?.data) {
                         const editData = response.data;
@@ -72,9 +71,7 @@ const AddRegisterEventPage = () => {
                         }
                     }
                 } catch (error) {
-                    setLoading(false);
-                } finally {
-                    setLoading(false);
+                    console.error('Error loading register event data:', error);
                 }
             };
             loadRegisterEventData();
@@ -98,7 +95,7 @@ const AddRegisterEventPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setSubmitting(true);
 
         try {
             let response;
@@ -135,9 +132,9 @@ const AddRegisterEventPage = () => {
                 handleBack(currentPage);
             }
         } catch (err) {
-            setLoading(false);
+            setSubmitting(false);
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
@@ -163,15 +160,7 @@ const AddRegisterEventPage = () => {
                             </div>
                         </div>
                         <div className="card-body">
-                            {loading && id ? (
-                                <div className="text-center">
-                                    <div className="spinner-border" role="status">
-                                        <span className="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p className="mt-2">Loading register event data...</p>
-                                </div>
-                            ) : (
-                                <form onSubmit={handleSubmit}>
+                            <form onSubmit={handleSubmit}>
                                     <Row>
                                         <Col sm={12}>
                                             <div className="form-group fill">
@@ -273,15 +262,14 @@ const AddRegisterEventPage = () => {
                                                 <Button
                                                     variant="primary"
                                                     type="submit"
-                                                    disabled={loading || !formData.userId || !formData.eventId}
+                                                    disabled={submitting || !formData.userId || !formData.eventId}
                                                 >
-                                                    {loading ? (id ? 'Updating...' : 'Creating...') : id ? 'Update' : 'Create'}
+                                                    {submitting ? (id ? 'Updating...' : 'Creating...') : id ? 'Update' : 'Create'}
                                                 </Button>
                                             </div>
                                         </div>
                                     </div>
                                 </form>
-                            )}
                         </div>
                     </div>
                 </div>

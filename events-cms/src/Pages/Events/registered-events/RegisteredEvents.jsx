@@ -41,12 +41,21 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
         $(tableZero).DataTable().clear().destroy();
     }
 
-    // Sort registrations by event start date
-    const sortedRegistrations = [...registrations].sort((a, b) => new Date(a.event.startDate) - new Date(b.event.startDate));
+    // Sort registrations by event start date in descending order (newest first)
+    // This matches the backend sorting behavior
+    const sortedRegistrations = [...registrations].sort((a, b) => {
+        const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
+        const dateB = b.event?.startDate ? new Date(b.event.startDate) : new Date(0);
+        // Normalize to midnight (ignore time component)
+        dateA.setHours(0, 0, 0, 0);
+        dateB.setHours(0, 0, 0, 0);
+        // Sort in descending order (newest first)
+        return dateB.getTime() - dateA.getTime();
+    });
 
     const dataTableInstance = $(tableZero).DataTable({
         data: sortedRegistrations || [],
-        order: [[5, 'asc']], // Sort by Event Schedule column by default
+        order: [[4, 'desc']], // Sort by Event Schedule column (index 4, 0-based) by default in descending order
         searching: true,
         searchDelay: 500,
         pageLength: 5,
@@ -181,6 +190,10 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
                 data: null,
                 title: 'Event Schedule',
                 render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        // Return raw date for sorting purposes
+                        return row.event?.startDate ? new Date(row.event.startDate).getTime() : 0;
+                    }
                     return formatDateTimeForTable(row.event.startDate, row.event.startTime);
                 }
             },
