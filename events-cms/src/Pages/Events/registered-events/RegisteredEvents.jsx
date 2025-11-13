@@ -15,6 +15,9 @@ import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmatio
 import ExportConfirmationModal from '../../../components/modal/ExportConfirmationModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
+import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../../hooks/useTableNavigation';
+import { useRef, useCallback } from 'react';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -29,14 +32,11 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent) {
+function atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Clean up existing table and event listeners
+    // Destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
         $(tableZero).DataTable().clear().destroy();
     }
@@ -44,7 +44,7 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
     // Sort registrations by event start date
     const sortedRegistrations = [...registrations].sort((a, b) => new Date(a.event.startDate) - new Date(b.event.startDate));
 
-    $(tableZero).DataTable({
+    const dataTableInstance = $(tableZero).DataTable({
         data: sortedRegistrations || [],
         order: [[5, 'asc']], // Sort by Event Schedule column by default
         searching: true,
@@ -210,8 +210,8 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
                     return `
                         <div class="btn-group" role="group" aria-label="Actions">
                             <button type="button" class="btn btn-icon btn-success view-btn" data-id="${
-                                row.event.id
-                            }" title="View Event Details" 
+                                row.id
+                            }" title="View Registration Details" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
@@ -285,32 +285,12 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
             // Setup date filter after table is initialized
             setupDateFilter(this.api());
 
-            // Add event listener for view button
-            $(document).on('click', '.view-btn', function () {
-                const eventId = $(this).data('id');
-                const registration = registrations.find((reg) => reg.event.id === eventId);
-                if (registration) {
-                    handleView(registration);
-                }
-            });
-
-            // Add event listener for edit button
-            $(document).on('click', '.edit-btn', function () {
-                const registrationId = $(this).data('id');
-                const registration = registrations.find((reg) => reg.id === registrationId);
-                if (registration) {
-                    handleEdit(registration);
-                }
-            });
-
-            // Add event listener for delete button
-            $(document).on('click', '.delete-btn', function () {
-                const registrationId = $(this).data('id');
-                const registration = registrations.find((reg) => reg.id === registrationId);
-                if (registration) {
-                    handleDelete(registration);
-                }
-            });
+            // Restore the current page using the hook function after table is fully initialized
+            // This sets up the page change listener and restores page from URL if needed
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
 
             // Add button initialization
             if (!$('#addRegisterEventBtn').length) {
@@ -323,20 +303,60 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
 
                 $('#addRegisterEventBtn').on('click', handleAddRegisterEvent);
             }
-        }
+        },
+        responsive: true
     });
-
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
 
     // Attach event listeners for actions
     $(document).on('click', '.view-btn', function () {
-        const eventId = $(this).data('id');
-        const dataEvent = registrations.find((reg) => reg.event.id === eventId);
-        if (dataEvent) {
-            handleView(dataEvent);
+        const registrationId = $(this).data('id');
+        const registration = registrations.find((reg) => reg.id === registrationId);
+        if (registration) {
+            // Get current page from DataTable instance before navigating
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            handleView(registration, currentPage);
         }
     });
+
+    $(document).on('click', '.edit-btn', function () {
+        const registrationId = $(this).data('id');
+        const registration = registrations.find((reg) => reg.id === registrationId);
+        if (registration) {
+            // Get current page from DataTable instance before navigating
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            handleEdit(registration, currentPage);
+        }
+    });
+
+    $(document).on('click', '.delete-btn', function () {
+        const registrationId = $(this).data('id');
+        const registration = registrations.find((reg) => reg.id === registrationId);
+        if (registration) {
+            handleDelete(registration);
+        }
+    });
+
+    return dataTableInstance;
 }
 
 const RegisteredEvents = () => {
@@ -345,6 +365,7 @@ const RegisteredEvents = () => {
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
+    const tableRef = useRef(null);
     
     // Filter logic using custom hook
     const {
@@ -365,6 +386,18 @@ const RegisteredEvents = () => {
         dispatch
     });
 
+    // Use pagination persistence hook
+    const { restoreTablePage } = usePersistedTablePage();
+
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: EVENT_PATHS.REGISTERED_EVENTS,
+        viewPath: EVENT_PATHS.VIEW_REGISTER_EVENT,
+        editPath: EVENT_PATHS.EDIT_REGISTER_EVENT,
+        addPath: EVENT_PATHS.ADD_REGISTER_EVENT
+    });
+
     // Delete modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [registrationToDelete, setRegistrationToDelete] = useState(null);
@@ -374,14 +407,10 @@ const RegisteredEvents = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
-    // Add handler for view button
-    const handleView = (registration) => {
-        navigate(EVENT_PATHS.VIEW_REGISTER_EVENT + '/' + registration.id);
-    };
-
-    const handleEdit = (registration) => {
-        navigate(EVENT_PATHS.EDIT_REGISTER_EVENT + '/' + registration.id);
-    };
+    // Add handler for Add Register Event button
+    const handleAddRegisterEvent = useCallback(() => {
+        handleAdd();
+    }, [handleAdd]);
 
     // Handle delete button click
     const handleDelete = (registration) => {
@@ -413,11 +442,6 @@ const RegisteredEvents = () => {
     const handleCancelDelete = () => {
         setShowDeleteModal(false);
         setRegistrationToDelete(null);
-    };
-
-    // Add handler for Add Register Event button
-    const handleAddRegisterEvent = () => {
-        navigate(EVENT_PATHS.ADD_REGISTER_EVENT);
     };
 
     // Handle export button click
@@ -459,21 +483,27 @@ const RegisteredEvents = () => {
         }
     };
 
-    const destroyTable = () => {
-        if (currentTable) {
+    const destroyTable = useCallback(() => {
+        if (tableRef.current) {
+            tableRef.current.off('page.dt');
             $('#data-table-zero').off('click', '.view-btn');
-            currentTable.destroy();
+            $('#data-table-zero').off('click', '.edit-btn');
+            $('#data-table-zero').off('click', '.delete-btn');
+            tableRef.current.destroy();
+            tableRef.current = null;
             setCurrentTable(null);
         }
-    };
+    }, []);
 
-    const initializeTable = () => {
+    const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(registrations) && registrations.length >= 0) {
-            const table = atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent);
+            const table = atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage);
+            tableRef.current = table;
             setCurrentTable(table);
         }
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [registrations, destroyTable, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);
 
     useEffect(() => {
         initializeTable();

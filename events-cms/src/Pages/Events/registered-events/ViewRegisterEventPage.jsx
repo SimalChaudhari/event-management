@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { registerEventById } from '../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../configs/env';
 import DateTimeFormatter from '../../../components/dateTime/DateTimeFormatter';
 import { EVENT_PATHS } from '../../../utils/constants';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 import EventBasicComponent from '../../../components/events/EventBasicComponent';
 import EventLocationComponent from '../../../components/events/EventLocationComponent';
 import EventSpeakersComponent from '../../../components/events/EventSpeakersComponent';
@@ -25,9 +26,37 @@ const ViewRegisterEventPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const [eventData, setEventData] = useState(null);
-   
     const [loading, setLoading] = useState(true);
+
+    // Get current registration page from URL for preservation
+    const [registrationPageFromUrl, setRegistrationPageFromUrl] = useState(null);
+    
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            setRegistrationPageFromUrl(pageParam);
+        } else {
+            if (location.state?.page) {
+                setRegistrationPageFromUrl(location.state.page);
+            }
+        }
+    }, [location.search, location.state]);
+
+    // Custom handleBack that uses the captured page parameter
+    const handleBack = useCallback(() => {
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageFromUrl = urlParams.get('page');
+        const currentPage = registrationPageFromUrl || pageFromUrl || location.state?.page;
+        
+        if (currentPage) {
+            navigate(`${EVENT_PATHS.REGISTERED_EVENTS}?page=${currentPage}`);
+        } else {
+            navigate(EVENT_PATHS.REGISTERED_EVENTS);
+        }
+    }, [navigate, registrationPageFromUrl, location.search, location.state]);
 
     // For image modals
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -280,7 +309,7 @@ const ViewRegisterEventPage = () => {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View</h4>
-                        <Button variant="secondary" onClick={() => navigate(EVENT_PATHS.REGISTERED_EVENTS)}>
+                        <Button variant="secondary" onClick={handleBack}>
                             <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
                             Back
                         </Button>

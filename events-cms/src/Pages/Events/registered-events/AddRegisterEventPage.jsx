@@ -1,17 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button, Row, Col, Container } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { createRegisterEvent, eventList, adminUpdateRegisterEvent, registerEventById } from '../../../store/actions/eventActions';
 import { userList } from '../../../store/actions/userActions';
 import { EVENT_PATHS } from '../../../utils/constants';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 
 const AddRegisterEventPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams(); // For edit mode
     const events = useSelector((state) => state.event?.event?.events || []);
     const users = useSelector((state) => state.user?.user || []);
+    const previousPageRef = useRef(null);
+
+    // Use reusable table navigation hook for back navigation
+    const { handleBack } = useTableNavigation({
+        tableRef: null, // Not needed for back navigation
+        listPath: EVENT_PATHS.REGISTERED_EVENTS,
+        viewPath: EVENT_PATHS.VIEW_REGISTER_EVENT,
+        editPath: EVENT_PATHS.EDIT_REGISTER_EVENT,
+        addPath: EVENT_PATHS.ADD_REGISTER_EVENT
+    });
 
     const [formData, setFormData] = useState({
         userId: '',
@@ -51,6 +63,13 @@ const AddRegisterEventPage = () => {
                             registerCode: editData.registerCode || '',
                             isCreatedByAdmin: editData.isCreatedByAdmin || true
                         });
+
+                        // Capture page from URL if available
+                        const urlParams = new URLSearchParams(location.search);
+                        const page = urlParams.get('page');
+                        if (page) {
+                            previousPageRef.current = page;
+                        }
                     }
                 } catch (error) {
                     setLoading(false);
@@ -59,8 +78,15 @@ const AddRegisterEventPage = () => {
                 }
             };
             loadRegisterEventData();
+        } else {
+            // Capture page from URL for create mode
+            const urlParams = new URLSearchParams(location.search);
+            const page = urlParams.get('page');
+            if (page) {
+                previousPageRef.current = page;
+            }
         }
-    }, [id, dispatch]);
+    }, [id, dispatch, location.search]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -103,7 +129,10 @@ const AddRegisterEventPage = () => {
                     });
                 }
 
-                navigate(EVENT_PATHS.REGISTERED_EVENTS);
+                // Navigate back with page preservation
+                const urlParams = new URLSearchParams(location.search);
+                const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+                handleBack(currentPage);
             }
         } catch (err) {
             setLoading(false);
@@ -113,7 +142,10 @@ const AddRegisterEventPage = () => {
     };
 
     const handleCancel = () => {
-        navigate(EVENT_PATHS.REGISTERED_EVENTS);
+        // Navigate back with page preservation
+        const urlParams = new URLSearchParams(location.search);
+        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+        handleBack(currentPage);
     };
 
     return (
