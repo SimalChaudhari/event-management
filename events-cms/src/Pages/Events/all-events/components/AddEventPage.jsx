@@ -964,13 +964,14 @@ function AddEventPage() {
                         // Navigate to the page where the updated event appears
                         // Example: If Nov 18 is updated to Dec 2, and there are 0 events with dates >= Dec 2,
                         // the updated event will be at index 0, which is page 1
-                        navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${pageNumber}`);
+                        // Navigate to the correct list based on event type
+                        navigate(`${listPath}?page=${pageNumber}`);
                     } else {
                         // Date didn't change, preserve the page number if we were editing from a specific page
                         if (previousPageRef.current) {
-                            navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${previousPageRef.current}`);
+                            navigate(`${listPath}?page=${previousPageRef.current}`);
                         } else {
-                            navigate(EVENT_PATHS.LIST_EVENTS);
+                            navigate(listPath);
                         }
                     }
                 } else {
@@ -1015,7 +1016,8 @@ function AddEventPage() {
                     // Navigate to the page where the new event appears
                     // Example: If Nov 30 is created and there are 10 events with dates >= Nov 30,
                     // the new event will be at index 10, which is page 3 (10 / 5 = 2, +1 = page 3)
-                    navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${pageNumber}`);
+                    // Navigate to the correct list based on event type
+                    navigate(`${listPath}?page=${pageNumber}`);
                 }
                 resetFormData();
             }
@@ -1246,18 +1248,33 @@ function AddEventPage() {
         }
     };
 
+    // Detect if this is for upcoming events by checking pathname
+    // AddEventPage is used for both regular events and upcoming events
+    const pathname = window.location.pathname || location.pathname;
+    const isUpcomingEvent = pathname && (
+        pathname.includes('/upcoming/edit-upcoming-event') ||
+        pathname.includes('/upcoming/add-upcoming-event') ||
+        pathname.startsWith('/upcoming/')
+    );
+    
+    // Determine which paths to use based on event type
+    const listPath = isUpcomingEvent ? EVENT_PATHS.UPCOMING_EVENTS : EVENT_PATHS.LIST_EVENTS;
+    const viewPath = isUpcomingEvent ? EVENT_PATHS.VIEW_UPCOMING_EVENT : EVENT_PATHS.VIEW_EVENT;
+    const editPath = isUpcomingEvent ? EVENT_PATHS.EDIT_UPCOMING_EVENT : EVENT_PATHS.EDIT_EVENT;
+    const addPath = isUpcomingEvent ? EVENT_PATHS.ADD_UPCOMING_EVENT : EVENT_PATHS.ADD_EVENT;
+
     // Use reusable table navigation hook for back navigation with page preservation
     const { handleBack } = useTableNavigation({
         tableRef: null, // Not needed for back navigation
-        listPath: EVENT_PATHS.LIST_EVENTS,
-        viewPath: EVENT_PATHS.VIEW_EVENT,
-        editPath: EVENT_PATHS.EDIT_EVENT,
-        addPath: EVENT_PATHS.ADD_EVENT
+        listPath: listPath,
+        viewPath: viewPath,
+        editPath: editPath,
+        addPath: addPath
     });
 
     const handleNavigate = () => {
         // Use the reusable handleBack function which preserves page from URL or location state
-        const urlParams = new URLSearchParams(location.search);
+        const urlParams = new URLSearchParams(location.search || window.location.search);
         const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
         handleBack(currentPage);
     };

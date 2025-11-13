@@ -63,14 +63,26 @@ const useTableNavigation = ({ tableRef, listPath, viewPath, editPath, addPath })
      * Handles navigation to view page with page preservation
      * 
      * @param {Object} data - Item data containing id
+     * @param {string} pageParam - Optional page parameter
      */
     const handleView = useCallback(
         (data, pageParam = null) => {
             // If pageParam is provided, use it; otherwise try to get from DataTable or URL
             const currentPage = pageParam || getCurrentPage();
-            navigateWithPage(viewPath, data.id, currentPage);
+            const fullPath = data.id ? `${viewPath}/${data.id}` : viewPath;
+            const url = currentPage ? `${fullPath}?page=${currentPage}` : fullPath;
+            
+            // Check if this is for upcoming events and add a flag
+            // This helps ViewEventPage know it's an upcoming event even if pathname check fails
+            const isUpcomingPath = viewPath.includes('/upcoming/view-upcoming-event');
+            if (isUpcomingPath) {
+                const separator = currentPage ? '&' : '?';
+                navigate(`${url}${separator}fromUpcoming=true`);
+            } else {
+                navigate(url);
+            }
         },
-        [viewPath, navigateWithPage, getCurrentPage]
+        [viewPath, navigate, getCurrentPage]
     );
 
     /**

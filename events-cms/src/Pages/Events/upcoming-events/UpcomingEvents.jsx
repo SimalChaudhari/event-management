@@ -16,23 +16,22 @@ import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUti
 import FilterComponent from '../../../components/common/FilterComponent';
 import useEventFilter from '../../../hooks/useEventFilter';
 import { EVENT_PATHS } from '../../../utils/constants';
+import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
+function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTablePage) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Clean up existing table and event listeners
+    // Destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
+    const dataTableInstance = $(tableZero).DataTable({
         data: data || [],
         order: [[0, 'asc']],
         searching: true,
@@ -198,37 +197,70 @@ function atable(data, handleAddEvent, handleEdit, handleDelete, handleView) {
             `;
 
             $('.date-filter-wrapper').html(dateFilterHtml);
-                  // Setup date filter after table is initialized
-                  setupDateFilter(this.api());
+            // Setup date filter after table is initialized
+            setupDateFilter(this.api());
 
-     
+            // Restore the current page using the hook function after table is fully initialized
+            // This sets up the page change listener and restores page from URL if needed
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
         },
-    })
-       
-  // Restore the page
-  $(tableZero).DataTable().page(currentPage).draw(false);
+        responsive: true
+    });
 
-  // Attach event listeners for actions
-  $(document).on('click', '.btn-icon', function () {
-      const eventId = $(this).data('id');
-      const dataEvent = data.find((user) => user.id === eventId);
-      if (dataEvent) {
-        handleView(dataEvent);
-      }
-  });
+    // Attach event listeners for actions
+    $(document).on('click', '.btn-icon', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((user) => user.id === eventId);
+        if (dataEvent) {
+            // Get current page from DataTable instance before navigating
+            // This ensures we always have the correct page number
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    // DataTable uses 0-based indexing, URL uses 1-based
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                // DataTable page info not available, fallback to URL
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            // Always pass the page parameter if available
+            handleView(dataEvent, currentPage);
+        }
+    });
 
-  $(document).on('click', '.edit-btn', function () {
-      const eventId = $(this).data('id');
-      const dataEvent = data.find((user) => user.id === eventId);
-      if (dataEvent) {
-          handleEdit(dataEvent);
-      }
-  });
+    $(document).on('click', '.edit-btn', function () {
+        const eventId = $(this).data('id');
+        const dataEvent = data.find((user) => user.id === eventId);
+        if (dataEvent) {
+            // Get current page from DataTable instance before navigating
+            let currentPage = null;
+            try {
+                const pageInfo = dataTableInstance.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                const urlParams = new URLSearchParams(window.location.search);
+                currentPage = urlParams.get('page');
+            }
+            
+            handleEdit(dataEvent, currentPage);
+        }
+    });
 
-  $(document).on('click', '.delete-btn', function () {
-      const eventId = $(this).data('id');
-      handleDelete(eventId);
-  });
+    $(document).on('click', '.delete-btn', function () {
+        const eventId = $(this).data('id');
+        handleDelete(eventId);
+    });
+
+    return dataTableInstance;
 }
 
 
@@ -257,12 +289,21 @@ const UpcomingEvents = () => {
         handleEventChange
     } = useEventFilter(upcomingEventList, { upcoming: true });
 
-    const handleView = useCallback((data) => {
-        navigate(`${EVENT_PATHS.VIEW_UPCOMING_EVENT}/${data.id}`);
-    }, [navigate]);
+    // Use pagination persistence hook
+    const { restoreTablePage } = usePersistedTablePage();
+
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: EVENT_PATHS.UPCOMING_EVENTS,
+        viewPath: EVENT_PATHS.VIEW_UPCOMING_EVENT,
+        editPath: EVENT_PATHS.EDIT_UPCOMING_EVENT,
+        addPath: EVENT_PATHS.ADD_UPCOMING_EVENT
+    });
 
     const destroyTable = useCallback(() => {
         if (tableRef.current) {
+            tableRef.current.off('page.dt');
             $('#data-table-zero').off('click', '.delete-btn');
             tableRef.current.destroy();
             tableRef.current = null;
@@ -271,13 +312,12 @@ const UpcomingEvents = () => {
     }, []);
 
     const handleAddEvent = useCallback(() => {
+        // Use the reusable handleAdd hook which preserves page number
+        handleAdd();
+        // Also set the modal state for backwards compatibility
         setEditData(null);
         setShowModal(true);
-    }, []);
-
-    const handleEdit = useCallback((data) => {
-        navigate(`${EVENT_PATHS.EDIT_UPCOMING_EVENT}/${data.id}`);
-    }, [navigate]);
+    }, [handleAdd]);
     
     const handleDelete = useCallback((eventId) => {
         setItemToDelete({ id: eventId });
@@ -288,11 +328,16 @@ const UpcomingEvents = () => {
     const initializeTable = useCallback(() => {
         destroyTable();
         if (Array.isArray(events) && events.length >= 0) {
-            const table = atable(events, handleAddEvent, handleEdit, handleDelete, handleView);
+            // Only initialize table when events change, not when page changes
+            // This prevents flickering when user clicks next/previous page
+            // Note: restoreTablePage is NOT in dependencies to prevent reinitialization when URL changes
+            // It's captured via closure and will always have the latest version
+            const table = atable(events, handleAdd, handleEdit, handleDelete, handleView, restoreTablePage);
             tableRef.current = table;
             setCurrentTable(table);
         }
-    }, [events, destroyTable, handleAddEvent, handleEdit, handleDelete, handleView]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [events, destroyTable, handleAdd, handleEdit, handleDelete, handleView]);
 
     // Load upcoming events only once on mount - check Redux first
     useEffect(() => {
