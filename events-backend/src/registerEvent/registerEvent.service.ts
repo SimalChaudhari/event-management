@@ -159,385 +159,255 @@ export class RegisterEventService {
     }
   }
 
-  async findAll(
-    userId: string,
-    role: string,
-    filters?: { filter?: string; userFilter?: string; eventFilter?: string },
-  ) {
+  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string }) {
     try {
-      const attendanceCache = new Map<string, number>();
-
+      let registerEvents;
       if (role === 'admin') {
+        // Admin can see all register events
         const queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
           .leftJoinAndSelect('registerEvent.event', 'event')
+          .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
+          .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+          .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+          .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
+          .leftJoinAndSelect('event.category', 'category')
+          .leftJoinAndSelect('category.category', 'categoryDetails')
+          .leftJoinAndSelect('event.galleries', 'galleries')
+          .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
+          .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
+          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
+          .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
+          .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
+          .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
+          .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
-          .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
-          .where('registerEvent.isRegister = :isRegister', { isRegister: true });
+          .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails');
 
+        // Apply filters if provided
         if (filters?.userFilter) {
           queryBuilder.andWhere(
             '(LOWER(user.firstName) LIKE LOWER(:userFilter) OR LOWER(user.lastName) LIKE LOWER(:userFilter) OR LOWER(user.email) LIKE LOWER(:userFilter))',
-            { userFilter: `%${filters.userFilter}%` },
+            { userFilter: `%${filters.userFilter}%` }
           );
         }
 
         if (filters?.eventFilter) {
           queryBuilder.andWhere(
             '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
-            { eventFilter: `%${filters.eventFilter}%` },
+            { eventFilter: `%${filters.eventFilter}%` }
           );
         }
 
-        if (filters?.filter) {
+        registerEvents = await queryBuilder.getMany();
+      } else {
+        // Normal user can only see their own registered events
+        const queryBuilder = this.registerEventRepository
+          .createQueryBuilder('registerEvent')
+          .leftJoinAndSelect('registerEvent.user', 'user')
+          .leftJoinAndSelect('registerEvent.event', 'event')
+          .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
+          .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
+          .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
+          .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
+          .leftJoinAndSelect('event.category', 'category')
+          .leftJoinAndSelect('category.category', 'categoryDetails')
+          .leftJoinAndSelect('event.galleries', 'galleries')
+          .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
+          .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
+          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
+          .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
+          .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
+          .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
+          .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
+          .leftJoinAndSelect('registerEvent.order', 'order')
+          .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
+          .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
+          .where('user.id = :userId', { userId })
+          .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true });
+
+        // Apply event filter for regular users
+        if (filters?.eventFilter) {
           queryBuilder.andWhere(
-            '(LOWER(registerEvent.status) LIKE LOWER(:filter) OR LOWER(registerEvent.type) LIKE LOWER(:filter))',
-            { filter: `%${filters.filter}%` },
+            '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
+            { eventFilter: `%${filters.eventFilter}%` }
           );
         }
 
-        const registerEvents = await queryBuilder
-          .orderBy('registerEvent.createdAt', 'DESC')
-          .getMany();
-
-        const data = await Promise.all(
-          registerEvents.map((registerEvent) =>
-            this.mapAdminRegisterEvent(registerEvent, attendanceCache),
-          ),
-        );
-
-        return {
-          success: true,
-          message: 'All registered events fetched for admin',
-          count: data.length,
-          data,
-        };
+        registerEvents = await queryBuilder.getMany();
       }
 
-      const queryBuilder = this.registerEventRepository
-        .createQueryBuilder('registerEvent')
-        .leftJoinAndSelect('registerEvent.user', 'user')
-        .leftJoinAndSelect('registerEvent.event', 'event')
-        .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
-        .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
-        .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
-        .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
-        .leftJoinAndSelect('event.category', 'category')
-        .leftJoinAndSelect('category.category', 'categoryDetails')
-        .leftJoinAndSelect('event.galleries', 'galleries')
-        .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
-        .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
-        .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-        .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
-        .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
-        .leftJoinAndSelect(
-          'programmeSessions.speakers',
-          'programmeSessionSpeakers',
-        )
-        .leftJoinAndSelect(
-          'programmeSessionSpeakers.speakerProfile',
-          'programmeSessionSpeakerProfile',
-        )
-        .leftJoinAndSelect(
-          'programmeSessionSpeakers.addresses',
-          'programmeSessionSpeakerAddresses',
-        )
-        .leftJoinAndSelect('registerEvent.order', 'order')
-        .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
-        .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
-        .where('user.id = :userId', { userId })
-        .andWhere('registerEvent.isRegister = :isRegister', {
-          isRegister: true,
-        });
+      // Add attendance count and favorite status to each registered event
+      const registerEventsWithAttendance = await Promise.all(
+        registerEvents.map(async (registerEvent) => {
+          const attendanceCount = registerEvent.eventId
+            ? await this.getEventAttendanceCount(registerEvent.eventId)
+            : 0;
 
-      if (filters?.eventFilter) {
-        queryBuilder.andWhere(
-          '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
-          { eventFilter: `%${filters.eventFilter}%` },
-        );
-      }
+          const surveyDetails = registerEvent.eventId
+            ? await this.surveyUtils.getSurveyDetailsByEventId(
+                registerEvent.eventId,
+                userId,
+              )
+            : null;
 
-      if (filters?.filter) {
-        queryBuilder.andWhere(
-          '(LOWER(registerEvent.status) LIKE LOWER(:filter) OR LOWER(registerEvent.type) LIKE LOWER(:filter))',
-          { filter: `%${filters.filter}%` },
-        );
-      }
+          // Get user's personal agenda items for this specific event
+          const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
+            this.agendaRepository,
+            registerEvent.eventId || '',
+            registerEvent.userId || '',
+          );
 
-      const registerEvents = await queryBuilder
-        .orderBy('registerEvent.createdAt', 'DESC')
-        .getMany();
+          let formattedDocuments: { name: string; document: string }[] = [];
+          if (
+            registerEvent?.event?.documents &&
+            registerEvent?.event?.documentNames
+          ) {
+            formattedDocuments = registerEvent.event.documents.map(
+              (doc, index) => ({
+                name:
+                  registerEvent.event?.documentNames?.[index] ||
+                  `Document ${index + 1}`,
+                document: doc,
+              }),
+            );
+          } else if (registerEvent?.event?.documents) {
+            // Fallback if no names are provided
+            formattedDocuments = registerEvent.event.documents.map(
+              (doc, index) => ({
+                name: `Document ${index + 1}`,
+                document: doc,
+              }),
+            );
+          }
 
-      const data = await Promise.all(
-        registerEvents.map((registerEvent) =>
-          this.mapUserRegisterEvent(registerEvent, userId, attendanceCache),
-        ),
+          // Check if event is favorited by the user
+          let isFavorite = false;
+          if (registerEvent.userId) {
+            const favorite = await this.favoriteEventRepository.findOne({
+              where: {
+                userId: registerEvent.userId,
+                eventId: registerEvent.eventId,
+              },
+            });
+            isFavorite = !!favorite;
+          }
+
+          const speakers = EventSpeakerUtils.buildSpeakerSchedule(
+            registerEvent.event,
+          );
+          const categories =
+            registerEvent.event?.category?.map((ec) => ec.category) || [];
+
+          // Format programme tracks with basic speaker info using utility
+          const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
+
+          // Get engagements for this event with Q&A and polling data
+          const engagements = registerEvent.eventId 
+            ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
+            : [];
+
+          const {
+            eventSpeakers,
+            category,
+            eventExhibitors,
+            exhibitorDescription,
+            eventStampDescription,
+            documents, // Remove original documents
+            documentNames, // Remove original documentNames
+            eventStampImages,
+            programmeTracks,
+            ...restEvent
+          } = registerEvent.event || {};
+
+          const event = {
+            ...restEvent,
+            registerEventId: registerEvent.id, // Add registerEventId inside event object
+            color: getEventColor(registerEvent.event?.type),
+            speakers,
+            speakersData: speakers,
+            categories,
+            documents: formattedDocuments,
+            engagements: engagements,
+            programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
+
+            eventStamps: {
+              description: registerEvent.event?.eventStampDescription,
+              images: registerEvent.event?.eventStampImages,
+            },
+
+            exhibitorsData: {
+              exhibitorDescription: exhibitorDescription || '',
+              exhibitors:
+                registerEvent.event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive)
+                  ?.map((ee) => {
+                    return {
+                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                    };
+                  }) || [],
+            },
+            myAgendas: formattedAgendas || [],
+
+            attendanceCount: attendanceCount,
+            surveyDetails: surveyDetails,
+            hasSurvey: !!surveyDetails,
+            isFavorite: isFavorite,
+            isRegister: registerEvent.isRegister,
+          };
+
+          const { firstName, lastName, email, mobile, id } =
+            registerEvent.user || {};
+          const cleanedUser = { firstName, lastName, email, mobile, id };
+
+          const {
+            orderId: _,
+            eventId: __,
+            isRegister: ___,
+          
+            ...cleanRegisterEvent
+          } = registerEvent;
+
+          // Get admin info for this registration - show if lucky draw feature is enabled
+          const hasAdminInfo =
+            registerEvent.adminInfo &&
+            registerEvent.event?.enableLuckyDrawFeature;
+
+          const adminInfo = hasAdminInfo
+            ? {
+                ...registerEvent.adminInfo,
+              }
+            : null;
+
+          return {
+            ...cleanRegisterEvent,
+            event,
+            user: cleanedUser,
+            isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+            adminInfo, // Add admin info
+            billingDetails: registerEvent.billingDetails || [], // Add billing details
+            // Add user's personal agenda data
+          };
+        }),
       );
 
       return {
         success: true,
-        message: 'Your registered events fetched successfully',
-        count: data.length,
-        data,
+        message:
+          role === 'admin'
+            ? 'All registered events fetched for admin'
+            : 'Your registered events fetched successfully',
+        count: registerEventsWithAttendance.length,
+        data: registerEventsWithAttendance,
       };
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Register Event retrieval');
     }
-  }
-
-  private async mapAdminRegisterEvent(
-    registerEvent: RegisterEvent,
-    attendanceCache: Map<string, number>,
-  ) {
-    const attendanceCount = registerEvent.eventId
-      ? await this.resolveAttendanceCount(registerEvent.eventId, attendanceCache)
-      : 0;
-
-    const { receiptUrl, invoiceUrl } =
-      this.extractBillingAttachmentUrls(registerEvent);
-
-    const event = registerEvent.event
-      ? {
-          ...registerEvent.event,
-          registerEventId: registerEvent.id,
-          color: getEventColor(registerEvent.event?.type),
-          attendanceCount,
-        }
-      : null;
-
-    const user = registerEvent.user
-      ? {
-          firstName: registerEvent.user.firstName,
-          lastName: registerEvent.user.lastName,
-          email: registerEvent.user.email,
-          mobile: registerEvent.user.mobile,
-          id: registerEvent.user.id,
-        }
-      : null;
-
-    const adminInfo =
-      registerEvent.event?.enableLuckyDrawFeature && registerEvent.adminInfo
-        ? { ...registerEvent.adminInfo }
-        : null;
-
-    return {
-      id: registerEvent.id,
-      userId: registerEvent.userId,
-      eventId: registerEvent.eventId,
-      orderId: registerEvent.orderId,
-      type: registerEvent.type,
-      status: registerEvent.status,
-      isCreatedByAdmin: registerEvent.isCreatedByAdmin,
-      isRegister: registerEvent.isRegister,
-      externalRegistrationId: registerEvent.externalRegistrationId,
-      externalRegistrationName: registerEvent.externalRegistrationName,
-      createdAt: registerEvent.createdAt,
-      event,
-      user,
-      order: registerEvent.order || null,
-      adminInfo,
-      billingDetails: registerEvent.billingDetails || [],
-      receiptUrl,
-      invoiceUrl,
-    };
-  }
-
-  private async mapUserRegisterEvent(
-    registerEvent: RegisterEvent,
-    userId: string,
-    attendanceCache: Map<string, number>,
-  ) {
-    const attendanceCount = registerEvent.eventId
-      ? await this.resolveAttendanceCount(registerEvent.eventId, attendanceCache)
-      : 0;
-
-    const surveyDetails = registerEvent.eventId
-      ? await this.surveyUtils.getSurveyDetailsByEventId(
-          registerEvent.eventId,
-          userId,
-        )
-      : null;
-
-    const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
-      this.agendaRepository,
-      registerEvent.eventId || '',
-      registerEvent.userId || '',
-    );
-
-    let formattedDocuments: { name: string; document: string }[] = [];
-    if (
-      registerEvent?.event?.documents &&
-      registerEvent?.event?.documentNames
-    ) {
-      formattedDocuments = registerEvent.event.documents.map(
-        (doc, index) => ({
-          name:
-            registerEvent.event?.documentNames?.[index] ||
-            `Document ${index + 1}`,
-          document: doc,
-        }),
-      );
-    } else if (registerEvent?.event?.documents) {
-      formattedDocuments = registerEvent.event.documents.map(
-        (doc, index) => ({
-          name: `Document ${index + 1}`,
-          document: doc,
-        }),
-      );
-    }
-
-    let isFavorite = false;
-    if (registerEvent.userId) {
-      const favorite = await this.favoriteEventRepository.findOne({
-        where: {
-          userId: registerEvent.userId,
-          eventId: registerEvent.eventId,
-        },
-      });
-      isFavorite = !!favorite;
-    }
-
-    const speakers = EventSpeakerUtils.buildSpeakerSchedule(
-      registerEvent.event,
-    );
-    const categories =
-      registerEvent.event?.category?.map((ec) => ec.category) || [];
-
-    const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(
-      registerEvent.event?.programmeTracks || [],
-    );
-
-    const engagements = registerEvent.eventId
-      ? await this.engagementService.getEngagementsByEvent(
-          registerEvent.eventId,
-        )
-      : [];
-
-    const {
-      eventSpeakers,
-      category,
-      eventExhibitors,
-      exhibitorDescription,
-      eventStampDescription,
-      documents,
-      documentNames,
-      eventStampImages,
-      programmeTracks,
-      ...restEvent
-    } = registerEvent.event || {};
-
-    const event = {
-      ...restEvent,
-      registerEventId: registerEvent.id,
-      color: getEventColor(registerEvent.event?.type),
-      speakers,
-      speakersData: speakers,
-      categories,
-      documents: formattedDocuments,
-      engagements,
-      programmeTracks: formattedProgrammeTracks,
-      eventStamps: {
-        description: registerEvent.event?.eventStampDescription,
-        images: registerEvent.event?.eventStampImages,
-      },
-      exhibitorsData: {
-        exhibitorDescription: exhibitorDescription || '',
-        exhibitors:
-          registerEvent.event?.eventExhibitors
-            ?.filter((ee) => ee.exhibitor.isActive)
-            ?.map((ee) => ({
-              ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-              promotionalOffers: ee.exhibitor.promotionalOffers || [],
-            })) || [],
-      },
-      myAgendas: formattedAgendas || [],
-      attendanceCount,
-      surveyDetails,
-      hasSurvey: !!surveyDetails,
-      isFavorite,
-      isRegister: registerEvent.isRegister,
-    };
-
-    const { firstName, lastName, email, mobile, id } =
-      registerEvent.user || {};
-    const cleanedUser = { firstName, lastName, email, mobile, id };
-
-    const {
-      orderId: _,
-      eventId: __,
-      isRegister: ___,
-      ...cleanRegisterEvent
-    } = registerEvent;
-
-    const hasAdminInfo =
-      registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
-
-    const adminInfo = hasAdminInfo ? { ...registerEvent.adminInfo } : null;
-
-    const { receiptUrl, invoiceUrl } =
-      this.extractBillingAttachmentUrls(registerEvent);
-
-    return {
-      ...cleanRegisterEvent,
-      event,
-      user: cleanedUser,
-      isCreatedByAdmin: registerEvent.isCreatedByAdmin,
-      adminInfo,
-      billingDetails: registerEvent.billingDetails || [],
-      receiptUrl,
-      invoiceUrl,
-    };
-  }
-
-  private async resolveAttendanceCount(
-    eventId: string,
-    cache: Map<string, number>,
-  ): Promise<number> {
-    if (!eventId) {
-      return 0;
-    }
-
-    if (cache.has(eventId)) {
-      return cache.get(eventId) || 0;
-    }
-
-    const count = await this.getEventAttendanceCount(eventId);
-    cache.set(eventId, count);
-    return count;
-  }
-
-  private extractBillingAttachmentUrls(registerEvent: RegisterEvent) {
-    const billingDetails = registerEvent.billingDetails || [];
-
-    if (!billingDetails.length) {
-      return { receiptUrl: null, invoiceUrl: null };
-    }
-
-    const findByKeyword = (keyword: string) =>
-      billingDetails.find(
-        (detail) =>
-          detail.billingDetailName &&
-          detail.billingDetailName.toLowerCase().includes(keyword),
-      );
-
-    const receiptDetail = findByKeyword('receipt');
-    const invoiceDetail = findByKeyword('invoice');
-    const fallbackDetail = billingDetails.find(
-      (detail) => detail.billingAttachmentUrl,
-    );
-
-    return {
-      receiptUrl:
-        receiptDetail?.billingAttachmentUrl ||
-        fallbackDetail?.billingAttachmentUrl ||
-        null,
-      invoiceUrl:
-        invoiceDetail?.billingAttachmentUrl ||
-        fallbackDetail?.billingAttachmentUrl ||
-        null,
-    };
   }
 
   async getEventAttendanceCount(eventId: string): Promise<number> {

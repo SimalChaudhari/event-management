@@ -43,9 +43,9 @@ const breadcrumbNavigation = {
                         { id: 'add-event', title: 'Add Event', type: 'item', url: '/events/add-event' },
                         { id: 'edit-event', title: 'Edit Event', type: 'item', url: '/events/edit-event/:id' },
                         { id: 'view-event', title: 'View Event', type: 'item', url: '/events/view-event/:id' },
-                        { id: 'add-register-event', title: 'Add Register Event', type: 'item', url: '/registred/add-register-event' },
-                        { id: 'edit-register-event', title: 'Edit Register Event', type: 'item', url: '/registred/edit-register-event/:id' },
-                        { id: 'view-register-event', title: 'View Register Event', type: 'item', url: '/registred/view-register-event/:id' },
+                        { id: 'add-register-event', title: 'Add Register Event', type: 'item', url: '/registered/add-register-event' },
+                        { id: 'edit-register-event', title: 'Edit Register Event', type: 'item', url: '/registered/edit-register-event/:id' },
+                        { id: 'view-register-event', title: 'View Register Event', type: 'item', url: '/registered/view-register-event/:id' },
                         { id: 'qa-management', title: 'Q&A Management', type: 'item', url: '/events/qa/:eventId' }
                     ]
                 },
