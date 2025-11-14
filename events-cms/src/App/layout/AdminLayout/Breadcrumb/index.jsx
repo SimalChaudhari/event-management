@@ -101,6 +101,17 @@ const breadcrumbNavigation = {
                         { id: 'engagement-sessions', title: 'Engagement Sessions', type: 'item', url: '/engagements/sessions/:trackId' },
                         { id: 'view-engagement-session', title: 'View Engagement Session', type: 'item', url: '/engagements/view-session/:id' }
                     ]
+                },
+                {
+                    id: 'push-notifications-dynamic',
+                    title: 'Notifications',
+                    type: 'collapse',
+                    children: [
+                        { id: 'push-notifications-list', title: 'Notifications', type: 'item', url: '/push-notifications' },
+                        { id: 'add-push-notification', title: 'Add Push Notification', type: 'item', url: '/push-notifications/add' },
+                        { id: 'edit-push-notification', title: 'Edit Push Notification', type: 'item', url: '/push-notifications/edit/:id' },
+                        { id: 'view-push-notification', title: 'View Push Notification', type: 'item', url: '/push-notifications/view/:id' }
+                    ]
                 }
             ]
         }

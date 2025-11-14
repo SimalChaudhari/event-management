@@ -6,10 +6,10 @@ import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import * as $ from 'jquery';
 import { getLogs, clearLogsError, exportLogRecipients } from '../../store/actions/logsActions';
 import '../../assets/css/event.css';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -18,9 +18,8 @@ $.DataTable = require('datatables.net-bs');
 function logsTable(
     data,
     handleRefresh,
-    handleViewDetails,
     handleExport,
-    { initialPage = 0, onPageChange } = {}
+    restoreTablePage
 ) {
     console.log('logsTable called with data:', data);
     console.log('Data length:', data?.length);
@@ -33,8 +32,16 @@ function logsTable(
         existingTable.destroy();
     }
 
-    $(tableZero).DataTable({
-        data: data || [],
+    const normalizedData = Array.isArray(data)
+        ? data.map((log) => ({
+              ...log,
+              id: log?.id || log?.sessionId || log?.createdAt || ''
+          }))
+        : [];
+
+    const dataTableInstance = $(tableZero).DataTable({
+        data: normalizedData,
+        rowId: 'id',
         order: [[0, 'desc']], // Sort by date descending
         searching: true,
         searchDelay: 500,
@@ -143,7 +150,7 @@ function logsTable(
             
         
         ],
-        initComplete: function (settings, json) {
+        initComplete: function () {
             // Add refresh button
             if (!$('#refreshBtn').length) {
                 $('.refresh-button').html(`
@@ -155,23 +162,16 @@ function logsTable(
 
                 $('#refreshBtn').on('click', handleRefresh);
             }
+
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
         }
     });
 
-    const tableElement = $(tableZero);
-    const tableInstance = tableElement.DataTable();
-
-    tableInstance.on('page.dt', function () {
-        if (typeof onPageChange === 'function') {
-            onPageChange(tableInstance.page());
-        }
-    });
-
-    if (initialPage > 0) {
-        tableInstance.page(initialPage).draw('page');
-    }
-
-    tableElement.off('click', '.export-btn').on('click', '.export-btn', function () {
+    const tableSelector = `${tableZero} tbody`;
+    $(tableSelector).off('click', '.export-btn').on('click', '.export-btn', function () {
         const sessionId = $(this).data('session');
     
         if (!sessionId) {
@@ -182,25 +182,11 @@ function logsTable(
         handleExport(sessionId);
     });
 
-    // Attach event listeners for actions
-    tableElement.off('click', '.view-btn').on('click', '.view-btn', function () {
-        const logId = $(this).data('id');
-
-        const logData = data.find((log) => log.id === logId);
-
-        if (logData) {
-            handleViewDetails(logData);
-        } else {
-            console.error('Log data not found for ID:', logId);
-        }
-    });
-
-    return tableInstance;
+    return dataTableInstance;
 }
 
 const LogsPage = () => {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
 
     // Redux state
     const { logs, error } = useSelector((state) => {
@@ -209,15 +195,7 @@ const LogsPage = () => {
     });
 
     const tableRef = useRef(null);
-    const currentPageRef = useRef(0);
-
-    const handleLogClick = useCallback(
-        (log) => {
-            console.log('handleLogClick called with log:', log);
-            navigate(`/logs/${log.sessionId}`);
-        },
-        [navigate]
-    );
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
 
     const handleRefreshLogs = useCallback(() => {
         dispatch(getLogs());
@@ -233,11 +211,10 @@ const LogsPage = () => {
 
     const destroyTable = useCallback(() => {
         if (tableRef.current) {
-            if (tableRef.current.page) {
-                currentPageRef.current = tableRef.current.page();
-            }
-            $('#logs-data-table').off('click', '.view-btn');
-            $('#logs-data-table').off('click', '.export-btn');
+            tableRef.current.off('page.dt');
+            const tableSelector = '#logs-data-table tbody';
+            $(tableSelector).off('click', '.export-btn');
+            $(tableSelector).off('click', '.view-btn');
             tableRef.current.destroy();
             tableRef.current = null;
         }
@@ -266,15 +243,13 @@ const LogsPage = () => {
             destroyTable();
 
             console.log('Creating table with logs:', logs);
-            const table = logsTable(logs, handleRefreshLogs, handleLogClick, handleExport, {
-                initialPage: currentPageRef.current,
-                onPageChange: (page) => {
-                    currentPageRef.current = page;
-                }
-            });
+            const table = logsTable(logs, handleRefreshLogs, handleExport, restoreTablePage);
             tableRef.current = table;
+            if (table && typeof checkAndAdjustPage === 'function') {
+                checkAndAdjustPage(table);
+            }
         }
-    }, [logs, handleRefreshLogs, handleLogClick, handleExport, destroyTable]);
+    }, [logs, handleRefreshLogs, handleExport, destroyTable, restoreTablePage, checkAndAdjustPage]);
 
     console.log('Rendering LogsPage - error:', error, 'logs:', logs);
 
