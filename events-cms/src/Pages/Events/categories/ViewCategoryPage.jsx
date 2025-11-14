@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Container, Badge } from 'react-bootstrap';
+import { useParams } from 'react-router-dom';
+import { Button, Row, Col, Container, Badge } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { categoryById } from '../../../store/actions/categoryActions';
 import { EVENT_PATHS } from '../../../utils/constants';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 
 const ViewCategoryPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const [categoryData, setCategoryData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { handleBack } = useTableNavigation({
+        tableRef: null,
+        listPath: EVENT_PATHS.CATEGORIES,
+        viewPath: EVENT_PATHS.VIEW_CATEGORY,
+        editPath: EVENT_PATHS.EDIT_CATEGORY,
+        addPath: EVENT_PATHS.ADD_CATEGORY
+    });
 
     useEffect(() => {
         const loadCategoryData = async () => {
@@ -53,7 +60,7 @@ const ViewCategoryPage = () => {
             >
                 <div className="d-flex justify-content-between align-items-center">
                     <h4 className="card-title">View</h4>
-                    <Button variant="secondary" onClick={() => navigate(EVENT_PATHS.CATEGORIES)}>
+                    <Button variant="secondary" onClick={() => handleBack()}>
                         <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                         Back
                     </Button>

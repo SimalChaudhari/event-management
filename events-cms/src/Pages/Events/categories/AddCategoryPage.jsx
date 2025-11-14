@@ -1,20 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
+import { Button, Row, Col, Container } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
-import { createCategory, updateCategory, categoryById } from '../../../store/actions/categoryActions';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { createCategory, updateCategory, categoryById, categoryList } from '../../../store/actions/categoryActions';
 import { EVENT_PATHS } from '../../../utils/constants';
+import useTableNavigation from '../../../hooks/useTableNavigation';
+import useCalculateTargetPage from '../../../hooks/useCalculateTargetPage';
 
 const AddCategoryPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams(); // Edit mode के लिए
+    const location = useLocation();
+    const { id } = useParams(); // Edit mode 
 
     const [formData, setFormData] = useState({
         name: '',
         description: ''
     });
     const [loading, setLoading] = useState(false);
+    const previousPageRef = React.useRef(null);
+    const originalCategoryNameRef = React.useRef('');
+
+    const { handleBack: handleBackNavigation } = useTableNavigation({
+        tableRef: null,
+        listPath: EVENT_PATHS.CATEGORIES,
+        viewPath: EVENT_PATHS.VIEW_CATEGORY,
+        editPath: EVENT_PATHS.EDIT_CATEGORY,
+        addPath: EVENT_PATHS.ADD_CATEGORY
+    });
+
+    const { calculateTargetPage } = useCalculateTargetPage({
+        listAction: categoryList,
+        reduxSelector: 'category.categories',
+        pageLength: 5,
+        sortType: 'string',
+        sortDirection: 'asc',
+        sortFields: ['name']
+    });
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || window.location.search);
+        const pageParam = params.get('page');
+        if (pageParam) {
+            previousPageRef.current = parseInt(pageParam, 10);
+        } else if (location.state?.page) {
+            previousPageRef.current = location.state.page;
+        }
+    }, [location.search, location.state, id]);
 
     // Load edit data if id exists
     useEffect(() => {
@@ -27,6 +59,7 @@ const AddCategoryPage = () => {
                             name: editData.name || '',
                             description: editData.description || ''
                         });
+                        originalCategoryNameRef.current = editData.name || '';
                     }
             };
             loadCategoryData();
@@ -46,20 +79,54 @@ const AddCategoryPage = () => {
         setLoading(true);
 
         try {
+            const getReturnPage = () => {
+                const params = new URLSearchParams(location.search || window.location.search);
+                return params.get('page') || location.state?.page || previousPageRef.current;
+            };
+
             if (id) {
                 const response = await dispatch(updateCategory(id, formData));
-                if (response) {
-                    navigate(EVENT_PATHS.CATEGORIES);
+                if (response?.success) {
+                    const originalName = (originalCategoryNameRef.current || '').trim();
+                    const updatedName = formData.name.trim();
+                    const updatedCategoryId =
+                        response?.category?.id ? String(response.category.id) : String(id);
+
+                    if (originalName && originalName !== updatedName) {
+                        const pageNumber = await calculateTargetPage({
+                            newItemData: { name: updatedName },
+                            entityId: updatedCategoryId,
+                            shouldRefreshList: !response?.category?.id
+                        });
+                        navigate(`${EVENT_PATHS.CATEGORIES}?page=${pageNumber}`);
+                    } else {
+                        const targetPage = getReturnPage();
+                        if (targetPage) {
+                            navigate(`${EVENT_PATHS.CATEGORIES}?page=${targetPage}`);
+                        } else {
+                            navigate(EVENT_PATHS.CATEGORIES);
+                        }
+                    }
                 }
             } else {
                 const response = await dispatch(createCategory(formData));
-                if (response) {
+                if (response?.success) {
+                    const newName = formData.name.trim();
+                    const createdCategoryId = response?.category?.id
+                        ? String(response.category.id)
+                        : null;
+
                     setFormData({
                         name: '',
                         description: ''
                     });
 
-                    navigate(EVENT_PATHS.CATEGORIES);
+                    const pageNumber = await calculateTargetPage({
+                        newItemData: { name: newName },
+                        entityId: createdCategoryId,
+                        shouldRefreshList: !createdCategoryId
+                    });
+                    navigate(`${EVENT_PATHS.CATEGORIES}?page=${pageNumber}`);
                 }
             }
         } catch (error) {
@@ -69,8 +136,14 @@ const AddCategoryPage = () => {
         }
     };
 
+    const getCurrentPage = () => {
+        const params = new URLSearchParams(location.search || window.location.search);
+        return params.get('page') || location.state?.page || previousPageRef.current;
+    };
+
     const handleCancel = () => {
-        navigate(EVENT_PATHS.CATEGORIES);
+        const targetPage = getCurrentPage();
+        handleBackNavigation(targetPage);
     };
 
     return (

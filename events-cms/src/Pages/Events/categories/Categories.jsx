@@ -8,33 +8,33 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { categoryList, deleteCategory } from '../../../store/actions/categoryActions';
-import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { EVENT_PATHS } from '../../../utils/constants';
+import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../../hooks/useTableNavigation';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
 
-function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
-    let tableZero = '#data-table-zero';
+function atable(data, handleAddCategory, handleEdit, handleDelete, handleView, restoreTablePage) {
+    const tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Preserve the current page
-    let currentPage = $(tableZero).DataTable().page();
-
-    // Clean up existing table and event listeners
     if ($.fn.DataTable.isDataTable(tableZero)) {
         $(tableZero).DataTable().clear().destroy();
     }
 
-    $(tableZero).DataTable({
-        data: data || [],
+    const validData = Array.isArray(data) ? data.filter((item) => item && item.id) : [];
+
+    const dataTableInstance = $(tableZero).DataTable({
+        data: validData,
+        rowId: 'id',
         order: [[0, 'asc']],
         searching: true,
         searchDelay: 500,
-        pageLength: 10,
+        pageLength: 5,
         lengthMenu: [
             [5, 10, 25, 50, -1],
             [5, 10, 25, 50, 'All']
@@ -118,8 +118,12 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
                 }
             }
         ],
-        initComplete: function (settings, json) {
-            // Add button initialization
+        initComplete: function () {
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
+
             if (!$('#addCategoryBtn').length) {
                 $('.add-category-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addCategoryBtn">
@@ -130,66 +134,84 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView) {
 
                 $('#addCategoryBtn').on('click', handleAddCategory);
             }
+        },
+        responsive: true
+    });
+
+    const tableSelector = `${tableZero} tbody`;
+    $(tableSelector).off('click', '.view-btn').on('click', '.view-btn', function () {
+        const table = $(tableZero).DataTable();
+        const rowData = table.row($(this).closest('tr')).data();
+        if (rowData && rowData.id) {
+            handleView(rowData);
         }
     });
 
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
-
-    // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
-        const categoryId = $(this).data('id');
-        const dataCategory = data.find((category) => category.id === categoryId);
-        if (dataCategory) {
-            handleView(dataCategory);
+    $(tableSelector).off('click', '.edit-btn').on('click', '.edit-btn', function () {
+        const table = $(tableZero).DataTable();
+        const rowData = table.row($(this).closest('tr')).data();
+        if (rowData && rowData.id) {
+            handleEdit(rowData);
         }
     });
 
-    $(document).on('click', '.edit-btn', function () {
+    $(tableSelector).off('click', '.delete-btn').on('click', '.delete-btn', function () {
         const categoryId = $(this).data('id');
-        const dataCategory = data.find((category) => category.id === categoryId);
-        if (dataCategory) {
-            handleEdit(dataCategory);
+        if (categoryId) {
+            handleDelete(categoryId);
         }
     });
 
-    $(document).on('click', '.delete-btn', function () {
-        const categoryId = $(this).data('id');
-        handleDelete(categoryId);
-    });
+    return dataTableInstance;
 }
 
 const Categories = () => {
     const dispatch = useDispatch();
     const categories = useSelector((state) => state.category?.categories);
-    const [showModal, setShowModal] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const tableRef = React.useRef(null);
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
 
-    const [showViewModal, setShowViewModal] = React.useState(false);
-    const [editData, setEditData] = React.useState(null);
-    const [viewData, setViewData] = React.useState(null);
-    const navigate = useNavigate();
-
-    const handleView = (data) => {
-        navigate(EVENT_PATHS.VIEW_CATEGORY + `/${data.id}`);
-    };
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: EVENT_PATHS.CATEGORIES,
+        viewPath: EVENT_PATHS.VIEW_CATEGORY,
+        editPath: EVENT_PATHS.EDIT_CATEGORY,
+        addPath: EVENT_PATHS.ADD_CATEGORY
+    });
 
     const destroyTable = () => {
         if (currentTable) {
-            $('#data-table-zero').off('click', '.delete-btn');
+            currentTable.off('page.dt');
+            const tableSelector = '#data-table-zero tbody';
+            $(tableSelector).off('click', '.view-btn');
+            $(tableSelector).off('click', '.edit-btn');
+            $(tableSelector).off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
+            tableRef.current = null;
         }
     };
 
     const initializeTable = () => {
         destroyTable();
-        if (Array.isArray(categories) && categories.length >= 0) {
-            const table = atable(categories, handleAddCategory, handleEdit, handleDelete, handleView);
+        if (Array.isArray(categories)) {
+            const table = atable(
+                categories,
+                handleAddCategory,
+                handleEditCategory,
+                handleDeleteCategory,
+                handleViewCategory,
+                restoreTablePage
+            );
             setCurrentTable(table);
+            tableRef.current = table;
+            if (table && typeof checkAndAdjustPage === 'function') {
+                checkAndAdjustPage(table);
+            }
         }
     };
 
@@ -210,14 +232,18 @@ const Categories = () => {
     }, [categories]);
 
     const handleAddCategory = () => {
-        navigate(EVENT_PATHS.ADD_CATEGORY);
+        handleAdd();
     };
 
-    const handleEdit = (data) => {
-        navigate(EVENT_PATHS.EDIT_CATEGORY + `/${data.id}`);
+    const handleEditCategory = (data) => {
+        handleEdit(data);
     };
 
-    const handleDelete = (categoryId) => {
+    const handleViewCategory = (data) => {
+        handleView(data);
+    };
+
+    const handleDeleteCategory = (categoryId) => {
         setItemToDelete({ id: categoryId });
         setShowDeleteModal(true);
     };
@@ -230,8 +256,6 @@ const Categories = () => {
             await dispatch(deleteCategory(itemToDelete.id));
             setShowDeleteModal(false);
             setItemToDelete(null);
-            destroyTable();
-            // No need to call categoryList() - deleteCategory already updates Redux directly
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {
@@ -244,10 +268,6 @@ const Categories = () => {
             setShowDeleteModal(false);
             setItemToDelete(null);
         }
-    };
-
-    const handleCloseModal = () => {
-        setShowModal(false);
     };
 
     return (
