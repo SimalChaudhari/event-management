@@ -196,34 +196,6 @@ const ViewEventPage = () => {
         }
     };
 
-    // const renderCategories = () => {
-    //     if (!eventData?.categories?.length) {
-    //         return <p>No categories listed.</p>;
-    //     }
-    //     return (
-    //         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-    //             {eventData?.categories?.map((category, index) => (
-    //                 <Badge
-    //                     key={category.id}
-    //                     bg="success"
-    //                     style={{
-    //                         fontSize: '14px',
-    //                         padding: '8px 16px',
-    //                         borderRadius: '20px',
-    //                         backgroundColor: '#FFF'
-    //                     }}
-    //                 >
-    //                     <i className="fas fa-tag me-2" style={{ color: '#000', marginRight: 6 }}></i>
-    //                     {category.name}
-    //                     {category.description}
-    //                 </Badge>
-    //             ))}
-
-    //             <div></div>
-    //         </div>
-    //     );
-    // };
-
     const renderEventStats = () => (
         <Row>
             <Col xs={6} md={3} className="mb-4">

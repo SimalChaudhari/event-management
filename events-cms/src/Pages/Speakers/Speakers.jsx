@@ -159,7 +159,8 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
     // Attach event listeners for actions
     $(document).on('click', '.view-btn', function () {
         const speakerId = $(this).data('id');
-        const dataSpeaker = data.find((speaker) => speaker.id === speakerId);
+        // Convert both to strings for consistent comparison (matching reducer logic)
+        const dataSpeaker = data.find((speaker) => speaker && String(speaker.id) === String(speakerId));
         if (dataSpeaker) {
             // Get current page from DataTable instance before navigating
             // This ensures we always have the correct page number
@@ -183,7 +184,8 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
 
     $(document).on('click', '.edit-btn', function () {
         const speakerId = $(this).data('id');
-        const dataSpeaker = data.find((speaker) => speaker.id === speakerId);
+        // Convert both to strings for consistent comparison (matching reducer logic)
+        const dataSpeaker = data.find((speaker) => speaker && String(speaker.id) === String(speakerId));
         if (dataSpeaker) {
             handleEdit(dataSpeaker);
         }

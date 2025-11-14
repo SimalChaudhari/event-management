@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
-import { createUser, editUser, userById } from '../../store/actions/userActions';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { createUser, editUser, userById, userList } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
 import { USER_PATHS } from '../../utils/constants';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
+import useTableNavigation from '../../hooks/useTableNavigation';
+import useCalculateTargetPage from '../../hooks/useCalculateTargetPage';
 
 const AddUserPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams(); // Edit mode
     const { error, userByID } = useSelector((state) => state.user); // Use state.user as per store structure
     const [loading, setIsLoading] = useState(false);
@@ -42,6 +45,35 @@ const AddUserPage = () => {
         profilePicture: null
     });
     const [imagePreview, setImagePreview] = useState(null);
+    const previousPageRef = React.useRef(null);
+    const originalUserNameRef = React.useRef({ firstName: '', lastName: '' });
+
+    const { handleBack: handleBackNavigation } = useTableNavigation({
+        tableRef: null,
+        listPath: USER_PATHS.LIST_USERS,
+        viewPath: USER_PATHS.VIEW_USER,
+        editPath: USER_PATHS.EDIT_USER,
+        addPath: USER_PATHS.ADD_USER
+    });
+
+    const { calculateTargetPage } = useCalculateTargetPage({
+        listAction: userList,
+        reduxSelector: 'user.user',
+        pageLength: 5,
+        sortType: 'string',
+        sortDirection: 'asc',
+        sortFields: ['firstName', 'lastName']
+    });
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            previousPageRef.current = parseInt(pageParam, 10);
+        } else if (location.state?.page) {
+            previousPageRef.current = location.state.page;
+        }
+    }, [id ,location.search, location.state]);
 
     // Load edit data if id exists
     useEffect(() => {
@@ -55,7 +87,7 @@ const AddUserPage = () => {
             };
             loadUserData();
         }
-    }, [id]);
+    }, [id, dispatch]);
 
     // Watch for userByID changes in Redux store
     useEffect(() => {
@@ -98,6 +130,11 @@ const AddUserPage = () => {
                 profilePicture: null
             });
 
+            originalUserNameRef.current = {
+                firstName: editData.firstName || '',
+                lastName: editData.lastName || ''
+            };
+
             if (editData.profilePicture) {
                 setImagePreview(`${API_URL}/${editData.profilePicture.replace(/\\/g, '/')}`);
             } else {
@@ -136,51 +173,87 @@ const AddUserPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setIsLoading(true);
 
         try {
             const formDataToSend = new FormData();
             Object.keys(formData).forEach((key) => {
                 const value = formData[key];
-                // Skip null values
                 if (value === null) {
                     return;
                 }
-                // For optional enum fields (like industry), convert empty strings to null
-                // Empty strings cause enum validation errors even though the field is optional
                 if (key === 'industry' && (value === '' || value === undefined)) {
-                    // Don't append empty industry - backend will use null/default
                     return;
                 }
-                // For other optional string fields, skip empty strings
-                const optionalFields = ['salutation', 'company', 'designation', 'linkedinProfile', 
-                                       'street', 'city', 'state', 'postalCode', 'country', 
-                                       'apartment', 'landmark', 'addressLabel', 'deliveryInstructions',
-                                       'companyName', 'position', 'description'];
+                const optionalFields = [
+                    'salutation',
+                    'company',
+                    'designation',
+                    'linkedinProfile',
+                    'street',
+                    'city',
+                    'state',
+                    'postalCode',
+                    'country',
+                    'apartment',
+                    'landmark',
+                    'addressLabel',
+                    'deliveryInstructions',
+                    'companyName',
+                    'position',
+                    'description'
+                ];
                 if (optionalFields.includes(key) && value === '') {
-                    // Skip empty optional fields
                     return;
                 }
                 formDataToSend.append(key, value);
             });
 
-            let response;
-            if (id) {
-                setIsLoading(true);
-                response = await dispatch(editUser(id, formDataToSend));
-                setIsLoading(false);
-            } else {
-                setIsLoading(true);
-                response = await dispatch(createUser(formDataToSend));
-                setIsLoading(false);
-            }
+            const getReturnPage = () => {
+                const urlParams = new URLSearchParams(location.search || window.location.search);
+                return urlParams.get('page') || location.state?.page || previousPageRef.current;
+            };
 
-            if (response) {
-                if (!id) {
+            if (id) {
+                const originalFirstName = originalUserNameRef.current.firstName?.trim() || '';
+                const originalLastName = originalUserNameRef.current.lastName?.trim() || '';
+                const newFirstName = formData.firstName.trim();
+                const newLastName = formData.lastName.trim();
+
+                const response = await dispatch(editUser(id, formDataToSend));
+                if (response) {
+                    if (originalFirstName !== newFirstName || originalLastName !== newLastName) {
+                        const pageNumber = await calculateTargetPage({
+                            newItemData: { firstName: newFirstName, lastName: newLastName },
+                            entityId:  String(id),
+                            shouldRefreshList: false
+                        });
+                        navigate(`${USER_PATHS.LIST_USERS}?page=${pageNumber}`);
+                    } else {
+                        const targetPage = previousPageRef.current;
+                        if (targetPage) {
+                            navigate(`${USER_PATHS.LIST_USERS}?page=${targetPage}`);
+                        } else {
+                            navigate(USER_PATHS.LIST_USERS);
+                        }
+                    }
+                }
+            } else {
+                const newFirstName = formData.firstName.trim();
+                const newLastName = formData.lastName.trim();
+                const response = await dispatch(createUser(formDataToSend));
+                if (response) {
+                
+
+                    const pageNumber = await calculateTargetPage({
+                        newItemData: { firstName: newFirstName, lastName: newLastName },
+                        entityId: response?.id ? String(response.id) : null,
+                        shouldRefreshList: true
+                    });
                     setFormData({
                         firstName: '',
                         lastName: '',
                         email: '',
-
                         mobile: '',
                         role: 'user',
                         salutation: '',
@@ -198,7 +271,6 @@ const AddUserPage = () => {
                         landmark: '',
                         addressLabel: '',
                         deliveryInstructions: '',
-
                         acceptTerms: false,
                         companyName: '',
                         position: '',
@@ -207,22 +279,29 @@ const AddUserPage = () => {
                         profilePicture: null
                     });
                     setImagePreview(null);
+                    navigate(`${USER_PATHS.LIST_USERS}?page=${pageNumber}`);
                 }
-                navigate(`${USER_PATHS.LIST_USERS}`);
-                setIsLoading(false);
             }
         } catch (error) {
-            setIsLoading(false);
             console.error('Error submitting form:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
+    const getCurrentPageForNavigation = () => {
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        return urlParams.get('page') || location.state?.page || previousPageRef.current;
+    };
+
     const handleCancel = () => {
-        navigate(`${USER_PATHS.LIST_USERS}`);
+        const targetPage = getCurrentPageForNavigation();
+        handleBackNavigation(targetPage);
     };
 
     const handleBack = () => {
-        navigate(-1);
+        const targetPage = getCurrentPageForNavigation();
+        handleBackNavigation(targetPage);
     };
 
     return (

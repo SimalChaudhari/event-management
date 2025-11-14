@@ -2,20 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { createSpeaker, updateSpeaker, speakerById } from '../../store/actions/speakerActions';
+import { createSpeaker, updateSpeaker, speakerById, speakerList } from '../../store/actions/speakerActions';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { SPEAKER_PATHS } from '../../utils/constants';
 import useTableNavigation from '../../hooks/useTableNavigation';
+import useCalculateTargetPage from '../../hooks/useCalculateTargetPage';
 
 const AddSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-    const { id } = useParams(); // Edit mode के लिए
+    const { id } = useParams(); 
 
     // Store the page number from where we came from (for edit mode)
     const previousPageRef = React.useRef(null);
+    
+    // Store original firstName and lastName for edit mode to detect changes
+    const originalSpeakerNameRef = React.useRef({ firstName: '', lastName: '' });
+    
+    // Use reusable hook for calculating target page
+    const { calculateTargetPage } = useCalculateTargetPage({
+        listAction: speakerList,
+        reduxSelector: 'speaker.speakers',
+        pageLength: 5,
+        sortType: 'string',
+        sortDirection: 'asc',
+        sortFields: ['firstName', 'lastName']
+    });
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -31,19 +45,17 @@ const AddSpeakerPage = () => {
     const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
 
-    // Capture the page number from URL when entering edit mode
+    // Capture the page number from URL when entering add/edit page
     useEffect(() => {
-        if (id) {
-            // Get page parameter from URL if it exists
-            const urlParams = new URLSearchParams(location.search);
-            const pageParam = urlParams.get('page');
-            if (pageParam) {
-                previousPageRef.current = parseInt(pageParam, 10);
-            } else {
-                // Also check if page is in location state (from navigation)
-                if (location.state?.page) {
-                    previousPageRef.current = location.state.page;
-                }
+        // Get page parameter from URL if it exists (for both add and edit mode)
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            previousPageRef.current = parseInt(pageParam, 10);
+        } else {
+            // Also check if page is in location state (from navigation)
+            if (location.state?.page) {
+                previousPageRef.current = location.state.page;
             }
         }
     }, [id, location.search, location.state]);
@@ -67,8 +79,14 @@ const AddSpeakerPage = () => {
                             description: editData.description || '',
                             profilePicture: null
                         });
+                        
+                        // Store original name for comparison on update
+                        originalSpeakerNameRef.current = {
+                            firstName: editData.firstName || '',
+                            lastName: editData.lastName || ''
+                        };
 
-                        // Edit mode में पुरानी image का URL set करें
+                       
                         if (editData.profilePicture) {
                             setImagePreview(`${API_URL}/${editData.profilePicture}`);
                         } else {
@@ -114,13 +132,20 @@ const AddSpeakerPage = () => {
     };
 
     // Use reusable table navigation hook for back navigation with page preservation
-    const { handleBack } = useTableNavigation({
+    const { handleBack: handleBackNavigation } = useTableNavigation({
         tableRef: null, // Not needed for back navigation
         listPath: SPEAKER_PATHS.LIST_SPEAKERS,
         viewPath: SPEAKER_PATHS.VIEW_SPEAKER,
         editPath: SPEAKER_PATHS.EDIT_SPEAKER,
         addPath: SPEAKER_PATHS.ADD_SPEAKER
     });
+    
+    // Handle Back button click - preserve page from URL or location state
+    const handleBack = () => {
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
+        handleBackNavigation(currentPage);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -135,16 +160,50 @@ const AddSpeakerPage = () => {
             });
 
             if (id) {
+                // For edit mode, check if firstName or lastName changed
+                const originalFirstName = originalSpeakerNameRef.current.firstName;
+                const originalLastName = originalSpeakerNameRef.current.lastName;
+                const newFirstName = formData.firstName.trim();
+                const newLastName = formData.lastName.trim();
+                
                 const response = await dispatch(updateSpeaker(id, submitData));
                 if (response) {
-                    // Preserve the page number if we were editing from a specific page
-                    const urlParams = new URLSearchParams(location.search);
-                    const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
-                    handleBack(currentPage);
+                    // If firstName or lastName changed, calculate which page the updated speaker will appear on
+                    // No need to refresh - Redux already has the updated speaker from updateSpeaker action
+                    if (originalFirstName !== newFirstName || originalLastName !== newLastName) {
+                        // Convert id to string for consistent comparison (matching reducer and hook logic)
+                        const pageNumber = await calculateTargetPage({
+                            newItemData: { firstName: newFirstName, lastName: newLastName },
+                            entityId: String(id), // Ensure string format for ID comparison
+                            shouldRefreshList: false // Redux already updated, no need to fetch again
+                        });
+                        navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${pageNumber}`);
+                    } else {
+                        // Name didn't change, preserve the page number if we were editing from a specific page
+                        if (previousPageRef.current) {
+                            navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${previousPageRef.current}`);
+                        } else {
+                            navigate(SPEAKER_PATHS.LIST_SPEAKERS);
+                        }
+                    }
                 }
             } else {
+                // For create mode, calculate which page the new speaker will appear on
+                const newFirstName = formData.firstName.trim();
+                const newLastName = formData.lastName.trim();
+                
                 const response = await dispatch(createSpeaker(submitData));
                 if (response) {
+                    // After creation, calculate the page
+                    // createSpeaker already adds the new speaker to Redux, no need to fetch again
+                    // We sort the existing Redux data in the hook before calculating
+                    // Convert id to string for consistent comparison (matching reducer and hook logic)
+                    const pageNumber = await calculateTargetPage({
+                        newItemData: { firstName: newFirstName, lastName: newLastName },
+                        entityId: response.id ? String(response.id) : null, // Ensure string format for ID comparison
+                        shouldRefreshList: false // Redux already updated, no need to fetch again
+                    });
+                    
                     setFormData({
                         firstName: '',
                         lastName: '',
@@ -158,10 +217,8 @@ const AddSpeakerPage = () => {
                     });
                     setImagePreview(null);
 
-                    // Use the reusable handleBack function which preserves page from URL
-                    const urlParams = new URLSearchParams(location.search);
-                    const currentPage = urlParams.get('page');
-                    handleBack(currentPage);
+                    // Navigate to the page where the new speaker appears
+                    navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${pageNumber}`);
                 }
             }
         } catch (error) {
@@ -172,10 +229,10 @@ const AddSpeakerPage = () => {
     };
 
     const handleCancel = () => {
-        // Use the reusable handleBack function which preserves page from URL or location state
-        const urlParams = new URLSearchParams(location.search);
+        // Use the reusable handleBackNavigation function which preserves page from URL or location state
+        const urlParams = new URLSearchParams(location.search || window.location.search);
         const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
-        handleBack(currentPage);
+        handleBackNavigation(currentPage);
     };
 
     return (
@@ -186,7 +243,7 @@ const AddSpeakerPage = () => {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Speaker' : 'Add Speaker'}</h4>
-                                <Button variant="secondary" onClick={handleCancel} disabled={loading}>
+                                <Button variant="secondary" onClick={handleBack} disabled={loading}>
                                     <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
                                 </Button>

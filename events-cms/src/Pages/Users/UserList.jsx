@@ -12,11 +12,12 @@ import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import ExportConfirmationModal from '../../components/modal/ExportConfirmationModal';
 import CsvUploadModal from '../../components/modals/CsvUploadModal';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
 import UserFilterComponent from '../../components/common/UserFilterComponent';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../hooks/useTableNavigation';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -36,10 +37,7 @@ function userTable(
     // Ensure data is valid and has proper structure
     const validData = Array.isArray(data) ? data.filter(item => item && item.id) : [];
 
-    // Preserve the current page
-    let currentPage = 0;
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        currentPage = $(tableZero).DataTable().page();
         $(tableZero).DataTable().clear().destroy();
     }
 
@@ -63,6 +61,7 @@ function userTable(
             {
                 data: 'firstName',
                 title: 'User Details',
+                type: 'string',
                 render: function (data, type, row) {
                     const imageUrl = row.profilePicture 
                         ? `${API_URL}/${row.profilePicture}` 
@@ -76,6 +75,13 @@ function userTable(
                     //     badgeClass = 'badge-light-danger';
                     //     statusText = 'Inactive';
                     // }
+
+                    // For sorting, return combined firstName + lastName
+                    if (type === 'sort' || type === 'type') {
+                        const firstName = (row.firstName || '').trim().toLowerCase();
+                        const lastName = (row.lastName || '').trim().toLowerCase();
+                        return `${firstName} ${lastName}`;
+                    }
 
                     return `
                         <div class="d-inline-block align-middle">
@@ -162,6 +168,10 @@ function userTable(
             }
         ],
         initComplete: function (settings, json) {
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
             if (!$('#addUserBtn').length) {
                 $('.add-user-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addUserBtn">
@@ -178,22 +188,51 @@ function userTable(
 
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
-                const id = $(this).data('id');
-                const userData = validData.find((user) => user && user.id === id);
-                if (userData) {
-                    handleViewUser(userData);
+                // Get the row data directly from DataTables (more reliable than data-id attribute)
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    handleViewUser(rowData);
                 } else {
-                    console.error('User data not found for ID:', id);
+                    // Fallback to data-id if row data not available
+                    const id = $(this).data('id');
+                    const userData = validData.find((user) => user && String(user.id) === String(id));
+                    if (userData) {
+                        handleViewUser(userData);
+                    } else {
+                        console.error('User data not found for ID:', id);
+                    }
                 }
             });
 
             $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
-                const id = $(this).data('id');
-                const userData = validData.find((user) => user && user.id === id);
-                if (userData) {
-                    handleEditUser(userData);
+                // Get the row data directly from DataTables (more reliable than data-id attribute)
+                const table = $(tableZero).DataTable();
+                const row = $(this).closest('tr');
+                const rowData = table.row(row).data();
+                
+                // Verify we got valid data
+                if (rowData && rowData.id) {
+                    // Double-check: verify this user exists in validData
+                    const foundUser = validData.find((user) => user && String(user.id) === String(rowData.id));
+                    if (foundUser) {
+                        console.log('Editing user:', foundUser.firstName, foundUser.lastName, 'ID:', foundUser.id);
+                        handleEditUser(foundUser); // Use foundUser from validData to ensure consistency
+                    } else {
+                        console.error('User from row data not found in validData. Row ID:', rowData.id, 'Row data:', rowData);
+                        // Fallback to rowData if not found (shouldn't happen)
+                        handleEditUser(rowData);
+                    }
                 } else {
-                    console.error('User data not found for ID:', id);
+                    // Fallback to data-id if row data not available
+                    const id = $(this).data('id');
+                    console.warn('Row data not available, using data-id:', id);
+                    const userData = validData.find((user) => user && String(user.id) === String(id));
+                    if (userData) {
+                        handleEditUser(userData);
+                    } else {
+                        console.error('User data not found for ID:', id);
+                    }
                 }
             });
 
@@ -217,11 +256,6 @@ function userTable(
         }
     });
 
-    // Restore the current page using the hook function
-    if (typeof restoreTablePage === 'function') {
-        restoreTablePage(dataTableInstance, currentPage);
-    }
-
     return dataTableInstance;
 }
 
@@ -229,6 +263,7 @@ const UserList = () => {
     const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
     const { user } = useSelector((state) => state.user);
     const navigate = useNavigate();
+    const location = useLocation();
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
     const [showExportConfirmModal, setShowExportConfirmModal] = useState(false);
@@ -237,19 +272,46 @@ const UserList = () => {
     const [isExporting, setIsExporting] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
     const [roleFilter, setRoleFilter] = useState('all');
+    const tableRef = React.useRef(null);
 
     const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: USER_PATHS.LIST_USERS,
+        viewPath: USER_PATHS.VIEW_USER,
+        editPath: USER_PATHS.EDIT_USER,
+        addPath: USER_PATHS.ADD_USER
+    });
 
     const handleViewUser = (userData) => {
-        navigate(`${USER_PATHS.VIEW_USER}/${userData.id}`);
+        // Get current page from DataTable or URL
+        let currentPage = null;
+        if (tableRef.current) {
+            try {
+                const pageInfo = tableRef.current.page.info();
+                if (pageInfo && pageInfo.page !== undefined) {
+                    currentPage = (pageInfo.page + 1).toString();
+                }
+            } catch (e) {
+                // Fallback to URL
+                const urlParams = new URLSearchParams(location.search);
+                currentPage = urlParams.get('page');
+            }
+        } else {
+            const urlParams = new URLSearchParams(location.search);
+            currentPage = urlParams.get('page');
+        }
+        handleView(userData, currentPage);
     };
 
     const handleAddUser = () => {
-        navigate(`${USER_PATHS.ADD_USER}`);
+        handleAdd();
     };
 
     const handleEditUser = (userData) => {
-        navigate(`${USER_PATHS.EDIT_USER}/${userData.id}`);
+        handleEdit(userData);
     };
 
     const handleDeleteUser = (userId) => {
@@ -318,9 +380,14 @@ const UserList = () => {
     const destroyTable = () => {
         if (currentTable) {
             currentTable.off('page.dt');
-            $('#user-data-table').off('click', '.delete-btn');
+            const tableSelector = '#user-data-table';
+            const tableBodySelector = `${tableSelector} tbody`;
+            $(tableBodySelector).off('click', '.view-btn');
+            $(tableBodySelector).off('click', '.edit-btn');
+            $(tableBodySelector).off('click', '.delete-btn');
             currentTable.destroy();
             setCurrentTable(null);
+            tableRef.current = null;
         }
     };
 
@@ -338,6 +405,7 @@ const UserList = () => {
                     handleExportUsers,
                     restoreTablePage
                 );
+                tableRef.current = table;
                 setCurrentTable(table);
                 // Check and adjust page if current page is now empty (after deletion)
                 if (table && typeof checkAndAdjustPage === 'function') {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Row, Col, Card, Badge, Container, Modal, Form } from 'react-bootstrap';
+import { Button, Row, Col, Badge, Container } from 'react-bootstrap';
 import Select from 'react-select';
 import { useDispatch, useSelector } from 'react-redux';
 import store from '../../../../store/store';
@@ -35,15 +35,9 @@ function AddEventPage() {
     const { id } = useParams(); // Edit mode
     const navigate = useNavigate();
     const location = useLocation();
-    const { fetchEvent } = FetchEventData();
-    const [display, setDisplay] = useState(null);
-    
-    // Get events from Redux to calculate page for new events
+  
     const events = useSelector((state) => state.event?.event?.events);
-    
-    // Store the page number from where we came from (for edit mode)
     const previousPageRef = useRef(null);
-    // Store the original event date to detect if date changed during edit
     const originalEventDateRef = useRef(null);
 
     const [speakerList, setSpeakerList] = useState([]);
@@ -131,12 +125,6 @@ function AddEventPage() {
     const [isLoadingExhibitors, setIsLoadingExhibitors] = useState(false);
     const [isLoadingCountries, setIsLoadingCountries] = useState(false);
 
-    // Track if data has been loaded to prevent multiple fetches
-    const [speakersLoaded, setSpeakersLoaded] = useState(false);
-    const [categoriesLoaded, setCategoriesLoaded] = useState(false);
-    const [exhibitorsLoaded, setExhibitorsLoaded] = useState(false);
-    const [countriesLoaded, setCountriesLoaded] = useState(false);
-
     // Use refs to track in-flight requests (prevents race conditions better than state)
     const fetchingSpeakersRef = useRef(false);
     const fetchingCategoriesRef = useRef(false);
@@ -191,12 +179,10 @@ function AddEventPage() {
             // Always set the list and loaded flags, even if empty array
             const speakersList = Array.isArray(speakers) ? speakers : [];
             setSpeakerList(speakersList);
-            setSpeakersLoaded(true);
             speakersLoadedRef.current = true; // Update ref synchronously
         } catch (error) {
             console.error('Error fetching speakers:', error);
             // Even on error, set loaded to true to prevent infinite retries
-            setSpeakersLoaded(true);
             speakersLoadedRef.current = true;
         } finally {
             setIsLoadingSpeakers(false);
@@ -215,11 +201,9 @@ function AddEventPage() {
             const categories = await dispatch(getCategoriesForEvent());
             const categoriesList = Array.isArray(categories) ? categories : [];
             setCategoryList(categoriesList);
-            setCategoriesLoaded(true);
             categoriesLoadedRef.current = true;
         } catch (error) {
             console.error('Error fetching categories:', error);
-            setCategoriesLoaded(true);
             categoriesLoadedRef.current = true;
         } finally {
             setIsLoadingCategories(false);
@@ -238,11 +222,9 @@ function AddEventPage() {
             const response = await dispatch(exhibitorGet());
             const exhibitorsList = Array.isArray(response?.data) ? response.data : [];
             setExhibitorList(exhibitorsList);
-            setExhibitorsLoaded(true);
             exhibitorsLoadedRef.current = true;
         } catch (error) {
             // Error handling without console
-            setExhibitorsLoaded(true);
             exhibitorsLoadedRef.current = true;
         } finally {
             setIsLoadingExhibitors(false);
@@ -261,11 +243,9 @@ function AddEventPage() {
             const countries = await dispatch(getCountries());
             const countriesList = Array.isArray(countries) ? countries : [];
             setCountryList(countriesList);
-            setCountriesLoaded(true);
             countriesLoadedRef.current = true;
         } catch (error) {
             console.error('Error fetching countries:', error);
-            setCountriesLoaded(true);
             countriesLoadedRef.current = true;
         } finally {
             setIsLoadingCountries(false);
@@ -2745,7 +2725,6 @@ function AddEventPage() {
                 onHide={() => setShowMapModal(false)}
                 formData={formData}
                 onLocationSave={handleLocationSave}
-                display={display}
             />
         </Container>
     );
