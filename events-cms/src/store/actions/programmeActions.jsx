@@ -32,12 +32,13 @@ export const clearProgrammeError = () => ({
     type: CLEAR_PROGRAMME_ERROR
 });
 
-// Get all tracks for an event
+// Get all tracks for an event (uses event-based endpoint)
 export const getTracksByEvent = (eventId) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.get(`/programme/events/${eventId}/tracks`);
+        // Use event-based endpoint
+        const response = await axiosInstance.get(`/events/${eventId}/programme/tracks`);
         
         dispatch({
             type: PROGRAMME_TRACKS_LIST,
@@ -78,12 +79,17 @@ export const getAllTracks = () => async (dispatch) => {
     }
 };
 
-// Get all sessions for a track
-export const getSessionsByTrack = (trackId) => async (dispatch) => {
+// Get all sessions for a track (uses event-based endpoint when eventId is provided)
+export const getSessionsByTrack = (trackId, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.get(`/programme/tracks/${trackId}/sessions`);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/tracks/${trackId}/sessions`
+            : `/programme/tracks/${trackId}/sessions`;
+        
+        const response = await axiosInstance.get(url);
         
         dispatch({
             type: PROGRAMME_TRACK_SESSIONS_LIST,
@@ -147,12 +153,13 @@ export const getAllSessions = () => async (dispatch) => {
     }
 };
 
-// Create track
+// Create track (uses event-based endpoint when eventId is provided)
 export const createTrack = (eventId, trackData) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.post(`/programme/events/${eventId}/tracks`, trackData);
+        // Use event-based endpoint
+        const response = await axiosInstance.post(`/events/${eventId}/programme/tracks`, trackData);
         
         dispatch({
             type: CREATE_PROGRAMME_TRACK,
@@ -171,12 +178,17 @@ export const createTrack = (eventId, trackData) => async (dispatch) => {
     }
 };
 
-// Update track
-export const updateTrack = (trackId, trackData) => async (dispatch) => {
+// Update track (uses event-based endpoint when eventId is provided)
+export const updateTrack = (trackId, trackData, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.put(`/programme/tracks/${trackId}`, trackData);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/tracks/${trackId}`
+            : `/programme/tracks/${trackId}`;
+        
+        const response = await axiosInstance.put(url, trackData);
         
         dispatch({
             type: UPDATE_PROGRAMME_TRACK,
@@ -195,12 +207,17 @@ export const updateTrack = (trackId, trackData) => async (dispatch) => {
     }
 };
 
-// Delete track
-export const deleteTrack = (trackId) => async (dispatch) => {
+// Delete track (uses event-based endpoint when eventId is provided)
+export const deleteTrack = (trackId, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.delete(`/programme/tracks/${trackId}`);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/tracks/${trackId}`
+            : `/programme/tracks/${trackId}`;
+        
+        const response = await axiosInstance.delete(url);
         
         dispatch({
             type: DELETE_PROGRAMME_TRACK,
@@ -219,12 +236,17 @@ export const deleteTrack = (trackId) => async (dispatch) => {
     }
 };
 
-// Create session
-export const createSession = (sessionData) => async (dispatch) => {
+// Create session (uses event-based endpoint when eventId is provided)
+export const createSession = (sessionData, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.post('/programme/sessions', sessionData);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/sessions`
+            : '/programme/sessions';
+        
+        const response = await axiosInstance.post(url, sessionData);
         
         dispatch({
             type: CREATE_PROGRAMME_SESSION,
@@ -243,12 +265,17 @@ export const createSession = (sessionData) => async (dispatch) => {
     }
 };
 
-// Update session
-export const updateSession = (sessionId, sessionData) => async (dispatch) => {
+// Update session (uses event-based endpoint when eventId is provided)
+export const updateSession = (sessionId, sessionData, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.put(`/programme/sessions/${sessionId}`, sessionData);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/sessions/${sessionId}`
+            : `/programme/sessions/${sessionId}`;
+        
+        const response = await axiosInstance.put(url, sessionData);
         
         dispatch({
             type: UPDATE_PROGRAMME_SESSION,
@@ -267,12 +294,17 @@ export const updateSession = (sessionId, sessionData) => async (dispatch) => {
     }
 };
 
-// Delete session
-export const deleteSession = (sessionId) => async (dispatch) => {
+// Delete session (uses event-based endpoint when eventId is provided)
+export const deleteSession = (sessionId, eventId = null) => async (dispatch) => {
     try {
         dispatch(setProgrammeLoading(true));
         
-        const response = await axiosInstance.delete(`/programme/sessions/${sessionId}`);
+        // Use event-based endpoint if eventId is provided
+        const url = eventId 
+            ? `/events/${eventId}/programme/sessions/${sessionId}`
+            : `/programme/sessions/${sessionId}`;
+        
+        const response = await axiosInstance.delete(url);
         
         dispatch({
             type: DELETE_PROGRAMME_SESSION,

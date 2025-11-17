@@ -28,6 +28,8 @@ import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../../utils/constants';
 import useTableNavigation from '../../../../hooks/useTableNavigation';
+import EventProgrammeManagement from '../../../../components/events/EventProgrammeManagement';
+import { createTrack, createSession } from '../../../../store/actions/programmeActions';
 
 // Main component
 function AddEventPage() {
@@ -39,6 +41,7 @@ function AddEventPage() {
     const events = useSelector((state) => state.event?.event?.events);
     const previousPageRef = useRef(null);
     const originalEventDateRef = useRef(null);
+    const programmeDataRef = useRef(null); // Store programme data during event creation
 
     const [speakerList, setSpeakerList] = useState([]);
     const [categoryList, setCategoryList] = useState([]);
@@ -481,6 +484,17 @@ function AddEventPage() {
 
                     setFloorPlanPreview(floorPlanPreviewUrl);
                     setBackgroundImagePreview(backgroundImagePreviewUrl);
+                    
+                    // Store event speakers in localStorage for programme session creation
+                    if (speakerIds && speakerIds.length > 0 && id) {
+                        const eventSpeakersKey = `event_${id}_speakers`;
+                        const speakersData = editData.speakers || editData.speakersData || [];
+                        localStorage.setItem(eventSpeakersKey, JSON.stringify({
+                            speakerIds: speakerIds,
+                            speakers: speakersData,
+                            timestamp: new Date().toISOString()
+                        }));
+                    }
                 }
             } catch (error) {
                 console.error('Error loading event data:', error);
@@ -733,6 +747,15 @@ function AddEventPage() {
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
         const selectedIds = selectedOptions.map((option) => option.value);
+        
+        // Store selected speakers in localStorage for programme session creation
+        const selectedSpeakers = speakerList.filter(speaker => selectedIds.includes(speaker.id));
+        const eventSpeakersKey = id ? `event_${id}_speakers` : 'event_temp_speakers';
+        localStorage.setItem(eventSpeakersKey, JSON.stringify({
+            speakerIds: selectedIds,
+            speakers: selectedSpeakers,
+            timestamp: new Date().toISOString()
+        }));
 
         setFormData((prev) => ({
             ...prev,
@@ -889,9 +912,70 @@ function AddEventPage() {
             }
         }
 
+        const saveProgrammeData = async (newEventId, programmeData) => {
+            if (!programmeData || !programmeData.tracks || programmeData.tracks.length === 0) {
+                return;
+            }
+
+            try {
+                // Create all tracks first
+                for (const track of programmeData.tracks) {
+                    const trackData = {
+                        title: track.title,
+                        description: track.description,
+                        isActive: track.isActive
+                    };
+                    const trackResult = await dispatch(createTrack(newEventId, trackData));
+                    
+                    if (trackResult?.success && trackResult.data) {
+                        const trackId = trackResult.data.id;
+                        const sessions = programmeData.sessions[track.id] || [];
+                        
+                        // Create all sessions for this track
+                        for (const session of sessions) {
+                            const sessionData = {
+                                trackId: trackId,
+                                title: session.title,
+                                description: session.description,
+                                sessionDate: session.sessionDate,
+                                startTime: session.startTime,
+                                endTime: session.endTime,
+                                venue: session.venue,
+                                isActive: session.isActive,
+                                speakerIds: session.speakers ? session.speakers.map(s => s.id || s).filter(Boolean) : []
+                            };
+                            await dispatch(createSession(sessionData, newEventId));
+                        }
+                    }
+                }
+                // toast.success('Programme data saved successfully');
+            } catch (error) {
+                console.error('Error saving programme data:', error);
+                // toast.error('Failed to save some programme data');
+            }
+        };
+
         try {
             const result = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
             if (result && result.success) {
+                const newEventId = result.data?.id || result.id || id;
+                
+                // If creating new event, move temp speakers to event-specific key
+                if (!id && newEventId) {
+                    const tempSpeakers = localStorage.getItem('event_temp_speakers');
+                    if (tempSpeakers) {
+                        localStorage.setItem(`event_${newEventId}_speakers`, tempSpeakers);
+                        localStorage.removeItem('event_temp_speakers');
+                    }
+                }
+                
+                // If creating new event and we have programme data, save it
+                if (!id && programmeDataRef.current) {
+                    if (newEventId) {
+                        await saveProgrammeData(newEventId, programmeDataRef.current);
+                    }
+                }
+                
                 // Redux store is already updated by the action, no need to fetch again
                 if (id) {
                     // For edit mode, check if the event date was changed
@@ -2698,6 +2782,22 @@ function AddEventPage() {
                                     {/* Event Stamp Modal */}
                                     {/* Remove the EventStampFormModal import and usage */}
                                     {/* <EventStampFormModal ... /> */}
+                                </Row>
+
+                                {/* Programme Management Section - Available in both create and edit modes */}
+                                <Row className="mt-4">
+                                    <Col sm={12}>
+                                        <EventProgrammeManagement 
+                                            eventId={id} 
+                                            isEditMode={!!id}
+                                            onProgrammeDataChange={(data) => {
+                                                if (!id) {
+                                                    // Store programme data for later saving after event creation
+                                                    programmeDataRef.current = data;
+                                                }
+                                            }}
+                                        />
+                                    </Col>
                                 </Row>
 
                                 {/* Form Actions */}

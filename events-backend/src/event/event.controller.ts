@@ -34,6 +34,14 @@ import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions
 import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/file-upload.utils';
 import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 import { EventNotificationService } from '../utils/event-notification.service';
+import { ProgrammeService } from '../programme/programme.service';
+import {
+  CreateProgrammeTrackDto,
+  UpdateProgrammeTrackDto,
+  CreateProgrammeSessionDto,
+  UpdateProgrammeSessionDto,
+  UpdateProgrammeTrackOrderDto,
+} from '../programme/programme.dto';
 
 @Controller('api/events')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,6 +50,7 @@ export class EventController {
     private readonly eventService: EventService,
     private readonly errorHandler: ErrorHandlerService,
     private readonly eventNotificationService: EventNotificationService,
+    private readonly programmeService: ProgrammeService,
   ) {}
 
   @Post('create')
@@ -176,7 +185,8 @@ export class EventController {
     @Request() req: any,
   ) {
     try {
-      const summaries = await this.eventService.getEventSummariesForRegistration();
+      const userRole = req.user?.role;
+      const summaries = await this.eventService.getEventSummariesForRegistration(userRole);
 
       return response.status(HttpStatus.OK).json({
         success: true,
@@ -830,5 +840,328 @@ export class EventController {
     return changes;
   }
 
+  // Programme Management Endpoints - Integrated into Event Controller
+  // Track Management
+  @Post(':eventId/programme/tracks')
+  @Roles(UserRole.Admin)
+  async createProgrammeTrack(
+    @Param('eventId') eventId: string,
+    @Body() createTrackDto: CreateProgrammeTrackDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const track = await this.programmeService.createTrack(eventId, createTrackDto);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme track created successfully',
+        data: track,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Create Programme Track', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get(':eventId/programme/tracks')
+  async getProgrammeTracks(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme tracks retrieved successfully',
+        data: tracks,
+        metadata: {
+          total: tracks.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get Programme Tracks', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Put(':eventId/programme/tracks/:trackId')
+  @Roles(UserRole.Admin)
+  async updateProgrammeTrack(
+    @Param('eventId') eventId: string,
+    @Param('trackId') trackId: string,
+    @Body() updateTrackDto: UpdateProgrammeTrackDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify track belongs to event
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      const track = tracks.find(t => t.id === trackId);
+      if (!track) {
+        throw new NotFoundException('Programme track not found for this event');
+      }
+
+      const updatedTrack = await this.programmeService.updateTrack(trackId, updateTrackDto);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme track updated successfully',
+        data: updatedTrack,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Update Programme Track', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Delete(':eventId/programme/tracks/:trackId')
+  @Roles(UserRole.Admin)
+  async deleteProgrammeTrack(
+    @Param('eventId') eventId: string,
+    @Param('trackId') trackId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify track belongs to event
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      const track = tracks.find(t => t.id === trackId);
+      if (!track) {
+        throw new NotFoundException('Programme track not found for this event');
+      }
+
+      await this.programmeService.deleteTrack(trackId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme track deleted successfully',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Delete Programme Track', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Put(':eventId/programme/tracks/reorder')
+  @Roles(UserRole.Admin)
+  async reorderProgrammeTracks(
+    @Param('eventId') eventId: string,
+    @Body() updateOrderDto: UpdateProgrammeTrackOrderDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify all tracks belong to event
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      const trackIds = new Set(tracks.map(t => t.id));
+      const allTracksBelongToEvent = updateOrderDto.items.every(item => trackIds.has(item.id));
+      
+      if (!allTracksBelongToEvent) {
+        throw new BadRequestException('All tracks must belong to the specified event');
+      }
+
+      await this.programmeService.reorderTracks(updateOrderDto.items);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme track order updated successfully',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Reorder Programme Tracks', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Session Management
+  @Post(':eventId/programme/sessions')
+  @Roles(UserRole.Admin)
+  async createProgrammeSession(
+    @Param('eventId') eventId: string,
+    @Body() createSessionDto: CreateProgrammeSessionDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify track belongs to event
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      const track = tracks.find(t => t.id === createSessionDto.trackId);
+      if (!track) {
+        throw new BadRequestException('Track does not belong to this event');
+      }
+
+      const session = await this.programmeService.createSession(createSessionDto);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme session created successfully',
+        data: session,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.CREATED).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Create Programme Session', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get(':eventId/programme/sessions')
+  async getProgrammeSessions(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const sessions = await this.programmeService.getSessionsByEvent(eventId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme sessions retrieved successfully',
+        data: sessions,
+        metadata: {
+          total: sessions.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get Programme Sessions', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Put(':eventId/programme/sessions/:sessionId')
+  @Roles(UserRole.Admin)
+  async updateProgrammeSession(
+    @Param('eventId') eventId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() updateSessionDto: UpdateProgrammeSessionDto,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify session belongs to event
+      const sessions = await this.programmeService.getSessionsByEvent(eventId);
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        throw new NotFoundException('Programme session not found for this event');
+      }
+
+      const updatedSession = await this.programmeService.updateSession(sessionId, updateSessionDto);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme session updated successfully',
+        data: updatedSession,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Update Programme Session', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Delete(':eventId/programme/sessions/:sessionId')
+  @Roles(UserRole.Admin)
+  async deleteProgrammeSession(
+    @Param('eventId') eventId: string,
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify session belongs to event
+      const sessions = await this.programmeService.getSessionsByEvent(eventId);
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) {
+        throw new NotFoundException('Programme session not found for this event');
+      }
+
+      await this.programmeService.deleteSession(sessionId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme session deleted successfully',
+        data: null,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Delete Programme Session', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get(':eventId/programme/tracks/:trackId/sessions')
+  async getProgrammeSessionsByTrack(
+    @Param('eventId') eventId: string,
+    @Param('trackId') trackId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Verify track belongs to event
+      const tracks = await this.programmeService.getTracksByEvent(eventId);
+      const track = tracks.find(t => t.id === trackId);
+      if (!track) {
+        throw new NotFoundException('Programme track not found for this event');
+      }
+
+      const sessions = await this.programmeService.getSessionsByTrack(trackId);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Programme sessions retrieved successfully',
+        data: sessions,
+        metadata: {
+          total: sessions.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get Programme Sessions by Track', req.user?.id);
+      throw error;
+    }
+  }
 
 }

@@ -41,6 +41,12 @@ export class ProgrammeSession {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  enablePolling!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  enableQna!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

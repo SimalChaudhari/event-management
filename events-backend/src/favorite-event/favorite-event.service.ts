@@ -4,7 +4,7 @@ import { Repository, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FavoriteEvent } from './favorite-event.entity';
 import { Event } from 'event/event.entity';
-import { UserEntity } from 'user/users.entity';
+import { UserEntity, UserRole } from 'user/users.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { getEventColor } from 'utils/event-color.util';
@@ -121,7 +121,11 @@ export class FavoriteEventService {
     // Apply filters based on filter type
     switch (filter) {
       case FavoriteFilterType.UPCOMING:
-        query = query.andWhere('event.startDate >= :today', { today });
+        // Only filter past events for non-admin users
+        // Admins can see all events including past events
+        if (userRole !== UserRole.Admin) {
+          query = query.andWhere('event.startDate >= :today', { today });
+        }
         break;
 
       case FavoriteFilterType.MY_EVENTS:

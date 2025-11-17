@@ -102,6 +102,14 @@ export class UpdateProgrammeSessionDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enablePolling?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableQna?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
   speakerIds?: string[];
@@ -149,6 +157,8 @@ export class ProgrammeSessionResponseDto {
   endTime!: string;
   venue?: string;
   isActive!: boolean;
+  enablePolling!: boolean;
+  enableQna!: boolean;
   createdAt!: Date;
   updatedAt!: Date;
   speakers?: {

@@ -148,17 +148,18 @@ const chartData = {
                     },
                     url: '/order'
                 },
-                {
-                    id: 'programme',
-                    title: 'Programme',
-                    type: 'item',
-                    // icon: 'feather icon-list',
-                    url: '/programme'
-                },
+                // Temporarily hidden - will be enabled later
+                // {
+                //     id: 'programme',
+                //     title: 'Programme',
+                //     type: 'item',
+                //     // icon: 'feather icon-list',
+                //     url: '/programme'
+                // },
                 {
                     id: 'engagements',
                     title: 'Engagement',
-                    type: 'item',
+                    type: 'item',   
                     // icon: 'feather icon-users',
                     url: '/engagements',
                     badge: {

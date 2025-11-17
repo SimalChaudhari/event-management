@@ -627,6 +627,21 @@ export const getSpeakersForEvent = () => async (dispatch) => {
     }
 };
 
+// Get speakers assigned to a specific event
+export const getEventSpeakers = (eventId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/events/get/${eventId}/speakers`);
+        if (response.data?.success) {
+            return { success: true, data: response.data.data || [] };
+        }
+        return { success: false, data: [] };
+    } catch (error) {
+        console.error('Error fetching event speakers:', error);
+        // Don't show toast error here, let caller handle it
+        return { success: false, data: [] };
+    }
+};
+
 // Get categories list for event form
 export const getCategoriesForEvent = () => async (dispatch) => {
     try {

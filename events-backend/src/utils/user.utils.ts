@@ -394,9 +394,13 @@ export class UserUtils {
         ? allSessions.filter((session: any) => sessionIds.includes(session.id))
         : allSessions;
 
-      // For user-facing APIs: Filter out inactive sessions
+      // For user-facing APIs: Filter out inactive sessions only
+      // Don't filter by enableQna/enablePolling - show all active sessions with messages if features are disabled
       if (isUserFacing) {
-        filteredSessions = filteredSessions.filter((session: any) => session.isActive === true);
+        filteredSessions = filteredSessions.filter((session: any) => {
+          // Must be active
+          return session.isActive === true;
+        });
       }
 
       // Track with sessions
@@ -426,6 +430,8 @@ export class UserUtils {
             description: speaker.speakerProfile?.description || ''
           })) || [],
           isActive: session.isActive !== undefined ? session.isActive : true,
+          enableQna: session.enableQna !== undefined ? session.enableQna : false,
+          enablePolling: session.enablePolling !== undefined ? session.enablePolling : false,
           statistics: session.statistics || {
             questionsCount: 0,
             answeredQuestionsCount: 0,
@@ -433,8 +439,9 @@ export class UserUtils {
             pollsCount: 0,
             totalVotesCount: 0
           },
-          questions: session.questions || [],
-          polling: session.polling || null
+          // For user-facing APIs: Show unavailable message if feature is disabled, otherwise show data
+          questions: (isUserFacing && session.enableQna !== true) ? 'Q&A unavailable' : (session.questions || []),
+          polling: (isUserFacing && session.enablePolling !== true) ? 'Polling unavailable' : (session.polling || null)
         })),
         sessionsCount: filteredSessions.length
       };

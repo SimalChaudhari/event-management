@@ -295,23 +295,29 @@ export class EventService {
 
       const events = await queryBuilder.getMany();
 
-      // Filter out past events (only exclude events where endDate < today)
-      // Include all events that are today or upcoming
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Filter out past events only for non-admin users
+      // Admins can see all events including past events
+      let filteredEvents = events;
       
-      const filteredEvents = events.filter((event) => {
-        const eventEndDate = new Date(event.endDate);
-        eventEndDate.setHours(0, 0, 0, 0);
+      if (userRole !== UserRole.Admin) {
+        // Filter out past events (only exclude events where endDate < today)
+        // Include all events that are today or upcoming
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
-        // Only exclude events where endDate < today (past events)
-        // Include all events from today onwards (today's events should be shown)
-        if (eventEndDate < today) {
-          return false; // Past event - exclude
-        }
-        
-        return true; // Include today's events and upcoming events
-      });
+        filteredEvents = events.filter((event) => {
+          const eventEndDate = new Date(event.endDate);
+          eventEndDate.setHours(0, 0, 0, 0);
+          
+          // Only exclude events where endDate < today (past events)
+          // Include all events from today onwards (today's events should be shown)
+          if (eventEndDate < today) {
+            return false; // Past event - exclude
+          }
+          
+          return true; // Include today's events and upcoming events
+        });
+      }
 
       // Sort events by startDate in descending order (newest first)
       // Events on Nov 14, 13, 12 will show as 14, 13, 12
@@ -549,13 +555,10 @@ export class EventService {
 
   /**
    * Retrieve a lightweight list of active events for admin dropdowns.
-   * Includes only core identifying fields and excludes past events.
+   * Includes only core identifying fields and excludes past events for non-admin users.
    */
-  async getEventSummariesForRegistration() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const events = await this.eventRepository
+  async getEventSummariesForRegistration(userRole?: string) {
+    const queryBuilder = this.eventRepository
       .createQueryBuilder('event')
       .select([
         'event.id',
@@ -564,8 +567,17 @@ export class EventService {
         'event.endDate',
         'event.location',
         'event.venue',
-      ])
-      .where('event.endDate >= :today', { today })
+      ]);
+
+    // Only filter out past events for non-admin users
+    // Admins can see all events including past events
+    if (userRole !== UserRole.Admin) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      queryBuilder.where('event.endDate >= :today', { today });
+    }
+
+    const events = await queryBuilder
       .orderBy('event.startDate', 'ASC')
       .getMany();
 

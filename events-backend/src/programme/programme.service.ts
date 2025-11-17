@@ -405,6 +405,8 @@ export class ProgrammeService {
       endTime: session.endTime,
       venue: session.venue,
       isActive: session.isActive,
+      enablePolling: session.enablePolling || false,
+      enableQna: session.enableQna || false,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       speakers: session.speakers ? session.speakers.map(speaker => 

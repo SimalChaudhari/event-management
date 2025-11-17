@@ -891,7 +891,7 @@ const routes = [
     ...speakerRoutes,
     ...surveyRoutes,
     ...pollingRoutes,
-    ...programmeRoutes,
+    // ...programmeRoutes, // Temporarily hidden - will be enabled later
     ...engagementRoutes,
     // ...moderatorRoutes,
     ...settingsRoutes,
