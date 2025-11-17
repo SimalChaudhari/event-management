@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Card from 'react-bootstrap/Card';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
@@ -20,6 +20,7 @@ import {
 import { eventList } from '../../store/actions/eventActions.jsx';
 import { getTracksByEvent } from '../../store/actions/programmeActions.jsx';
 import { PUSH_NOTIFICATION_PATHS } from '../../utils/constants.js';
+import useTableNavigation from '../../hooks/useTableNavigation';
 import '../../assets/css/event.css';
 
 const initialFormState = {
@@ -46,6 +47,7 @@ const toDateTimeLocal = (value) => {
 const AddPushNotificationPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams();
     const isEditing = Boolean(id);
 
@@ -58,6 +60,25 @@ const AddPushNotificationPage = () => {
     const [formState, setFormState] = useState(initialFormState);
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const previousPageRef = React.useRef(null);
+
+    const { handleBack: handleBackNavigation } = useTableNavigation({
+        tableRef: null,
+        listPath: PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS,
+        viewPath: PUSH_NOTIFICATION_PATHS.VIEW_NOTIFICATION,
+        editPath: PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION,
+        addPath: PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION
+    });
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            previousPageRef.current = parseInt(pageParam, 10);
+        } else if (location.state?.page) {
+            previousPageRef.current = location.state.page;
+        }
+    }, [id, location.search, location.state]);
 
     useEffect(() => {
         dispatch(eventList());
@@ -343,15 +364,31 @@ const AddPushNotificationPage = () => {
             }
 
             if (response?.success) {
-                navigate(PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS);
+                const targetPage = previousPageRef.current;
+                if (targetPage) {
+                    navigate(`${PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS}?page=${targetPage}`);
+                } else {
+                    navigate(PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS);
+                }
             }
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    const getCurrentPageForNavigation = () => {
+        const urlParams = new URLSearchParams(location.search || window.location.search);
+        return urlParams.get('page') || location.state?.page || previousPageRef.current;
+    };
+
     const handleCancel = () => {
-        navigate(PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS);
+        const targetPage = getCurrentPageForNavigation();
+        handleBackNavigation(targetPage);
+    };
+
+    const handleBack = () => {
+        const targetPage = getCurrentPageForNavigation();
+        handleBackNavigation(targetPage);
     };
 
     const renderStatusBanner = () => {
@@ -439,7 +476,7 @@ const AddPushNotificationPage = () => {
                     <Card>
                         <Card.Header className="d-flex justify-content-between align-items-center">
                             <h4 className="mb-0">{isEditing ? 'Edit Push Notification' : 'Add Push Notification'}</h4>
-                            <Button variant="secondary" onClick={handleCancel}>
+                            <Button variant="secondary" onClick={handleBack}>
                                 <i className="feather icon-arrow-left me-2" />
                                 Back
                             </Button>

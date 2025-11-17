@@ -31,4 +31,10 @@ export class AppController {
     };
   }
 
+  @Get('tools/push-notification-tester')
+  getPushNotificationTester(@Res() res: Response) {
+    const filePath = join(process.cwd(), 'tools', 'push-notification-tester.html');
+    return res.sendFile(filePath);
+  }
+
 }

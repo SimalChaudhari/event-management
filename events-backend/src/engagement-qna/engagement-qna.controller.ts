@@ -14,6 +14,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { join } from 'path';
 import { EngagementQnaService } from './engagement-qna.service';
 import {
   CreateEngagementQuestionDto,
@@ -55,6 +56,13 @@ export class EngagementQnaController {
       return undefined;
     }
     return req.user.id ?? req.user.sub ?? req.user.userId ?? req.user._id;
+  }
+
+  // Real-Time Q&A Dashboard (Public Access)
+  @Public()
+  @Get('realtime-dashboard')
+  getRealtimeDashboard(@Res() res: Response) {
+    return res.sendFile(join(__dirname, '..', '..', 'public', 'qna-realtime.html'));
   }
 
   // 3. Like/Unlike Question (Registered users only)

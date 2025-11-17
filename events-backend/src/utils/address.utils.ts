@@ -137,8 +137,9 @@ export class AddressUtils {
    * @returns AddressData object with extracted fields
    */
   static extractAddressData(data: any): AddressData {
+    // Map 'address' to 'street' for frontend compatibility
     return {
-      street: data.street,
+      street: data.address || data.street,
       city: data.city,
       state: data.state,
       postalCode: data.postalCode,

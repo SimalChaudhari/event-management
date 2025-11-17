@@ -26,6 +26,7 @@ import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { UserEntity } from '../user/users.entity';
 import { PushNotification } from '../settings/setting.entity';
 import { NotificationUtil } from '../utils/notification.util';
+import { PushNotificationGateway } from './push-notification.gateway';
 import { FirebaseUtil } from '../utils/firebase.util';
 import {
   ScheduledPushNotificationDelivery,
@@ -52,6 +53,7 @@ export class ScheduledPushNotificationService {
     @InjectRepository(PushNotification)
     private readonly pushNotificationRepository: Repository<PushNotification>,
     private readonly notificationUtil: NotificationUtil,
+    private readonly pushNotificationGateway: PushNotificationGateway,
   ) {}
 
   async create(
@@ -306,7 +308,25 @@ export class ScheduledPushNotificationService {
         throw new NotFoundException('Scheduled notification not found');
       }
 
+      const deliveries = await this.deliveryRepository.find({
+        where: { notificationId: notification.id },
+        select: ['userId'],
+      });
+
+      await this.deliveryRepository.delete({ notificationId: notification.id });
       await this.scheduledNotificationRepository.remove(notification);
+
+      const affectedUserIds = [
+        ...new Set(
+          deliveries
+            .map((delivery) => delivery.userId)
+            .filter((userId): userId is string => !!userId),
+        ),
+      ];
+
+      affectedUserIds.forEach((userId) =>
+        this.pushNotificationGateway.emitNotificationDeleted(userId, id),
+      );
     } catch (error) {
       this.logger.error('Error deleting scheduled notification:', error);
       throw error;
@@ -479,64 +499,105 @@ export class ScheduledPushNotificationService {
         // Note: We'll need to send directly to ensure redirect data is included
         for (const userId of targetUserIds) {
           const deliveryRecord = deliveryMap.get(userId);
-          let userSuccess = false;
+          let pushSuccess = false;
+          let pushFailed = false;
           let userErrorMessage: string | undefined;
+          let hasDeviceTokens = false;
 
           try {
             const deviceTokens = await this.pushNotificationRepository.find({
               where: { userId, isActive: true },
             });
 
-            for (const deviceToken of deviceTokens) {
-              try {
-                await FirebaseUtil.sendPushNotification(
-                  deviceToken.deviceToken,
-                  {
-                    title: notificationPayload.title,
-                    body: notificationPayload.description,
-                    data: {
-                      ...notificationPayload,
-                      notificationId: notification.id,
-                      timestamp: new Date().toISOString(),
-                    },
-                  },
-                  deviceToken.platform,
-                );
-                sentCount++;
-                userSuccess = true;
-              } catch (error) {
-                this.logger.error(
-                  `Failed to send push notification to device ${deviceToken.id}:`,
-                  error,
-                );
-                failedCount++;
-                userErrorMessage =
-                  error instanceof Error ? error.message : String(error);
-              }
-            }
+            hasDeviceTokens = deviceTokens.length > 0;
 
-            if (!userSuccess && !userErrorMessage) {
-              userErrorMessage = 'No active device tokens found for user';
+            if (hasDeviceTokens) {
+              for (const deviceToken of deviceTokens) {
+                try {
+                  await FirebaseUtil.sendPushNotification(
+                    deviceToken.deviceToken,
+                    {
+                      title: notificationPayload.title,
+                      body: notificationPayload.description,
+                      data: {
+                        ...notificationPayload,
+                        notificationId: notification.id,
+                        timestamp: new Date().toISOString(),
+                      },
+                    },
+                    deviceToken.platform,
+                  );
+                  sentCount++;
+                  pushSuccess = true;
+                } catch (error) {
+                  this.logger.error(
+                    `Failed to send push notification to device ${deviceToken.id}:`,
+                    error,
+                  );
+                  failedCount++;
+                  pushFailed = true;
+                  userErrorMessage =
+                    error instanceof Error ? error.message : String(error);
+                }
+              }
             }
           } catch (error) {
             this.logger.error(`Failed to send notification to user ${userId}:`, error);
             failedCount++;
+            pushFailed = true;
             if (!userErrorMessage) {
               userErrorMessage =
                 error instanceof Error ? error.message : String(error);
             }
           }
 
+          // Always try to send via socket (delivery channel)
+          let socketDelivered = false;
           if (deliveryRecord) {
-            if (userSuccess) {
+            try {
+              this.emitSocketNotification(
+                userId,
+                notification,
+                deliveryRecord,
+                pushSuccess ? DeliveryStatus.SENT : DeliveryStatus.PENDING,
+              );
+              // Check if user is online (socket delivery will work)
+              const isUserOnline = this.pushNotificationGateway.checkUserOnline(userId);
+              if (isUserOnline) {
+                socketDelivered = true;
+                // Only increment if push didn't succeed (avoid double counting)
+                if (!pushSuccess) {
+                  sentCount++;
+                }
+              }
+            } catch (error) {
+              this.logger.error(
+                `Failed to send socket notification to user ${userId}:`,
+                error,
+              );
+            }
+          }
+
+          // Determine final delivery status
+          if (deliveryRecord) {
+            if (pushSuccess || socketDelivered) {
+              // Success if push worked OR socket delivery worked
               deliveryRecord.status = DeliveryStatus.SENT;
               deliveryRecord.deliveredAt = new Date();
               deliveryRecord.failedAt = undefined;
               deliveryRecord.errorMessage = undefined;
-            } else {
+            } else if (!hasDeviceTokens && !socketDelivered) {
+              // No device tokens and user not online - keep as PENDING (not failed)
+              // They might come online later and receive it
+              deliveryRecord.status = DeliveryStatus.PENDING;
+              deliveryRecord.deliveredAt = undefined;
+              deliveryRecord.failedAt = undefined;
+              deliveryRecord.errorMessage = undefined;
+            } else if (pushFailed && !socketDelivered) {
+              // Push failed with actual error and socket didn't work - mark as FAILED
               deliveryRecord.status = DeliveryStatus.FAILED;
               deliveryRecord.failedAt = new Date();
-              deliveryRecord.errorMessage = userErrorMessage;
+              deliveryRecord.errorMessage = userErrorMessage || 'Failed to deliver notification';
             }
             deliveryUpdates.push(deliveryRecord);
           }
@@ -633,6 +694,34 @@ export class ScheduledPushNotificationService {
     userId: string,
     filters?: UserPushNotificationFilterDto,
   ): Promise<UserPushNotificationResponseDto[]> {
+    // First, update PENDING deliveries to SENT when user fetches notifications
+    // This handles the case where user wasn't connected via socket but now sees the notification
+    // Do this BEFORE applying filters, so we update all PENDING for this user
+    const pendingDeliveriesToUpdate = await this.deliveryRepository.find({
+      where: {
+        userId,
+        status: DeliveryStatus.PENDING,
+      },
+    });
+
+    if (pendingDeliveriesToUpdate.length > 0) {
+      const now = new Date();
+      pendingDeliveriesToUpdate.forEach((delivery) => {
+        delivery.status = DeliveryStatus.SENT;
+        delivery.deliveredAt = now;
+        delivery.failedAt = undefined;
+        delivery.errorMessage = undefined;
+      });
+
+      // Bulk update PENDING to SENT
+      await this.deliveryRepository.save(pendingDeliveriesToUpdate);
+
+      this.logger.debug(
+        `Marked ${pendingDeliveriesToUpdate.length} PENDING deliveries as SENT for user ${userId} (fetched via API)`,
+      );
+    }
+
+    // Now fetch deliveries with filters applied
     const queryBuilder = this.deliveryRepository
       .createQueryBuilder('delivery')
       .leftJoinAndSelect('delivery.notification', 'notification')
@@ -654,7 +743,7 @@ export class ScheduledPushNotificationService {
 
     const deliveries = await queryBuilder.getMany();
 
-    return deliveries.map((delivery) => ({
+    const response = deliveries.map((delivery) => ({
       id: delivery.id,
       message: delivery.notification?.message ?? '',
       sendToAllUsers: delivery.notification?.sendToAllUsers ?? false,
@@ -672,6 +761,12 @@ export class ScheduledPushNotificationService {
       createdAt: delivery.createdAt,
       updatedAt: delivery.updatedAt,
     }));
+
+    if (userId) {
+      this.pushNotificationGateway.emitNotificationList(userId, response);
+    }
+
+    return response;
   }
 
   async markUserNotificationRead(
@@ -691,6 +786,10 @@ export class ScheduledPushNotificationService {
       delivery.readAt = new Date();
       await this.deliveryRepository.save(delivery);
     }
+
+    if (userId) {
+      this.pushNotificationGateway.emitNotificationRead(userId, delivery.id);
+    }
   }
 
   async markAllUserNotificationsRead(userId: string): Promise<void> {
@@ -701,6 +800,8 @@ export class ScheduledPushNotificationService {
       .where('userId = :userId', { userId })
       .andWhere('isRead = :isRead', { isRead: false })
       .execute();
+
+    this.pushNotificationGateway.emitAllNotificationsRead(userId);
   }
 
   private mapToResponseDto(
@@ -730,6 +831,137 @@ export class ScheduledPushNotificationService {
       createdAt: notification.createdAt,
       updatedAt: notification.updatedAt,
     };
+  }
+
+  private emitSocketNotification(
+    userId: string,
+    notification: ScheduledPushNotification,
+    delivery?: ScheduledPushNotificationDelivery,
+    status?: DeliveryStatus,
+  ): void {
+    if (!this.pushNotificationGateway) {
+      return;
+    }
+
+    const socketPayload = {
+      type: 'scheduled_push',
+      notificationId: notification.id,
+      deliveryId: delivery?.id,
+      message: notification.message,
+      eventId: notification.eventId,
+      redirectType: notification.redirectType,
+      redirectUrl: notification.redirectUrl,
+      appPageRoute:
+        notification.appPageRoute && notification.eventId
+          ? notification.appPageRoute.replace(':eventId', notification.eventId)
+          : notification.appPageRoute,
+      scheduledAt: notification.scheduledAt,
+      sentAt: notification.sentAt ?? new Date(),
+      status: status ?? NotificationStatus.SCHEDULED,
+      timestamp: new Date(),
+    };
+
+    this.pushNotificationGateway.sendScheduledNotification(userId, socketPayload);
+  }
+
+  /**
+   * Cleanup old delivery records to reduce database size
+   * @param readRetentionDays - Days to keep read notifications (default: 30)
+   * @param unreadRetentionDays - Days to keep unread notifications (default: 90)
+   * @returns Number of deleted records
+   */
+  async cleanupOldDeliveryRecords(
+    readRetentionDays: number = 30,
+    unreadRetentionDays: number = 90,
+  ): Promise<{
+    readDeleted: number;
+    unreadDeleted: number;
+    totalDeleted: number;
+  }> {
+    try {
+      const now = new Date();
+      
+      // Calculate cutoff dates
+      const readCutoffDate = new Date(now);
+      readCutoffDate.setDate(readCutoffDate.getDate() - readRetentionDays);
+      
+      const unreadCutoffDate = new Date(now);
+      unreadCutoffDate.setDate(unreadCutoffDate.getDate() - unreadRetentionDays);
+
+      // Delete old READ notifications
+      const readResult = await this.deliveryRepository
+        .createQueryBuilder()
+        .delete()
+        .where('isRead = :isRead', { isRead: true })
+        .andWhere('readAt < :cutoffDate', { cutoffDate: readCutoffDate })
+        .execute();
+
+      const readDeleted = readResult.affected || 0;
+
+      // Delete old UNREAD notifications (keep them longer)
+      const unreadResult = await this.deliveryRepository
+        .createQueryBuilder()
+        .delete()
+        .where('isRead = :isRead', { isRead: false })
+        .andWhere('createdAt < :cutoffDate', { cutoffDate: unreadCutoffDate })
+        .execute();
+
+      const unreadDeleted = unreadResult.affected || 0;
+
+      const totalDeleted = readDeleted + unreadDeleted;
+
+      this.logger.log(
+        `Cleanup completed: ${readDeleted} read + ${unreadDeleted} unread = ${totalDeleted} total delivery records deleted`,
+      );
+
+      return {
+        readDeleted,
+        unreadDeleted,
+        totalDeleted,
+      };
+    } catch (error) {
+      this.logger.error('Error cleaning up old delivery records:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cleanup old delivery records using environment variables for retention
+   * Reads from: PUSH_NOTIFICATION_READ_RETENTION_DAYS (default: 30)
+   *            PUSH_NOTIFICATION_UNREAD_RETENTION_DAYS (default: 90)
+   */
+  async cleanupOldDeliveryRecordsWithEnv(): Promise<{
+    readDeleted: number;
+    unreadDeleted: number;
+    totalDeleted: number;
+  }> {
+    const readRetention = parseInt(
+      process.env.PUSH_NOTIFICATION_READ_RETENTION_DAYS || '30',
+      10,
+    );
+    const unreadRetention = parseInt(
+      process.env.PUSH_NOTIFICATION_UNREAD_RETENTION_DAYS || '90',
+      10,
+    );
+
+    return this.cleanupOldDeliveryRecords(readRetention, unreadRetention);
+  }
+
+  /**
+   * Cron job to automatically clean up old delivery records daily at 2 AM
+   * Runs every day at 2:00 AM (cron: '0 2 * * *')
+   */
+  @Cron('0 2 * * *')
+  async scheduledCleanupOldDeliveryRecords() {
+    try {
+      this.logger.log('Starting scheduled cleanup of old delivery records...');
+      const result = await this.cleanupOldDeliveryRecordsWithEnv();
+      this.logger.log(
+        `Scheduled cleanup completed: ${result.totalDeleted} records deleted (${result.readDeleted} read, ${result.unreadDeleted} unread)`,
+      );
+    } catch (error) {
+      this.logger.error('Error in scheduled cleanup of delivery records:', error);
+    }
   }
 }
 

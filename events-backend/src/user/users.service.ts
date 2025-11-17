@@ -162,6 +162,7 @@ export class UserService {
   async update(
     id: string,
     updateData: Partial<UserEntity> & {
+      address?: string; // Frontend sends 'address' instead of 'street'
       street?: string;
       city?: string;
       state?: string;
@@ -195,8 +196,10 @@ export class UserService {
       }
 
       // Extract address data
+      // Map 'address' to 'street' for frontend compatibility
       const {
-        street,
+        address,
+        street: streetField,
         city,
         state,
         postalCode,
@@ -211,6 +214,9 @@ export class UserService {
         id: userId,
         ...safeUpdateData
       } = updateData;
+      
+      // Use 'address' if provided, otherwise use 'street'
+      const street = address || streetField;
 
       // Update the user
       Object.assign(user, safeUpdateData);
@@ -224,7 +230,7 @@ export class UserService {
         postalCode,
         country,
         addressType,
-        isDefaultAddress,
+        isDefaultAddress: isDefaultAddress !== undefined ? isDefaultAddress : true, // Default to true for profile updates
         apartment,
         landmark,
         addressLabel,

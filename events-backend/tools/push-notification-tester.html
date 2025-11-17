@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Push Notification Namespace Tester</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          sans-serif;
+        color-scheme: light dark;
+      }
+
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        background: #0e1014;
+        color: #e7ecf3;
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 1.5rem;
+        letter-spacing: 0.02em;
+      }
+
+      .card {
+        border-radius: 12px;
+        background: #151922;
+        border: 1px solid #1f2533;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+      }
+
+      label {
+        display: block;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.25rem;
+        color: #8b97b5;
+      }
+
+      input {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #272f42;
+        background: #0e121b;
+        color: #e7ecf3;
+        font-size: 0.95rem;
+        margin-bottom: 0.9rem;
+      }
+
+      button {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        transition: transform 120ms ease, box-shadow 120ms ease;
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, #5c6cff, #9b58ff);
+        color: #fff;
+        box-shadow: 0 8px 20px rgba(94, 108, 255, 0.45);
+      }
+
+      button.danger {
+        background: #ff4d6d;
+        color: #fff;
+        margin-left: 0.5rem;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .feed {
+        margin-top: 1rem;
+        background: #0b0f17;
+        border-radius: 12px;
+        border: 1px solid #1c2231;
+        padding: 1rem;
+        max-height: 420px;
+        overflow-y: auto;
+      }
+
+      .feed-empty {
+        color: #7782a3;
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 1.75rem 0.5rem;
+      }
+
+      .feed-item {
+        border-bottom: 1px solid #1f2533;
+        padding: 0.75rem 0;
+      }
+
+      .feed-item:last-child {
+        border-bottom: none;
+      }
+
+      .feed-title {
+        font-weight: 600;
+        color: #f5f6fb;
+        margin-bottom: 0.35rem;
+      }
+
+      .feed-meta {
+        color: #8b97b5;
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+      #status {
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 0.35rem;
+        background: #ffb347;
+      }
+
+      .connected .status-dot {
+        background: #4ade80;
+      }
+
+      .disconnected .status-dot {
+        background: #f87171;
+      }
+
+      pre {
+        margin: 0;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      #logs {
+        max-height: 420px;
+        overflow-y: auto;
+        margin-top: 0.75rem;
+        padding-right: 0.5rem;
+      }
+
+      .log-entry {
+        border-bottom: 1px solid #1f2533;
+        padding: 0.6rem 0;
+      }
+
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(156, 163, 175, 0.15);
+        color: #cbd5f5;
+      }
+
+      .feed-actions {
+        margin-top: 0.5rem;
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      button.small {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        background: linear-gradient(135deg, #5c6cff, #9b58ff);
+        color: #fff;
+      }
+
+      button.small:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .feed-item.read {
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Push Notification Tester</h1>
+      <label for="baseUrl">Backend base URL (optional)</label>
+      <input
+        id="baseUrl"
+        type="text"
+        value=""
+        placeholder="http://localhost:5000"
+      />
+      <p style="margin-top: -0.6rem; color: #9da9c9; font-size: 0.85rem">
+        Leave empty to auto-use the page origin.
+      </p>
+
+      <label for="tokenInput">JWT token</label>
+      <input
+        id="tokenInput"
+        type="text"
+        placeholder="paste user token"
+        autocomplete="off"
+      />
+
+      <div>
+        <button id="connectBtn" class="primary">Connect</button>
+        <button id="disconnectBtn" class="danger" disabled>Disconnect</button>
+      </div>
+      <div id="status" class="status disconnected">
+        <span class="status-dot"></span>
+        <span class="status-text">Disconnected</span>
+      </div>
+
+      <div id="feed" class="feed">
+        <div class="feed-empty">Connect to start receiving notifications.</div>
+      </div>
+    </div>
+
+    <script>
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const statusEl = document.getElementById('status');
+      const feedEl = document.getElementById('feed');
+      let socket;
+
+      const EVENTS = [
+        'connected',
+        'scheduled_push_notification:send',
+        'scheduled_push_notification:list',
+        'scheduled_push_notification:read',
+        'scheduled_push_notification:read_all',
+        'scheduled_push_notification:delete',
+      ];
+
+      function setStatus(state, text) {
+        statusEl.classList.remove('connected', 'disconnected');
+        statusEl.classList.add(state);
+        const textNode = statusEl.querySelector('.status-text');
+        if (textNode) textNode.textContent = text;
+      }
+
+      function resetFeed() {
+        feedEl.innerHTML = `<div class="feed-empty">Connected. Waiting for notifications.</div>`;
+      }
+
+      function addFeedItem(title, detailLines = [], deliveryId = null, isRead = false) {
+        const placeholder = feedEl.querySelector('.feed-empty');
+        if (placeholder) feedEl.removeChild(placeholder);
+        const item = document.createElement('div');
+        item.className = `feed-item${isRead ? ' read' : ''}`;
+        item.dataset.deliveryId = deliveryId || '';
+        item.innerHTML = `
+          <div class="feed-title">${title}</div>
+          <div class="feed-meta">
+            ${
+              detailLines.length
+                ? detailLines.map((line) => `<div>${line}</div>`).join('')
+                : 'No additional data'
+            }
+          </div>
+          ${
+            deliveryId && !isRead
+              ? `<div class="feed-actions">
+                  <button class="small mark-read-btn" data-delivery-id="${deliveryId}">
+                    Mark as Read
+                  </button>
+                </div>`
+              : isRead
+              ? `<div class="feed-meta" style="margin-top: 0.25rem; color: #4ade80;">
+                  ✓ Read
+                </div>`
+              : ''
+          }
+        `;
+        feedEl.prepend(item);
+      }
+
+      function describePayload(event, payload) {
+        switch (event) {
+          case 'scheduled_push_notification:send':
+            return [
+              `Message: ${payload?.message || payload?.body || '(no message)'}`,
+              `Notification ID: ${payload?.notificationId || 'n/a'}`,
+              `Sent at: ${payload?.sentAt || payload?.timestamp || 'n/a'}`,
+            ];
+          case 'scheduled_push_notification:list':
+            return [`Items received: ${(payload?.notifications || []).length}`];
+          case 'scheduled_push_notification:read':
+            return [`Delivery ID: ${payload?.deliveryId || 'n/a'}`];
+          case 'scheduled_push_notification:read_all':
+            return ['All notifications marked read'];
+          case 'scheduled_push_notification:delete':
+            return [`Notification ID: ${payload?.notificationId || 'n/a'}`];
+          default:
+            return [`Payload: ${JSON.stringify(payload)}`];
+        }
+      }
+
+      async function markAsRead(deliveryId) {
+        if (!deliveryId) return;
+        const baseUrl = normalizeBaseUrl(document.getElementById('baseUrl').value.trim());
+        const token = document.getElementById('tokenInput').value.trim();
+        
+        // Find the feed item and disable the button
+        const feedItem = feedEl.querySelector(`[data-delivery-id="${deliveryId}"]`);
+        const btn = feedItem?.querySelector('.mark-read-btn');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Marking...';
+        }
+
+        try {
+          const res = await fetch(`${baseUrl}/api/user/push-notifications/${deliveryId}/read`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            // The socket event will handle the UI update
+            // But we can update immediately for better UX
+            if (feedItem) {
+              const actions = feedItem.querySelector('.feed-actions');
+              if (actions) {
+                actions.outerHTML = `<div class="feed-meta" style="margin-top: 0.25rem; color: #4ade80;">
+                  ✓ Marked as read
+                </div>`;
+              }
+              feedItem.classList.add('read');
+            }
+          } else {
+            const error = await res.json().catch(() => ({ message: 'Failed to mark as read' }));
+            addFeedItem('mark_read_error', [`Delivery ${deliveryId}: ${error.message || res.statusText}`]);
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = 'Mark as Read';
+            }
+          }
+        } catch (error) {
+          addFeedItem('mark_read_error', [`Delivery ${deliveryId}: ${error.message}`]);
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Mark as Read';
+          }
+        }
+      }
+
+      function updateFeedItemAsRead(deliveryId) {
+        const feedItem = feedEl.querySelector(`[data-delivery-id="${deliveryId}"]`);
+        if (feedItem && !feedItem.classList.contains('read')) {
+          const actions = feedItem.querySelector('.feed-actions');
+          if (actions) {
+            actions.outerHTML = `<div class="feed-meta" style="margin-top: 0.25rem; color: #4ade80;">
+              ✓ Read
+            </div>`;
+          }
+          feedItem.classList.add('read');
+        }
+      }
+
+      function normalizeBaseUrl(value) {
+        if (!value) {
+          return window.location.origin;
+        }
+        try {
+          if (!/^https?:\/\//i.test(value)) {
+            value = `${window.location.protocol}//${value}`;
+          }
+          const parsed = new URL(value, window.location.origin);
+          return parsed.origin;
+        } catch (_err) {
+          return window.location.origin;
+        }
+      }
+
+      function connectSocket() {
+        const baseUrlInput = document.getElementById('baseUrl');
+        const baseUrl = normalizeBaseUrl(baseUrlInput.value.trim());
+        baseUrlInput.value = baseUrl;
+        const token = document.getElementById('tokenInput').value.trim();
+        if (!baseUrl || !token) {
+          alert('Provide token and base URL.');
+          return;
+        }
+
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+
+        socket = io(`${baseUrl}/push-notifications`, {
+          transports: ['websocket', 'polling'],
+          auth: { token },
+        });
+
+        socket.on('connect', () => {
+          setStatus('connected', 'Connected');
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          resetFeed();
+        });
+
+        socket.on('disconnect', (reason) => {
+          setStatus('disconnected', `Disconnected (${reason})`);
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+        });
+
+        socket.on('connect_error', (err) => {
+          setStatus('disconnected', 'Connection error');
+          addFeedItem('connect_error', [`${err.message}`]);
+        });
+
+        socket.on('error', (err) => {
+          addFeedItem('error', [`${err?.message || err}`]);
+        });
+
+        socket.on('scheduled_push_notification:send', (payload) => {
+          addFeedItem(
+            'send',
+            describePayload('scheduled_push_notification:send', payload),
+            payload?.deliveryId,
+            false,
+          );
+        });
+
+        socket.on('scheduled_push_notification:list', (payload) => {
+          addFeedItem(
+            'list',
+            describePayload('scheduled_push_notification:list', payload),
+            null,
+            false,
+          );
+        });
+
+        socket.on('scheduled_push_notification:read', (payload) => {
+          updateFeedItemAsRead(payload?.deliveryId);
+          addFeedItem(
+            'read',
+            describePayload('scheduled_push_notification:read', payload),
+            payload?.deliveryId,
+            true,
+          );
+        });
+
+        socket.on('scheduled_push_notification:read_all', (payload) => {
+          // Mark all items as read
+          const allItems = feedEl.querySelectorAll('[data-delivery-id]');
+          allItems.forEach((item) => {
+            const deliveryId = item.dataset.deliveryId;
+            if (deliveryId) updateFeedItemAsRead(deliveryId);
+          });
+          addFeedItem(
+            'read_all',
+            describePayload('scheduled_push_notification:read_all', payload),
+            null,
+            false,
+          );
+        });
+
+        socket.on('scheduled_push_notification:delete', (payload) => {
+          addFeedItem(
+            'delete',
+            describePayload('scheduled_push_notification:delete', payload),
+            null,
+            false,
+          );
+        });
+
+        socket.on('connected', (payload) => {
+          addFeedItem('connected', [`User ID: ${payload?.userId || 'n/a'}`], null, false);
+        });
+      }
+
+      function disconnectSocket() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+        setStatus('disconnected', 'Disconnected');
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        feedEl.innerHTML = `<div class="feed-empty">Connect to start receiving notifications.</div>`;
+      }
+
+      // Handle mark as read button clicks
+      feedEl.addEventListener('click', (e) => {
+        if (e.target.classList.contains('mark-read-btn')) {
+          const deliveryId = e.target.dataset.deliveryId;
+          if (deliveryId) {
+            markAsRead(deliveryId);
+          }
+        }
+      });
+
+      connectBtn.addEventListener('click', connectSocket);
+      disconnectBtn.addEventListener('click', disconnectSocket);
+
+      window.addEventListener('beforeunload', disconnectSocket);
+
+      // Auto-fill base URL with current origin on load
+      window.addEventListener('DOMContentLoaded', () => {
+        const baseUrlInput = document.getElementById('baseUrl');
+        if (!baseUrlInput.value) {
+          baseUrlInput.value = window.location.origin;
+        }
+      });
+
+      // Remove API helper actions (not needed for simplified UI)
+    </script>
+  </body>
+</html>
+
+

@@ -163,8 +163,35 @@ export class UserUtils {
       ? (user.isActive ? 'Delete Account' : 'Delete Account')
       : null;
     
+    // Get default address and flatten address fields onto user object for frontend compatibility
+    const defaultAddress = this.getDefaultAddress(user);
+    const addressFields = defaultAddress ? {
+      address: defaultAddress.street || '',
+      street: defaultAddress.street || '',
+      city: defaultAddress.city || '',
+      state: defaultAddress.state || '',
+      postalCode: defaultAddress.postalCode || '',
+      country: defaultAddress.country || '',
+      apartment: defaultAddress.apartment || '',
+      landmark: defaultAddress.landmark || '',
+      addressLabel: defaultAddress.label || '',
+      deliveryInstructions: defaultAddress.instructions || '',
+    } : {
+      address: '',
+      street: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: '',
+      apartment: '',
+      landmark: '',
+      addressLabel: '',
+      deliveryInstructions: '',
+    };
+    
     return {
       ...sanitizedUser,
+      ...addressFields,
       formattedAddress: this.formatUserAddress(user),
       accountActionButton: accountActionButton,
       isDeleteButtonVisible: isDeleteButtonVisible

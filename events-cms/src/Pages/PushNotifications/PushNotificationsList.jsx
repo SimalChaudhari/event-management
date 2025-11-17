@@ -4,7 +4,6 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import Spinner from 'react-bootstrap/Spinner';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import * as $ from 'jquery';
@@ -17,6 +16,8 @@ import {
 } from '../../store/actions/pushNotificationActions.jsx';
 import { PUSH_NOTIFICATION_PATHS } from '../../utils/constants.js';
 import { setupDateFilter, resetFilters } from '../../utils/dateFilter';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../hooks/useTableNavigation';
 import '../../assets/css/event.css';
 
 // Register DataTable plugin (Bootstrap styling)
@@ -293,21 +294,21 @@ const buildActionsCell = (notification) => {
     `;
 };
 
-const ptable = (data, handlers) => {
+const ptable = (data, handlers, restoreTablePage) => {
     const { onAdd, onView, onSend, onEdit, onDelete } = handlers;
     const tableSelector = TABLE_SELECTOR;
 
     $.fn.dataTable.ext.errMode = 'throw';
 
-    let currentPage = 0;
+    const validData = Array.isArray(data) ? data.filter((item) => item && item.id) : [];
+
     if ($.fn.DataTable.isDataTable(tableSelector)) {
-        const existing = $(tableSelector).DataTable();
-        currentPage = existing.page();
-        existing.clear().destroy();
+        $(tableSelector).DataTable().clear().destroy();
     }
 
     const dataTable = $(tableSelector).DataTable({
-        data: Array.isArray(data) ? data : [],
+        data: validData,
+        rowId: 'id',
         order: [[3, 'desc']],
         searching: true,
         searchDelay: 500,
@@ -356,6 +357,11 @@ const ptable = (data, handlers) => {
             }
         },
         initComplete: function () {
+            if (typeof restoreTablePage === 'function') {
+                const api = this.api();
+                restoreTablePage(api);
+            }
+
             const dateFilterHtml = `
                 <div class="date-filter-container d-flex align-items-center">
                     <div class="filter-group mr-3">
@@ -399,45 +405,48 @@ const ptable = (data, handlers) => {
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();
             }
-        }
+        },
+        responsive: true
     });
 
-    dataTable.page(currentPage).draw(false);
-
-    $(document)
+    const tableBodySelector = `${tableSelector} tbody`;
+    $(tableBodySelector)
         .off('click', '.push-view-btn')
         .on('click', '.push-view-btn', function () {
-            const notificationId = $(this).data('id');
-            if (notificationId && typeof onView === 'function') {
-                onView(notificationId);
+            const table = $(tableSelector).DataTable();
+            const rowData = table.row($(this).closest('tr')).data();
+            if (rowData && rowData.id && typeof onView === 'function') {
+                onView(rowData.id);
             }
         });
 
-    $(document)
+    $(tableBodySelector)
         .off('click', '.push-send-btn')
         .on('click', '.push-send-btn', function () {
-            const notificationId = $(this).data('id');
-            const status = $(this).data('status');
-            if (notificationId && typeof onSend === 'function') {
-                onSend(notificationId, status);
+            const table = $(tableSelector).DataTable();
+            const rowData = table.row($(this).closest('tr')).data();
+            if (rowData && rowData.id && typeof onSend === 'function') {
+                onSend(rowData.id, rowData.status);
             }
         });
 
-    $(document)
+    $(tableBodySelector)
         .off('click', '.push-edit-btn')
         .on('click', '.push-edit-btn', function () {
-            const notificationId = $(this).data('id');
-            if (notificationId && typeof onEdit === 'function') {
-                onEdit(notificationId);
+            const table = $(tableSelector).DataTable();
+            const rowData = table.row($(this).closest('tr')).data();
+            if (rowData && rowData.id && typeof onEdit === 'function') {
+                onEdit(rowData.id);
             }
         });
 
-    $(document)
+    $(tableBodySelector)
         .off('click', '.push-delete-btn')
         .on('click', '.push-delete-btn', function () {
-            const notificationId = $(this).data('id');
-            if (notificationId && typeof onDelete === 'function') {
-                onDelete(notificationId);
+            const table = $(tableSelector).DataTable();
+            const rowData = table.row($(this).closest('tr')).data();
+            if (rowData && rowData.id && typeof onDelete === 'function') {
+                onDelete(rowData.id);
             }
         });
 
@@ -447,7 +456,7 @@ const ptable = (data, handlers) => {
 const PushNotificationsList = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { notifications, loading } = useSelector((state) => state.pushNotification || {});
+    const { notifications } = useSelector((state) => state.pushNotification || {});
 
     const [currentTable, setCurrentTable] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -460,24 +469,57 @@ const PushNotificationsList = () => {
         status: null
     });
 
+    const tableRef = React.useRef(null);
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS,
+        viewPath: PUSH_NOTIFICATION_PATHS.VIEW_NOTIFICATION,
+        editPath: PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION,
+        addPath: PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION
+    });
+
     const handleNavigateToCreate = useCallback(() => {
-        navigate(PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION);
-    }, [navigate]);
+        handleAdd();
+    }, [handleAdd]);
 
     const handleViewNotification = useCallback(
         (notificationId) => {
             if (!notificationId) return;
-            navigate(`${PUSH_NOTIFICATION_PATHS.VIEW_NOTIFICATION}/${notificationId}`);
+            const notification = Array.isArray(notifications) 
+                ? notifications.find((n) => String(n.id) === String(notificationId))
+                : null;
+            if (notification) {
+                let currentPage = null;
+                if (tableRef.current) {
+                    try {
+                        const pageInfo = tableRef.current.page.info();
+                        if (pageInfo && pageInfo.page !== undefined) {
+                            currentPage = (pageInfo.page + 1).toString();
+                        }
+                    } catch (e) {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        currentPage = urlParams.get('page');
+                    }
+                }
+                handleView(notification, currentPage);
+            }
         },
-        [navigate]
+        [handleView, notifications]
     );
 
     const handleEditNotification = useCallback(
         (notificationId) => {
             if (!notificationId) return;
-            navigate(`${PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION}/${notificationId}`);
+            const notification = Array.isArray(notifications) 
+                ? notifications.find((n) => String(n.id) === String(notificationId))
+                : null;
+            if (notification) {
+                handleEdit(notification);
+            }
         },
-        [navigate]
+        [handleEdit, notifications]
     );
 
     const handleDeleteRequest = useCallback((notificationId) => {
@@ -487,24 +529,29 @@ const PushNotificationsList = () => {
     }, []);
 
     const destroyTable = useCallback(() => {
-        $(document).off('click', '.push-view-btn');
-        $(document).off('click', '.push-send-btn');
-        $(document).off('click', '.push-edit-btn');
-        $(document).off('click', '.push-delete-btn');
-        if ($.fn.DataTable.isDataTable(TABLE_SELECTOR)) {
-            $(TABLE_SELECTOR).DataTable().clear().destroy();
+        if (tableRef.current) {
+            tableRef.current.off('page.dt');
+            const tableBodySelector = `${TABLE_SELECTOR} tbody`;
+            $(tableBodySelector).off('click', '.push-view-btn');
+            $(tableBodySelector).off('click', '.push-send-btn');
+            $(tableBodySelector).off('click', '.push-edit-btn');
+            $(tableBodySelector).off('click', '.push-delete-btn');
+            tableRef.current.destroy();
+            tableRef.current = null;
+            setCurrentTable(null);
         }
-
-        setCurrentTable(null);
     }, []);
 
     useEffect(() => {
-        dispatch(fetchPushNotifications());
-
-        return () => {
-            destroyTable();
-        };
-    }, [dispatch, destroyTable]);
+        // Only fetch if notifications are not already loaded in Redux
+        // This prevents unnecessary API calls when navigating back after create/update/delete
+        // Since create/update/delete already update Redux, we don't need to fetch again
+        if (!notifications || notifications.length === 0) {
+            dispatch(fetchPushNotifications());
+        }
+        return () => destroyTable();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleOpenSendModal = useCallback(
         (notificationId, status) => {
@@ -531,8 +578,8 @@ const PushNotificationsList = () => {
         if (!sendModalState.notificationId) return;
         setIsSending(true);
         try {
+            // sendPushNotificationNow already calls fetchPushNotifications() internally
             await dispatch(sendPushNotificationNow(sendModalState.notificationId));
-            await dispatch(fetchPushNotifications());
         } finally {
             setIsSending(false);
             setSendModalState({
@@ -555,36 +602,43 @@ const PushNotificationsList = () => {
             startDate: notification.scheduledAt || notification.createdAt || null
         }));
 
-        const tableInstance = ptable(tableData, {
-            onAdd: handleNavigateToCreate,
-            onView: handleViewNotification,
-            onSend: handleOpenSendModal,
-            onEdit: handleEditNotification,
-            onDelete: handleDeleteRequest
-        });
+        const tableInstance = ptable(
+            tableData,
+            {
+                onAdd: handleNavigateToCreate,
+                onView: handleViewNotification,
+                onSend: handleOpenSendModal,
+                onEdit: handleEditNotification,
+                onDelete: handleDeleteRequest
+            },
+            restoreTablePage
+        );
 
         setCurrentTable(tableInstance);
-    }, [destroyTable, notifications, handleNavigateToCreate, handleViewNotification, handleOpenSendModal, handleEditNotification, handleDeleteRequest]);
+        tableRef.current = tableInstance;
+        if (tableInstance && typeof checkAndAdjustPage === 'function') {
+            checkAndAdjustPage(tableInstance);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [notifications, handleNavigateToCreate, handleViewNotification, handleOpenSendModal, handleEditNotification, handleDeleteRequest, restoreTablePage, checkAndAdjustPage]);
 
     useEffect(() => {
-        if (loading) {
-            return;
+        if (notifications) {
+            initializeTable();
         }
-
-        initializeTable();
-
         return () => {
             destroyTable();
         };
-    }, [loading, initializeTable, destroyTable]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [notifications]);
 
     useEffect(() => {
         return () => {
-            if (currentTable && typeof currentTable.search === 'function') {
-                resetFilters(currentTable);
+            if (tableRef.current && typeof tableRef.current.search === 'function') {
+                resetFilters(tableRef.current);
             }
         };
-    }, [currentTable]);
+    }, []);
 
     const handleCloseDeleteModal = () => {
         if (isDeleting) return;
@@ -598,10 +652,10 @@ const PushNotificationsList = () => {
 
         const success = await dispatch(deletePushNotification(notificationToDelete));
         if (success) {
-            await dispatch(fetchPushNotifications());
+            // deletePushNotification already updates Redux directly, no need to fetch again
             setShowDeleteModal(false);
             setNotificationToDelete(null);
-            destroyTable();
+            // Table will be automatically reinitialized when notifications data updates via useEffect
         }
 
         setIsDeleting(false);
@@ -634,24 +688,17 @@ const PushNotificationsList = () => {
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">
                         <Card.Body>
-                            {loading ? (
-                                <div className="text-center py-4">
-                                    <Spinner animation="border" variant="primary" role="status" />
-                                    <p className="mt-2 mb-0 text-muted">Loading push notifications…</p>
-                                </div>
-                            ) : (
-                                <Table striped hover responsive id="push-notifications-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Notification / Schedule</th>
-                                            <th>Audience</th>
-                                            <th>Event</th>
-                                            <th>Scheduled Date</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                </Table>
-                            )}
+                            <Table striped hover responsive id="push-notifications-table">
+                                <thead>
+                                    <tr>
+                                        <th>Notification / Schedule</th>
+                                        <th>Audience</th>
+                                        <th>Event</th>
+                                        <th>Scheduled Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                            </Table>
                         </Card.Body>
                     </Card>
                 </Col>

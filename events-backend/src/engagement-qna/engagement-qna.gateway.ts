@@ -12,8 +12,14 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EngagementQnaService } from './engagement-qna.service';
 
 @WebSocketGateway({
-  cors: { origin: '*' },
-  namespace: '/qna'
+  cors: { 
+    origin: '*',
+    // methods: ['GET', 'POST'],
+    credentials: true
+  },
+  namespace: '/qna',
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 })
 @Injectable()
 export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
@@ -22,6 +28,8 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
 
   private connectedClients = new Map<string, string>(); // socketId -> shareToken
   private shareTokenRooms = new Map<string, Set<string>>(); // shareToken -> Set of socketIds
+  private engagementRooms = new Map<string, Set<string>>(); // engagementId -> Set of socketIds
+  private sessionRooms = new Map<string, Set<string>>(); // sessionId -> Set of socketIds
 
   constructor(private readonly engagementQnaService: EngagementQnaService) {}
 
@@ -118,6 +126,118 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
     }
   }
 
+  @SubscribeMessage('join_engagement')
+  handleJoinEngagement(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { engagementId: string }
+  ) {
+    try {
+      if (!data?.engagementId) {
+        client.emit('error', { message: 'Engagement ID is required' });
+        return;
+      }
+
+      const engagementId = data.engagementId;
+      
+      // Join room for this engagement
+      client.join(`engagement:${engagementId}`);
+      
+      // Track this client
+      if (!this.engagementRooms.has(engagementId)) {
+        this.engagementRooms.set(engagementId, new Set());
+      }
+      this.engagementRooms.get(engagementId)!.add(client.id);
+
+      client.emit('joined_engagement', { 
+        engagementId,
+        message: 'Successfully joined engagement Q&A updates room'
+      });
+    } catch (error) {
+      console.error('Error joining engagement room:', error);
+      client.emit('error', { message: 'Failed to join engagement room' });
+    }
+  }
+
+  @SubscribeMessage('join_session')
+  handleJoinSession(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string }
+  ) {
+    try {
+      if (!data?.sessionId) {
+        client.emit('error', { message: 'Session ID is required' });
+        return;
+      }
+
+      const sessionId = data.sessionId;
+      
+      // Join room for this session
+      client.join(`session:${sessionId}`);
+      
+      // Track this client
+      if (!this.sessionRooms.has(sessionId)) {
+        this.sessionRooms.set(sessionId, new Set());
+      }
+      this.sessionRooms.get(sessionId)!.add(client.id);
+
+      client.emit('joined_session', { 
+        sessionId,
+        message: 'Successfully joined session Q&A updates room'
+      });
+    } catch (error) {
+      console.error('Error joining session room:', error);
+      client.emit('error', { message: 'Failed to join session room' });
+    }
+  }
+
+  @SubscribeMessage('leave_engagement')
+  handleLeaveEngagement(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { engagementId: string }
+  ) {
+    try {
+      if (data?.engagementId) {
+        client.leave(`engagement:${data.engagementId}`);
+        
+        const room = this.engagementRooms.get(data.engagementId);
+        if (room) {
+          room.delete(client.id);
+          if (room.size === 0) {
+            this.engagementRooms.delete(data.engagementId);
+          }
+        }
+      }
+      
+      client.emit('left_engagement', { message: 'Left engagement Q&A updates room' });
+    } catch (error) {
+      console.error('Error leaving engagement room:', error);
+    }
+  }
+
+  @SubscribeMessage('leave_session')
+  handleLeaveSession(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string }
+  ) {
+    try {
+      if (data?.sessionId) {
+        client.leave(`session:${data.sessionId}`);
+        
+        const room = this.sessionRooms.get(data.sessionId);
+        if (room) {
+          room.delete(client.id);
+          if (room.size === 0) {
+            this.sessionRooms.delete(data.sessionId);
+          }
+        }
+      }
+      
+      client.emit('left_session', { message: 'Left session Q&A updates room' });
+    } catch (error) {
+      console.error('Error leaving session room:', error);
+    }
+  }
+
   @SubscribeMessage('modal_state_change')
   handleModalStateChange(
     @ConnectedSocket() client: Socket,
@@ -154,6 +274,42 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
   // Method to emit session update to all clients in a share token room
   emitSessionUpdate(shareToken: string, eventType: string, data: any) {
     this.server.to(`share:${shareToken}`).emit('session_update', {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Method to emit question update to engagement room (for mobile app)
+  emitQuestionUpdateToEngagement(engagementId: string, eventType: string, data: any) {
+    this.server.to(`engagement:${engagementId}`).emit('question_update', {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Method to emit question update to session room (for mobile app)
+  emitQuestionUpdateToSession(sessionId: string, eventType: string, data: any) {
+    this.server.to(`session:${sessionId}`).emit('question_update', {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Method to emit session update to engagement room (for mobile app)
+  emitSessionUpdateToEngagement(engagementId: string, eventType: string, data: any) {
+    this.server.to(`engagement:${engagementId}`).emit('session_update', {
+      type: eventType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Method to emit session update to session room (for mobile app)
+  emitSessionUpdateToSession(sessionId: string, eventType: string, data: any) {
+    this.server.to(`session:${sessionId}`).emit('session_update', {
       type: eventType,
       data,
       timestamp: new Date().toISOString()

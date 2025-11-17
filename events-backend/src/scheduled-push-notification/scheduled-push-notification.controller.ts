@@ -79,5 +79,36 @@ export class ScheduledPushNotificationController {
       success: true,
     };
   }
+
+  @Post('cleanup/old-deliveries')
+  @HttpCode(HttpStatus.OK)
+  async cleanupOldDeliveries(
+    @Query('readDays') readDays?: string,
+    @Query('unreadDays') unreadDays?: string,
+  ): Promise<{
+    message: string;
+    readDeleted: number;
+    unreadDeleted: number;
+    totalDeleted: number;
+  }> {
+    let result;
+    if (readDays || unreadDays) {
+      const readRetention = readDays ? parseInt(readDays, 10) : 30;
+      const unreadRetention = unreadDays ? parseInt(unreadDays, 10) : 90;
+      result = await this.scheduledNotificationService.cleanupOldDeliveryRecords(
+        readRetention,
+        unreadRetention,
+      );
+    } else {
+      result = await this.scheduledNotificationService.cleanupOldDeliveryRecordsWithEnv();
+    }
+
+    return {
+      message: `Cleanup completed: ${result.totalDeleted} records deleted`,
+      readDeleted: result.readDeleted,
+      unreadDeleted: result.unreadDeleted,
+      totalDeleted: result.totalDeleted,
+    };
+  }
 }
 

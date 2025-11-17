@@ -12,6 +12,7 @@ import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { UserEntity } from '../user/users.entity';
 import { PushNotification } from '../settings/setting.entity';
 import { NotificationUtil } from '../utils/notification.util';
+import { PushNotificationGateway } from './push-notification.gateway';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { UserScheduledPushNotificationController } from './user-scheduled-push-notification.controller';
 
@@ -35,7 +36,7 @@ import { UserScheduledPushNotificationController } from './user-scheduled-push-n
     ]),
   ],
   controllers: [ScheduledPushNotificationController, UserScheduledPushNotificationController],
-  providers: [ScheduledPushNotificationService, NotificationUtil],
+  providers: [ScheduledPushNotificationService, NotificationUtil, PushNotificationGateway],
   exports: [ScheduledPushNotificationService],
 })
 export class ScheduledPushNotificationModule {}

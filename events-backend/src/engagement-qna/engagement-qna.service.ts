@@ -118,6 +118,18 @@ export class EngagementQnaService {
       // Emit WebSocket event for question creation
       // Find session share link and emit to session share token room
       if (savedQuestion.sessionId && this.gateway) {
+        const questionData = {
+          question: savedQuestion,
+          sessionId: savedQuestion.sessionId,
+          engagementId: createDto.engagementId
+        };
+
+        // Emit to engagement room (for mobile app)
+        this.gateway.emitQuestionUpdateToEngagement(createDto.engagementId, 'question_created', questionData);
+        
+        // Emit to session room (for mobile app)
+        this.gateway.emitQuestionUpdateToSession(savedQuestion.sessionId, 'question_created', questionData);
+
         const sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
           where: { sessionId: savedQuestion.sessionId, isActive: true },
         });
@@ -125,8 +137,7 @@ export class EngagementQnaService {
         if (sessionShareLink && (!sessionShareLink.expiresAt || sessionShareLink.expiresAt > new Date())) {
           // Emit question update for session share link
           this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_created', {
-            question: savedQuestion,
-            sessionId: savedQuestion.sessionId,
+            ...questionData,
             shareToken: sessionShareLink.shareToken
           });
           
@@ -146,8 +157,7 @@ export class EngagementQnaService {
           if (trackShareLink && (!trackShareLink.expiresAt || trackShareLink.expiresAt > new Date())) {
             // Emit question update for track share link
             this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_created', {
-              question: savedQuestion,
-              sessionId: savedQuestion.sessionId,
+              ...questionData,
               trackId: engagement.trackId,
               shareToken: trackShareLink.shareToken
             });
@@ -160,6 +170,15 @@ export class EngagementQnaService {
             });
           }
         }
+
+        // Emit session updates to engagement and session rooms
+        this.gateway.emitSessionUpdateToEngagement(createDto.engagementId, 'session_updated', {
+          sessionId: savedQuestion.sessionId,
+          engagementId: createDto.engagementId
+        });
+        this.gateway.emitSessionUpdateToSession(savedQuestion.sessionId, 'session_updated', {
+          sessionId: savedQuestion.sessionId
+        });
       }
 
       return {
@@ -482,6 +501,24 @@ export class EngagementQnaService {
         where: { id: answeredById },
       });
 
+      // Emit WebSocket event for question answered
+      if (this.gateway && savedQuestion.engagementId && savedQuestion.sessionId) {
+        const questionData = {
+          question: savedQuestion,
+          sessionId: savedQuestion.sessionId,
+          engagementId: savedQuestion.engagementId
+        };
+
+        // Emit to engagement room (for mobile app)
+        this.gateway.emitQuestionUpdateToEngagement(savedQuestion.engagementId, 'question_answered', questionData);
+        
+        // Emit to session room (for mobile app)
+        this.gateway.emitQuestionUpdateToSession(savedQuestion.sessionId, 'question_answered', questionData);
+
+        // Also emit to share token rooms
+        await this.emitQuestionUpdateToShareLinks(savedQuestion.id);
+      }
+
       return {
         success: true,
         message: isUpdating 
@@ -592,6 +629,22 @@ export class EngagementQnaService {
         return;
       }
 
+      const questionData = {
+        question,
+        sessionId: question.sessionId,
+        engagementId: question.engagementId
+      };
+
+      // Emit to engagement room (for mobile app)
+      if (question.engagementId) {
+        this.gateway.emitQuestionUpdateToEngagement(question.engagementId, 'question_updated', questionData);
+      }
+
+      // Emit to session room (for mobile app)
+      if (question.sessionId) {
+        this.gateway.emitQuestionUpdateToSession(question.sessionId, 'question_updated', questionData);
+      }
+
       const sessionShareLinks =
         await this.engagementQnaShareLinkRepository.find({
           where: { sessionId: question.sessionId, isActive: true },
@@ -599,8 +652,7 @@ export class EngagementQnaService {
 
       for (const shareLink of sessionShareLinks) {
         this.gateway.emitQuestionUpdate(shareLink.shareToken, 'question_updated', {
-          question,
-          sessionId: question.sessionId,
+          ...questionData,
           shareToken: shareLink.shareToken,
         });
       }
@@ -614,8 +666,7 @@ export class EngagementQnaService {
 
         for (const trackShareLink of trackShareLinks) {
           this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_updated', {
-            question,
-            sessionId: question.sessionId,
+            ...questionData,
             trackId,
             shareToken: trackShareLink.shareToken,
           });
@@ -626,6 +677,69 @@ export class EngagementQnaService {
         error,
         'Emit question update after like toggle',
       );
+    }
+  }
+
+  // Helper method to emit question deletion to all relevant rooms
+  private async emitQuestionDeletionToAllRooms(questionId: string) {
+    if (!this.gateway) {
+      return;
+    }
+
+    try {
+      const question = await this.engagementQnaQuestionRepository.findOne({
+        where: { id: questionId },
+        relations: ['engagement', 'engagement.track'],
+      });
+
+      if (!question) {
+        return;
+      }
+
+      const questionData = {
+        questionId,
+        question: { id: questionId }, // Minimal question data for deletion
+        sessionId: question.sessionId,
+        engagementId: question.engagementId
+      };
+
+      // Emit to engagement room (for mobile app)
+      if (question.engagementId) {
+        this.gateway.emitQuestionUpdateToEngagement(question.engagementId, 'question_deleted', questionData);
+      }
+
+      // Emit to session room (for mobile app)
+      if (question.sessionId) {
+        this.gateway.emitQuestionUpdateToSession(question.sessionId, 'question_deleted', questionData);
+      }
+
+      // Emit to share token rooms (existing logic)
+      const sessionShareLinks = await this.engagementQnaShareLinkRepository.find({
+        where: { sessionId: question.sessionId, isActive: true },
+      });
+
+      for (const shareLink of sessionShareLinks) {
+        this.gateway.emitQuestionUpdate(shareLink.shareToken, 'question_deleted', {
+          questionId,
+          shareToken: shareLink.shareToken
+        });
+      }
+
+      const trackId = question.engagement?.trackId;
+      if (trackId) {
+        const trackShareLinks = await this.engagementQnaTrackShareLinkRepository.find({
+          where: { trackId, isActive: true },
+        });
+
+        for (const trackShareLink of trackShareLinks) {
+          this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_deleted', {
+            questionId,
+            shareToken: trackShareLink.shareToken
+          });
+        }
+      }
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Emit question deletion to all rooms');
     }
   }
 
@@ -689,7 +803,16 @@ export class EngagementQnaService {
         throw new ValidationException('You can only delete your own questions');
       }
 
+      // Store question info before deletion for WebSocket emission
+      const questionEngagementId = question.engagementId;
+      const questionSessionId = question.sessionId;
+
       await this.engagementQnaQuestionRepository.remove(question);
+
+      // Emit WebSocket event for question deletion
+      if (this.gateway) {
+        await this.emitQuestionDeletionToAllRooms(id);
+      }
 
       return {
         success: true,
@@ -999,28 +1122,55 @@ export class EngagementQnaService {
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 
-      // Emit WebSocket event for real-time updates to ALL related share tokens
+      // Reload question with all relations to ensure complete data
+      const questionWithRelations = await this.engagementQnaQuestionRepository.findOne({
+        where: { id: savedQuestion.id },
+        relations: ['askedBy', 'answeredByUser', 'engagement', 'engagement.track', 'likes'],
+      });
+
+      if (!questionWithRelations) {
+        return {
+          success: true,
+          message: isUpdating 
+            ? 'Answer updated successfully' 
+            : 'Question answered successfully',
+          data: savedQuestion,
+        };
+      }
+
+      const questionData = {
+        question: questionWithRelations,
+        sessionId: questionWithRelations.sessionId,
+        engagementId: questionWithRelations.engagementId
+      };
+
+      // Emit WebSocket event for real-time updates to ALL rooms (engagement, session, and share tokens)
       if (this.gateway) {
+        // Emit to engagement room (for mobile app)
+        if (questionWithRelations.engagementId) {
+          this.gateway.emitQuestionUpdateToEngagement(questionWithRelations.engagementId, 'question_answered', questionData);
+        }
+
+        // Emit to session room (for mobile app)
+        if (questionWithRelations.sessionId) {
+          this.gateway.emitQuestionUpdateToSession(questionWithRelations.sessionId, 'question_answered', questionData);
+        }
+
         // Emit to the current shareToken room (session share link)
         this.gateway.emitQuestionUpdate(shareToken, 'question_answered', {
-          question: savedQuestion,
+          ...questionData,
           shareToken
         });
 
         // Also emit to track share link if exists
-        const questionWithTrack = await this.engagementQnaQuestionRepository.findOne({
-          where: { id: questionId },
-          relations: ['engagement', 'engagement.track'],
-        });
-        
-        if (questionWithTrack?.engagement?.trackId) {
+        if (questionWithRelations.engagement?.trackId) {
           const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
-            where: { trackId: questionWithTrack.engagement.trackId, isActive: true },
+            where: { trackId: questionWithRelations.engagement.trackId, isActive: true },
           });
           
           if (trackShareLink) {
             this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_answered', {
-              question: savedQuestion,
+              ...questionData,
               shareToken: trackShareLink.shareToken
             });
           }
@@ -1083,7 +1233,7 @@ export class EngagementQnaService {
         throw new ValidationException('This share link has expired');
       }
 
-      // Get question
+      // Get question with all necessary relations
       let question;
       let questionTrackId = null; // Store track ID for WebSocket emission
       
@@ -1108,9 +1258,14 @@ export class EngagementQnaService {
         questionTrackId = question?.engagement?.trackId || trackShareLink.trackId;
       }
 
+      // Ensure we have engagementId and sessionId before proceeding
       if (!question) {
         throw new ResourceNotFoundException('Question', questionId);
       }
+
+      // Store engagementId and sessionId before any updates
+      const questionEngagementId = question.engagementId;
+      const questionSessionId = question.sessionId;
 
       // Store track ID if not already stored
       if (!questionTrackId && question.engagement?.trackId) {
@@ -1129,18 +1284,52 @@ export class EngagementQnaService {
 
       const savedQuestion = await this.engagementQnaQuestionRepository.save(question);
 
-      // Emit WebSocket event for real-time updates to ALL related share tokens
+      // Reload question with all relations to ensure complete data
+      const questionWithRelations = await this.engagementQnaQuestionRepository.findOne({
+        where: { id: savedQuestion.id },
+        relations: ['askedBy', 'answeredByUser', 'engagement', 'engagement.track', 'likes'],
+      });
+
+      if (!questionWithRelations) {
+        return {
+          success: true,
+          message: 'Question updated successfully',
+          data: savedQuestion,
+        };
+      }
+
+      // Use reloaded question's IDs, but fallback to stored IDs if needed
+      const finalEngagementId = questionWithRelations.engagementId || questionEngagementId;
+      const finalSessionId = questionWithRelations.sessionId || questionSessionId;
+
+      const questionData = {
+        question: questionWithRelations,
+        sessionId: finalSessionId,
+        engagementId: finalEngagementId
+      };
+
+      // Emit WebSocket event for real-time updates to ALL rooms (engagement, session, and share tokens)
       if (this.gateway) {
+        // Emit to engagement room (for mobile app)
+        if (finalEngagementId) {
+          this.gateway.emitQuestionUpdateToEngagement(finalEngagementId, 'question_updated', questionData);
+        }
+
+        // Emit to session room (for mobile app)
+        if (finalSessionId) {
+          this.gateway.emitQuestionUpdateToSession(finalSessionId, 'question_updated', questionData);
+        }
+
         // Emit to the current shareToken room
         this.gateway.emitQuestionUpdate(shareToken, 'question_updated', {
-          question: savedQuestion,
+          ...questionData,
           shareToken
         });
 
         // Also emit to related share tokens:
         // 1. If updated via track share link, also emit to session share link
         // 2. If updated via session share link, also emit to track share link
-        if (shareLink && savedQuestion.sessionId) {
+        if (shareLink && questionWithRelations.sessionId) {
           // Find track share link for this session's track
           if (questionTrackId) {
             const trackShareLink = await this.engagementQnaTrackShareLinkRepository.findOne({
@@ -1149,20 +1338,20 @@ export class EngagementQnaService {
             
             if (trackShareLink) {
               this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_updated', {
-                question: savedQuestion,
+                ...questionData,
                 shareToken: trackShareLink.shareToken
               });
             }
           }
-        } else if (trackShareLink && savedQuestion.sessionId) {
+        } else if (trackShareLink && questionWithRelations.sessionId) {
           // Find session share link for this question's session
           const sessionShareLink = await this.engagementQnaShareLinkRepository.findOne({
-            where: { sessionId: savedQuestion.sessionId, isActive: true },
+            where: { sessionId: questionWithRelations.sessionId, isActive: true },
           });
           
           if (sessionShareLink) {
             this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_updated', {
-              question: savedQuestion,
+              ...questionData,
               shareToken: sessionShareLink.shareToken
             });
           }
@@ -1247,6 +1436,7 @@ export class EngagementQnaService {
 
       // Store question info before deletion for WebSocket emission
       const questionSessionId = question.sessionId;
+      const questionEngagementId = question.engagementId;
       let questionTrackId = null;
       
       // Get track ID if available
@@ -1263,11 +1453,28 @@ export class EngagementQnaService {
       // Delete question
       await this.engagementQnaQuestionRepository.remove(question);
 
-      // Emit WebSocket event for real-time updates to ALL related share tokens
+      const questionData = {
+        questionId,
+        question: { id: questionId }, // Minimal question data for deletion
+        sessionId: questionSessionId,
+        engagementId: questionEngagementId
+      };
+
+      // Emit WebSocket event for real-time updates to ALL rooms (engagement, session, and share tokens)
       if (this.gateway) {
+        // Emit to engagement room (for mobile app)
+        if (questionEngagementId) {
+          this.gateway.emitQuestionUpdateToEngagement(questionEngagementId, 'question_deleted', questionData);
+        }
+
+        // Emit to session room (for mobile app)
+        if (questionSessionId) {
+          this.gateway.emitQuestionUpdateToSession(questionSessionId, 'question_deleted', questionData);
+        }
+
         // Emit to the current shareToken room
         this.gateway.emitQuestionUpdate(shareToken, 'question_deleted', {
-          questionId,
+          ...questionData,
           shareToken
         });
 
@@ -1281,7 +1488,7 @@ export class EngagementQnaService {
             
             if (trackShareLink) {
               this.gateway.emitQuestionUpdate(trackShareLink.shareToken, 'question_deleted', {
-                questionId,
+                ...questionData,
                 shareToken: trackShareLink.shareToken
               });
             }
@@ -1294,7 +1501,7 @@ export class EngagementQnaService {
           
           if (sessionShareLink) {
             this.gateway.emitQuestionUpdate(sessionShareLink.shareToken, 'question_deleted', {
-              questionId,
+              ...questionData,
               shareToken: sessionShareLink.shareToken
             });
           }

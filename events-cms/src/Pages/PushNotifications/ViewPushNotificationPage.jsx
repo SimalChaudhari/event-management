@@ -14,6 +14,7 @@ import {
     clearPushNotificationDetail
 } from '../../store/actions/pushNotificationActions.jsx';
 import { PUSH_NOTIFICATION_PATHS } from '../../utils/constants.js';
+import useTableNavigation from '../../hooks/useTableNavigation';
 import '../../assets/css/event.css';
 
 const badgeVariantMap = {
@@ -33,6 +34,14 @@ const ViewPushNotificationPage = () => {
         (state) => state.pushNotification || {}
     );
 
+    const { handleBack } = useTableNavigation({
+        tableRef: null,
+        listPath: PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS,
+        viewPath: PUSH_NOTIFICATION_PATHS.VIEW_NOTIFICATION,
+        editPath: PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION,
+        addPath: PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION
+    });
+
     useEffect(() => {
         if (id) {
             dispatch(fetchPushNotificationDetail(id));
@@ -42,10 +51,6 @@ const ViewPushNotificationPage = () => {
             dispatch(clearPushNotificationDetail());
         };
     }, [dispatch, id]);
-
-    const handleBack = () => {
-        navigate(PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS);
-    };
 
     const audienceDescription = useMemo(() => {
         if (!selectedNotification) return '';
@@ -91,7 +96,7 @@ const ViewPushNotificationPage = () => {
                             <Alert variant="warning" className="mb-3">
                                 Push notification not found or you might not have access to view it.
                             </Alert>
-                            <Button variant="outline-secondary" onClick={handleBack}>
+                            <Button variant="outline-secondary" onClick={() => handleBack()}>
                                 <i className="feather icon-arrow-left me-2" />
                                 Back to List
                             </Button>
@@ -169,7 +174,7 @@ const ViewPushNotificationPage = () => {
                                 <Button
                                     variant="link"
                                     className="text-decoration-none text-white px-0 d-inline-flex align-items-center mb-2"
-                                    onClick={handleBack}
+                                    onClick={() => handleBack()}
                                     style={{ opacity: 0.85 }}
                                 >
                                     <i className="feather icon-arrow-left me-2" />
