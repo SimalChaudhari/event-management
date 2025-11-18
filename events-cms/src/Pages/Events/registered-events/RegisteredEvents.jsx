@@ -9,7 +9,6 @@ import FilterComponent from '../../../components/common/FilterComponent';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useFilterLogic from '../../../hooks/useFilterLogic';
 import '../../../assets/css/register.css';
-import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import RegisterEventModal from './modal/RegisterEventModal';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import ExportConfirmationModal from '../../../components/modal/ExportConfirmationModal';
@@ -17,7 +16,7 @@ import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUti
 import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -66,7 +65,6 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
         pagingType: 'full_numbers',
         dom:
             "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-register-event-button ml-2'>>>" +
-            "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
 
@@ -267,37 +265,6 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
         ],
 
         initComplete: function (settings, json) {
-            const dateFilterHtml = `
-                <div class="date-filter-container d-flex align-items-center">
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">From:</label>
-                        <input 
-                            type="date" 
-                            id="startDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">To:</label>
-                        <input 
-                            type="date" 
-                            id="endDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div id="clearFilterBtn" class="filter-group" style="display: none;">
-                        <button class="btn btn-light">
-                            <i class="feather icon-x"></i> Clear Filter
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            $('.date-filter-wrapper').html(dateFilterHtml);
-
-            // Setup date filter after table is initialized
-            setupDateFilter(this.api());
-
             // Restore the current page using the hook function after table is fully initialized
             // This sets up the page change listener and restores page from URL if needed
             if (typeof restoreTablePage === 'function') {
@@ -374,16 +341,47 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
 
 const RegisteredEvents = () => {
     const dispatch = useDispatch();
-    const registrations = useSelector((state) => state.event.participatedEvents.data || []);
+    const participatedEventsData = useSelector((state) => state.event.participatedEvents || {});
+    const registrations = participatedEventsData.data || [];
+    const filterData = participatedEventsData.filter || null; // Extract filter data from response
+    
     const [currentTable, setCurrentTable] = useState(null);
     const location = useLocation();
     const navigate = useNavigate();
     const tableRef = useRef(null);
     
-    // Filter logic using custom hook
+    // Transform filter data to match FilterComponent expected format
+    // Backend returns: { events: [{id, eventName}], users: [{id, username, email}] }
+    // FilterComponent expects: { events: [{id, name, location}], users: [{id, firstName, lastName, email}] }
+    const transformedFilterUsers = useMemo(() => {
+        if (!filterData?.users) return [];
+        return filterData.users.map(user => {
+            // Split username into firstName and lastName if possible, otherwise use username as firstName
+            const nameParts = (user.username || '').split(' ').filter(part => part.trim());
+            return {
+                id: user.id,
+                firstName: nameParts[0] || user.username || '',
+                lastName: nameParts.slice(1).join(' ') || '',
+                email: user.email || user.username || '' // Use email from backend or username as fallback
+            };
+        });
+    }, [filterData?.users]);
+    
+    const transformedFilterEvents = useMemo(() => {
+        if (!filterData?.events) return [];
+        return filterData.events.map(event => ({
+            id: event.id,
+            name: event.eventName || event.name || '',
+            location: '' // Location not in filter data, will be empty
+        }));
+    }, [filterData?.events]);
+    
+    // Filter logic using custom hook - pass filter data as initial data
     const {
         selectedUserId,
         selectedEventId,
+        startDate,
+        endDate,
         users,
         events,
         loadingDropdowns,
@@ -391,11 +389,17 @@ const RegisteredEvents = () => {
         applyFilters,
         clearFilters,
         setSelectedUserId,
-        setSelectedEventId
+        setSelectedEventId,
+        setStartDate,
+        setEndDate,
+        handleUserChange,
+        handleEventChange
     } = useFilterLogic({
         filterAction: participatedEvents,
-        loadUsersAction: getAllUsersForFilter,
-        loadEventsAction: getAllEventsForFilter,
+        loadUsersAction: filterData ? null : getAllUsersForFilter, // Don't load if filter data available
+        loadEventsAction: filterData ? null : getAllEventsForFilter, // Don't load if filter data available
+        initialUsers: transformedFilterUsers, // Pass transformed filter users
+        initialEvents: transformedFilterEvents, // Pass transformed filter events
         dispatch
     });
 
@@ -523,13 +527,6 @@ const RegisteredEvents = () => {
         return () => destroyTable();
     }, [registrations]);
 
-    useEffect(() => {
-        return () => {
-            if (currentTable) {
-                resetFilters(currentTable);
-            }
-        };
-    }, [location.pathname]);
 
     return (
         <>
@@ -540,27 +537,34 @@ const RegisteredEvents = () => {
                 loadingDropdowns={loadingDropdowns}
                 selectedUserId={selectedUserId}
                 selectedEventId={selectedEventId}
-                onUserChange={setSelectedUserId}
-                onEventChange={setSelectedEventId}
+                startDate={startDate}
+                endDate={endDate}
+                onUserChange={handleUserChange}
+                onEventChange={handleEventChange}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
                 onApplyFilters={applyFilters}
                 onClearFilters={clearFilters}
                 activeFilters={activeFilters}
                 showUserFilter={true}
                 showEventFilter={true}
+                showDateFilter={true}
                 actionButtons={
                     <>
                         <button
-                            className="btn btn-success d-flex align-items-center"
+                            className="btn btn-success d-flex align-items-center mb-2 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0"
                             onClick={handleGenerateQrClick}
                             disabled={!selectedEventId}
+                            style={{ whiteSpace: 'nowrap' }}
                         >
                             <i className="feather icon-grid mr-1"></i>
                             Generate QR Codes
                         </button>
                         <button 
-                            className="btn btn-info d-flex align-items-center" 
+                            className="btn btn-info d-flex align-items-center mb-2 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0" 
                             onClick={handleExportClick}
                             disabled={!selectedEventId}
+                            style={{ whiteSpace: 'nowrap' }}
                         >
                             <i className="feather icon-download mr-1"></i>
                             Export Users

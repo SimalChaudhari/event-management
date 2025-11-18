@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { RegisterEvent } from './registerEvent.entity';
 import {
   CreateRegisterEventDto,
@@ -159,47 +159,49 @@ export class RegisterEventService {
     }
   }
 
-  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string }) {
+  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string }) {
     try {
       let registerEvents;
       if (role === 'admin') {
         // Admin can see all register events
+        // Optimized: Only load basic details - event, order, and registration details
         const queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
           .leftJoinAndSelect('registerEvent.event', 'event')
-          .leftJoinAndSelect('event.eventSpeakers', 'eventSpeakers')
-          .leftJoinAndSelect('eventSpeakers.speaker', 'speaker')
-          .leftJoinAndSelect('speaker.speakerProfile', 'speakerProfile')
-          .leftJoinAndSelect('speaker.addresses', 'speakerAddresses')
-          .leftJoinAndSelect('event.category', 'category')
-          .leftJoinAndSelect('category.category', 'categoryDetails')
-          .leftJoinAndSelect('event.galleries', 'galleries')
-          .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
-          .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
-          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
-          .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
-          .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
-          .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
-          .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
-          .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
           .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails');
 
         // Apply filters if provided
-        if (filters?.userFilter) {
+        // Filter by user ID (exact match) - takes priority over userFilter
+        if (filters?.userId) {
+          queryBuilder.andWhere('user.id = :userId', { userId: filters.userId });
+        } else if (filters?.userFilter) {
+          // Filter by user name/email (LIKE search)
           queryBuilder.andWhere(
             '(LOWER(user.firstName) LIKE LOWER(:userFilter) OR LOWER(user.lastName) LIKE LOWER(:userFilter) OR LOWER(user.email) LIKE LOWER(:userFilter))',
             { userFilter: `%${filters.userFilter}%` }
           );
         }
 
-        if (filters?.eventFilter) {
+        // Filter by event ID (exact match) - takes priority over eventFilter
+        if (filters?.eventId) {
+          queryBuilder.andWhere('event.id = :eventId', { eventId: filters.eventId });
+        } else if (filters?.eventFilter) {
+          // Filter by event name/location (LIKE search)
           queryBuilder.andWhere(
             '(LOWER(event.name) LIKE LOWER(:eventFilter) OR LOWER(event.location) LIKE LOWER(:eventFilter))',
             { eventFilter: `%${filters.eventFilter}%` }
           );
+        }
+
+        // Filter by date range
+        if (filters?.startDate) {
+          queryBuilder.andWhere('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+        }
+        if (filters?.endDate) {
+          queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
         }
 
         // Sort by event startDate in descending order (newest first)
@@ -208,6 +210,10 @@ export class RegisterEventService {
         registerEvents = await queryBuilder.getMany();
       } else {
         // Normal user can only see their own registered events
+        // Exclude past events - only show upcoming/active events
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+        
         const queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
@@ -231,7 +237,10 @@ export class RegisterEventService {
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
           .where('user.id = :userId', { userId })
-          .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true });
+          .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true })
+          // Exclude past events - only show events where endDate is today or in the future
+          // Use MoreThanOrEqual for proper date comparison
+          .andWhere('event.endDate >= :today', { today });
 
         // Apply event filter for regular users
         if (filters?.eventFilter) {
@@ -241,169 +250,216 @@ export class RegisterEventService {
           );
         }
 
-        // Sort by event startDate in descending order (newest first)
-        queryBuilder.orderBy('event.startDate', 'DESC');
+        // Filter by date range for regular users
+        if (filters?.startDate) {
+          queryBuilder.andWhere('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+        }
+        if (filters?.endDate) {
+          queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
+        }
+
+        // Sort by event startDate in ascending order (upcoming first)
+        queryBuilder.orderBy('event.startDate', 'ASC');
 
         registerEvents = await queryBuilder.getMany();
+        
+        // Additional filter to ensure past events are excluded (safety check)
+        // Filter out events where endDate < today
+        const todayForFilter = new Date();
+        todayForFilter.setHours(0, 0, 0, 0);
+        
+        registerEvents = registerEvents.filter((registerEvent) => {
+          if (!registerEvent.event?.endDate) return false;
+          const eventEndDate = new Date(registerEvent.event.endDate);
+          eventEndDate.setHours(0, 0, 0, 0);
+          // Only include events where endDate >= today
+          return eventEndDate >= todayForFilter;
+        });
       }
 
       // Add attendance count and favorite status to each registered event
       const registerEventsWithAttendance = await Promise.all(
         registerEvents.map(async (registerEvent) => {
+          // Get attendance count for both admin and regular users
           const attendanceCount = registerEvent.eventId
             ? await this.getEventAttendanceCount(registerEvent.eventId)
             : 0;
 
-          const surveyDetails = registerEvent.eventId
-            ? await this.surveyUtils.getSurveyDetailsByEventId(
-                registerEvent.eventId,
-                userId,
-              )
-            : null;
+          if (role === 'admin') {
+            // For admin: Only return basic event details, order details, and registration details
+            const { firstName, lastName, email, mobile, id } = registerEvent.user || {};
+            const cleanedUser = { firstName, lastName, email, mobile, id };
 
-          // Get user's personal agenda items for this specific event
-          const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
-            this.agendaRepository,
-            registerEvent.eventId || '',
-            registerEvent.userId || '',
-          );
+            // Extract only basic event fields (no nested relations)
+            const basicEvent = registerEvent.event ? {
+              id: registerEvent.event.id,
+              name: registerEvent.event.name,
+              description: registerEvent.event.description,
+              startDate: registerEvent.event.startDate,
+              endDate: registerEvent.event.endDate,
+              startTime: registerEvent.event.startTime,
+              endTime: registerEvent.event.endTime,
+              location: registerEvent.event.location,
+              venue: registerEvent.event.venue,
+              country: registerEvent.event.country,
+              type: registerEvent.event.type,
+              price: registerEvent.event.price,
+              currency: registerEvent.event.currency,
+              registerEventId: registerEvent.id,
+              attendanceCount: attendanceCount,
+            } : null;
 
-          let formattedDocuments: { name: string; document: string }[] = [];
-          if (
-            registerEvent?.event?.documents &&
-            registerEvent?.event?.documentNames
-          ) {
-            formattedDocuments = registerEvent.event.documents.map(
-              (doc, index) => ({
-                name:
-                  registerEvent.event?.documentNames?.[index] ||
-                  `Document ${index + 1}`,
-                document: doc,
-              }),
+            return {
+              id: registerEvent.id,
+              status: registerEvent.status,
+              type: registerEvent.type,
+              createdAt: registerEvent.createdAt,
+              isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+              event: basicEvent,
+              user: cleanedUser,
+              order: registerEvent.order || null,
+              adminInfo: registerEvent.adminInfo || null,
+              billingDetails: registerEvent.billingDetails || null,
+            };
+          } else {
+            // For regular users: Keep full details
+            // attendanceCount already calculated above
+
+            const surveyDetails = registerEvent.eventId
+              ? await this.surveyUtils.getSurveyDetailsByEventId(
+                  registerEvent.eventId,
+                  userId,
+                )
+              : null;
+
+            // Get user's personal agenda items for this specific event
+            const formattedAgendas = await AgendaUtils.getUserPersonalAgendas(
+              this.agendaRepository,
+              registerEvent.eventId || '',
+              registerEvent.userId || '',
             );
-          } else if (registerEvent?.event?.documents) {
-            // Fallback if no names are provided
-            formattedDocuments = registerEvent.event.documents.map(
-              (doc, index) => ({
-                name: `Document ${index + 1}`,
-                document: doc,
-              }),
-            );
-          }
 
-          // Check if event is favorited by the user
-          let isFavorite = false;
-          if (registerEvent.userId) {
-            const favorite = await this.favoriteEventRepository.findOne({
-              where: {
-                userId: registerEvent.userId,
-                eventId: registerEvent.eventId,
+            let formattedDocuments: { name: string; document: string }[] = [];
+            if (
+              registerEvent?.event?.documents &&
+              registerEvent?.event?.documentNames
+            ) {
+              formattedDocuments = registerEvent.event.documents.map(
+                (doc, index) => ({
+                  name:
+                    registerEvent.event?.documentNames?.[index] ||
+                    `Document ${index + 1}`,
+                  document: doc,
+                }),
+              );
+            } else if (registerEvent?.event?.documents) {
+              // Fallback if no names are provided
+              formattedDocuments = registerEvent.event.documents.map(
+                (doc, index) => ({
+                  name: `Document ${index + 1}`,
+                  document: doc,
+                }),
+              );
+            }
+
+            // Check if event is favorited by the user
+            let isFavorite = false;
+            if (registerEvent.userId) {
+              const favorite = await this.favoriteEventRepository.findOne({
+                where: {
+                  userId: registerEvent.userId,
+                  eventId: registerEvent.eventId,
+                },
+              });
+              isFavorite = !!favorite;
+            }
+
+            // For regular users, load full event details
+            const speakers = registerEvent.event?.eventSpeakers 
+              ? EventSpeakerUtils.buildSpeakerSchedule(registerEvent.event)
+              : [];
+            const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+            const formattedProgrammeTracks = registerEvent.event?.programmeTracks 
+              ? UserUtils.formatProgrammeTracks(registerEvent.event.programmeTracks)
+              : [];
+
+            // Get engagements for this event with Q&A and polling data
+            const engagements = registerEvent.eventId 
+              ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
+              : [];
+
+            const {
+              eventSpeakers,
+              category,
+              eventExhibitors,
+              exhibitorDescription,
+              eventStampDescription,
+              documents,
+              documentNames,
+              eventStampImages,
+              programmeTracks,
+              ...restEvent
+            } = registerEvent.event || {};
+
+            const event = {
+              ...restEvent,
+              registerEventId: registerEvent.id,
+              color: getEventColor(registerEvent.event?.type),
+              speakers,
+              speakersData: speakers,
+              categories,
+              documents: formattedDocuments,
+              engagements: engagements,
+              programmeTracks: formattedProgrammeTracks,
+              eventStamps: {
+                description: registerEvent.event?.eventStampDescription,
+                images: registerEvent.event?.eventStampImages,
               },
-            });
-            isFavorite = !!favorite;
-          }
-
-          const speakers = EventSpeakerUtils.buildSpeakerSchedule(
-            registerEvent.event,
-          );
-          const categories =
-            registerEvent.event?.category?.map((ec) => ec.category) || [];
-
-          // Format programme tracks with basic speaker info using utility
-          const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(registerEvent.event?.programmeTracks || []);
-
-          // Get engagements for this event with Q&A and polling data
-          const engagements = registerEvent.eventId 
-            ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
-            : [];
-
-          const {
-            eventSpeakers,
-            category,
-            eventExhibitors,
-            exhibitorDescription,
-            eventStampDescription,
-            documents, // Remove original documents
-            documentNames, // Remove original documentNames
-            eventStampImages,
-            programmeTracks,
-            ...restEvent
-          } = registerEvent.event || {};
-
-          const event = {
-            ...restEvent,
-            registerEventId: registerEvent.id, // Add registerEventId inside event object
-            color: getEventColor(registerEvent.event?.type),
-            speakers,
-            speakersData: speakers,
-            categories,
-            documents: formattedDocuments,
-            engagements: engagements,
-            programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
-
-            eventStamps: {
-              description: registerEvent.event?.eventStampDescription,
-              images: registerEvent.event?.eventStampImages,
-            },
-
-            exhibitorsData: {
-              exhibitorDescription: exhibitorDescription || '',
-              exhibitors:
-                registerEvent.event?.eventExhibitors
-                  ?.filter((ee) => ee.exhibitor.isActive)
+              exhibitorsData: {
+                exhibitorDescription: exhibitorDescription || '',
+                exhibitors: registerEvent.event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor?.isActive)
                   ?.map((ee) => {
                     return {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
+                      promotionalOffers: ee.exhibitor?.promotionalOffers || [],
                     };
                   }) || [],
-            },
-            myAgendas: formattedAgendas || [],
+              },
+              myAgendas: formattedAgendas || [],
+              attendanceCount: attendanceCount,
+              surveyDetails: surveyDetails,
+              hasSurvey: !!surveyDetails,
+              isFavorite: isFavorite,
+              isRegister: registerEvent.isRegister,
+            };
 
-            attendanceCount: attendanceCount,
-            surveyDetails: surveyDetails,
-            hasSurvey: !!surveyDetails,
-            isFavorite: isFavorite,
-            isRegister: registerEvent.isRegister,
-          };
+            const { firstName, lastName, email, mobile, id } =
+              registerEvent.user || {};
+            const cleanedUser = { firstName, lastName, email, mobile, id };
 
-          const { firstName, lastName, email, mobile, id } =
-            registerEvent.user || {};
-          const cleanedUser = { firstName, lastName, email, mobile, id };
+            const {
+              orderId: _,
+              eventId: __,
+              isRegister: ___,
+              ...cleanRegisterEvent
+            } = registerEvent;
 
-          const {
-            orderId: _,
-            eventId: __,
-            isRegister: ___,
-          
-            ...cleanRegisterEvent
-          } = registerEvent;
-
-          // Get admin info for this registration - show if lucky draw feature is enabled
-          const hasAdminInfo =
-            registerEvent.adminInfo &&
-            registerEvent.event?.enableLuckyDrawFeature;
-
-          const adminInfo = hasAdminInfo
-            ? {
-                ...registerEvent.adminInfo,
-              }
-            : null;
-
-          return {
-            ...cleanRegisterEvent,
-            event,
-            user: cleanedUser,
-            isCreatedByAdmin: registerEvent.isCreatedByAdmin,
-            adminInfo, // Add admin info
-            billingDetails: registerEvent.billingDetails || [], // Add billing details
-            // Add user's personal agenda data
-          };
+            return {
+              ...cleanRegisterEvent,
+              event,
+              user: cleanedUser,
+              isCreatedByAdmin: registerEvent.isCreatedByAdmin,
+              adminInfo: registerEvent.adminInfo || null,
+              billingDetails: registerEvent.billingDetails || [],
+            };
+          }
         }),
       );
 
-      // Sort registrations by event startDate in descending order (newest first)
-      // Similar to how events are sorted in event service
+      // Sort registrations by event startDate
+      // For admin: descending order (newest first)
+      // For regular users: ascending order (upcoming first) - already filtered to exclude past events
       registerEventsWithAttendance.sort((a, b) => {
         // Create date objects and normalize to midnight (ignore time component)
         const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
@@ -411,9 +467,73 @@ export class RegisterEventService {
         const dateB = b.event?.startDate ? new Date(b.event.startDate) : new Date(0);
         dateB.setHours(0, 0, 0, 0);
         
-        // Compare dates in descending order (newest first)
-        return dateB.getTime() - dateA.getTime();
+        if (role === 'admin') {
+          // Admin: descending order (newest first)
+          return dateB.getTime() - dateA.getTime();
+        } else {
+          // Regular users: ascending order (upcoming first)
+          return dateA.getTime() - dateB.getTime();
+        }
       });
+
+      // For admin role, include filter data (events and users list)
+      // Extract unique events and users from ALL registered events (not filtered ones)
+      // This ensures filter dropdown always shows all registered events/users, not just filtered subset
+      let filterData = null;
+      if (role === 'admin') {
+        // Fetch ALL registered events (without filters) to get complete filter data
+        const allRegisterEvents = await this.registerEventRepository
+          .createQueryBuilder('registerEvent')
+          .leftJoinAndSelect('registerEvent.user', 'user')
+          .leftJoinAndSelect('registerEvent.event', 'event')
+          .orderBy('event.startDate', 'DESC')
+          .getMany();
+
+        // Extract unique events and users from all registered events
+        const uniqueEventsMap = new Map<string, { id: string; eventName: string }>();
+        const uniqueUsersMap = new Map<string, { id: string; username: string; email: string }>();
+
+        allRegisterEvents.forEach((registerEvent) => {
+          // Extract unique events
+          if (registerEvent.event && registerEvent.event.id) {
+            if (!uniqueEventsMap.has(registerEvent.event.id)) {
+              uniqueEventsMap.set(registerEvent.event.id, {
+                id: registerEvent.event.id,
+                eventName: registerEvent.event.name || '',
+              });
+            }
+          }
+
+          // Extract unique users
+          if (registerEvent.user && registerEvent.user.id) {
+            if (!uniqueUsersMap.has(registerEvent.user.id)) {
+              const firstName = registerEvent.user.firstName || '';
+              const lastName = registerEvent.user.lastName || '';
+              const email = registerEvent.user.email || '';
+              const username = `${firstName} ${lastName}`.trim() || email || 'Unknown User';
+              
+              uniqueUsersMap.set(registerEvent.user.id, {
+                id: registerEvent.user.id,
+                username: username,
+                email: email,
+              });
+            }
+          }
+        });
+
+        // Convert maps to arrays and sort
+        const formattedEvents = Array.from(uniqueEventsMap.values()).sort((a, b) => 
+          a.eventName.localeCompare(b.eventName)
+        );
+        const formattedUsers = Array.from(uniqueUsersMap.values()).sort((a, b) => 
+          a.username.localeCompare(b.username)
+        );
+
+        filterData = {
+          events: formattedEvents,
+          users: formattedUsers,
+        };
+      }
 
       return {
         success: true,
@@ -423,6 +543,7 @@ export class RegisterEventService {
             : 'Your registered events fetched successfully',
         count: registerEventsWithAttendance.length,
         data: registerEventsWithAttendance,
+        ...(filterData && { filter: filterData }),
       };
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Register Event retrieval');

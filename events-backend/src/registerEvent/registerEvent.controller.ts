@@ -151,7 +151,11 @@ export class RegisterEventController {
     @Res() response: Response,
     @Query('filter') filter?: string,
     @Query('user') userFilter?: string,
-    @Query('event') eventFilter?: string
+    @Query('event') eventFilter?: string,
+    @Query('userId') filterUserId?: string,
+    @Query('eventId') filterEventId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
   ) {
     try {
       const userId = req.user.id;
@@ -159,7 +163,11 @@ export class RegisterEventController {
       const result = await this.registerEventService.findAll(userId, role, {
         filter,
         userFilter,
-        eventFilter
+        eventFilter,
+        userId: filterUserId,
+        eventId: filterEventId,
+        startDate,
+        endDate
       });
       
       // Apply tab visibility filtering to events in the result

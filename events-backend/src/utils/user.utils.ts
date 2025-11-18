@@ -589,4 +589,54 @@ export class UserUtils {
       };
     }
   }
+
+  /**
+   * Get filter data for admin panel - returns all events and users with id and name
+   * This can be reused across different services
+   * @param eventRepository Event repository instance
+   * @param userRepository User repository instance
+   * @returns Filter data with events and users arrays
+   */
+  static async getFilterData(
+    eventRepository: any,
+    userRepository: any,
+  ): Promise<{ events: Array<{ id: string; eventName: string }>; users: Array<{ id: string; username: string; email: string }> }> {
+    try {
+      // Get all events with id and name for filter dropdown
+      const allEvents = await eventRepository.find({
+        select: ['id', 'name'],
+        order: { startDate: 'DESC' },
+      });
+
+      // Get all users with id, firstName, lastName, and email for filter dropdown
+      const allUsers = await userRepository.find({
+        select: ['id', 'firstName', 'lastName', 'email'],
+        order: { createdAt: 'DESC' },
+      });
+
+      // Format events: { id, eventName }
+      const formattedEvents = allEvents.map((event: any) => ({
+        id: event.id,
+        eventName: event.name,
+      }));
+
+      // Format users: { id, username: "firstName lastName" or email, email: user.email }
+      const formattedUsers = allUsers.map((user: any) => ({
+        id: user.id,
+        username: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User',
+        email: user.email || '',
+      }));
+
+      return {
+        events: formattedEvents,
+        users: formattedUsers,
+      };
+    } catch (error) {
+      console.error('Error getting filter data:', error);
+      return {
+        events: [],
+        users: [],
+      };
+    }
+  }
 }

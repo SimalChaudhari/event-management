@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Row, Col, Card, Container, Modal, Alert, Badge } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { getGalleryById } from '../../../store/actions/galleryActions';
-import { MEDIA_MANAGER_PATHS } from '../../../utils/constants';
+import { MEDIA_MANAGER_PATHS, EVENT_PATHS } from '../../../utils/constants';
 
 const ViewGalleryPage = () => {
     const { id } = useParams();
@@ -123,10 +123,16 @@ const ViewGalleryPage = () => {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View Gallery</h4>
-                        <Button variant="secondary" onClick={() => navigate(MEDIA_MANAGER_PATHS.GALLERY)}>
-                            <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                            Back
-                        </Button>
+                        <div className="d-flex gap-2">
+                            <Button variant="primary" onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}>
+                                <i style={{ marginRight: '10px' }} className="fas fa-edit me-2"></i>
+                                Edit Gallery
+                            </Button>
+                            <Button variant="secondary" onClick={() => navigate(MEDIA_MANAGER_PATHS.GALLERY)}>
+                                <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                Back
+                            </Button>
+                        </div>
                     </div>
                 </div>
 

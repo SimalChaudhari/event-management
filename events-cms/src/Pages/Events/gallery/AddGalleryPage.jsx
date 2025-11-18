@@ -11,11 +11,10 @@ import ConfirmationModal from '../../../components/modal/DeleteConfirmationImage
 const AddGalleryPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { EventId } = useParams(); // Edit mode
-
     const [searchParams] = useSearchParams();
     const id = searchParams.get('eventId');
     const galleryId = searchParams.get('galleryId');
+    const isEditMode = !!galleryId; // Edit mode based on galleryId
 
     const [formData, setFormData] = useState({
         title: '',
@@ -57,7 +56,7 @@ const AddGalleryPage = () => {
 
                         setFormData({
                             title: gallery.title || '',
-                            eventId: gallery.eventId || EventId,
+                            eventId: gallery.eventId || id,
                             galleryImages: imagesData
                         });
 
@@ -241,8 +240,8 @@ const AddGalleryPage = () => {
             const submitData = new FormData();
             submitData.append('title', formData.title);
             // Add ID for edit mode
-            if (id) {
-                submitData.append('id', id);
+            if (galleryId) {
+                submitData.append('id', galleryId);
             }
 
             // Handle images - separate existing and new images like AddEventPage
@@ -256,8 +255,8 @@ const AddGalleryPage = () => {
                     }
                 });
 
-                // For edit mode, send existing images to preserve them in originalImages field
-                if (id) {
+                    // For edit mode, send existing images to preserve them in originalImages field
+                    if (galleryId) {
                     const existingImages = [];
                     formData.galleryImages.forEach((image) => {
                         if (typeof image === 'string') {
@@ -273,7 +272,7 @@ const AddGalleryPage = () => {
                 }
             }
 
-            const response = await dispatch(createOrUpdateGallery(submitData, id));
+            const response = await dispatch(createOrUpdateGallery(submitData, galleryId));
             if (response) {
                 navigate(`${EVENT_PATHS.LIST_EVENTS}`);
             }
@@ -306,7 +305,7 @@ const AddGalleryPage = () => {
                     <div className="card">
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
-                                <h4 className="card-title">{EventId ? 'Edit Gallery' : 'Add Gallery'}</h4>
+                                <h4 className="card-title">{isEditMode ? 'Edit Gallery' : 'Add Gallery'}</h4>
                                 <Button variant="secondary" onClick={handleCancel}>
                                     <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                     Back
@@ -336,7 +335,7 @@ const AddGalleryPage = () => {
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <Badge bg="info">
-                                                <span>Gallery Images {!id && '*'}</span> {formData.galleryImages.length}/20
+                                                <span>Gallery Images {!galleryId && '*'}</span> {formData.galleryImages.length}/20
                                             </Badge>
 
                                             {/* Drag and Drop Zone */}
@@ -416,7 +415,7 @@ const AddGalleryPage = () => {
                                                         >
                                                             Selected Images ({formData.galleryImages.length})
                                                         </h6>
-                                                        {id && formData.galleryImages.length > 0 && (
+                                                        {galleryId && formData.galleryImages.length > 0 && (
                                                             <Button
                                                                 variant="outline-danger"
                                                                 size="sm"
@@ -623,7 +622,7 @@ const AddGalleryPage = () => {
                                                             >
                                                                 <span>💡</span>
                                                                 <span>
-                                                                    {id
+                                                                    {galleryId
                                                                         ? 'Existing images will be updated, new images will be added. Click ✕ to remove.'
                                                                         : 'First image will be the gallery thumbnail. Click ✕ to remove images.'}
                                                                 </span>
@@ -650,16 +649,16 @@ const AddGalleryPage = () => {
                                                     loading ||
                                                     !formData.title.trim() ||
                                                     !formData.eventId ||
-                                                    (!id && formData.galleryImages.length === 0) ||
+                                                    (!galleryId && formData.galleryImages.length === 0) ||
                                                     deletingImage !== null
                                                 }
                                             >
                                                 {loading ? (
                                                     <>
                                                         <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                                                        {id ? 'Updating...' : 'Creating...'}
+                                                        {galleryId ? 'Updating...' : 'Creating...'}
                                                     </>
-                                                ) : id ? (
+                                                ) : galleryId ? (
                                                     'Update Gallery'
                                                 ) : (
                                                     'Create Gallery'

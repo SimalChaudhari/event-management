@@ -59,17 +59,25 @@ export const eventList = (filters = {}) => async (dispatch, getState) => {
             payload: eventsData // Assuming response contains the customers data
         });
         
-        // Also store events for filter dropdown if not already stored
-        const state = getState();
-        if (!state.event?.eventFilterList || state.event.eventFilterList.length === 0) {
-            const filterEvents = eventsData?.events || eventsData || [];
+        // Store filter data from response if available (for admin)
+        if (eventsData?.filter?.events) {
             dispatch({
                 type: EVENT_FILTER_LIST,
-                payload: Array.isArray(filterEvents) ? filterEvents : []
+                payload: eventsData.filter.events
             });
+        } else {
+            // Fallback: Also store events for filter dropdown if not already stored
+            const state = getState();
+            if (!state.event?.eventFilterList || state.event.eventFilterList.length === 0) {
+                const filterEvents = eventsData?.events || eventsData || [];
+                dispatch({
+                    type: EVENT_FILTER_LIST,
+                    payload: Array.isArray(filterEvents) ? filterEvents : []
+                });
+            }
         }
         
-        return true;
+        return eventsData; // Return full response including filter data
     } catch (error) {
         // Check if error response exists and handle error message
         const errorMessage = error?.response?.data?.message;
@@ -237,12 +245,25 @@ export const participatedEvents = (filters = {}) => async (dispatch) => {
         // Build query parameters
         const queryParams = new URLSearchParams();
         
-        if (filters.userFilter) {
+        // Support both ID-based and name-based filtering
+        if (filters.userId) {
+            queryParams.append('userId', filters.userId);
+        } else if (filters.userFilter) {
             queryParams.append('user', filters.userFilter);
         }
         
-        if (filters.eventFilter) {
+        if (filters.eventId) {
+            queryParams.append('eventId', filters.eventId);
+        } else if (filters.eventFilter) {
             queryParams.append('event', filters.eventFilter);
+        }
+        
+        if (filters.startDate) {
+            queryParams.append('startDate', filters.startDate);
+        }
+        
+        if (filters.endDate) {
+            queryParams.append('endDate', filters.endDate);
         }
         
         if (filters.filter) {

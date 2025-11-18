@@ -9,10 +9,15 @@ const FilterComponent = ({
     onClearFilters,
     showUserFilter = true,
     showEventFilter = true,
+    showDateFilter = true,
     selectedUserId = '',
     selectedEventId = '',
+    startDate = '',
+    endDate = '',
     onUserChange,
     onEventChange,
+    onStartDateChange,
+    onEndDateChange,
     activeFilters = {},
     actionButtons = null
 }) => {
@@ -20,7 +25,9 @@ const FilterComponent = ({
         if (onApplyFilters) {
             onApplyFilters({
                 userId: selectedUserId,
-                eventId: selectedEventId
+                eventId: selectedEventId,
+                startDate: startDate,
+                endDate: endDate
             });
         }
     };
@@ -31,7 +38,18 @@ const FilterComponent = ({
         }
     };
 
-    const hasActiveFilters = selectedUserId || selectedEventId;
+    const hasActiveFilters = selectedUserId || selectedEventId || startDate || endDate;
+    
+    // Check if filters need to be applied (selected filters differ from active filters)
+    // Show Apply button when selected filters are different from currently active filters
+    const needsApply = (selectedUserId && selectedUserId !== activeFilters.user) || 
+                      (selectedEventId && selectedEventId !== activeFilters.event) ||
+                      (startDate && startDate !== activeFilters.startDate) ||
+                      (endDate && endDate !== activeFilters.endDate) ||
+                      (!selectedUserId && activeFilters.user) ||
+                      (!selectedEventId && activeFilters.event) ||
+                      (!startDate && activeFilters.startDate) ||
+                      (!endDate && activeFilters.endDate);
 
     return (
         <Card className="mb-4 shadow-sm border-0" style={{ borderRadius: '8px' }}>
@@ -67,7 +85,7 @@ const FilterComponent = ({
                 <Row className="align-items-end">
                     {/* User Filter */}
                     {showUserFilter && (
-                        <Col xl={actionButtons ? 3 : 4} lg={actionButtons ? 3 : 4} md={actionButtons ? 6 : 6} sm={12} xs={12}>
+                        <Col xl={actionButtons && showDateFilter ? 2 : actionButtons ? 3 : showDateFilter ? 2 : 4} lg={actionButtons && showDateFilter ? 2 : actionButtons ? 3 : showDateFilter ? 2 : 4} md={actionButtons ? 6 : 6} sm={12} xs={12} className="mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3">
                             <Form.Group className="mb-0">
                                 <Form.Label
                                     style={{
@@ -108,7 +126,7 @@ const FilterComponent = ({
 
                     {/* Event Filter */}
                     {showEventFilter && (
-                        <Col xl={actionButtons ? 3 : 4} lg={actionButtons ? 3 : 4} md={actionButtons ? 6 : 6} sm={12} xs={12}>
+                        <Col xl={actionButtons && showDateFilter ? 2 : actionButtons ? 3 : showDateFilter ? 2 : 4} lg={actionButtons && showDateFilter ? 2 : actionButtons ? 3 : showDateFilter ? 2 : 4} md={actionButtons ? 6 : 6} sm={12} xs={12} className="mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3">
                             <Form.Group className="mb-0">
                                 <Form.Label
                                     style={{
@@ -147,32 +165,114 @@ const FilterComponent = ({
                         </Col>
                     )}
 
+                    {/* Date Filters */}
+                    {showDateFilter && (
+                        <>
+                            <Col key="start-date-filter" xl={actionButtons ? 2 : 3} lg={actionButtons ? 2 : 3} md={actionButtons ? 6 : 6} sm={12} xs={12} className="mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3">
+                                <Form.Group className="mb-0">
+                                    <Form.Label
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: '600',
+                                            color: '#495057',
+                                            marginBottom: '8px'
+                                        }}
+                                    >
+                                        <i className="feather icon-calendar mr-1"></i>
+                                        From Date
+                                    </Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => {
+                                            const selectedStartDate = e.target.value;
+                                            if (onStartDateChange) {
+                                                onStartDateChange(selectedStartDate);
+                                            }
+                                            // Set max date for end date
+                                            if (selectedStartDate && endDate && new Date(selectedStartDate) > new Date(endDate)) {
+                                                if (onEndDateChange) {
+                                                    onEndDateChange('');
+                                                }
+                                            }
+                                        }}
+                                        max={endDate || undefined}
+                                        style={{
+                                            borderRadius: '6px',
+                                            border: '1px solid #ced4da',
+                                            padding: '8px 12px'
+                                        }}
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col key="end-date-filter" xl={actionButtons ? 2 : 3} lg={actionButtons ? 2 : 3} md={actionButtons ? 6 : 6} sm={12} xs={12} className="mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3">
+                                <Form.Group className="mb-0">
+                                    <Form.Label
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: '600',
+                                            color: '#495057',
+                                            marginBottom: '8px'
+                                        }}
+                                    >
+                                        <i className="feather icon-calendar mr-1"></i>
+                                        To Date
+                                    </Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => {
+                                            const selectedEndDate = e.target.value;
+                                            if (selectedEndDate && startDate && new Date(selectedEndDate) < new Date(startDate)) {
+                                                alert('End date cannot be earlier than start date');
+                                                return;
+                                            }
+                                            if (onEndDateChange) {
+                                                onEndDateChange(selectedEndDate);
+                                            }
+                                        }}
+                                        min={startDate || undefined}
+                                        style={{
+                                            borderRadius: '6px',
+                                            border: '1px solid #ced4da',
+                                            padding: '8px 12px'
+                                        }}
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </>
+                    )}
+
                     {/* Action Buttons Column */}
                     {actionButtons && (
-                        <Col xl={6} lg={6} md={12} sm={12} xs={12} className="d-flex justify-content-xl-end justify-content-lg-end justify-content-md-end justify-content-start align-items-end mt-xl-0 mt-lg-0 mt-md-0 mt-3">
-                            <div className="d-flex flex-wrap" style={{ gap: '12px' }}>
-                                <Button
-                                    variant="primary"
-                                    onClick={handleApplyFilters}
-                                    disabled={loadingDropdowns}
-                                    style={{
-                                        backgroundColor: '#4680ff',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        padding: '8px 14px',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        minWidth: '85px',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    <i className="feather icon-search mr-1"></i>
-                                    Apply
-                                </Button>
+                        <Col xl={showDateFilter ? 4 : 6} lg={showDateFilter ? 4 : 6} md={12} sm={12} xs={12} className="d-flex justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start align-items-center mt-xl-0 mt-lg-0 mt-md-4 mt-sm-4 mt-4">
+                            <div className="d-flex flex-wrap align-items-center" style={{ gap: '10px', width: '100%' }}>
+                                {needsApply && (
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleApplyFilters}
+                                        disabled={loadingDropdowns}
+                                        className="mb-2 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0"
+                                        style={{
+                                            backgroundColor: '#4680ff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '8px 14px',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            minWidth: '85px',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <i className="feather icon-search mr-1"></i>
+                                        Apply
+                                    </Button>
+                                )}
                                 {hasActiveFilters && (
                                     <Button
                                         variant="outline-secondary"
                                         onClick={handleClearFilters}
+                                        className="mb-2 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0"
                                         style={{
                                             borderRadius: '6px',
                                             padding: '8px 14px',
@@ -198,24 +298,26 @@ const FilterComponent = ({
                                 className="d-flex align-items-end justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start flex-wrap"
                                 style={{ gap: '12px' }}
                             >
-                                <Button
-                                    variant="primary"
-                                    onClick={handleApplyFilters}
-                                    disabled={loadingDropdowns}
-                                    style={{
-                                        backgroundColor: '#4680ff',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        padding: '8px 14px',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        minWidth: '85px',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    <i className="feather icon-search mr-1"></i>
-                                    Apply
-                                </Button>
+                                {needsApply && (
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleApplyFilters}
+                                        disabled={loadingDropdowns}
+                                        style={{
+                                            backgroundColor: '#4680ff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '8px 14px',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            minWidth: '85px',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <i className="feather icon-search mr-1"></i>
+                                        Apply
+                                    </Button>
+                                )}
                                 {hasActiveFilters && (
                                     <Button
                                         variant="outline-secondary"

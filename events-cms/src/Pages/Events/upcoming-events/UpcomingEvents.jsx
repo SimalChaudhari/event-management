@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -7,7 +7,6 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { eventDelete, upcomingEventList } from '../../../store/actions/eventActions';
-import { setupDateFilter, resetFilters } from '../../../utils/dateFilter';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
@@ -18,6 +17,7 @@ import useEventFilter from '../../../hooks/useEventFilter';
 import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
+import useFilterLogic from '../../../hooks/useFilterLogic';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -44,7 +44,6 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
         pagingType: 'full_numbers',
         dom:
             "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
-            "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
             "<'row'<'col-sm-12'tr>>" +
             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         columns: [
@@ -170,36 +169,6 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
             }
         ],
         initComplete: function (settings, json) {
-            const dateFilterHtml = `
-                <div class="date-filter-container d-flex align-items-center">
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">From:</label>
-                        <input 
-                            type="date" 
-                            id="startDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">To:</label>
-                        <input 
-                            type="date" 
-                            id="endDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div id="clearFilterBtn" class="filter-group" style="display: none;">
-                        <button class="btn btn-light">
-                            <i class="feather icon-x"></i> Clear Filter
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            $('.date-filter-wrapper').html(dateFilterHtml);
-            // Setup date filter after table is initialized
-            setupDateFilter(this.api());
-
             // Restore the current page using the hook function after table is fully initialized
             // This sets up the page change listener and restores page from URL if needed
             if (typeof restoreTablePage === 'function') {
@@ -267,6 +236,9 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
 const UpcomingEvents = () => {
     const dispatch = useDispatch();
     const events = useSelector((state) => state.event?.upcomingEvents?.events);
+    const filterData = useSelector((state) => state.event?.upcomingEvents?.filter); // Get filter data from response
+    const eventFilterList = useSelector((state) => state.event?.eventFilterList || []); // Get from Redux store
+
     const [showModal, setShowModal] = useState(false);
     const [editData, setEditData] = useState(null);
 
@@ -278,16 +250,41 @@ const UpcomingEvents = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const tableRef = useRef(null);
 
-    // Use reusable event filter hook for upcoming events with initial filter
+    // Transform filter events data to match FilterComponent format
+    // IMPORTANT: For upcoming events, use filterData?.events (upcoming events only) not eventFilterList (all events)
+    // This ensures the dropdown only shows upcoming events, not all events
+    const transformedFilterEvents = useMemo(() => {
+        // For upcoming events page, prioritize filterData?.events (contains only upcoming events)
+        // Only use eventFilterList as fallback if filterData?.events is not available
+        // This ensures we only show upcoming events in the dropdown, not all events
+        const eventsToUse = filterData?.events?.length > 0 ? filterData.events : (eventFilterList || []);
+        return eventsToUse.map(event => ({
+            id: event.id,
+            name: event.eventName || event.name || '',
+            location: event.location || '' // Location not in filter data, will be empty
+        }));
+    }, [filterData?.events, eventFilterList]);
+
+    // Use unified filter hook with event mode for upcoming events
     const {
         selectedEventId,
-        allEvents,
+        startDate,
+        endDate,
+        events: allEvents,
         loadingDropdowns,
         activeFilters,
         applyFilters,
         clearFilters,
-        handleEventChange
-    } = useEventFilter(upcomingEventList, { upcoming: true });
+        handleEventChange,
+        setStartDate,
+        setEndDate
+    } = useFilterLogic({
+        filterAction: upcomingEventList,
+        dispatch,
+        initialEvents: transformedFilterEvents,
+        initialFilters: { upcoming: true },
+        filterMode: 'event'
+    });
 
     // Use pagination persistence hook
     const { restoreTablePage } = usePersistedTablePage();
@@ -339,18 +336,6 @@ const UpcomingEvents = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [events, destroyTable, handleAdd, handleEdit, handleDelete, handleView]);
 
-    // Load upcoming events only once on mount - check Redux first
-    useEffect(() => {
-        // Check if events already exist in Redux
-        if (!events || events.length === 0) {
-            dispatch(upcomingEventList());
-        }
-        return () => {
-            destroyTable();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     // Initialize table when events change
     useEffect(() => {
         if (events) {
@@ -361,14 +346,6 @@ const UpcomingEvents = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [events]);
-
-    useEffect(() => {
-        return () => {
-            if (tableRef.current) {
-                resetFilters(tableRef.current);
-            }
-        };
-    }, [location.pathname]);
 
  
 
@@ -408,12 +385,17 @@ const UpcomingEvents = () => {
                 events={allEvents}
                 loadingDropdowns={loadingDropdowns}
                 selectedEventId={selectedEventId}
+                startDate={startDate}
+                endDate={endDate}
                 onEventChange={handleEventChange}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
                 onApplyFilters={applyFilters}
                 onClearFilters={clearFilters}
                 activeFilters={activeFilters}
                 showUserFilter={false}
                 showEventFilter={true}
+                showDateFilter={true}
             />
         
             <DeleteConfirmationModal

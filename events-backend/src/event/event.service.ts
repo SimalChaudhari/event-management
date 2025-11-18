@@ -263,11 +263,12 @@ export class EventService {
         );
       }
 
-      if (filters.startDate && filters.endDate) {
-        queryBuilder.andWhere(
-          'event.startDate >= :startDate AND event.endDate <= :endDate',
-          { startDate: filters.startDate, endDate: filters.endDate },
-        );
+      // Filter by date range - handle startDate and endDate separately
+      if (filters.startDate) {
+        queryBuilder.andWhere('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+      }
+      if (filters.endDate) {
+        queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
       }
 
       if (filters.type) {
@@ -515,6 +516,19 @@ export class EventService {
           return dateB.getTime() - dateA.getTime();
         });
 
+        // For admin role, include filter data from available events in response (not all events from database)
+        let filterData = null;
+        if (userRole === UserRole.Admin) {
+          // Use the actual available events from the response, not all events from database
+          const formattedEvents = completeEvents.map(event => ({
+            id: event.id,
+            eventName: event.name,
+          }));
+          filterData = {
+            events: formattedEvents,
+          };
+        }
+
         return {
           events: completeEvents,
           speakers: allSpeakers,
@@ -533,7 +547,24 @@ export class EventService {
             globalSearch: true,
             searchKeyword: filters.globalSearch,
             totalMatches: completeEvents.length
-          }
+          },
+          ...(filterData && { filter: filterData }), // Conditionally add filter data for admin
+        };
+      }
+
+      // For admin role, include filter data from available events in response
+      // Different filter data for events list vs upcoming events list
+      let filterData = null;
+      if (userRole === UserRole.Admin) {
+        // Use the actual available events from the response, not all events from database
+        // If upcoming filter is applied, only include upcoming events in filter data
+        // Otherwise, include all available events in filter data
+        const formattedEvents = eventsWithAttendance.map(event => ({
+          id: event.id,
+          eventName: event.name,
+        }));
+        filterData = {
+          events: formattedEvents,
         };
       }
 
@@ -543,7 +574,8 @@ export class EventService {
           total: eventsWithAttendance.length,
           timestamp: new Date().toISOString(),
           globalSearch: false
-        }
+        },
+        ...(filterData && { filter: filterData }), // Conditionally add filter data for admin
       };
     } catch (error) {
       if (error instanceof ValidationException) {
