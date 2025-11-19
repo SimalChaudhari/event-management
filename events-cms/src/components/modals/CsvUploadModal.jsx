@@ -3,6 +3,7 @@ import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import { Alert, ProgressBar, Table, Badge } from 'react-bootstrap';
+import Select from 'react-select';
 import { uploadCsvUsers, downloadSampleCsv } from '../../store/actions/userActions';
 import axiosInstance from '../../configs/axiosInstance';
 import { useDispatch } from 'react-redux';
@@ -67,9 +68,28 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
         setEventFetchError('');
         try {
             const response = await axiosInstance.get('/events/dropdown-list');
-            const events = Array.isArray(response?.data?.data) ? response.data.data : [];
-            setEventOptions(events);
-            if (events.length === 0) {
+            const allEvents = Array.isArray(response?.data?.data) ? response.data.data : [];
+            
+            // Filter out past events - only show upcoming and current events
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const upcomingEvents = allEvents.filter(event => {
+                if (!event.endDate) return true; // Include events without end date
+                const endDate = new Date(event.endDate);
+                endDate.setHours(0, 0, 0, 0);
+                return endDate >= today; // Show events that haven't ended yet
+            });
+            
+            // Sort by start date (upcoming first)
+            upcomingEvents.sort((a, b) => {
+                const dateA = a.startDate ? new Date(a.startDate) : new Date(0);
+                const dateB = b.startDate ? new Date(b.startDate) : new Date(0);
+                return dateA - dateB;
+            });
+            
+            setEventOptions(upcomingEvents);
+            if (upcomingEvents.length === 0) {
                 setEventFetchError('No upcoming events are available for selection.');
             }
         } catch (error) {
@@ -319,11 +339,6 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             return;
         }
 
-        if (!selectedEventId) {
-            setErrorMessage('Please choose an event before uploading the CSV.');
-            return;
-        }
-
         if (validationResults.totalValid === 0) {
             setErrorMessage('No valid data found in CSV file. Please check the validation errors below.');
             return;
@@ -348,7 +363,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             // Only upload valid data
             const result = await dispatch(
                 uploadCsvUsers(validationResults.validRows, {
-                    eventId: selectedEventId,
+                    eventId: selectedEventId || undefined, // Send undefined if empty string
                     fileName: selectedFile?.name,
                 })
             );
@@ -540,55 +555,150 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                 </div>
 
                 <Form.Group controlId="eventSelection" className="mb-4">
-                    <Form.Label className="font-weight-600">
-                        <i className="feather icon-calendar mr-1"></i>
-                        Associate CSV Users with an Event
-                    </Form.Label>
-                    <div className="d-flex">
-                        <Form.Control
-                            as="select"
-                            value={selectedEventId}
-                            onChange={(e) => {
-                                setSelectedEventId(e.target.value);
-                                if (errorMessage && errorMessage.toLowerCase().includes('event')) {
-                                    setErrorMessage('');
-                                }
-                            }}
-                            disabled={isLoadingEvents}
-                            className="mr-2"
-                        >
-                            <option value="">
-                                {isLoadingEvents ? 'Loading events...' : 'Select an event'}
-                            </option>
-                            {eventOptions.map((event) => (
-                                <option key={event.id} value={event.id}>
-                                    {formatEventLabel(event)}
-                                </option>
-                            ))}
-                        </Form.Control>
+                    <Form.Label className="font-weight-600 d-flex align-items-center justify-content-between">
+                        <span>
+                            <i className="feather icon-calendar mr-1"></i>
+                            Associate CSV Users with an Event <span className="text-muted">(Optional)</span>
+                        </span>
                         <Button
-                            variant="outline-secondary"
+                            variant="link"
+                            size="sm"
                             onClick={fetchEventOptions}
                             disabled={isLoadingEvents}
                             title="Refresh events"
+                            className="p-0"
+                            style={{ fontSize: '0.875rem' }}
                         >
                             {isLoadingEvents ? (
                                 <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                             ) : (
-                                <i className="feather icon-refresh-cw"></i>
+                                <><i className="feather icon-refresh-cw mr-1"></i>Refresh</>
                             )}
                         </Button>
-                    </div>
-                    {eventFetchError ? (
-                        <small className="text-danger d-block mt-2">{eventFetchError}</small>
-                    ) : selectedEvent ? (
-                        <small className="text-muted d-block mt-2">
-                            Users in this CSV will be linked to <strong>{selectedEvent.name}</strong>
-                        </small>
+                    </Form.Label>
+                    
+                    {isLoadingEvents ? (
+                        <div className="text-center py-3">
+                            <span className="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                            <span className="text-muted">Loading events...</span>
+                        </div>
                     ) : (
-                        <small className="text-muted d-block mt-2">
-                            Select an event to link all uploaded users.
-                        </small>
+                        <Select
+                            value={selectedEventId ? {
+                                value: selectedEventId,
+                                label: (() => {
+                                    const event = eventOptions.find(e => e.id === selectedEventId);
+                                    if (!event) return '';
+                                    const isCurrentEvent = event.startDate && new Date(event.startDate) <= new Date() && event.endDate && new Date(event.endDate) >= new Date();
+                                    const eventLabel = formatEventLabel(event);
+                                    return isCurrentEvent 
+                                        ? `${event.name} • ${eventLabel} • [Ongoing]`
+                                        : `${event.name} • ${eventLabel}`;
+                                })()
+                            } : null}
+                            onChange={(selectedOption) => {
+                                setSelectedEventId(selectedOption?.value || '');
+                                if (errorMessage && errorMessage.toLowerCase().includes('event')) {
+                                    setErrorMessage('');
+                                }
+                            }}
+                            options={[
+                                { value: '', label: 'No Event Association', isNoEvent: true },
+                                ...eventOptions.map((event) => {
+                                    const isCurrentEvent = event.startDate && new Date(event.startDate) <= new Date() && event.endDate && new Date(event.endDate) >= new Date();
+                                    const eventLabel = formatEventLabel(event);
+                                    const displayLabel = isCurrentEvent 
+                                        ? `${event.name} • ${eventLabel} • [Ongoing]`
+                                        : `${event.name} • ${eventLabel}`;
+                                    
+                                    return {
+                                        value: event.id,
+                                        label: displayLabel,
+                                        event: event
+                                    };
+                                })
+                            ]}
+                            placeholder={eventOptions.length === 0 ? 'No upcoming events available' : 'Select an event (Optional)...'}
+                            isSearchable
+                            isClearable
+                            isDisabled={isLoadingEvents}
+                            isLoading={isLoadingEvents}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            filterOption={(option, searchText) => {
+                                if (option.data && option.data.isNoEvent) {
+                                    return searchText === '' || 'no event'.includes(searchText.toLowerCase());
+                                }
+                                const searchLower = searchText.toLowerCase();
+                                const event = option.data?.event;
+                                if (!event) return false;
+                                
+                                const nameMatch = event.name?.toLowerCase().includes(searchLower);
+                                const locationMatch = event.location?.toLowerCase().includes(searchLower) || event.venue?.toLowerCase().includes(searchLower);
+                                const dateMatch = formatEventLabel(event).toLowerCase().includes(searchLower);
+                                
+                                return nameMatch || locationMatch || dateMatch;
+                            }}
+                            styles={{
+                                control: (base) => ({
+                                    ...base,
+                                    fontSize: '14px',
+                                    minHeight: '38px',
+                                }),
+                                menu: (base) => ({
+                                    ...base,
+                                    zIndex: 9999,
+                                    maxHeight: '300px'
+                                }),
+                                menuPortal: (base) => ({
+                                    ...base,
+                                    zIndex: 9999
+                                }),
+                                option: (base, state) => ({
+                                    ...base,
+                                    backgroundColor: state.isSelected 
+                                        ? '#007bff' 
+                                        : state.isFocused 
+                                        ? '#f8f9fa' 
+                                        : 'white',
+                                    color: state.isSelected ? 'white' : '#212529',
+                                    '&:active': {
+                                        backgroundColor: state.isSelected ? '#007bff' : '#e9ecef'
+                                    }
+                                })
+                            }}
+                            formatOptionLabel={({ label, data }) => {
+                                if (data && data.isNoEvent) {
+                                    return (
+                                        <div className="text-muted">
+                                            <i className="feather icon-x-circle mr-2"></i>
+                                            {label}
+                                        </div>
+                                    );
+                                }
+                                return label;
+                            }}
+                        />
+                    )}
+                    
+                    {eventFetchError && (
+                        <small className="text-danger d-block mt-2">{eventFetchError}</small>
+                    )}
+                    
+                    {selectedEvent && (
+                        <div className="alert alert-info mt-3 mb-0">
+                            <i className="feather icon-info mr-2"></i>
+                            <strong>Selected:</strong> {selectedEvent.name}
+                            <br />
+                            <small>New users will receive credentials + QR code. Existing users will receive QR code only.</small>
+                        </div>
+                    )}
+                    
+                    {!selectedEventId && (
+                        <div className="alert alert-secondary mt-3 mb-0">
+                            <i className="feather icon-info mr-2"></i>
+                            <strong>No Event Selected:</strong> New users will receive credentials email only. Existing users will not receive any email.
+                        </div>
                     )}
                 </Form.Group>
 
@@ -872,8 +982,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                         disabled={
                             !selectedFile ||
                             isUploading ||
-                            validationResults.totalValid === 0 ||
-                            !selectedEventId
+                            validationResults.totalValid === 0
                         }
                     >
                         {isUploading ? (

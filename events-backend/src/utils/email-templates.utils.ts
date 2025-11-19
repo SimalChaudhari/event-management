@@ -29,12 +29,15 @@ export interface UserQRCodeEmailData {
   lastName: string;
   salutation?: string;
   eventName: string;
+  eventStartDate?: string | Date; // Event start date for calculating days remaining
   qrCodeCid: string;
   qrCodeBuffer: Buffer;
   qrCodeFilename?: string;
   eventInfoImageCid?: string;
   eventInfoImageBuffer?: Buffer;
   eventInfoImageFilename?: string;
+  password?: string; // Optional password for new users
+  showCredentials?: boolean; // Flag to show/hide login credentials in email
 }
 
 export type EmailTemplatePayload = UserCredentialsData | UserQRCodeEmailData;
@@ -252,9 +255,91 @@ export class EmailTemplateUtils {
    * @returns HTML email template
    */
   static generateUserQRCodeTemplate(data: UserQRCodeEmailData): string {
+    const showCredentials = data.showCredentials && data.password;
+    
+    // Calculate days remaining until event
+    const calculateDaysRemaining = (): string => {
+      if (!data.eventStartDate) {
+        return 'the countdown is on!';
+      }
+      
+      try {
+        const eventDate = new Date(data.eventStartDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        eventDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = eventDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+          return 'the event has started!';
+        } else if (diffDays === 0) {
+          return 'the event is today!';
+        } else if (diffDays === 1) {
+          return 'just 1 more day to go!';
+        } else {
+          return `just ${diffDays} more days to go!`;
+        }
+      } catch (error) {
+        return 'the countdown is on!';
+      }
+    };
+    
+    const daysRemainingText = calculateDaysRemaining();
+    
+    // Format event date for display (e.g., "12 November")
+    const formatEventDate = (): string => {
+      if (!data.eventStartDate) {
+        return 'the event day';
+      }
+      
+      try {
+        const eventDate = new Date(data.eventStartDate);
+        const day = eventDate.getDate();
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'];
+        const month = monthNames[eventDate.getMonth()];
+        return `${day} ${month}`;
+      } catch (error) {
+        return 'the event day';
+      }
+    };
+    
+    const formattedEventDate = formatEventDate();
+    
+    const credentialsSection = showCredentials ? `
+          <div style="
+              background-color: #e7f3ff;
+              border: 1px solid #b3d9ff;
+              color: #004085;
+              padding: 20px;
+              margin: 20px 0;
+              border-radius: 8px;
+              text-align: center;
+          ">
+              <h3 style="margin: 0 0 15px 0; color: #004085;">🔐 Your Login Credentials</h3>
+              <p style="margin: 8px 0; font-size: 16px;">
+                  <strong>Email:</strong> ${data.email}
+              </p>
+              <p style="margin: 8px 0; font-size: 16px;">
+                  <strong>Password:</strong> <span style="background-color: #004085; color: white; padding: 5px 10px; border-radius: 4px; font-family: monospace;">${data.password}</span>
+              </p>
+          </div>
+
+          <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; margin: 20px 0; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #856404;">🔒 Important Security Notice</h4>
+              <ul style="margin: 0; padding-left: 20px;">
+                  <li>Please change your password after your first login</li>
+                  <li>Keep your credentials secure and do not share them</li>
+                  <li>Use a strong, unique password for better security</li>
+              </ul>
+          </div>
+    ` : '';
+
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px; background-color: #f9f9f9;">
-       <h3 style="color: #333; text-align:left;">Get ready for ISCA Conference 2025</h3>
+       <h3 style="color: #333; text-align:left;">Get ready for ${data.eventName}</h3>
      
           <p style="color: #555; font-size: 16px;">
               ${
@@ -264,12 +349,20 @@ export class EmailTemplateUtils {
               }
           </p>
 
+          ${showCredentials ? `
           <p style="color: #555; font-size: 16px;">
-              <b>Just 1 more day to go – the countdown to ISCA Conference 2025 is on!</b>
+              Welcome to our event platform! Your account has been created successfully. Here are your login credentials and event information:
           </p>
+          ` : `
+          <p style="color: #555; font-size: 16px;">
+              <b>${daysRemainingText.charAt(0).toUpperCase() + daysRemainingText.slice(1)} – The countdown to ${data.eventName} is on!</b>
+          </p>
+          `}
 
-           <p style="color: #555; font-size: 16px;">
-           The QR code below will be used for your event day registration on 12 November. Please save it and have it ready when you arrive at the venue.
+          ${credentialsSection}
+
+          <p style="color: #555; font-size: 16px;">
+           The QR code below will be used for your event day registration on ${formattedEventDate}. Please save it and have it ready when you arrive at the venue.
           </p>
 
               <br>
@@ -300,13 +393,13 @@ export class EmailTemplateUtils {
               overflow: hidden;
               border: 1px solid #e0e0e0;
           ">
-              <img src="https://events.isca.org.sg:3000/image.png" alt="ISCA Conference 2025 - What to Expect" style="display: block; width: 100%; height: auto;" />
+              <img src="https://events.isca.org.sg:3000/image.png" alt="${data.eventName} - What to Expect" style="display: block; width: 100%; height: auto;" />
           </div>
 
           <div style="height: 2px;"></div>
               
           <p style="color: #555; font-size: 16px;">
-             We look forward to hosting you at ISCA Conference 2025!
+             We look forward to hosting you at ${data.eventName}!
           </p>
 
           <p style="color: #555; font-size: 16px;">
@@ -332,7 +425,7 @@ export class EmailTemplateUtils {
     return {
       from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
-      subject: `ISCA Conference 2025 – Your Registration & Event Guide Inside`,
+      subject: `${data.eventName} – Your Registration & Event Guide Inside`,
       html: this.generateUserQRCodeTemplate(data),
       attachments: [
         {
@@ -363,12 +456,14 @@ export class EmailTemplateUtils {
    * @returns Email options object
    */
   static getEmailOptions(data: EmailTemplatePayload) {
-    if ('password' in data) {
-      return this.getUserCredentialsEmailOptions(data);
-    }
-
+    // Check for QR code first (has qrCodeBuffer property)
     if ('qrCodeBuffer' in data) {
       return this.getUserQRCodeEmailOptions(data);
+    }
+
+    // Otherwise it's a credentials email (has password property and no qrCodeBuffer)
+    if ('password' in data && !('qrCodeBuffer' in data)) {
+      return this.getUserCredentialsEmailOptions(data as UserCredentialsData);
     }
 
     throw new Error('Unsupported email template payload');

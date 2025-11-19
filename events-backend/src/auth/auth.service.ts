@@ -912,17 +912,17 @@ export class AuthService {
 
       console.log(`🚀 PROFESSIONAL CSV UPLOAD: Processing ${csvData.length} users...`);
 
-      if (!eventId) {
-        throw new BadRequestException('Event selection is required for CSV upload');
-      }
+      // Event is optional - if provided, associate users with event and send QR codes
+      let event = null;
+      if (eventId) {
+        event = await this.eventRepository.findOne({
+          where: { id: eventId },
+          select: ['id', 'name', 'startDate'],
+        });
 
-      const event = await this.eventRepository.findOne({
-        where: { id: eventId },
-        select: ['id', 'name'],
-      });
-
-      if (!event) {
-        throw new BadRequestException('Selected event could not be found');
+        if (!event) {
+          throw new BadRequestException('Selected event could not be found');
+        }
       }
 
       // Create initial log entry
@@ -952,21 +952,60 @@ export class AuthService {
         select: ['id', 'email', 'firstName', 'lastName', 'salutation'],
       });
 
-      const eventAssociationResult = await this.associateUsersWithEvent(
-        usersForAssociation.map((user) => user.id),
-        eventId,
-      );
+      // Associate users with event if eventId is provided
+      let eventAssociationResult = { registrationsCreated: 0, registrationsSkipped: 0 };
+      if (eventId && event) {
+        eventAssociationResult = await this.associateUsersWithEvent(
+          usersForAssociation.map((user) => user.id),
+          eventId,
+        );
+      }
 
-      // Prepare QR email payloads for all processed users
-      const qrEmailPayloads = await this.prepareQrEmailPayloads(
-        usersForAssociation,
-        userProcessingResult.emailsToNotify,
-        event.name,
-      );
+      // Prepare email payloads based on scenario
+      let emailPayloads: EmailTemplatePayload[] = [];
+      
+      if (eventId && event) {
+        // Scenario 2: With event registration
+        // - New users: credentials + QR code (showCredentials = true)
+        // - Existing users: QR code only (showCredentials = false)
+        const qrEmailPayloads = await this.prepareQrEmailPayloads(
+          usersForAssociation,
+          userProcessingResult.emailsToNotify,
+          event.name,
+          userProcessingResult.newUserPasswords,
+          userProcessingResult.existingUserEmails,
+          event.startDate,
+        );
+        emailPayloads = qrEmailPayloads;
+      } else {
+        // Scenario 1: Without event registration
+        // - New users: credentials only
+        // - Existing users: no email
+        const credentialsPayloads: UserCredentialsData[] = [];
+        for (const user of usersForAssociation) {
+          const normalizedEmail = normalizeEmail(user.email);
+          const password = userProcessingResult.newUserPasswords.get(normalizedEmail);
+          
+          // Only send credentials to new users
+          if (password) {
+            const emailEntry = userProcessingResult.emailsToNotify.find(
+              e => normalizeEmail(e.email) === normalizedEmail
+            );
+            
+            credentialsPayloads.push({
+              email: user.email,
+              firstName: user.firstName || emailEntry?.firstName || '',
+              lastName: user.lastName || emailEntry?.lastName || '',
+              password: password,
+            });
+          }
+        }
+        emailPayloads = credentialsPayloads;
+      }
 
       let recipientSnapshot: EmailRecipientLog[] = [];
-      if (qrEmailPayloads.length > 0) {
-        recipientSnapshot = qrEmailPayloads.map((payload) => ({
+      if (emailPayloads.length > 0) {
+        recipientSnapshot = emailPayloads.map((payload) => ({
           email: payload.email,
           firstName: payload.firstName,
           lastName: payload.lastName,
@@ -980,25 +1019,25 @@ export class AuthService {
 
       // Step 2: Send emails in BACKGROUND (don't wait for them)
       let emailsToSendCount = 0;
-      if (csvUploadConfig.isEmailSendingEnabled() && qrEmailPayloads.length > 0) {
-        emailsToSendCount = qrEmailPayloads.length;
-        console.log(`📧 Scheduling ${emailsToSendCount} QR emails to be sent in background...`);
+      if (csvUploadConfig.isEmailSendingEnabled() && emailPayloads.length > 0) {
+        emailsToSendCount = emailPayloads.length;
+        const emailType = eventId ? 'QR code' : 'credentials';
+        console.log(`📧 Scheduling ${emailsToSendCount} ${emailType} emails to be sent in background...`);
         
         // Get email configuration based on provider
         const emailConfig = csvUploadConfig.getEmailBatchConfig();
         
         // Send emails asynchronously in background (NO AWAIT - don't wait for completion)
         this.sendEmailsInBackground(
-          qrEmailPayloads,
+          emailPayloads,
           sessionId,
           emailConfig
         ).then(() => {
-          console.log(`✅ Background QR email sending completed for session ${sessionId}`);
+          console.log(`✅ Background ${emailType} email sending completed for session ${sessionId}`);
         }).catch((error) => {
-          console.error(`❌ Background QR email sending failed for session ${sessionId}:`, error);
+          console.error(`❌ Background ${emailType} email sending failed for session ${sessionId}:`, error);
         });
-        
-            }
+      }
 
       if (userProcessingResult.skippedUsers.length > 0) {
         console.log(`\n--- SKIPPED USERS ---`);
@@ -1041,16 +1080,23 @@ export class AuthService {
         skippedRecords: userProcessingResult.skippedUsers,
         emailDetails: initialEmailDetails,
         summary: `${emailsToSendCount > 0 
-          ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (QR processing in background)` 
+          ? `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | Emails: ${emailsToSendCount} pending (${eventId ? 'QR' : 'credentials'} processing in background)` 
           : `Users Created: ${userProcessingResult.newUsersCreated}, Updated: ${userProcessingResult.usersToUpdate.length}, Skipped: ${existingUsersSkipped} | No emails to send`
-        } | Event: ${event.name} (${eventAssociationResult.registrationsCreated} registrations, ${eventAssociationResult.registrationsSkipped} already registered)`
+        }${event ? ` | Event: ${event.name} (${eventAssociationResult.registrationsCreated} registrations, ${eventAssociationResult.registrationsSkipped} already registered)` : ' | No event association'}`
       });
 
  
 
       // Prepare final response - return immediately without waiting for emails
+      const emailMessage = emailsToSendCount > 0 
+        ? `${emailsToSendCount} ${eventId ? 'QR code' : 'credentials'} emails are being sent in background.`
+        : '';
+      const eventMessage = event 
+        ? ` Users associated with ${event.name}.`
+        : '';
+      
       const response: CsvUploadResponseDto = {
-        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailsToSendCount > 0 ? `${emailsToSendCount} QR code emails are being sent in background.` : ''} Users associated with ${event.name}.`,
+        message: `CSV upload completed successfully! ${userProcessingResult.newUsersCreated} users created, ${userProcessingResult.usersToUpdate.length} users updated. ${emailMessage}${eventMessage}`,
         totalProcessed: csvData.length.toString(),
         newUsersCreated: userProcessingResult.newUsersCreated.toString(),
         existingUsersSkipped: existingUsersSkipped.toString(),
@@ -1073,12 +1119,12 @@ export class AuthService {
           status: 'disabled'
         },
         sessionId: sessionId,
-        eventAssociation: {
+        eventAssociation: event ? {
           eventId: event.id,
           eventName: event.name,
           registrationsCreated: eventAssociationResult.registrationsCreated,
           registrationsSkipped: eventAssociationResult.registrationsSkipped,
-        },
+        } : undefined,
       };
 
       return response;
@@ -1197,6 +1243,8 @@ export class AuthService {
     skippedUsers: string[];
     passwordsGenerated: number;
     existingUsersCount: number;
+    newUserPasswords: Map<string, string>; // Map of normalized email to plain text password for new users
+    existingUserEmails: Set<string>; // Set of normalized emails for existing users
   }> {
     // Bulk query for existing users - normalize emails for case-insensitive comparison
     const csvEmails = csvData.map(user => normalizeEmail(user.email));
@@ -1217,6 +1265,8 @@ export class AuthService {
     const emailsToNotify: Array<{ email: string; firstName: string; lastName: string; salutation?: string }> = [];
     const skippedUsers: string[] = [];
     let passwordsGenerated = 0;
+    const newUserPasswords = new Map<string, string>(); // Track plain text passwords for new users
+    const existingUserEmails = new Set<string>(); // Track existing user emails
 
     // Process each user
     for (const userData of csvData) {
@@ -1233,6 +1283,9 @@ export class AuthService {
       }
 
       if (existingUser) {
+        // Track existing user email
+        existingUserEmails.add(normalizedEmail);
+        
         // Existing user - update password if needed, and also update company/designation
         if (!existingUser.password || existingUser.password.trim() === '') {
           const randomPassword = PasswordUtils.generateRandomPassword(12);
@@ -1262,6 +1315,8 @@ export class AuthService {
       } else {
         // New user - prepare for bulk creation
         const randomPassword = PasswordUtils.generateRandomPassword(12);
+        // Store plain text password for email sending
+        newUserPasswords.set(normalizedEmail, randomPassword);
         const userDataToSanitize: any = {
           firstName: userData.firstName,
           lastName: userData.lastName,
@@ -1346,7 +1401,9 @@ export class AuthService {
       emailsToNotify,
       skippedUsers,
       passwordsGenerated,
-      existingUsersCount: existingUsers.length
+      existingUsersCount: existingUsers.length,
+      newUserPasswords,
+      existingUserEmails
     };
   }
 
@@ -1354,6 +1411,9 @@ export class AuthService {
     users: Array<{ id: string; email: string; firstName: string; lastName: string; salutation?: string }>,
     emailsToNotify: Array<{ email: string; firstName: string; lastName: string; salutation?: string }>,
     eventName: string,
+    newUserPasswords?: Map<string, string>,
+    existingUserEmails?: Set<string>,
+    eventStartDate?: Date | string,
   ): Promise<UserQRCodeEmailData[]> {
     const userMap = new Map<string, { id: string; email: string; firstName: string; lastName: string; salutation?: string }>();
     users.forEach((user) => {
@@ -1383,15 +1443,25 @@ export class AuthService {
       try {
         const qrCodeBuffer = await QRCodeUtils.generateQRCodeBuffer(user.id);
         const qrCodeCid = `user-qr-${user.id}@events`;
+        const normalizedEmail = normalizeEmail(user.email);
+        
+        // Determine if this is a new user (has password) or existing user
+        const isNewUser = newUserPasswords && newUserPasswords.has(normalizedEmail);
+        const password = isNewUser ? newUserPasswords.get(normalizedEmail) : undefined;
+        const showCredentials = isNewUser && password !== undefined;
+        
         payloads.push({
           email: user.email,
           firstName: user.firstName || entry.firstName || '',
           lastName: user.lastName || entry.lastName || '',
           salutation: user.salutation || entry.salutation,
           eventName,
+          eventStartDate: eventStartDate,
           qrCodeCid,
           qrCodeBuffer,
           qrCodeFilename: `qr-${user.id}.png`,
+          password,
+          showCredentials,
         });
       } catch (error) {
         console.error(`❌ Failed to generate QR code for ${entry.email}:`, error);

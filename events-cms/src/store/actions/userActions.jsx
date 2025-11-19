@@ -136,12 +136,6 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
 
         const resolvedOptions = typeof options === 'string' ? { eventId: options } : options || {};
         const { eventId, fileName } = resolvedOptions;
-
-        if (!eventId) {
-            const message = 'Event selection is required before uploading the CSV.';
-            toast.error(message);
-            return { success: false, message };
-        }
         
         let response;
         
@@ -150,7 +144,10 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
             // Handle file upload
             const formData = new FormData();
             formData.append('csvFile', csvData);
-            formData.append('eventId', eventId);
+            // Only append eventId if it's provided (optional)
+            if (eventId) {
+                formData.append('eventId', eventId);
+            }
             if (fileName) {
                 formData.append('fileName', fileName);
             } else if (csvData?.name) {
@@ -166,7 +163,7 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
             // Handle JSON data - send as regular JSON request body
             response = await axiosInstance.post('/auth/upload-csv-users', {
                 users: csvData,
-                eventId,
+                eventId: eventId || undefined, // Send undefined if not provided
                 fileName: fileName || undefined,
             }, {
                 headers: {
