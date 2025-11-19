@@ -42,6 +42,7 @@ const useFilterLogic = ({
     const filtersAppliedRef = useRef(false);
     const lastUrlParamsRef = useRef('');
     const hasInitializedRef = useRef(false);
+    const isApplyingFiltersRef = useRef(false); // Track when applyFilters is actively running
     
     // Refs to preserve the full lists for dropdown (not filtered results)
     const fullEventsListRef = useRef(initialEvents);
@@ -87,15 +88,27 @@ const useFilterLogic = ({
     }, [dispatch, loadUsersAction, loadEventsAction]);
 
     /**
-     * Apply filters with URL parameter updates
+     * Apply filters with URL parameter updates - IMMEDIATE API CALL
      */
     const applyFilters = useCallback(async (filterOverrides = {}) => {
-         
         // CRITICAL: Start with empty object, don't use initialFilters to avoid carrying over old values
         // Only add filters that are explicitly selected/active
         const filters = {};
         
+        // Preserve page-level filters from initialFilters (e.g., upcoming: true)
+        if (initialFilters) {
+            Object.keys(initialFilters).forEach(key => {
+                // Only preserve non-filter keys (like 'upcoming', 'filter', etc.)
+                if (key !== 'userId' && key !== 'userFilter' && 
+                    key !== 'eventId' && key !== 'eventFilter' && key !== 'eventName' &&
+                    key !== 'startDate' && key !== 'endDate') {
+                    filters[key] = initialFilters[key];
+                }
+            });
+        }
+        
         // Handle user filter (only for registered events mode)
+        // CRITICAL: Always use filterOverrides first (from FilterComponent) - these are the latest values
         const userIdToUse = filterOverrides.userId !== undefined ? filterOverrides.userId : selectedUserId;
         
         // Only add user filter if a user is actually selected (not empty)
@@ -103,50 +116,71 @@ const useFilterLogic = ({
             // Prefer userId for exact matching (backend supports it)
             filters.userId = userIdToUse;
         }
-        // If userIdToUse is empty/null, don't add user filter (shows all users)
         
         // Handle event filter - different format based on mode
+        // CRITICAL: Always use filterOverrides first (from FilterComponent) - these are the latest values
         const eventIdToUse = filterOverrides.eventId !== undefined ? filterOverrides.eventId : selectedEventId;
+        
+        // CRITICAL: If FilterComponent passed eventName directly, use it (most reliable)
+        // This avoids lookup issues when events array isn't populated yet
+        const eventNameFromOverride = filterOverrides.eventName;
         
         // Only add event filter if an event is actually selected (not empty)
         if (eventIdToUse) {
-            if (events.length > 0) {
-                const selectedEvent = events.find(event => event.id === eventIdToUse);
-                if (selectedEvent) {
-                    if (filterMode === 'registered') {
-                        // For registered events: use eventFilter with name
-                        filters.eventFilter = selectedEvent.name;
-                    } else {
-                        // For event listing pages: use eventName
-                        filters.eventName = selectedEvent.name;
-                    }
-                } else {
-                    // Event not found in array, use eventId directly (backend supports it for registered mode)
-                    if (filterMode === 'registered') {
-                        filters.eventId = eventIdToUse;
-                    } else {
-                        console.log('❌ Event not found for ID:', eventIdToUse);
+            let eventNameToUse = null;
+            
+            // Priority 1: Use eventName from filterOverrides (passed directly from FilterComponent)
+            if (eventNameFromOverride) {
+                eventNameToUse = eventNameFromOverride;
+            } else {
+                // Priority 2: Look up event name from events state or initialEvents
+                const eventsToSearch = events.length > 0 ? events : (initialEvents.length > 0 ? initialEvents : []);
+                
+                if (eventsToSearch.length > 0) {
+                    // Try to find event by ID - handle both string and number IDs
+                    const selectedEvent = eventsToSearch.find(event => {
+                        const eventId = String(event.id || event.eventId || '');
+                        const searchId = String(eventIdToUse);
+                        return eventId === searchId;
+                    });
+                    
+                    if (selectedEvent) {
+                        // Get event name - handle different property names
+                        eventNameToUse = selectedEvent.name || selectedEvent.eventName || selectedEvent.event_name || null;
                     }
                 }
+            }
+            
+            // Apply the event filter if we have the name (or use eventId for registered mode)
+            if (eventNameToUse) {
+                if (filterMode === 'registered') {
+                    // For registered events: use eventFilter with name
+                    filters.eventFilter = eventNameToUse;
+                } else {
+                    // For event listing pages: use eventName
+                    filters.eventName = eventNameToUse;
+                }
             } else {
-                // Events not loaded yet - use eventId directly (backend supports it for registered mode)
+                // Event name not available - use eventId for registered mode, skip for event mode
                 if (filterMode === 'registered') {
                     filters.eventId = eventIdToUse;
                 } else {
-                    console.log('❌ Events not loaded yet for ID:', eventIdToUse);
+                    // For event mode, we need event name - log for debugging
+                    console.warn('Event name not available for ID:', eventIdToUse, 'Events state:', events.length, 'Initial events:', initialEvents.length);
                 }
             }
         }
-        // If eventIdToUse is empty/null, don't add event filter (shows all events)
 
         // Get date filters - only add if they have values
+        // CRITICAL: Always use filterOverrides first (from FilterComponent) - these are the latest values
         const startDateToUse = filterOverrides.startDate !== undefined ? filterOverrides.startDate : startDate;
         const endDateToUse = filterOverrides.endDate !== undefined ? filterOverrides.endDate : endDate;
         
-        if (startDateToUse) {
+        // CRITICAL: Only add date filters if they have actual values (not empty strings)
+        if (startDateToUse && startDateToUse.trim() !== '') {
             filters.startDate = startDateToUse;
         }
-        if (endDateToUse) {
+        if (endDateToUse && endDateToUse.trim() !== '') {
             filters.endDate = endDateToUse;
         }
 
@@ -170,38 +204,79 @@ const useFilterLogic = ({
             queryParams.append('endDate', endDateToUse);
         }
 
-        // Update URL without page refresh
-        // The useEffect will detect URL change and call the API
+        // Update URL for bookmarking/sharing
         const newUrl = queryParams.toString() 
             ? `${location.pathname}?${queryParams.toString()}`
             : location.pathname;
         
-        // Store the new URL params before navigation so useEffect can detect the change
-        const newUrlParams = queryParams.toString();
+        const newUrlSearch = queryParams.toString();
         
-        // Reset flags to allow useEffect to process the new URL
-        // Store the NEW URL params (not old) so useEffect can detect the change properly
-        const newUrlSearch = newUrl.includes('?') ? `?${newUrl.split('?')[1]}` : '';
-        filtersAppliedRef.current = false;
-        // Don't update lastUrlParamsRef here - let useEffect detect the URL change
-        // This ensures the useEffect will run and apply the filters
-        
-        navigate(newUrl, { replace: true });
-
         // Update active filters state - only include filters that are actually selected
         const active = {};
         if (userIdToUse) active.user = userIdToUse;
         if (eventIdToUse) active.event = eventIdToUse;
         if (startDateToUse) active.startDate = startDateToUse;
         if (endDateToUse) active.endDate = endDateToUse;
-        // Don't include initialFilters to avoid stale values
         
         setActiveFilters(active);
         
-        // Don't dispatch here - let the useEffect handle it when URL changes
-        // This prevents duplicate API calls
+        // Debug: Log filters being sent
+        console.log('🔍 Applying filters:', {
+            filters,
+            eventIdToUse,
+            startDateToUse,
+            endDateToUse,
+            eventsAvailable: events.length > 0 || initialEvents.length > 0,
+            eventsCount: events.length,
+            initialEventsCount: initialEvents.length
+        });
+        
+        // CRITICAL: Set flag to indicate we're applying filters
+        // This prevents useEffect from running while we're applying filters
+        isApplyingFiltersRef.current = true;
+        
+        // CRITICAL: Update refs BEFORE dispatch and navigation to prevent useEffect from interfering
+        // Set the NEW URL params so useEffect knows this URL was already handled
+        // Normalize the URL params string (always start with ? if it has params)
+        const newUrlParamsString = newUrlSearch ? `?${newUrlSearch}` : '';
+        lastUrlParamsRef.current = newUrlParamsString;
+        filtersAppliedRef.current = true;
+        
+        // IMMEDIATELY dispatch the action with filters - single API call
+        if (filterAction) {
+            try {
+                // Dispatch the action
+                await dispatch(filterAction(filters));
+                
+                // Navigate to new URL AFTER dispatch completes (for bookmarking/sharing)
+                // The refs are already set, so useEffect will skip when URL changes
+                navigate(newUrl, { replace: true });
+                
+                // Reset flag after a short delay to allow navigation to complete
+                // This ensures useEffect sees the flag and skips
+                setTimeout(() => {
+                    isApplyingFiltersRef.current = false;
+                }, 100);
+                
+                return true;
+            } catch (error) {
+                console.error('Error applying filters:', error);
+                // Reset refs on error so user can retry
+                filtersAppliedRef.current = false;
+                lastUrlParamsRef.current = location.search; // Reset to current URL
+                isApplyingFiltersRef.current = false;
+                return false;
+            }
+        } else {
+            // If no filterAction, just update URL
+            navigate(newUrl, { replace: true });
+            setTimeout(() => {
+                isApplyingFiltersRef.current = false;
+            }, 100);
+        }
+        
         return true;
-    }, [selectedUserId, selectedEventId, startDate, endDate, users, events, initialFilters, location.pathname, navigate, dispatch, filterAction]);
+    }, [selectedUserId, selectedEventId, startDate, endDate, users, events, initialEvents, initialFilters, location.pathname, navigate, dispatch, filterAction, filterMode]);
 
     /**
      * Clear all filters
@@ -621,17 +696,24 @@ const useFilterLogic = ({
         }
         
         // Handle events list - preserve full list (e.g., all upcoming events)
+        // CRITICAL: Always update if we have no events yet (first load) - this ensures events are available immediately
         if (initialEvents.length > 0) {
             // Only update events if:
-            // 1. We don't have any events yet (first load)
+            // 1. We don't have any events yet (first load) - ALWAYS update in this case
             // 2. The new list is larger than the stored full list (complete list, not filtered)
             // 3. The new list contains all events from current stored list (complete list)
             const currentStoredCount = fullEventsListRef.current.length;
+            const currentEventsCount = events.length;
             const newEventsCount = initialEvents.length;
             
-            // If we have no stored events, or new list is larger, update it
-            // This ensures we preserve the full list and don't replace it with filtered results
-            if (currentStoredCount === 0 || newEventsCount > currentStoredCount) {
+            // CRITICAL: If we have no events in state yet, always update (first load)
+            // This ensures events are available for filter application
+            if (currentEventsCount === 0) {
+                setEvents(initialEvents);
+                fullEventsListRef.current = initialEvents;
+            } else if (currentStoredCount === 0 || newEventsCount > currentStoredCount) {
+                // If we have no stored events, or new list is larger, update it
+                // This ensures we preserve the full list and don't replace it with filtered results
                 setEvents(initialEvents);
                 fullEventsListRef.current = initialEvents;
             } else if (newEventsCount === currentStoredCount) {
@@ -651,15 +733,18 @@ const useFilterLogic = ({
         }
     }, [initialUsers, initialEvents]);
 
-    // Load dropdown data and initial data once on mount
+    // Load dropdown data and initial data once on mount ONLY
+    // CRITICAL: This should NOT run when URL changes from filter application
+    // URL changes are handled by the separate useEffect that watches location.search
     useEffect(() => {
         let mounted = true;
         
         const initializeData = async () => {
+            // CRITICAL: Only run once on initial mount, not on URL changes
             if (!mounted || hasInitializedRef.current) return;
             hasInitializedRef.current = true;
             
-            // Check URL parameters first
+            // Check URL parameters first (for initial page load with URL params)
             const urlParams = new URLSearchParams(location.search);
             const userIdFromUrl = urlParams.get('userId');
             const eventIdFromUrl = urlParams.get('eventId');
@@ -694,11 +779,32 @@ const useFilterLogic = ({
                         lastUrlParamsRef.current = location.search;
                         dispatch(filterAction(filters));
                     } else {
-                        // For event mode with eventId: load all data first to get filter dropdown options
-                        // The filter application useEffect will handle applying filters when events are ready
-                        filtersAppliedRef.current = false;
-                        lastUrlParamsRef.current = ''; // Reset to allow filter application
-                        dispatch(filterAction({})); // Load all data first
+                        // For event mode with eventId: check if we already have events loaded
+                        // If events are available, apply filter immediately
+                        if (events.length > 0 || initialEvents.length > 0) {
+                            const eventsToUse = events.length > 0 ? events : initialEvents;
+                            const selectedEvent = eventsToUse.find(event => event.id === eventIdFromUrl);
+                            if (selectedEvent) {
+                                const filters = { ...initialFilters };
+                                filters.eventName = selectedEvent.name;
+                                if (startDateFromUrl) filters.startDate = startDateFromUrl;
+                                if (endDateFromUrl) filters.endDate = endDateFromUrl;
+                                filtersAppliedRef.current = true;
+                                lastUrlParamsRef.current = location.search;
+                                dispatch(filterAction(filters));
+                            } else {
+                                // Event not found - load all data first
+                                filtersAppliedRef.current = false;
+                                lastUrlParamsRef.current = '';
+                                dispatch(filterAction({}));
+                            }
+                        } else {
+                            // Events not loaded yet - load all data first to get filter dropdown options
+                            // The filter application useEffect will handle applying filters when events are ready
+                            filtersAppliedRef.current = false;
+                            lastUrlParamsRef.current = '';
+                            dispatch(filterAction({}));
+                        }
                     }
                 } else {
                     // No URL filters, load all data
@@ -721,181 +827,93 @@ const useFilterLogic = ({
         return () => {
             mounted = false;
         };
-    }, [location.search]); // Include location.search to handle URL changes on mount
+        // CRITICAL: Remove location.search from dependencies - only run once on mount
+        // URL changes are handled by the separate useEffect below
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty array = only run once on mount
 
-    // Apply filters from URL when data is ready (optimized to avoid re-renders)
+    // Apply filters from URL on initial load or when URL changes externally (e.g., browser back/forward)
+    // This only runs when URL changes externally, not when applyFilters is called (which handles its own dispatch)
     useEffect(() => {
+        const currentUrlParams = location.search;
+        
+        // CRITICAL: Skip if applyFilters is currently running
+        // This prevents duplicate API calls when applyFilters updates URL
+        if (isApplyingFiltersRef.current) {
+            console.log('⏭️ Skipping useEffect - applyFilters is currently running');
+            return;
+        }
+        
+        // CRITICAL: Skip if filters were already applied by applyFilters function
+        // This prevents duplicate API calls when applyFilters updates URL
+        if (filtersAppliedRef.current) {
+            // Check if the current URL matches what we just set in applyFilters
+            const expectedUrlParams = lastUrlParamsRef.current;
+            
+            // Normalize both URLs for comparison
+            // location.search already includes the ? prefix, so normalize both
+            const normalizedCurrent = currentUrlParams || '';
+            const normalizedExpected = expectedUrlParams || '';
+            
+            // Compare the actual query strings (without ? prefix for comparison)
+            const currentQuery = normalizedCurrent.replace(/^\?/, '');
+            const expectedQuery = normalizedExpected.replace(/^\?/, '');
+            
+            // If query strings match (or both are empty), applyFilters already handled it - skip
+            if (currentQuery === expectedQuery) {
+                // URL matches what applyFilters set - skip to prevent duplicate call
+                console.log('⏭️ Skipping useEffect - filters already applied by applyFilters');
+                return;
+            }
+            // If URL doesn't match, it's an external change (browser back/forward) - proceed
+            console.log('🔄 URL changed externally - applying filters from URL');
+        }
+        
+        // Only proceed if URL actually changed (external navigation like browser back/forward)
+        if (currentUrlParams === lastUrlParamsRef.current) {
+            return; // No change, skip
+        }
+        
+        if (!filterAction) return;
+        
         const urlParams = new URLSearchParams(location.search);
         const userIdFromUrl = urlParams.get('userId');
         const eventIdFromUrl = urlParams.get('eventId');
         const startDateFromUrl = urlParams.get('startDate');
         const endDateFromUrl = urlParams.get('endDate');
-        const currentUrlParams = location.search;
         
-        // Check if URL changed
-        const urlChanged = currentUrlParams !== lastUrlParamsRef.current;
-        
-        // Check if eventId was removed (for both event and registered modes)
-        const previousUrlParams = new URLSearchParams(lastUrlParamsRef.current);
-        const previousEventId = previousUrlParams.get('eventId');
-        const previousUserId = previousUrlParams.get('userId');
-        const eventIdWasRemoved = previousEventId && !eventIdFromUrl && urlChanged;
-        const userIdWasRemoved = previousUserId && !userIdFromUrl && urlChanged && filterMode === 'registered';
-        
-        // If URL is empty and eventId was removed, load all events/data
-        const hasUrlFilters = userIdFromUrl || eventIdFromUrl || startDateFromUrl || endDateFromUrl;
-        if (!hasUrlFilters && eventIdWasRemoved) {
-            // Preserve page-level filters (e.g., upcoming: true)
-            const emptyFilters = {};
-            if (initialFilters) {
-                Object.keys(initialFilters).forEach(key => {
-                    if (key !== 'userId' && key !== 'userFilter' && 
-                        key !== 'eventId' && key !== 'eventFilter' && key !== 'eventName' &&
-                        key !== 'startDate' && key !== 'endDate') {
-                        emptyFilters[key] = initialFilters[key];
-                    }
-                });
-            }
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(emptyFilters)); // Load all events/data with page-level filters
-            return;
-        }
-        
-        // If userId was removed (for registered mode), clear user filter and load all users
-        if (userIdWasRemoved) {
-            // If URL is completely empty (no other filters), dispatch filters with page-level filters preserved
-            if (!hasUrlFilters) {
-                const emptyFilters = {};
-                // Preserve page-level filters (e.g., upcoming: true)
-                if (initialFilters) {
-                    Object.keys(initialFilters).forEach(key => {
-                        if (key !== 'userId' && key !== 'userFilter' && 
-                            key !== 'eventId' && key !== 'eventFilter' && key !== 'eventName' &&
-                            key !== 'startDate' && key !== 'endDate') {
-                            emptyFilters[key] = initialFilters[key];
-                        }
-                    });
-                }
-                filtersAppliedRef.current = true;
-                lastUrlParamsRef.current = currentUrlParams;
-                // Dispatch filters to load all data and clear any cached filters
-                dispatch(filterAction(emptyFilters));
-                return;
-            }
-            
-            // If there are other filters (event, dates), include only those
-            // Start with empty object to avoid carrying over old user filters
-            const filters = {};
-            if (eventIdFromUrl) {
-                // Add event filter if event is selected
-                if (events.length > 0) {
-                    const selectedEvent = events.find(event => event.id === eventIdFromUrl);
-                    if (selectedEvent) {
-                        filters.eventFilter = selectedEvent.name;
-                    } else {
-                        filters.eventId = eventIdFromUrl;
-                    }
-                } else {
-                    filters.eventId = eventIdFromUrl;
-                }
-            }
-            if (startDateFromUrl) filters.startDate = startDateFromUrl;
-            if (endDateFromUrl) filters.endDate = endDateFromUrl;
-            
-            // CRITICAL: Ensure no user-related filters are included
-            if (filters.userId) delete filters.userId;
-            if (filters.userFilter) delete filters.userFilter;
-            
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(filters));
-            return;
-        }
-        
-        // If eventId was removed but other filters exist, apply only those filters (without event filter)
-        if (eventIdWasRemoved && (userIdFromUrl || startDateFromUrl || endDateFromUrl)) {
-            // Start with empty object to avoid carrying over old event filters
-            const filters = {};
-            if (filterMode === 'registered' && userIdFromUrl) {
-                filters.userId = userIdFromUrl;
-            }
-            if (startDateFromUrl) filters.startDate = startDateFromUrl;
-            if (endDateFromUrl) filters.endDate = endDateFromUrl;
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(filters));
-            return;
-        }
-        
-        // If URL is completely empty (no filters at all), ensure we load all data
-        // This handles the case when all filters are cleared
-        if (!hasUrlFilters) {
-            // Only skip if we already applied filters for this empty URL
-            // Otherwise, dispatch empty filters to load all data
-            if (filtersAppliedRef.current && currentUrlParams === lastUrlParamsRef.current) {
-                return; // Already applied, skip
-            }
-            // URL is empty - dispatch filters with only page-level filters preserved
-            const emptyFilters = {};
-            // Preserve page-level filters from initialFilters (e.g., upcoming: true)
-            if (initialFilters) {
-                Object.keys(initialFilters).forEach(key => {
-                    // Only preserve non-filter keys (like 'upcoming', 'filter', etc.)
-                    if (key !== 'userId' && key !== 'userFilter' && 
-                        key !== 'eventId' && key !== 'eventFilter' && key !== 'eventName' &&
-                        key !== 'startDate' && key !== 'endDate') {
-                        emptyFilters[key] = initialFilters[key];
-                    }
-                });
-            }
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(emptyFilters)); // Load all data with page-level filters
-            return;
-        }
-        if (!filterAction) return;
-        
-        // Prevent duplicate API calls - only apply filters once per URL change
-        // Allow re-application if userId or eventId was removed
-        if (filtersAppliedRef.current && currentUrlParams === lastUrlParamsRef.current && !eventIdWasRemoved && !userIdWasRemoved) {
-            return;
-        }
-        
-        // Start with empty object and only add filters from URL
-        // Don't use initialFilters to avoid carrying over old filter values
+        // Build filters from URL - this handles initial page load or external URL changes
         const filters = {};
-        let hasValidFilters = false;
-        let needsEventData = false; // Track if we need events to be loaded
+        
+        // Preserve page-level filters from initialFilters (e.g., upcoming: true)
+        if (initialFilters) {
+            Object.keys(initialFilters).forEach(key => {
+                if (key !== 'userId' && key !== 'userFilter' && 
+                    key !== 'eventId' && key !== 'eventFilter' && key !== 'eventName' &&
+                    key !== 'startDate' && key !== 'endDate') {
+                    filters[key] = initialFilters[key];
+                }
+            });
+        }
         
         // Handle user filter (only for registered mode)
         if (userIdFromUrl && filterMode === 'registered') {
-            // For registered mode, use userId for exact matching (preferred)
-            // Backend supports userId directly for exact match
             filters.userId = userIdFromUrl;
-            hasValidFilters = true;
         }
         
         // Handle event filter - different based on mode
-        // IMPORTANT: Only add event filter if eventId exists in URL
-        // If eventId is not in URL, don't add any event filter (ensures old filters are cleared)
         if (eventIdFromUrl) {
             if (filterMode === 'registered') {
-                // For registered mode: backend supports eventId directly, but we prefer eventFilter (name)
+                // For registered mode: backend supports eventId directly, but prefer eventFilter (name)
                 if (events.length > 0) {
                     const selectedEvent = events.find(event => event.id === eventIdFromUrl);
                     if (selectedEvent) {
                         filters.eventFilter = selectedEvent.name;
-                        hasValidFilters = true;
                     } else {
-                        // Event not found in array, use eventId directly (backend supports it)
                         filters.eventId = eventIdFromUrl;
-                        hasValidFilters = true;
                     }
                 } else {
-                    // Events not loaded yet - use eventId directly (backend supports it)
                     filters.eventId = eventIdFromUrl;
-                    hasValidFilters = true;
                 }
             } else {
                 // For event mode: must convert eventId to eventName
@@ -903,50 +921,33 @@ const useFilterLogic = ({
                     const selectedEvent = events.find(event => event.id === eventIdFromUrl);
                     if (selectedEvent) {
                         filters.eventName = selectedEvent.name;
-                        hasValidFilters = true;
+                    } else {
+                        // Event not found - skip event filter for now
+                        console.warn('Event not found for ID:', eventIdFromUrl);
                     }
                 } else {
-                    // Events not loaded yet - we need to wait
-                    needsEventData = true;
+                    // Events not loaded yet - wait for events to load
+                    // This will be handled when events load (dependency in useEffect)
+                    return;
                 }
             }
         }
 
-        // Add date filters - these can be applied immediately, even if events not loaded
+        // Add date filters
         if (startDateFromUrl) {
             filters.startDate = startDateFromUrl;
-            hasValidFilters = true;
         }
-
         if (endDateFromUrl) {
             filters.endDate = endDateFromUrl;
-            hasValidFilters = true;
         }
         
-        // If we need event data but don't have it, and we have date filters, apply date filters now
-        // The event filter will be applied later when events load
-        if (needsEventData && (startDateFromUrl || endDateFromUrl)) {
-            const dateOnlyFilters = { ...initialFilters };
-            if (startDateFromUrl) dateOnlyFilters.startDate = startDateFromUrl;
-            if (endDateFromUrl) dateOnlyFilters.endDate = endDateFromUrl;
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(dateOnlyFilters));
-            return; // Will re-apply when events load
-        }
+        // Mark as applied and update refs
+        filtersAppliedRef.current = true;
+        lastUrlParamsRef.current = currentUrlParams;
         
-        // If we need event data but don't have it, wait for events to load
-        if (needsEventData) {
-            return; // Will re-apply when events load
-        }
-        
-        // Apply filters if we have valid ones
-        if (hasValidFilters) {
-            filtersAppliedRef.current = true;
-            lastUrlParamsRef.current = currentUrlParams;
-            dispatch(filterAction(filters));
-        }
-    }, [location.search, filterAction, dispatch, initialFilters, filterMode, events, users]); // Include events and users to detect when they load
+        // Dispatch the action - single API call
+        dispatch(filterAction(filters));
+    }, [location.search, filterAction, dispatch, initialFilters, filterMode, events]); // Include events to detect when they load
 
     return {
         // State

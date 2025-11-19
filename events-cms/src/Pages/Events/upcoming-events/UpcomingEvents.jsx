@@ -257,7 +257,51 @@ const UpcomingEvents = () => {
         // For upcoming events page, prioritize filterData?.events (contains only upcoming events)
         // Only use eventFilterList as fallback if filterData?.events is not available
         // This ensures we only show upcoming events in the dropdown, not all events
-        const eventsToUse = filterData?.events?.length > 0 ? filterData.events : (eventFilterList || []);
+        let eventsToUse = filterData?.events?.length > 0 ? filterData.events : (eventFilterList || []);
+        
+        // CRITICAL: Only filter out past events if we're using eventFilterList (all events)
+        // filterData?.events already comes filtered from backend with upcoming=true, so no need to filter again
+        if (!filterData?.events?.length && eventFilterList?.length > 0) {
+            // We're using eventFilterList (all events), so filter out past events
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+            
+            eventsToUse = eventsToUse.filter(event => {
+                if (!event.startDate) {
+                    // If no startDate, include it (might be a data issue, but don't exclude)
+                    return true;
+                }
+                
+                try {
+                    // Parse the event start date - handle different date formats
+                    let eventDate;
+                    if (typeof event.startDate === 'string') {
+                        // Handle ISO string format (e.g., "2024-12-25" or "2024-12-25T00:00:00.000Z")
+                        eventDate = new Date(event.startDate.split('T')[0]); // Get date part only
+                    } else if (event.startDate instanceof Date) {
+                        eventDate = new Date(event.startDate);
+                    } else {
+                        // Try to parse as date
+                        eventDate = new Date(event.startDate);
+                    }
+                    
+                    // Check if date is valid
+                    if (isNaN(eventDate.getTime())) {
+                        console.warn('Invalid date for event:', event.id, event.startDate);
+                        return true; // Include events with invalid dates (don't exclude)
+                    }
+                    
+                    eventDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+                    
+                    // Only include events where startDate is today or in the future
+                    return eventDate >= today;
+                } catch (error) {
+                    console.warn('Error parsing date for event:', event.id, error);
+                    return true; // Include events with date parsing errors (don't exclude)
+                }
+            });
+        }
+        
         return eventsToUse.map(event => ({
             id: event.id,
             name: event.eventName || event.name || '',

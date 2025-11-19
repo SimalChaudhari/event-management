@@ -23,9 +23,24 @@ const FilterComponent = ({
 }) => {
     const handleApplyFilters = () => {
         if (onApplyFilters) {
+            // Find the selected event to get its name directly
+            // This ensures we have the event name even if events array isn't populated in the hook yet
+            let eventName = null;
+            if (selectedEventId && events.length > 0) {
+                const selectedEvent = events.find(event => {
+                    const eventId = String(event.id || event.eventId || '');
+                    const searchId = String(selectedEventId);
+                    return eventId === searchId;
+                });
+                if (selectedEvent) {
+                    eventName = selectedEvent.name || selectedEvent.eventName || selectedEvent.event_name || null;
+                }
+            }
+            
             onApplyFilters({
                 userId: selectedUserId,
                 eventId: selectedEventId,
+                eventName: eventName, // Pass event name directly to avoid lookup issues
                 startDate: startDate,
                 endDate: endDate
             });
