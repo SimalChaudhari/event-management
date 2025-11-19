@@ -323,9 +323,42 @@ const EngagementList = () => {
     });
 
 
+    // Track if we've already loaded data to prevent duplicate calls
+    const dataLoadedRef = React.useRef(false);
+    const skipInitialFetchRef = React.useRef(false);
+    
+    // Check for skipInitialFetch flag immediately (synchronously) on mount
+    // This must be done before useEffects run to prevent duplicate calls
+    if (location.state?.skipInitialFetch) {
+        skipInitialFetchRef.current = true;
+    }
+
     // Initialize filters from URL and fetch engagements
     // Only run on initial mount, not on every URL change
     useEffect(() => {
+        // Skip initial fetch if coming from update (data already fresh from calculateEngagementTargetPage)
+        const shouldSkip = location.state?.skipInitialFetch || skipInitialFetchRef.current;
+        if (shouldSkip) {
+            const urlParams = new URLSearchParams(location.search);
+            const eventId = urlParams.get('eventId') || '';
+            setSelectedEventId(eventId);
+            setActiveFilters({ event: eventId });
+            lastUrlParamsRef.current = location.search;
+            filtersAppliedRef.current = true;
+            dataLoadedRef.current = true;
+            skipInitialFetchRef.current = false;
+            // Clear the flag so it doesn't affect future navigations
+            if (location.state?.skipInitialFetch) {
+                window.history.replaceState({ ...location.state, skipInitialFetch: undefined }, '');
+            }
+            return () => destroyTable();
+        }
+
+        // Skip if data already loaded (prevent duplicate calls)
+        if (dataLoadedRef.current) {
+            return;
+        }
+
         const urlParams = new URLSearchParams(location.search);
         const eventId = urlParams.get('eventId') || '';
         setSelectedEventId(eventId);
@@ -338,6 +371,7 @@ const EngagementList = () => {
                 filters.eventId = eventId;
             }
             await dispatch(getAllEngagements(filters));
+            dataLoadedRef.current = true;
         };
         fetchData();
         lastUrlParamsRef.current = location.search;
@@ -350,9 +384,25 @@ const EngagementList = () => {
     useEffect(() => {
         const currentUrlParams = location.search;
         
+        // Skip if coming from create/update (data already fresh)
+        const shouldSkip = location.state?.skipInitialFetch || skipInitialFetchRef.current;
+        if (shouldSkip) {
+            skipInitialFetchRef.current = false;
+            // Clear the flag
+            if (location.state?.skipInitialFetch) {
+                window.history.replaceState({ ...location.state, skipInitialFetch: undefined }, '');
+            }
+            return;
+        }
+        
         // Skip if we're currently applying filters internally
         if (isApplyingFiltersRef.current) {
             return;
+        }
+        
+        // Skip if data was just loaded (prevent duplicate on initial mount)
+        if (!dataLoadedRef.current) {
+            return; // Let the initial mount useEffect handle it
         }
         
         // Skip if URL matches what we just set (already handled by handleApplyFilters)
@@ -383,7 +433,7 @@ const EngagementList = () => {
         fetchData();
         lastUrlParamsRef.current = currentUrlParams;
         filtersAppliedRef.current = true;
-    }, [location.search, dispatch]);
+    }, [location.search, location.state, dispatch]);
 
     useEffect(() => {
         initializeTable();

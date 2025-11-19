@@ -37,4 +37,14 @@ export class AppController {
     return res.sendFile(filePath);
   }
 
+  @Get('qna-realtime')
+  getQnARealtimeDashboard(@Res() res: Response) {
+    return res.sendFile(join(process.cwd(), 'public', 'qna-realtime.html'));
+  }
+
+  @Get('realtime-qna')
+  getRealtimeQnA(@Res() res: Response) {
+    return res.sendFile(join(process.cwd(), 'public', 'qna-realtime.html'));
+  }
+
 }

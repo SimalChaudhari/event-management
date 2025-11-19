@@ -405,7 +405,10 @@
             <div class="connection-form">
                 <div class="form-group">
                     <label for="serverUrl">Server URL</label>
-                    <input type="text" id="serverUrl" placeholder="http://localhost:3000">
+                    <input type="text" id="serverUrl" placeholder="https://events.isca.org.sg:5000 or http://localhost:5000">
+                    <small style="color: #6c757d; font-size: 0.85em; display: block; margin-top: 5px;">
+                        Use <strong>https://</strong> or <strong>wss://</strong> for production (Socket.IO will auto-detect secure connection)
+                    </small>
                 </div>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 200px;">
@@ -429,9 +432,10 @@
                         <input type="text" id="shareToken" placeholder="Enter share token">
                     </div>
                 </div>
-                <div class="form-group" style="display: flex; align-items: flex-end;">
+                <div class="form-group" style="display: flex; align-items: flex-end; gap: 10px;">
                     <button class="btn btn-primary" id="connectBtn" onclick="connectSocket()">Connect & Join</button>
-                    <button class="btn btn-danger" id="disconnectBtn" onclick="disconnectSocket()" style="margin-left: 10px;" disabled>Disconnect</button>
+                    <button class="btn" id="testConnectionBtn" onclick="testConnection()" style="background: #17a2b8; color: white;">Test WSS Connection</button>
+                    <button class="btn btn-danger" id="disconnectBtn" onclick="disconnectSocket()" disabled>Disconnect</button>
                 </div>
             </div>
             <div style="margin-top: 15px;">
@@ -633,7 +637,20 @@
         // Fetch existing questions from API (important: WebSocket only sends NEW updates)
         async function fetchExistingQuestions(type, id) {
             try {
-                const serverUrl = document.getElementById('serverUrl').value.trim();
+                let serverUrl = document.getElementById('serverUrl').value.trim();
+                
+                // Normalize URL for fetch() - convert wss:// to https:// and ws:// to http://
+                if (serverUrl.startsWith('wss://')) {
+                    serverUrl = serverUrl.replace('wss://', 'https://');
+                } else if (serverUrl.startsWith('ws://')) {
+                    serverUrl = serverUrl.replace('ws://', 'http://');
+                }
+                
+                // Remove trailing slash
+                if (serverUrl.endsWith('/')) {
+                    serverUrl = serverUrl.slice(0, -1);
+                }
+                
                 let apiUrl = '';
                 
                 if (type === 'engagement') {
@@ -677,6 +694,85 @@
             }
         }
 
+        // Test WSS connection only (without joining room)
+        function testConnection() {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            
+            if (!serverUrl) {
+                alert('Please enter a server URL');
+                return;
+            }
+
+            updateStatus('connecting', 'Testing connection...');
+            addEventLog(`Testing WSS connection to ${serverUrl}...`, 'info');
+
+            // Disconnect existing test socket if any
+            let testSocket = null;
+
+            // Normalize URL
+            let normalizedUrl = serverUrl.trim();
+            if (normalizedUrl.endsWith('/')) {
+                normalizedUrl = normalizedUrl.slice(0, -1);
+            }
+            
+            if (normalizedUrl.startsWith('wss://')) {
+                normalizedUrl = normalizedUrl.replace('wss://', 'https://');
+            }
+            if (normalizedUrl.startsWith('ws://')) {
+                normalizedUrl = normalizedUrl.replace('ws://', 'http://');
+            }
+
+            testSocket = io(`${normalizedUrl}/qna`, {
+                transports: ['websocket', 'polling'],
+                reconnection: false, // Don't reconnect for test
+                timeout: 5000,
+                secure: normalizedUrl.startsWith('https://')
+            });
+
+            const testTimeout = setTimeout(() => {
+                if (testSocket && !testSocket.connected) {
+                    addEventLog('❌ Connection test failed: Timeout after 5 seconds', 'error');
+                    updateStatus('disconnected', 'Connection Test Failed');
+                    testSocket.disconnect();
+                }
+            }, 5000);
+
+            testSocket.on('connect', () => {
+                clearTimeout(testTimeout);
+                const transport = testSocket.io.engine.transport.name;
+                const isSecure = window.location.protocol === 'https:' || normalizedUrl.startsWith('https://');
+                
+                addEventLog(`✅ Connection successful!`, 'success');
+                addEventLog(`   Transport: ${transport}`, 'success');
+                addEventLog(`   Using secure connection: ${isSecure ? 'Yes (WSS)' : 'No (WS)'}`, 'success');
+                addEventLog(`   Socket ID: ${testSocket.id}`, 'success');
+                
+                updateStatus('connected', 'Connection Test Passed');
+                
+                // Disconnect test socket after 2 seconds
+                setTimeout(() => {
+                    testSocket.disconnect();
+                    updateStatus('disconnected', 'Test Complete');
+                    addEventLog('Test connection closed', 'info');
+                }, 2000);
+            });
+
+            testSocket.on('connected', (data) => {
+                addEventLog(`Server message: ${data.message}`, 'success');
+            });
+
+            testSocket.on('connect_error', (error) => {
+                clearTimeout(testTimeout);
+                addEventLog(`❌ Connection test failed: ${error.message}`, 'error');
+                updateStatus('disconnected', 'Connection Test Failed');
+                addEventLog(`   Check if server is running and URL is correct`, 'error');
+            });
+
+            testSocket.on('disconnect', () => {
+                addEventLog('Test connection closed', 'info');
+            });
+        }
+
         function connectSocket() {
             const serverUrl = document.getElementById('serverUrl').value.trim();
             const connectionType = document.getElementById('connectionType').value;
@@ -709,11 +805,30 @@
                 socket.disconnect();
             }
 
-            socket = io(`${serverUrl}/qna`, {
+            // Normalize URL - Socket.IO handles wss:// automatically if using https://
+            // Remove trailing slash and ensure proper protocol
+            let normalizedUrl = serverUrl.trim();
+            if (normalizedUrl.endsWith('/')) {
+                normalizedUrl = normalizedUrl.slice(0, -1);
+            }
+            
+            // Convert wss:// to https:// (Socket.IO expects https:// and auto-converts to wss:// for WebSocket)
+            if (normalizedUrl.startsWith('wss://')) {
+                normalizedUrl = normalizedUrl.replace('wss://', 'https://');
+            }
+            // Convert ws:// to http://
+            if (normalizedUrl.startsWith('ws://')) {
+                normalizedUrl = normalizedUrl.replace('ws://', 'http://');
+            }
+            
+            // Socket.IO will automatically use wss:// if the URL is https://
+            socket = io(`${normalizedUrl}/qna`, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionDelay: 1000,
-                reconnectionAttempts: 5
+                reconnectionAttempts: 5,
+                // Force secure connection if using https://
+                secure: normalizedUrl.startsWith('https://')
             });
 
             socket.on('connect', () => {
@@ -869,7 +984,14 @@
         window.addEventListener('DOMContentLoaded', () => {
             const currentUrl = window.location.origin;
             const serverUrlInput = document.getElementById('serverUrl');
-            serverUrlInput.value = currentUrl;
+            
+            // If on production domain, use production URL, otherwise use current origin
+            if (window.location.hostname.includes('events.isca.org.sg')) {
+                // Use HTTPS for production
+                serverUrlInput.value = 'https://events.isca.org.sg:5000';
+            } else {
+                serverUrlInput.value = currentUrl;
+            }
         });
 
         // Allow Enter key to connect

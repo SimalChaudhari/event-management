@@ -61,12 +61,12 @@ const AddEngagementPage = () => {
 
     // Helper function to flatten engagements and calculate target page
     const calculateEngagementTargetPage = React.useCallback(async (engagementId, isCreate = false) => {
-        // Refresh engagements list to get latest data (especially important for create)
+        // Always fetch fresh data to ensure we have the latest engagements
+        // This is especially important for create, but also needed for update to get correct sorting
         await dispatch(getAllEngagements());
         
         // Get current engagements from Redux store directly (after refresh)
-        const state = store.getState();
-        const currentEngagements = state.engagement?.engagements || [];
+        const currentEngagements = store.getState().engagement?.engagements || [];
         
         // Flatten the grouped data (same logic as in EngagementList)
         const flattenedData = [];
@@ -111,8 +111,16 @@ const AddEngagementPage = () => {
         return pageNumber;
     }, [dispatch]);
 
+    // Track if events have been loaded to prevent duplicate calls
+    const eventsLoadedRef = React.useRef(false);
+
     // Load events and filter to only show events with tracks
     useEffect(() => {
+        // Only load events once on mount, not on every render
+        if (eventsLoadedRef.current) {
+            return;
+        }
+
         const loadEvents = async () => {
             setLoadingEvents(true);
             try {
@@ -175,6 +183,7 @@ const AddEngagementPage = () => {
                 });
                 
                 setEventsWithTracks(filteredEvents);
+                eventsLoadedRef.current = true;
             } catch (error) {
                 console.error('Error loading events:', error);
                 setEvents([]);
@@ -188,7 +197,11 @@ const AddEngagementPage = () => {
         if (isEditing) {
             dispatch(getEngagementById(id));
         }
-    }, [dispatch, isEditing, id]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount
+
+    // Track last loaded event to prevent duplicate calls
+    const lastLoadedEventIdRef = React.useRef(null);
 
     // Load tracks and engagements when event is selected (on-demand loading)
     useEffect(() => {
@@ -196,6 +209,12 @@ const AddEngagementPage = () => {
             if (!selectedEventId) {
                 // Clear tracks and used track IDs when no event is selected
                 setUsedTrackIds([]);
+                lastLoadedEventIdRef.current = null;
+                return;
+            }
+
+            // Skip if we already loaded data for this event
+            if (lastLoadedEventIdRef.current === selectedEventId) {
                 return;
             }
 
@@ -209,6 +228,7 @@ const AddEngagementPage = () => {
                 if (engagementResult?.success) {
                     setUsedTrackIds(engagementResult.data || []);
                 }
+                lastLoadedEventIdRef.current = selectedEventId;
             } catch (error) {
                 console.error('Error loading event data:', error);
                 setUsedTrackIds([]);
@@ -386,10 +406,13 @@ const AddEngagementPage = () => {
                 if (result?.success) {
                     const updatedEngagementId = result?.data?.id ? String(result.data.id) : String(id);
                     
-                    // Always calculate target page to navigate to where the engagement appears
-                    // This ensures we go to the correct page based on event-wise sorting
+                    // Calculate target page to navigate to where the engagement appears
+                    // This calls getAllEngagements to get fresh data for accurate page calculation
                     const pageNumber = await calculateEngagementTargetPage(updatedEngagementId, false);
-                    navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${pageNumber}`);
+                    // Navigate with a flag to skip initial data fetch in EngagementList (data already fresh)
+                    navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${pageNumber}`, { 
+                        state: { skipInitialFetch: true }
+                    });
                 }
             } else {
                 const result = await dispatch(createEngagement(payload));
@@ -404,15 +427,12 @@ const AddEngagementPage = () => {
                     setSelectedTrackId('');
                     setSelectedSessionIds([]);
 
-                    if (createdEngagementId) {
-                        // Always calculate target page to navigate to where the engagement appears
-                        const pageNumber = await calculateEngagementTargetPage(createdEngagementId, true);
-                        navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${pageNumber}`);
-                    } else {
-                        // Fallback if engagement ID not available
-                        const targetPage = previousPageRef.current || 1;
-                        navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${targetPage}`);
-                    }
+                    // Navigate to page 1 after create
+                    // Fetch engagements once here, then EngagementList will skip fetching
+                    await dispatch(getAllEngagements());
+                    navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=1`, { 
+                        state: { skipInitialFetch: true }
+                    });
                 }
             }
         } catch (error) {
