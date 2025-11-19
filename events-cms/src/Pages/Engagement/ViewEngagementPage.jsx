@@ -93,7 +93,12 @@ const ViewEngagementPage = () => {
                     <i className="feather icon-alert-circle" style={{ fontSize: '48px', color: '#dc3545' }}></i>
                     <h4 className="mt-3">Engagement Not Found</h4>
                     <p className="text-muted">The engagement you're looking for doesn't exist.</p>
-                    <Button variant="primary" onClick={() => navigate(ENGAGEMENT_PATHS.LIST_ENGAGEMENTS)}>
+                    <Button variant="primary" onClick={() => {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const currentPage = urlParams.get('page');
+                        const url = currentPage ? `${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${currentPage}` : ENGAGEMENT_PATHS.LIST_ENGAGEMENTS;
+                        navigate(url);
+                    }}>
                         Back to List
                     </Button>
                 </div>
@@ -152,7 +157,12 @@ const ViewEngagementPage = () => {
                         <div>
                             <Button 
                                 variant="secondary" 
-                                onClick={() => navigate(ENGAGEMENT_PATHS.LIST_ENGAGEMENTS)}
+                                onClick={() => {
+                                    const urlParams = new URLSearchParams(window.location.search);
+                                    const currentPage = urlParams.get('page');
+                                    const url = currentPage ? `${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${currentPage}` : ENGAGEMENT_PATHS.LIST_ENGAGEMENTS;
+                                    navigate(url);
+                                }}
                                 style={{ 
                                     padding: '8px 16px',
                                     fontWeight: '500'

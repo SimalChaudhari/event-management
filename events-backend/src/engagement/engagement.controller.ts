@@ -140,12 +140,43 @@ export class EngagementController {
    */
   @Get()
   @Roles(UserRole.Admin, UserRole.Moderator)
-  async getAllEngagements(@Res() response: Response) {
+  async getAllEngagements(
+    @Query('eventId') eventId: string,
+    @Res() response: Response,
+  ) {
     try {
-      const engagements = await this.engagementService.getAllEngagements();
+      // Get filtered engagements (if eventId provided) or all engagements
+      const engagements = await this.engagementService.getAllEngagements(eventId);
+      
+      // Extract unique events from engagements for filter dropdown
+      // If eventId filter is applied, we need to fetch all engagements to get all events
+      // Otherwise, we can use the current engagements data
+      let allEngagementsForEvents = engagements;
+      if (eventId) {
+        // If filtering by event, fetch all engagements to get complete events list for dropdown
+        allEngagementsForEvents = await this.engagementService.getAllEngagements();
+      }
+      
+      // Extract unique events from engagements for filter dropdown
+      const eventsMap = new Map();
+      allEngagementsForEvents.forEach((engagementGroup: any) => {
+        if (engagementGroup.event && engagementGroup.event.id) {
+          const eventIdStr = String(engagementGroup.event.id);
+          if (!eventsMap.has(eventIdStr)) {
+            eventsMap.set(eventIdStr, {
+              id: engagementGroup.event.id,
+              name: engagementGroup.event.name || engagementGroup.event.eventName || '',
+              location: engagementGroup.event.location || ''
+            });
+          }
+        }
+      });
+      const events = Array.from(eventsMap.values());
+      
       return response.status(HttpStatus.OK).json({
         success: true,
-        data: engagements,
+        data: engagements, // Filtered engagements (or all if no filter)
+        events: events, // All events that have engagements (for filter dropdown)
         total: engagements.length,
       });
     } catch (error: any) {

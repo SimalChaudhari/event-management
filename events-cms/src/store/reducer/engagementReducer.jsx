@@ -15,6 +15,7 @@ const initialState = {
     engagements: [],
     selectedEngagement: null,
     trackEngagements: {}, // Store engagements by trackId: { trackId1: [engagements], trackId2: [engagements] }
+    events: [], // Events that have engagements (for filter dropdown)
     loading: false,
     error: null,
 };
@@ -46,6 +47,12 @@ const engagementReducer = (state = initialState, action) => {
                 engagements: action.payload,
                 loading: false,
                 error: null,
+            };
+            
+        case 'ENGAGEMENT_EVENTS_LIST':
+            return {
+                ...state,
+                events: action.payload,
             };
             
         case ENGAGEMENT_BY_ID:

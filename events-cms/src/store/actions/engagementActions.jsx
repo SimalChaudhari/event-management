@@ -31,18 +31,34 @@ export const clearEngagementError = () => ({
 });
 
 // Get all engagements
-export const getAllEngagements = () => async (dispatch) => {
+export const getAllEngagements = (filters = {}) => async (dispatch) => {
     try {
         dispatch(setEngagementLoading(true));
         
-        const response = await axiosInstance.get('/engagements');
+        const queryParams = new URLSearchParams();
+        if (filters.eventId) {
+            queryParams.append('eventId', filters.eventId);
+        }
+        
+        const queryString = queryParams.toString();
+        const url = queryString ? `/engagements?${queryString}` : '/engagements';
+        
+        const response = await axiosInstance.get(url);
         
         dispatch({
             type: ENGAGEMENT_LIST,
             payload: response.data.data
         });
         
-        return { success: true, data: response.data.data };
+        // Store events from response for filter dropdown
+        if (response.data.events) {
+            dispatch({
+                type: 'ENGAGEMENT_EVENTS_LIST',
+                payload: response.data.events
+            });
+        }
+        
+        return { success: true, data: response.data.data, events: response.data.events || [] };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch engagements';
         dispatch(setEngagementError(errorMessage));
@@ -119,6 +135,26 @@ export const getEngagementsByTrack = (trackId) => async (dispatch) => {
         return { error: true, message: errorMessage };
     } finally {
         dispatch(setEngagementLoading(false));
+    }
+};
+
+// Get engagements by event ID (optimized for form - returns simple list of trackIds)
+export const getEngagementsByEvent = (eventId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/engagements/event/${eventId}`);
+        
+        // Extract trackIds from engagements for quick lookup
+        const engagements = response.data.data || {};
+        const programmeTracks = engagements.programmeTracks || [];
+        const usedTrackIds = programmeTracks
+            .filter(track => track.engagementId)
+            .map(track => track.id || track.trackId);
+        
+        return { success: true, data: usedTrackIds, fullData: engagements };
+    } catch (error) {
+        // If endpoint doesn't exist or fails, return empty array (graceful degradation)
+        console.warn('Failed to fetch engagements by event:', error?.response?.data?.message);
+        return { success: true, data: [], fullData: null };
     }
 };
 

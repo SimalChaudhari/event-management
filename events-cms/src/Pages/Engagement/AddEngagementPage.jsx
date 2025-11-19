@@ -1,22 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button, Row, Col, Container } from 'react-bootstrap';
 import Select from 'react-select';
-import { createEngagement, updateEngagement, getEngagementById, getAllEngagements } from '../../store/actions/engagementActions';
-import { getAllTracks, getSessionsByTrack } from '../../store/actions/programmeActions';
+import { createEngagement, updateEngagement, getEngagementById, getEngagementsByEvent, getAllEngagements } from '../../store/actions/engagementActions';
+import { getTracksByEvent, getSessionsByTrack, getAllTracks } from '../../store/actions/programmeActions';
 import { getAllEventsForFilter } from '../../store/actions/eventActions';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
+import store from '../../store/store';
+import useTableNavigation from '../../hooks/useTableNavigation';
 
 const AddEngagementPage = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const location = useLocation();
     const { id } = useParams();
     const isEditing = Boolean(id);
 
-    const { selectedEngagement, engagements, loading } = useSelector((state) => state.engagement);
+    const { selectedEngagement, loading, engagements } = useSelector((state) => state.engagement);
     const { tracks, trackSessions: allTrackSessions } = useSelector((state) => state.programme);
+    
+    const previousPageRef = React.useRef(null);
+    const originalDisplayOrderRef = React.useRef(null);
+    
+    const { handleBack: handleBackNavigation } = useTableNavigation({
+        tableRef: null,
+        listPath: ENGAGEMENT_PATHS.LIST_ENGAGEMENTS,
+        viewPath: ENGAGEMENT_PATHS.VIEW_ENGAGEMENT,
+        editPath: ENGAGEMENT_PATHS.EDIT_ENGAGEMENT,
+        addPath: ENGAGEMENT_PATHS.ADD_ENGAGEMENT
+    });
 
     const [formData, setFormData] = useState({
         isActive: true
@@ -26,32 +40,185 @@ const AddEngagementPage = () => {
     const [selectedTrackId, setSelectedTrackId] = useState('');
     const [selectedSessionIds, setSelectedSessionIds] = useState([]);
     const [events, setEvents] = useState([]);
+    const [eventsWithTracks, setEventsWithTracks] = useState([]); // Filtered events that have tracks
+    const [usedTrackIds, setUsedTrackIds] = useState([]); // Track IDs that already have engagements
     const [loadingEvents, setLoadingEvents] = useState(false);
+    const [loadingTracks, setLoadingTracks] = useState(false);
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [loadingSessions, setLoadingSessions] = useState(false);
 
+    // Store previous page from URL
+    useEffect(() => {
+        const params = new URLSearchParams(location.search || window.location.search);
+        const pageParam = params.get('page');
+        if (pageParam) {
+            previousPageRef.current = parseInt(pageParam, 10);
+        } else if (location.state?.page) {
+            previousPageRef.current = location.state.page;
+        }
+    }, [location.search, location.state, id]);
+
+    // Helper function to flatten engagements and calculate target page
+    const calculateEngagementTargetPage = React.useCallback(async (engagementId, isCreate = false) => {
+        // Refresh engagements list to get latest data (especially important for create)
+        await dispatch(getAllEngagements());
+        
+        // Get current engagements from Redux store directly (after refresh)
+        const state = store.getState();
+        const currentEngagements = state.engagement?.engagements || [];
+        
+        // Flatten the grouped data (same logic as in EngagementList)
+        const flattenedData = [];
+        currentEngagements.forEach(eventGroup => {
+            if (eventGroup.event && eventGroup.programmeTracks && eventGroup.programmeTracks.length > 0) {
+                eventGroup.programmeTracks.forEach((track, index) => {
+                    if (track.engagementId) {
+                        flattenedData.push({
+                            engagementId: track.engagementId,
+                            displayOrder: typeof track.displayOrder === 'number' ? track.displayOrder : index,
+                            createdAt: track.createdAt || new Date().toISOString()
+                        });
+                    }
+                });
+            }
+        });
+        
+        // Sort by displayOrder then createdAt (same as table)
+        flattenedData.sort((a, b) => {
+            const orderA = Number.isFinite(a.displayOrder) ? a.displayOrder : Number.MAX_SAFE_INTEGER;
+            const orderB = Number.isFinite(b.displayOrder) ? b.displayOrder : Number.MAX_SAFE_INTEGER;
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+            const createdA = new Date(a.createdAt).getTime();
+            const createdB = new Date(b.createdAt).getTime();
+            return createdA - createdB;
+        });
+        
+        // Find the position of the engagement
+        const engagementIndex = flattenedData.findIndex(item => 
+            String(item.engagementId) === String(engagementId)
+        );
+        
+        if (engagementIndex === -1) {
+            // If not found, return to previous page or page 1
+            return previousPageRef.current || 1;
+        }
+        
+        // Calculate page number (pageLength is 10)
+        const pageNumber = Math.floor(engagementIndex / 10) + 1;
+        return pageNumber;
+    }, [dispatch]);
+
+    // Load events and filter to only show events with tracks
     useEffect(() => {
         const loadEvents = async () => {
             setLoadingEvents(true);
             try {
+                // Load all events
                 const eventsData = await dispatch(getAllEventsForFilter());
                 setEvents(eventsData || []);
+                
+                // Load all tracks to check which events have tracks
+                const tracksResult = await dispatch(getAllTracks());
+                const allTracks = tracksResult?.data || [];
+                
+                // Get unique event IDs that have tracks
+                const eventIdsWithTracks = new Set(
+                    allTracks.map(track => track.eventId || track.event?.id).filter(Boolean)
+                );
+                
+                // Filter events to only include those with tracks and exclude past events
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+                
+                const filteredEvents = (eventsData || []).filter(event => {
+                    // First check if event has tracks
+                    if (!eventIdsWithTracks.has(event.id)) {
+                        return false;
+                    }
+                    
+                    // Filter out past events - only show upcoming/future events
+                    if (!event.startDate) {
+                        // If no startDate, include it (might be a data issue, but don't exclude)
+                        return true;
+                    }
+                    
+                    try {
+                        // Parse the event start date - handle different date formats
+                        let eventDate;
+                        if (typeof event.startDate === 'string') {
+                            // Handle ISO string format (e.g., "2024-12-25" or "2024-12-25T00:00:00.000Z")
+                            eventDate = new Date(event.startDate.split('T')[0]); // Get date part only
+                        } else if (event.startDate instanceof Date) {
+                            eventDate = new Date(event.startDate);
+                        } else {
+                            // Try to parse as date
+                            eventDate = new Date(event.startDate);
+                        }
+                        
+                        // Check if date is valid
+                        if (isNaN(eventDate.getTime())) {
+                            console.warn('Invalid date for event:', event.id, event.startDate);
+                            return true; // Include events with invalid dates (don't exclude)
+                        }
+                        
+                        eventDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+                        
+                        // Only include events where startDate is today or in the future
+                        return eventDate >= today;
+                    } catch (error) {
+                        console.warn('Error parsing date for event:', event.id, error);
+                        return true; // Include events with date parsing errors (don't exclude)
+                    }
+                });
+                
+                setEventsWithTracks(filteredEvents);
             } catch (error) {
                 console.error('Error loading events:', error);
                 setEvents([]);
+                setEventsWithTracks([]);
             } finally {
                 setLoadingEvents(false);
             }
         };
 
-        dispatch(getAllTracks());
-        dispatch(getAllEngagements());
         loadEvents();
         if (isEditing) {
             dispatch(getEngagementById(id));
         }
     }, [dispatch, isEditing, id]);
+
+    // Load tracks and engagements when event is selected (on-demand loading)
+    useEffect(() => {
+        const loadEventData = async () => {
+            if (!selectedEventId) {
+                // Clear tracks and used track IDs when no event is selected
+                setUsedTrackIds([]);
+                return;
+            }
+
+            setLoadingTracks(true);
+            try {
+                // Load tracks for the selected event
+                await dispatch(getTracksByEvent(selectedEventId));
+                
+                // Load engagements for the selected event to check which tracks are used
+                const engagementResult = await dispatch(getEngagementsByEvent(selectedEventId));
+                if (engagementResult?.success) {
+                    setUsedTrackIds(engagementResult.data || []);
+                }
+            } catch (error) {
+                console.error('Error loading event data:', error);
+                setUsedTrackIds([]);
+            } finally {
+                setLoadingTracks(false);
+            }
+        };
+
+        loadEventData();
+    }, [dispatch, selectedEventId]);
 
     useEffect(() => {
         if (isEditing && selectedEngagement) {
@@ -69,10 +236,30 @@ const AddEngagementPage = () => {
             
             if (eventId) {
                 setSelectedEventId(eventId);
+                
+                // Ensure the current event is included in eventsWithTracks if editing
+                // (in case it's not in the filtered list for some reason)
+                if (event && !eventsWithTracks.find(e => e.id === eventId)) {
+                    setEventsWithTracks(prev => {
+                        const exists = prev.find(e => e.id === eventId);
+                        if (!exists) {
+                            return [...prev, event].sort((a, b) => {
+                                const nameA = a.name || '';
+                                const nameB = b.name || '';
+                                return nameA.localeCompare(nameB);
+                            });
+                        }
+                        return prev;
+                    });
+                }
             }
             if (trackId) {
                 setSelectedTrackId(trackId);
             }
+
+            // Store original displayOrder for comparison
+            const originalDisplayOrder = firstTrack?.displayOrder ?? selectedEngagement.displayOrder ?? null;
+            originalDisplayOrderRef.current = originalDisplayOrder;
 
             // Set session IDs if they exist - check both locations
             if (selectedEngagement.sessionIds) {
@@ -82,7 +269,7 @@ const AddEngagementPage = () => {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isEditing, selectedEngagement]);
+    }, [isEditing, selectedEngagement, eventsWithTracks]);
 
     const handleInputChange = (e) => {
         const { name, type, checked } = e.target;
@@ -101,15 +288,17 @@ const AddEngagementPage = () => {
 
     const handleEventChange = (eventId) => {
         setSelectedEventId(eventId || '');
-        // Only reset track selection when event changes in add mode, not in edit mode
-        if (!isEditing) {
-            setSelectedTrackId('');
-        }
+        // Reset track and session selection when event changes
+        setSelectedTrackId('');
+        setSelectedSessionIds([]);
         if (errors.eventId) {
             setErrors(prev => ({ ...prev, eventId: '' }));
         }
         if (errors.trackId) {
             setErrors(prev => ({ ...prev, trackId: '' }));
+        }
+        if (errors.sessionIds) {
+            setErrors(prev => ({ ...prev, sessionIds: '' }));
         }
     };
 
@@ -187,15 +376,44 @@ const AddEngagementPage = () => {
                 }
             }
 
-            let result;
-            if (isEditing) {
-                result = await dispatch(updateEngagement(id, payload));
-            } else {
-                result = await dispatch(createEngagement(payload));
-            }
+            const getReturnPage = () => {
+                const params = new URLSearchParams(location.search || window.location.search);
+                return params.get('page') || location.state?.page || previousPageRef.current;
+            };
 
-            if (result.success) {
-                navigate(ENGAGEMENT_PATHS.LIST_ENGAGEMENTS);
+            if (isEditing) {
+                const result = await dispatch(updateEngagement(id, payload));
+                if (result?.success) {
+                    const updatedEngagementId = result?.data?.id ? String(result.data.id) : String(id);
+                    
+                    // Always calculate target page to navigate to where the engagement appears
+                    // This ensures we go to the correct page based on event-wise sorting
+                    const pageNumber = await calculateEngagementTargetPage(updatedEngagementId, false);
+                    navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${pageNumber}`);
+                }
+            } else {
+                const result = await dispatch(createEngagement(payload));
+                if (result?.success) {
+                    const createdEngagementId = result?.data?.id
+                        ? String(result.data.id)
+                        : null;
+
+                    // Reset form
+                    setFormData({ isActive: true });
+                    setSelectedEventId('');
+                    setSelectedTrackId('');
+                    setSelectedSessionIds([]);
+
+                    if (createdEngagementId) {
+                        // Always calculate target page to navigate to where the engagement appears
+                        const pageNumber = await calculateEngagementTargetPage(createdEngagementId, true);
+                        navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${pageNumber}`);
+                    } else {
+                        // Fallback if engagement ID not available
+                        const targetPage = previousPageRef.current || 1;
+                        navigate(`${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${targetPage}`);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error saving engagement:', error);
@@ -204,46 +422,81 @@ const AddEngagementPage = () => {
         }
     };
 
-    const handleNavigate = () => {
-        navigate(ENGAGEMENT_PATHS.LIST_ENGAGEMENTS);
+    const getReturnPage = () => {
+        const params = new URLSearchParams(location.search || window.location.search);
+        return params.get('page') || location.state?.page || previousPageRef.current;
     };
 
-    // Get list of track IDs that already have engagements (excluding current one if editing)
-    const usedTrackIds = engagements
-        ?.filter(engagement => !isEditing || engagement.id !== id)
-        .map(engagement => engagement.trackId) || [];
+    const handleCancel = () => {
+        const targetPage = getReturnPage();
+        handleBackNavigation(targetPage);
+    };
 
-    // Filter out tracks that already have engagements
-    const availableTracks = tracks?.filter(track => !usedTrackIds.includes(track.id)) || [];
+    // Filter out tracks that already have engagements (excluding current one if editing)
+    const currentTrackId = selectedEngagement?.trackId || selectedEngagement?.programmeTracks?.[0]?.id || selectedEngagement?.programmeTracks?.[0]?.trackId;
+    const filteredUsedTrackIds = isEditing && currentTrackId
+        ? usedTrackIds.filter(trackId => trackId !== currentTrackId)
+        : usedTrackIds;
+
+    // Filter tracks: Since getTracksByEvent already returns tracks for the selected event,
+    // we only need to filter out tracks that already have engagements
+    // All tracks in Redux are already for the selected event, so just filter by used tracks
+    const availableTracks = tracks?.filter(track => 
+        !filteredUsedTrackIds.includes(track.id)
+    ) || [];
 
     // If editing, include the current track even if it has an engagement
-    const displayTracks = isEditing && selectedEngagement?.trackId
-        ? [...availableTracks, tracks?.find(t => t.id === selectedEngagement.trackId)].filter(Boolean)
+    const displayTracks = isEditing && currentTrackId
+        ? [...availableTracks, tracks?.find(t => t.id === currentTrackId)].filter(Boolean)
         : availableTracks;
 
-    // Filter tracks by selected event
-    const filteredTracks = selectedEventId
-        ? displayTracks.filter(track => track.event?.id === selectedEventId)
-        : displayTracks;
+    // Tracks are already filtered
+    const filteredTracks = displayTracks;
+
+    // Check if all tracks are full (have engagements)
+    const allTracksForEvent = tracks || [];
+    const totalTracksCount = allTracksForEvent.length;
+    const usedTracksCount = filteredUsedTrackIds.length;
+    const allTracksFull = totalTracksCount > 0 && usedTracksCount >= totalTracksCount && !isEditing;
 
     // Create track options for select dropdown (simple list, not grouped since we filter by event)
-    const trackOptions = filteredTracks
-        .map(track => ({
-            value: track.id,
-            label: track.title
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+    let trackOptions = [];
+    if (allTracksFull) {
+        // Show message when all tracks are full
+        trackOptions = [{
+            value: '',
+            label: 'All tracks are full - No available tracks',
+            isDisabled: true
+        }];
+    } else {
+        trackOptions = filteredTracks
+            .map(track => ({
+                value: track.id,
+                label: track.title || track.name || 'Untitled Track'
+            }))
+            .filter(option => option.value) // Filter out any invalid options
+            .sort((a, b) => {
+                const labelA = a.label || '';
+                const labelB = b.label || '';
+                return labelA.localeCompare(labelB);
+            });
+    }
 
     // Find selected track option
     const selectedTrackOption = trackOptions.find(option => option.value === selectedTrackId);
 
-    // Create event options for select dropdown
-    const eventOptions = events
+    // Create event options for select dropdown (only events with tracks)
+    const eventOptions = eventsWithTracks
         .map(event => ({
             value: event.id,
-            label: event.name
+            label: event.name || event.eventName || 'Untitled Event'
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .filter(option => option.value) // Filter out any invalid options
+        .sort((a, b) => {
+            const labelA = a.label || '';
+            const labelB = b.label || '';
+            return labelA.localeCompare(labelB);
+        });
 
     const selectedEventOption = eventOptions.find(option => option.value === selectedEventId);
 
@@ -281,7 +534,7 @@ const AddEngagementPage = () => {
                                     <h4 className="card-title">
                                         {isEditing ? 'Edit Engagement' : 'Add New Engagement'}
                                     </h4>
-                                    <Button variant="secondary" onClick={handleNavigate}>
+                                    <Button variant="secondary" onClick={handleCancel}>
                                         <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
                                         Back
                                     </Button>
@@ -302,9 +555,9 @@ const AddEngagementPage = () => {
                                                     value={selectedEventOption}
                                                     onChange={(option) => handleEventChange(option?.value)}
                                                     placeholder="Select Event..."
-                                                    isClearable
-                                                    isSearchable
-                                                    isDisabled={loadingEvents}
+                                                    isClearable={!isEditing}
+                                                    isSearchable={!isEditing}
+                                                    isDisabled={loadingEvents || isEditing}
                                                     isLoading={loadingEvents}
                                                     className={errors.eventId ? 'is-invalid' : ''}
                                                     styles={{
@@ -323,7 +576,10 @@ const AddEngagementPage = () => {
                                                     <small className="text-danger">{errors.eventId}</small>
                                                 )}
                                                 <small className="form-text text-muted">
-                                                    Select an event to view its programme tracks
+                                                    {isEditing 
+                                                        ? "Event cannot be changed when editing an engagement"
+                                                        : "Select an event to view its programme tracks"
+                                                    }
                                                 </small>
                                             </div>
                                         </Col>
@@ -339,10 +595,19 @@ const AddEngagementPage = () => {
                                                     options={trackOptions}
                                                     value={selectedTrackOption}
                                                     onChange={(option) => handleTrackChange(option?.value)}
-                                                    placeholder={selectedEventId ? "Select Programme Track..." : "Please select an event first"}
-                                                    isClearable
-                                                    isSearchable
-                                                    isDisabled={!selectedEventId}
+                                                    placeholder={
+                                                        !selectedEventId 
+                                                            ? "Please select an event first"
+                                                            : loadingTracks 
+                                                            ? "Loading tracks..." 
+                                                            : allTracksFull
+                                                            ? "All tracks are full"
+                                                            : "Select Programme Track..."
+                                                    }
+                                                    isClearable={!allTracksFull && !isEditing}
+                                                    isSearchable={!allTracksFull && !isEditing}
+                                                    isDisabled={!selectedEventId || loadingTracks || allTracksFull || isEditing}
+                                                    isLoading={loadingTracks}
                                                     className={errors.trackId ? 'is-invalid' : ''}
                                                     styles={{
                                                         control: (base) => ({
@@ -359,10 +624,14 @@ const AddEngagementPage = () => {
                                                 {errors.trackId && (
                                                     <small className="text-danger">{errors.trackId}</small>
                                                 )}
-                                                <small className="form-text text-muted">
-                                                    {selectedEventId 
-                                                        ? "Only tracks without existing engagements are shown"
-                                                        : "Select an event first to view available tracks"
+                                                <small className={`form-text ${allTracksFull ? 'text-warning' : 'text-muted'}`}>
+                                                    {isEditing
+                                                        ? "Programme track cannot be changed when editing an engagement"
+                                                        : !selectedEventId 
+                                                        ? "Select an event first to view available tracks"
+                                                        : allTracksFull
+                                                        ? "⚠️ All tracks for this event already have engagements created"
+                                                        : "Only tracks without existing engagements are shown"
                                                     }
                                                 </small>
                                             </div>
@@ -442,7 +711,7 @@ const AddEngagementPage = () => {
                                             <div className="d-flex justify-content-between gap-2 mt-4">
                                                 <Button 
                                                     variant="danger" 
-                                                    onClick={handleNavigate}
+                                                    onClick={handleCancel}
                                                     disabled={submitting}
                                                 >
                                                     Cancel
@@ -450,7 +719,8 @@ const AddEngagementPage = () => {
                                                 <Button 
                                                     variant="primary" 
                                                     type="submit"
-                                                    disabled={submitting}
+                                                    disabled={submitting || (allTracksFull && !isEditing)}
+                                                    title={allTracksFull && !isEditing ? "Cannot create engagement - all tracks are full" : ""}
                                                 >
                                                     {submitting ? 'Saving...' : (isEditing ? 'Update' : 'Create')}
                                                 </Button>

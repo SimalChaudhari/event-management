@@ -8,23 +8,25 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { getAllEngagements, deleteEngagement, toggleEngagementStatus, reorderEngagements } from '../../store/actions/engagementActions';
-import { getAllTracks } from '../../store/actions/programmeActions';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { ENGAGEMENT_PATHS, PROGRAMME_PATHS } from '../../utils/constants';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import useTableNavigation from '../../hooks/useTableNavigation';
 import FilterComponent from '../../components/common/FilterComponent';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 require('datatables.net-rowreorder');
 
-function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleToggleStatus, handleSessions, handleReorder) {
+function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView, handleToggleStatus, handleSessions, handleReorder, restoreTablePage) {
     let tableZero = '#engagements-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
     // Flatten grouped data to show events with their tracks
+    // Backend already sorts events by event name, so we maintain that order
     const flattenedData = [];
     data.forEach(eventGroup => {
         if (eventGroup.event && eventGroup.programmeTracks && eventGroup.programmeTracks.length > 0) {
@@ -62,10 +64,8 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
         return createdA - createdB;
     });
 
-    // Preserve the current page
-    let currentPage = 0;
+    // Destroy existing table if it exists
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        currentPage = $(tableZero).DataTable().page();
         $(tableZero).DataTable().clear().destroy();
     }
 
@@ -76,8 +76,8 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
         searchDelay: 500,
         pageLength: 10,
         lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
+            [10, 25, 50, 100, -1],
+            [10, 25, 50, 100, 'All']
         ],
         rowReorder: {
             dataSrc: 'displayOrder',
@@ -195,6 +195,12 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             }
         ],
         initComplete: function (settings, json) {
+            // Restore table page from URL if restoreTablePage function is provided
+            if (typeof restoreTablePage === 'function') {
+                const api = new $.fn.dataTable.Api(settings);
+                restoreTablePage(api);
+            }
+
             // Add "Create New Engagement" button
             $('.add-engagement-button').html(
                 '<button type="button" class="btn btn-primary add-new-engagement-btn" style="white-space: nowrap;">' +
@@ -208,18 +214,17 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
                 .on('click', function () {
                     handleAdd();
                 });
-
-            // Restore the previous page
-            const api = new $.fn.dataTable.Api(settings);
-            api.page(currentPage).draw('page');
         },
         drawCallback: function (settings) {
+            const api = new $.fn.dataTable.Api(settings);
             // Attach event listeners after each draw
             $('.view-btn')
                 .off('click')
                 .on('click', function () {
-                    const id = $(this).data('id');
-                    handleView(id);
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.engagementId) {
+                        handleView({ id: rowData.engagementId });
+                    }
                 });
 
 
@@ -233,8 +238,10 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
             $('.edit-btn')
                 .off('click')
                 .on('click', function () {
-                    const id = $(this).data('id');
-                    handleEdit(id);
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.engagementId) {
+                        handleEdit({ id: rowData.engagementId });
+                    }
                 });
 
             $('.delete-btn')
@@ -284,58 +291,108 @@ function engagementsTable(data, handleAdd, handleEdit, handleDelete, handleView,
         }
     });
 
-    tableInstance.page(currentPage).draw(false);
     return tableInstance;
 }
 
 const EngagementList = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
 
-    const { engagements, loading } = useSelector((state) => state.engagement);
-    const { tracks } = useSelector((state) => state.programme);
+    const { engagements, loading, events: engagementEvents } = useSelector((state) => state.engagement);
 
     const [currentTable, setCurrentTable] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [engagementToDelete, setEngagementToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [selectedEventId, setSelectedEventId] = useState('');
-    const [filteredEngagements, setFilteredEngagements] = useState([]);
     const [isReordering, setIsReordering] = useState(false);
+    const [selectedEventId, setSelectedEventId] = useState('');
+    const [activeFilters, setActiveFilters] = useState({});
+    const tableRef = React.useRef(null);
+    const isApplyingFiltersRef = React.useRef(false);
+    const lastUrlParamsRef = React.useRef('');
+    const filtersAppliedRef = React.useRef(false);
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    
+    const { handleView: handleViewWithPage, handleEdit: handleEditWithPage, handleAdd: handleAddWithPage, handleBack } = useTableNavigation({
+        tableRef,
+        listPath: ENGAGEMENT_PATHS.LIST_ENGAGEMENTS,
+        viewPath: ENGAGEMENT_PATHS.VIEW_ENGAGEMENT,
+        editPath: ENGAGEMENT_PATHS.EDIT_ENGAGEMENT,
+        addPath: ENGAGEMENT_PATHS.ADD_ENGAGEMENT
+    });
 
+
+    // Initialize filters from URL and fetch engagements
+    // Only run on initial mount, not on every URL change
     useEffect(() => {
+        const urlParams = new URLSearchParams(location.search);
+        const eventId = urlParams.get('eventId') || '';
+        setSelectedEventId(eventId);
+        setActiveFilters({ event: eventId });
+        
+        // Fetch engagements with filters from URL
         const fetchData = async () => {
-            await dispatch(getAllEngagements());
-            await dispatch(getAllTracks());
+            const filters = {};
+            if (eventId) {
+                filters.eventId = eventId;
+            }
+            await dispatch(getAllEngagements(filters));
         };
         fetchData();
+        lastUrlParamsRef.current = location.search;
+        filtersAppliedRef.current = true;
         return () => destroyTable();
-    }, [dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount
 
-    // Filter engagements by event
+    // Handle external URL changes (browser back/forward)
     useEffect(() => {
-        if (!engagements || engagements.length === 0) {
-            setFilteredEngagements([]);
+        const currentUrlParams = location.search;
+        
+        // Skip if we're currently applying filters internally
+        if (isApplyingFiltersRef.current) {
             return;
         }
         
-        if (selectedEventId) {
-            const filtered = engagements.filter(engagement => {
-                return engagement.event && engagement.event.id === selectedEventId;
-            });
-            setFilteredEngagements(filtered);
-        } else {
-            setFilteredEngagements(engagements);
+        // Skip if URL matches what we just set (already handled by handleApplyFilters)
+        if (filtersAppliedRef.current) {
+            const expectedUrlParams = lastUrlParamsRef.current;
+            const normalizedCurrent = currentUrlParams || '';
+            const normalizedExpected = expectedUrlParams || '';
+            const currentQuery = normalizedCurrent.replace(/^\?/, '');
+            const expectedQuery = normalizedExpected.replace(/^\?/, '');
+            if (currentQuery === expectedQuery) {
+                return; // Already handled
+            }
         }
-    }, [engagements, selectedEventId]);
+        
+        // URL changed externally (browser back/forward) - apply filters from URL
+        const urlParams = new URLSearchParams(currentUrlParams);
+        const eventId = urlParams.get('eventId') || '';
+        setSelectedEventId(eventId);
+        setActiveFilters({ event: eventId });
+        
+        const fetchData = async () => {
+            const filters = {};
+            if (eventId) {
+                filters.eventId = eventId;
+            }
+            await dispatch(getAllEngagements(filters));
+        };
+        fetchData();
+        lastUrlParamsRef.current = currentUrlParams;
+        filtersAppliedRef.current = true;
+    }, [location.search, dispatch]);
 
     useEffect(() => {
         initializeTable();
         return () => destroyTable();
-    }, [filteredEngagements]);
+    }, [engagements]);
 
     const destroyTable = () => {
         if (currentTable) {
+            currentTable.off('page.dt');
             $('#engagements-data-table').off('click', '.delete-btn');
             $('#engagements-data-table').off('click', '.edit-btn');
             $('#engagements-data-table').off('click', '.view-btn');
@@ -344,6 +401,7 @@ const EngagementList = () => {
             $('#engagements-data-table').off('row-reorder');
             currentTable.destroy();
             setCurrentTable(null);
+            tableRef.current = null;
         }
     };
 
@@ -368,7 +426,11 @@ const EngagementList = () => {
         try {
             const result = await dispatch(reorderEngagements(payload));
             if (!result?.error) {
-                await dispatch(getAllEngagements());
+                const filters = {};
+                if (selectedEventId) {
+                    filters.eventId = selectedEventId;
+                }
+                await dispatch(getAllEngagements(filters));
             }
         } catch (error) {
             console.error('Error reordering engagements:', error);
@@ -379,40 +441,61 @@ const EngagementList = () => {
 
     const initializeTable = () => {
         destroyTable();
-        if (Array.isArray(filteredEngagements) && filteredEngagements.length >= 0) {
+        if (Array.isArray(engagements) && engagements.length >= 0) {
             const table = engagementsTable(
-                filteredEngagements,
+                engagements,
                 handleAdd,
                 handleEdit,
                 handleDelete,
                 handleView,
                 handleToggleStatus,
                 handleSessions,
-                handleReorder
+                handleReorder,
+                restoreTablePage
             );
             setCurrentTable(table);
+            tableRef.current = table;
+            if (table && typeof checkAndAdjustPage === 'function') {
+                checkAndAdjustPage(table);
+            }
         }
     };
 
     const handleAdd = () => {
-        navigate(ENGAGEMENT_PATHS.ADD_ENGAGEMENT);
+        handleAddWithPage();
     };
 
-    const handleEdit = (id) => {
-        navigate(`${ENGAGEMENT_PATHS.EDIT_ENGAGEMENT}/${id}`);
+    const handleEdit = (data) => {
+        if (typeof data === 'string') {
+            // Backward compatibility: if id is passed as string
+            handleEditWithPage({ id: data });
+        } else {
+            handleEditWithPage(data);
+        }
     };
 
-    const handleView = (id) => {
-        navigate(`${ENGAGEMENT_PATHS.VIEW_ENGAGEMENT}/${id}`);
+    const handleView = (data) => {
+        if (typeof data === 'string') {
+            // Backward compatibility: if id is passed as string
+            handleViewWithPage({ id: data });
+        } else {
+            handleViewWithPage(data);
+        }
     };
 
     const handleQA = (id) => {
-        navigate(`/engagement/qa/${id}`);
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = urlParams.get('page');
+        const url = currentPage ? `/engagement/qa/${id}?page=${currentPage}` : `/engagement/qa/${id}`;
+        navigate(url);
     };
 
     const handleSessions = (trackId) => {
         if (!trackId) return;
-        navigate(`${ENGAGEMENT_PATHS.SESSIONS}/${trackId}`);
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = urlParams.get('page');
+        const url = currentPage ? `${ENGAGEMENT_PATHS.SESSIONS}/${trackId}?page=${currentPage}` : `${ENGAGEMENT_PATHS.SESSIONS}/${trackId}`;
+        navigate(url);
     };
 
     const handleDelete = (id) => {
@@ -447,7 +530,11 @@ const EngagementList = () => {
 
     const handleToggleStatus = async (id) => {
         await dispatch(toggleEngagementStatus(id));
-        await dispatch(getAllEngagements());
+        const filters = {};
+        if (selectedEventId) {
+            filters.eventId = selectedEventId;
+        }
+        await dispatch(getAllEngagements(filters));
     };
 
     const confirmDelete = async () => {
@@ -458,7 +545,11 @@ const EngagementList = () => {
             const result = await dispatch(deleteEngagement(engagementToDelete.id));
             if (result && !result.error) {
                 // Refresh the list after successful deletion
-                await dispatch(getAllEngagements());
+                const filters = {};
+                if (selectedEventId) {
+                    filters.eventId = selectedEventId;
+                }
+                await dispatch(getAllEngagements(filters));
                 setShowDeleteModal(false);
                 setEngagementToDelete(null);
             }
@@ -475,47 +566,144 @@ const EngagementList = () => {
         setEngagementToDelete(null);
     };
 
-    // Get unique events from engagements
-    const getAvailableEvents = () => {
-        if (!engagements || engagements.length === 0) return [];
-        const eventsMap = new Map();
-        engagements.forEach(engagement => {
-            if (engagement.event && !eventsMap.has(engagement.event.id)) {
-                eventsMap.set(engagement.event.id, engagement.event);
+    const handleApplyFilters = async (filters) => {
+        // Handle empty eventId as clearing the filter
+        const newEventId = filters.eventId || '';
+        const currentEventId = activeFilters.event || '';
+        const filterChanged = currentEventId !== newEventId;
+        
+        // Set flag to prevent useEffect from running
+        isApplyingFiltersRef.current = true;
+        
+        // Apply filters immediately
+        const filterParams = {};
+        if (newEventId) {
+            filterParams.eventId = newEventId;
+        }
+        await dispatch(getAllEngagements(filterParams));
+        
+        // Update URL with filters
+        const urlParams = new URLSearchParams();
+        
+        // Only add eventId to URL if it's not empty
+        if (newEventId) {
+            urlParams.set('eventId', newEventId);
+        }
+        
+        // Reset to page 1 when filter changes, otherwise preserve current page
+        if (filterChanged) {
+            urlParams.set('page', '1');
+        } else {
+            const currentPage = new URLSearchParams(location.search).get('page');
+            if (currentPage) {
+                urlParams.set('page', currentPage);
             }
-        });
-        return Array.from(eventsMap.values());
+        }
+        
+        const newUrl = urlParams.toString() ? `${location.pathname}?${urlParams.toString()}` : location.pathname;
+        const newUrlParams = newUrl.includes('?') ? newUrl.split('?')[1] : '';
+        lastUrlParamsRef.current = newUrlParams ? `?${newUrlParams}` : '';
+        filtersAppliedRef.current = true;
+        
+        navigate(newUrl, { replace: true });
+        
+        // Update state - clear filter if eventId is empty
+        setSelectedEventId(newEventId);
+        setActiveFilters(newEventId ? { event: newEventId } : {});
+        
+        // Reset flag after a short delay
+        setTimeout(() => {
+            isApplyingFiltersRef.current = false;
+        }, 100);
     };
 
-    const handleEventChange = (eventId) => {
-        setSelectedEventId(eventId);
-    };
-
-    const activeFilters = selectedEventId ? { eventId: selectedEventId } : {};
-
-    const applyFilters = () => {
-        // Filters are already applied via selectedEventId state
-    };
-
-    const clearFilters = () => {
+    const handleClearFilters = async () => {
+        // Check if there are active filters to clear
+        const hasActiveFilters = activeFilters.event;
+        
+        // Set flag to prevent useEffect from running
+        isApplyingFiltersRef.current = true;
+        
+        // Clear filters immediately
+        await dispatch(getAllEngagements({}));
+        
+        // Update URL - reset to page 1 when clearing filters
+        const urlParams = new URLSearchParams();
+        
+        // Only preserve page if no filters were active (shouldn't happen, but just in case)
+        if (!hasActiveFilters) {
+            const currentPage = new URLSearchParams(location.search).get('page');
+            if (currentPage) {
+                urlParams.set('page', currentPage);
+            }
+        } else {
+            // Reset to page 1 when clearing filters
+            urlParams.set('page', '1');
+        }
+        
+        const newUrl = urlParams.toString() ? `${location.pathname}?${urlParams.toString()}` : location.pathname;
+        const newUrlParams = newUrl.includes('?') ? newUrl.split('?')[1] : '';
+        lastUrlParamsRef.current = newUrlParams ? `?${newUrlParams}` : '';
+        filtersAppliedRef.current = true;
+        
+        navigate(newUrl, { replace: true });
+        
         setSelectedEventId('');
+        setActiveFilters({});
+        
+        // Reset flag after a short delay
+        setTimeout(() => {
+            isApplyingFiltersRef.current = false;
+        }, 100);
     };
+
+    const handleEventChange = async (eventId) => {
+        const newEventId = eventId || '';
+        setSelectedEventId(newEventId);
+        
+        // Automatically apply filter when event is changed (including "All Events")
+        // Find event name for the filter
+        let eventName = null;
+        if (newEventId && engagementEvents && engagementEvents.length > 0) {
+            const selectedEvent = engagementEvents.find(event => {
+                const eventIdStr = String(event.id || '');
+                const searchId = String(newEventId);
+                return eventIdStr === searchId;
+            });
+            if (selectedEvent) {
+                eventName = selectedEvent.name || selectedEvent.eventName || null;
+            }
+        }
+        
+        // Apply filters immediately
+        await handleApplyFilters({
+            eventId: newEventId,
+            eventName: eventName
+        });
+    };
+
+    // Transform events for FilterComponent (from engagements response)
+    const transformedEvents = React.useMemo(() => {
+        return (engagementEvents || []).map(event => ({
+            id: event.id,
+            name: event.name || event.eventName || ''
+        }));
+    }, [engagementEvents]);
 
     return (
         <React.Fragment>
-            {/* Filter Component */}
             <FilterComponent
-                events={getAvailableEvents()}
-                loadingDropdowns={false}
+                events={transformedEvents}
+                showUserFilter={false}
+                showDateFilter={false}
+                showEventFilter={true}
                 selectedEventId={selectedEventId}
                 onEventChange={handleEventChange}
-                onApplyFilters={applyFilters}
-                onClearFilters={clearFilters}
+                onApplyFilters={handleApplyFilters}
+                onClearFilters={handleClearFilters}
                 activeFilters={activeFilters}
-                showUserFilter={false}
-                showEventFilter={true}
+                loadingDropdowns={false}
             />
-
             <Row>
                 <Col>
                     <Card>
@@ -523,18 +711,10 @@ const EngagementList = () => {
                             <Card.Title as="h5">Engagement Management </Card.Title>
                         </Card.Header>
                         <Card.Body>
-                            {loading ? (
-                                <div className="text-center">
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="sr-only">Loading...</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <Table striped responsive id="engagements-data-table" className="table table-hover">
-                                    <thead></thead>
-                                    <tbody></tbody>
-                                </Table>
-                            )}
+                            <Table striped responsive id="engagements-data-table" className="table table-hover">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </Table>
                         </Card.Body>
                     </Card>
                 </Col>

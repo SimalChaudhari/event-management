@@ -354,7 +354,11 @@ const EngagementSessionsPage = () => {
     }, [trackSessions, navigate, isLoading, handleToggleSessionStatus]);
 
     const handleBack = () => {
-        navigate(-1);
+        // Preserve page number when navigating back
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = urlParams.get('page');
+        const url = currentPage ? `${ENGAGEMENT_PATHS.LIST_ENGAGEMENTS}?page=${currentPage}` : ENGAGEMENT_PATHS.LIST_ENGAGEMENTS;
+        navigate(url);
     };
 
     const handleSavePolling = async () => {

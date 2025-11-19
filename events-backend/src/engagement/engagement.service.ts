@@ -271,8 +271,18 @@ export class EngagementService {
   /**
    * Get all engagements with formatted data
    */
-  async getAllEngagements(): Promise<any[]> {
+  async getAllEngagements(eventId?: string): Promise<any[]> {
+    const whereCondition: any = {};
+    
+    // Filter by eventId if provided
+    if (eventId) {
+      whereCondition.track = {
+        event: { id: eventId }
+      };
+    }
+
     const engagements = await this.engagementRepository.find({
+      where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
       order: { displayOrder: 'ASC', createdAt: 'ASC' },
     });
