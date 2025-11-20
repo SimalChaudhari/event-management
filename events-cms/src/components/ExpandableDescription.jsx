@@ -20,9 +20,10 @@ import { useState } from 'react';
 
         return (
             <div className={className}>
-                <span style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
-                    {truncatedText}
-                </span>
+                <div 
+                    style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px', lineHeight: '1.6' }}
+                    dangerouslySetInnerHTML={{ __html: truncatedText }}
+                />
                 {shouldTruncate && (
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}

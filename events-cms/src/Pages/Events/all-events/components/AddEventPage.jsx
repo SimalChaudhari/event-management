@@ -30,6 +30,7 @@ import { EVENT_PATHS } from '../../../../utils/constants';
 import useTableNavigation from '../../../../hooks/useTableNavigation';
 import EventProgrammeManagement from '../../../../components/events/EventProgrammeManagement';
 import { createTrack, createSession } from '../../../../store/actions/programmeActions';
+import SettingsEditor from '../../../../App/components/CkEditor/SettingsEditor';
 
 // Main component
 function AddEventPage() {
@@ -1679,17 +1680,26 @@ function AddEventPage() {
                                    
 
                                     <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="description">
+                                        <div className="form-group" style={{ marginTop: '10px' }}>
+                                            <label htmlFor="description" style={{ 
+                                                display: 'block', 
+                                                marginBottom: '10px', 
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500',
+                                                color: '#4680ff'
+                                            }}>
                                                 Event Description (Optional)
                                             </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="description"
-                                                value={formData.description}
-                                                onChange={handleChange}
+                                            <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                            <SettingsEditor
+                                                data={formData.description || ''}
+                                                onChange={(event, editor) => {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        description: editor.getData()
+                                                    }));
+                                                }}
                                                 placeholder="Enter event description..."
-                                                rows={3}
                                             />
                                         </div>
                                     </Col>
@@ -1879,33 +1889,51 @@ function AddEventPage() {
                                     </Col>
 
                                     <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="exhibitorDescription">
+                                        <div className="form-group" style={{ marginTop: '10px' }}>
+                                            <label htmlFor="exhibitorDescription" style={{ 
+                                                display: 'block', 
+                                                marginBottom: '10px', 
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500',
+                                                color: '#4680ff'
+                                            }}>
                                                 Exhibitor Description (Optional)
                                             </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="exhibitorDescription"
-                                                value={formData.exhibitorDescription}
-                                                onChange={handleExhibitorDescriptionChange}
+                                            <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                            <SettingsEditor
+                                                data={formData.exhibitorDescription || ''}
+                                                onChange={(event, editor) => {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        exhibitorDescription: editor.getData()
+                                                    }));
+                                                }}
                                                 placeholder="Enter exhibitor description..."
-                                                rows={3}
                                             />
                                         </div>
                                     </Col>
 
                                     <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="eventStampDescription">
+                                        <div className="form-group" style={{ marginTop: '10px' }}>
+                                            <label htmlFor="eventStampDescription" style={{ 
+                                                display: 'block', 
+                                                marginBottom: '10px', 
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500',
+                                                color: '#4680ff'
+                                            }}>
                                                 Event Stamp Description (Optional)
                                             </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="eventStampDescription"
-                                                value={formData.eventStampDescription}
-                                                onChange={handleEventStampDescriptionChange}
+                                            <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                            <SettingsEditor
+                                                data={formData.eventStampDescription || ''}
+                                                onChange={(event, editor) => {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        eventStampDescription: editor.getData()
+                                                    }));
+                                                }}
                                                 placeholder="Enter event stamp description..."
-                                                rows={3}
                                             />
                                         </div>
                                     </Col>

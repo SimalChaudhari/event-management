@@ -250,7 +250,6 @@ const chartData = {
                             id: 'email-templates',
                             title: 'Email Templates',
                             type: 'item',
-                            icon: 'feather icon-mail',
                             url: '/settings/email-templates'
                         },
                         {

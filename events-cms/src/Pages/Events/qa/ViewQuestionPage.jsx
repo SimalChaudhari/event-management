@@ -958,9 +958,12 @@ const ViewQuestionPage = () => {
                                                                 ></i>
                                                                 Event Description:
                                                             </div>
-                                                            <div style={{ color: '#212529', lineHeight: '1.6', fontSize: '15px' }}>
-                                                                {eventData.description || 'No description available.'}
-                                                            </div>
+                                                            <div 
+                                                                style={{ color: '#212529', lineHeight: '1.6', fontSize: '15px' }}
+                                                                dangerouslySetInnerHTML={{ 
+                                                                    __html: eventData.description || 'No description available.' 
+                                                                }}
+                                                            />
                                                         </div>
                                                     </Col>
                                                     <Col lg={12} md={12}>

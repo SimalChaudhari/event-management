@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Form, Button, Col, Row } from 'react-bootstrap';
 import SingaporePhoneInput from '../../../../components/SingaporePhoneInput';
+import SettingsEditor from '../../../../App/components/CkEditor/SettingsEditor';
 
 const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData, isLoading = false }) => {
     return (
@@ -118,17 +119,28 @@ const SpeakerFormModal = ({ show, onClose, onChange, onSubmit, formData, isLoadi
                     </Col>
 
                     <Col sm={12}>
-                        <div className="form-group fill">
-                            <label className="floating-label" htmlFor="description">
+                        <div className="form-group" style={{ marginTop: '10px' }}>
+                            <label htmlFor="description" style={{ 
+                                display: 'block', 
+                                marginBottom: '10px', 
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: '#4680ff'
+                            }}>
                                 Description
                             </label>
-                            <textarea
-                                className="form-control"
-                                name="description"
-                                value={formData.description}
-                                onChange={onChange}
+                            <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                            <SettingsEditor
+                                data={formData.description || ''}
+                                onChange={(event, editor) => {
+                                    onChange({
+                                        target: {
+                                            name: 'description',
+                                            value: editor.getData()
+                                        }
+                                    });
+                                }}
                                 placeholder="Enter speaker description"
-                                rows={3}
                             />
                         </div>
                     </Col>

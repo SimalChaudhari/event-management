@@ -201,7 +201,12 @@ function RegisterEventModal({ show, onHide, eventData }) {
                             )}
                         </div>
 
-                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
+                        {speaker.description && (
+                            <div 
+                                className="speaker-description"
+                                dangerouslySetInnerHTML={{ __html: speaker.description }}
+                            />
+                        )}
                     </div>
                 ))}
             </div>
@@ -574,14 +579,15 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                                     <p className="mt-3">
                                                         <strong>Description:</strong>
                                                     </p>
-                                                    <p
+                                                    <div
                                                         style={{
                                                             textAlign: 'justify',
                                                             lineHeight: '1.5'
                                                         }}
-                                                    >
-                                                        {eventData.event?.description}
-                                                    </p>
+                                                        dangerouslySetInnerHTML={{ 
+                                                            __html: eventData.event?.description || '' 
+                                                        }}
+                                                    />
                                                 </Col>
                                             </Row>
                                         </div>

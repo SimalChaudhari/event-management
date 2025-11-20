@@ -472,7 +472,12 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             )}
                         </div>
 
-                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
+                        {speaker.description && (
+                            <div 
+                                className="speaker-description"
+                                dangerouslySetInnerHTML={{ __html: speaker.description }}
+                            />
+                        )}
                     </div>
                 ))}
             </div>
@@ -573,9 +578,11 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                 Description
                             </h6>
                         </div>
-                        <p className="mb-0" style={{ fontSize: '13px', lineHeight: '1.4', color: '#6c757d' }}>
-                            {event.description}
-                        </p>
+                        <div 
+                            className="mb-0" 
+                            style={{ fontSize: '13px', lineHeight: '1.4', color: '#6c757d' }}
+                            dangerouslySetInnerHTML={{ __html: event.description }}
+                        />
                     </div>
                 </Col>
             </Row>

@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { createSpeaker, updateSpeaker } from '../../../store/actions/speakerActions';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import SingaporePhoneInput from '../../../components/SingaporePhoneInput';
+import SettingsEditor from '../../../App/components/CkEditor/SettingsEditor';
 
 const AddSpeakerModal = ({ show, handleClose, editData }) => {
     const dispatch = useDispatch();
@@ -214,17 +215,26 @@ const AddSpeakerModal = ({ show, handleClose, editData }) => {
                         </Col>
 
                         <Col sm={12}>
-                            <div className="form-group fill">
-                                <label className="floating-label" htmlFor="description">
+                            <div className="form-group" style={{ marginTop: '10px' }}>
+                                <label htmlFor="description" style={{ 
+                                    display: 'block', 
+                                    marginBottom: '10px', 
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    color: '#4680ff'
+                                }}>
                                     Description
                                 </label>
-                                <textarea
-                                    className="form-control"
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
+                                <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                <SettingsEditor
+                                    data={formData.description || ''}
+                                    onChange={(event, editor) => {
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            description: editor.getData()
+                                        }));
+                                    }}
                                     placeholder="Enter speaker description"
-                                    rows={4}
                                 />
                             </div>
                         </Col>

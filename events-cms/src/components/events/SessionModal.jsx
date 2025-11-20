@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Button, Row, Col, Badge, Form } from 'react-bootstrap';
 import Select from 'react-select';
+import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
 
 const SessionModal = ({
     show,
@@ -55,9 +56,17 @@ const SessionModal = ({
                                     <label className="font-weight-bold" style={{ color: '#333', marginBottom: '3px', fontSize: '14px' }}>
                                         Description
                                     </label>
-                                    <div style={{ fontSize: '14px', padding: '4px 0 0 0', whiteSpace: 'pre-wrap', minHeight: '24px' }}>
-                                        {currentSession.description || 'No description available'}
-                                    </div>
+                                    <div 
+                                        style={{ 
+                                            fontSize: '14px', 
+                                            padding: '4px 0 0 0', 
+                                            minHeight: '24px',
+                                            lineHeight: '1.6'
+                                        }}
+                                        dangerouslySetInnerHTML={{ 
+                                            __html: currentSession.description || 'No description available' 
+                                        }}
+                                    />
                                 </div>
                             </Col>
                             <Col sm={12}>
@@ -220,17 +229,23 @@ const SessionModal = ({
                             </div>
                         </Col>
                         <Col sm={12}>
-                            <div className="form-group fill">
-                                <label className="floating-label" htmlFor="sessionDescription">
+                            <div className="form-group" style={{ marginTop: '10px' }}>
+                                <label htmlFor="sessionDescription" style={{ 
+                                    display: 'block', 
+                                    marginBottom: '10px', 
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    color: '#4680ff'
+                                }}>
                                     Description
                                 </label>
-                                <textarea
-                                    className="form-control"
-                                    id="sessionDescription"
+                                <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                <SettingsEditor
+                                    data={sessionForm.description || ''}
+                                    onChange={(event, editor) => {
+                                        setSessionForm({ ...sessionForm, description: editor.getData() });
+                                    }}
                                     placeholder="Enter session description"
-                                    value={sessionForm.description}
-                                    onChange={(e) => setSessionForm({ ...sessionForm, description: e.target.value })}
-                                    rows={3}
                                 />
                             </div>
                         </Col>

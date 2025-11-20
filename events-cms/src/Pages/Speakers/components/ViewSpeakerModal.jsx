@@ -243,9 +243,13 @@ const ViewSpeakerModal = ({ show, handleClose, speakerData }) => {
                                             <hr />
                                             <Row>
                                                 <Col xs={12}>
-                                                    <p className="text-muted" style={{ lineHeight: '1.6' }}>
-                                                        {speakerData.description}
-                                                    </p>
+                                                    <div 
+                                                        className="text-muted" 
+                                                        style={{ lineHeight: '1.6' }}
+                                                        dangerouslySetInnerHTML={{ 
+                                                            __html: speakerData.description 
+                                                        }}
+                                                    />
                                                 </Col>
                                             </Row>
                                         </Card.Body>

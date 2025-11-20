@@ -7,6 +7,7 @@ import { createTrack, updateTrack, getAllTracks } from '../../store/actions/prog
 import { eventList } from '../../store/actions/eventActions';
 import { toast } from 'react-toastify';
 import { PROGRAMME_PATHS } from '../../utils/constants';
+import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
 
 const AddTrackPage = () => {
     const navigate = useNavigate();
@@ -232,20 +233,28 @@ const AddTrackPage = () => {
                                             </Col>
 
                                             <Col sm={12}>
-                                                <div className="form-group fill">
-                                                    <label className="floating-label" htmlFor="description">
+                                                <div className="form-group" style={{ marginTop: '10px' }}>
+                                                    <label htmlFor="description" style={{ 
+                                                        display: 'block', 
+                                                        marginBottom: '10px', 
+                                                        fontSize: '0.875rem',
+                                                        fontWeight: '500',
+                                                        color: '#4680ff'
+                                                    }}>
                                                         Description
                                                     </label>
-                                                    <textarea
-                                                        className="form-control"
-                                                        id="description"
-                                                        name="description"
-                                                        rows="4"
+                                                    <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                                    <SettingsEditor
+                                                        data={formData.description || ''}
+                                                        onChange={(event, editor) => {
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                description: editor.getData()
+                                                            }));
+                                                        }}
                                                         placeholder="Enter track description (optional)"
-                                                        value={formData.description}
-                                                        onChange={handleInputChange}
                                                     />
-                                                    <small className="text-muted">
+                                                    <small className="text-muted" style={{ display: 'block', marginTop: '10px' }}>
                                                         Provide a brief description of this track
                                                     </small>
                                                 </div>

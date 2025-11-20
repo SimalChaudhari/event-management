@@ -290,9 +290,16 @@ const ViewSpeakerPage = () => {
                                             <i className="fas fa-sticky-note mr-2" style={{ color: '#4680ff' }}></i>
                                             About Speaker
                                         </h5>
-                                        <p style={{ color: '#666', lineHeight: '1.6', marginBottom: '0' }}>
-                                            {speakerData.description}
-                                        </p>
+                                        <div 
+                                            style={{ 
+                                                color: '#666', 
+                                                lineHeight: '1.6', 
+                                                marginBottom: '0' 
+                                            }}
+                                            dangerouslySetInnerHTML={{ 
+                                                __html: speakerData.description 
+                                            }}
+                                        />
                                     </div>
                                 )}
 

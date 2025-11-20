@@ -455,7 +455,12 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                             )}
                         </div>
 
-                        {speaker.description && <div className="speaker-description">{speaker.description}</div>}
+                        {speaker.description && (
+                            <div 
+                                className="speaker-description"
+                                dangerouslySetInnerHTML={{ __html: speaker.description }}
+                            />
+                        )}
                     </div>
                 ))}
             </div>
@@ -552,9 +557,11 @@ function ViewWithdrawalModal({ show, handleClose, withdrawalData }) {
                                 Description
                             </h6>
                         </div>
-                        <p className="mb-0" style={{ fontSize: '13px', lineHeight: '1.4', color: '#6c757d' }}>
-                            {event.description}
-                        </p>
+                        <div 
+                            className="mb-0" 
+                            style={{ fontSize: '13px', lineHeight: '1.4', color: '#6c757d' }}
+                            dangerouslySetInnerHTML={{ __html: event.description }}
+                        />
                     </div>
                 </Col>
             </Row>

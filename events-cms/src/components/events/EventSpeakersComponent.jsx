@@ -282,18 +282,22 @@ const EventSpeakersComponent = ({ speakers, handleSpeakerImageClick }) => {
                                 <span className="fw-bold text-dark fs-6">Description:</span>
                             </div>
                             <div style={{ marginLeft: '24px' }}>
-                                <p className="text-muted fs-6 mb-0" style={{ 
-                                    lineHeight: '1.5',
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: '1',
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word'
-                                }}>
-                                    {speaker.description || 'No description available'}
-                                </p>
+                                <div 
+                                    className="text-muted fs-6 mb-0" 
+                                    style={{ 
+                                        lineHeight: '1.5',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: '1',
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'break-word'
+                                    }}
+                                    dangerouslySetInnerHTML={{ 
+                                        __html: speaker.description || 'No description available' 
+                                    }}
+                                />
                             </div>
                         </div>
                         
