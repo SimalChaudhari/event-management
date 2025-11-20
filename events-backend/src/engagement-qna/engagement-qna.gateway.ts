@@ -15,7 +15,7 @@ import { EngagementQnaService } from './engagement-qna.service';
   cors: { 
     origin: '*',
     // methods: ['GET', 'POST'],
-    credentials: true
+    // credentials: true // Removed - not needed for public Q&A, and conflicts with origin: '*'
   },
   namespace: '/qna',
   transports: ['websocket', 'polling'],
@@ -40,6 +40,10 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
 
   async handleConnection(client: Socket) {
     try {
+      console.log(`[Q&A Gateway] New client connected: ${client.id}`);
+      console.log(`[Q&A Gateway] Client transport: ${client.conn.transport.name}`);
+      console.log(`[Q&A Gateway] Client namespace: ${client.nsp.name}`);
+      
       // For Q&A share links, we don't require authentication
       // Clients will join rooms based on shareToken
       client.emit('connected', { 
@@ -53,6 +57,7 @@ export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisco
   }
 
   async handleDisconnect(client: Socket) {
+    console.log(`[Q&A Gateway] Client disconnected: ${client.id}`);
     const shareToken = this.connectedClients.get(client.id);
     if (shareToken) {
       const room = this.shareTokenRooms.get(shareToken);

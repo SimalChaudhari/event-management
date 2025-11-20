@@ -86,7 +86,12 @@ export const MEDIA_MANAGER_PATHS = {
 
 export const SETTINGS_PATHS = {
     TERMS_AND_CONDITIONS: '/settings/terms-conditions',
-    PRIVACY_POLICY: '/settings/privacy-policy'
+    PRIVACY_POLICY: '/settings/privacy-policy',
+    EMAIL_TEMPLATES: '/settings/email-templates',
+    ADD_EMAIL_TEMPLATE: '/settings/email-templates/add',
+    EDIT_EMAIL_TEMPLATE: '/settings/email-templates/edit/:id',
+    VIEW_EMAIL_TEMPLATE: '/settings/email-templates/view/:id',
+    CHOOSE_EMAIL_TEMPLATE: '/settings/email-templates/choose-template'
 };
 
 export const TRANSACTION_PATHS = {

@@ -175,7 +175,12 @@ const engagementComponents = {
  */
 const settingsComponents = {
     TermsAndConditions: React.lazy(() => import('./Pages/Settings/TC/TermCondition.jsx')),
-    PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx'))
+    PrivacyPolicy: React.lazy(() => import('./Pages/Settings/Privacy/PrivacyPolicy.jsx')),
+    EmailTemplates: React.lazy(() => import('./Pages/Settings/EmailTemplates/EmailTemplatesList.jsx')),
+    AddEmailTemplate: React.lazy(() => import('./Pages/Settings/EmailTemplates/AddEmailTemplatePage.jsx')),
+    ViewEmailTemplate: React.lazy(() => import('./Pages/Settings/EmailTemplates/ViewEmailTemplatePage.jsx')),
+    EditEmailTemplate: React.lazy(() => import('./Pages/Settings/EmailTemplates/AddEmailTemplatePage.jsx')),
+    ChooseEmailTemplate: React.lazy(() => import('./Pages/Settings/EmailTemplates/ChooseTemplatePage.jsx'))
 };
 
 /**
@@ -552,6 +557,36 @@ const settingsRoutes = [
         exact: true,
         name: 'Privacy Policy',
         component: settingsComponents.PrivacyPolicy
+    },
+    {
+        path: SETTINGS_PATHS.EMAIL_TEMPLATES,
+        exact: true,
+        name: 'Email Templates',
+        component: settingsComponents.EmailTemplates
+    },
+    {
+        path: SETTINGS_PATHS.ADD_EMAIL_TEMPLATE,
+        exact: true,
+        name: 'Add Email Template',
+        component: settingsComponents.AddEmailTemplate
+    },
+    {
+        path: SETTINGS_PATHS.EDIT_EMAIL_TEMPLATE,
+        exact: true,
+        name: 'Edit Email Template',
+        component: settingsComponents.EditEmailTemplate
+    },
+    {
+        path: SETTINGS_PATHS.VIEW_EMAIL_TEMPLATE,
+        exact: true,
+        name: 'View Email Template',
+        component: settingsComponents.ViewEmailTemplate
+    },
+    {
+        path: SETTINGS_PATHS.CHOOSE_EMAIL_TEMPLATE,
+        exact: true,
+        name: 'Choose Email Template',
+        component: settingsComponents.ChooseEmailTemplate
     }
 ];
 

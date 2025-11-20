@@ -75,7 +75,7 @@ const SecuritySettingsCard = ({
                     }}>
                         <i className="feather icon-lock text-white" />
                     </div>
-                    <h5 className="section-title mb-0">Change Password</h5>
+                    <h5 className="section-title mb-0">Change password</h5>
                 </div>
                 <button
                     type="button"
@@ -112,7 +112,7 @@ const SecuritySettingsCard = ({
                             <Form>
                                 <Row className="mb-3">
                                     <Col md={12}>
-                                        <label className="info-label mb-2 d-block">Current Password</label>
+                                        <label className="info-label mb-2 d-block">Current password</label>
                                         <div className="input-group">
                                             <Field
                                                 type="password"
@@ -149,7 +149,7 @@ const SecuritySettingsCard = ({
                                 </Row>
                                 <Row className="mb-3">
                                     <Col md={12}>
-                                        <label className="info-label mb-2 d-block">New Password</label>
+                                        <label className="info-label mb-2 d-block">New password</label>
                                         <div className="input-group">
                                             <Field
                                                 type="password"
@@ -186,7 +186,7 @@ const SecuritySettingsCard = ({
                                 </Row>
                                 <Row className="mb-3">
                                     <Col md={12}>
-                                        <label className="info-label mb-2 d-block">Confirm New Password</label>
+                                        <label className="info-label mb-2 d-block">Confirm new password</label>
                                         <div className="input-group">
                                             <Field
                                                 type="password"
@@ -244,7 +244,7 @@ const SecuritySettingsCard = ({
                                         ) : (
                                             <>
                                                 <i className="feather icon-save mr-2" />
-                                                Change Password
+                                                Change password
                                             </>
                                         )}
                                     </button>

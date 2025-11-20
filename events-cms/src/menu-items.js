@@ -247,6 +247,13 @@ const chartData = {
                             url: '/settings/terms-conditions'
                         },
                         {
+                            id: 'email-templates',
+                            title: 'Email Templates',
+                            type: 'item',
+                            icon: 'feather icon-mail',
+                            url: '/settings/email-templates'
+                        },
+                        {
                             id: 'privacy-policy',
                             title: 'Privacy Policy',
                             type: 'item',

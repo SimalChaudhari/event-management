@@ -18,6 +18,7 @@ import { CsvProcessorService } from '../utils/csv-processor.service';
 import { SSOModule } from './sso.module';
 import { OAuthAuthService } from './oauth-auth.service';
 import { UserModule } from '../user/users.module';
+import { EmailTemplateModule } from '../email-template/email-template.module';
 
 
 dotenv.config(); // Load environment variables
@@ -31,6 +32,7 @@ dotenv.config(); // Load environment variables
     CsvUploadLogModule,
     SSOModule, // Import SSOModule to get OAuthAuthService
     UserModule,
+    EmailTemplateModule, // Import EmailTemplateModule for email templates
   ],
   providers: [
     AuthService, 

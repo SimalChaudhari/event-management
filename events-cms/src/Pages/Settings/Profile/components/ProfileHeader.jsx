@@ -245,7 +245,7 @@ const ProfileHeader = ({
                                         >
                                             <Dropdown.Item onClick={handleUploadClick} style={{ padding: '0.75rem 1.25rem', borderRadius: '8px', marginBottom: '0.25rem' }}>
                                                 <i className="feather icon-upload-cloud mr-2" />
-                                                Upload New Photo
+                                                Upload new photo
                                             </Dropdown.Item>
                                             <Dropdown.Item 
                                                 onClick={handleRemoveProfilePictureClick}
@@ -257,7 +257,7 @@ const ProfileHeader = ({
                                                 }}
                                             >
                                                 <i className="feather icon-trash-2 mr-2" />
-                                                Remove Photo
+                                                Remove photo
                                             </Dropdown.Item>
                                         </Dropdown.Menu>
                                     </Dropdown>
@@ -301,7 +301,7 @@ const ProfileHeader = ({
                                             }}
                                         >
                                             <i className={`feather ${user?.isVerify ? 'icon-check-circle' : 'icon-alert-circle'}`} />
-                                            <span className="d-none d-sm-inline">{user?.isVerify ? 'Verified' : 'Not Verified'}</span>
+                                            <span className="d-none d-sm-inline">{user?.isVerify ? 'Verified' : 'Not verified'}</span>
                                         </span>
                                     </div>
                                     <div className="d-flex align-items-center justify-content-center justify-content-md-start">

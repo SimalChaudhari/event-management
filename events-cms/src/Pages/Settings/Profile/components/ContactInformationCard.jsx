@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Card } from 'react-bootstrap';
+import { Row, Col, Card, Badge } from 'react-bootstrap';
 import SingaporePhoneInput from '../../../../components/SingaporePhoneInput';
 import { formatPhoneDisplay } from '../../../../utils/phoneFormatter';
 
@@ -57,19 +57,7 @@ const ContactInformationCard = ({
         <Card style={profileStyles.infoCard} className="info-card-hover">
             <div style={profileStyles.sectionHeader}>
                 <div className="d-flex align-items-center">
-                    <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #4299e1, #3182ce)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: '1rem'
-                    }}>
-                        <i className="feather icon-phone text-white" />
-                    </div>
-                    <h5 className="section-title mb-0">Contact Information</h5>
+                    <h5 className="section-title mb-0">Contact information</h5>
                 </div>
                 <button
                     type="button"
@@ -84,26 +72,62 @@ const ContactInformationCard = ({
             {/* View Mode */}
             <div className={isEditMode ? 'collapse' : 'collapse show'}>
                 <div style={profileStyles.infoItem} className="info-item-hover">
-                    <div className="info-label mb-2">Mobile Number</div>
-                    <a href={`tel:${user?.mobile}`} className="contact-link">
-                        <i className="feather icon-phone" />
-                        <span className="info-value">{formatPhoneDisplay(user?.mobile)}</span>
-                    </a>
+                    <div className="info-label mb-2">Mobile number</div>
+                    <div className="d-flex align-items-center">
+                        <Badge className="mr-3" style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            backgroundColor: '#667eea'
+                        }}>
+                            <i className="feather icon-phone text-white" style={{ fontSize: '16px' }} />
+                        </Badge>
+                        <a href={`tel:${user?.mobile}`} className="text-decoration-none">
+                            <span className="info-value">{formatPhoneDisplay(user?.mobile)}</span>
+                        </a>
+                    </div>
                 </div>
                 <div style={profileStyles.infoItem} className="info-item-hover">
-                    <div className="info-label mb-2">Email Address</div>
-                    <a href={`mailto:${user?.email}`} className="contact-link">
-                        <i className="feather icon-mail" />
-                        <span className="info-value">{user?.email}</span>
-                    </a>
+                    <div className="info-label mb-2">Email address</div>
+                    <div className="d-flex align-items-center">
+                        <Badge className="mr-3" style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            backgroundColor: '#667eea'
+                        }}>
+                            <i className="feather icon-mail text-white" style={{ fontSize: '16px' }} />
+                        </Badge>
+                        <a href={`mailto:${user?.email}`} className="text-decoration-none">
+                            <span className="info-value">{user?.email}</span>
+                        </a>
+                    </div>
                 </div>
                 {user?.linkedinProfile && (
                     <div style={profileStyles.infoItem} className="info-item-hover">
-                        <div className="info-label mb-2">LinkedIn Profile</div>
-                        <a href={user.linkedinProfile} target="_blank" rel="noopener noreferrer" className="contact-link">
-                            <i className="feather icon-globe" />
-                            <span className="info-value">{user.linkedinProfile}</span>
-                        </a>
+                        <div className="info-label mb-2">LinkedIn profile</div>
+                        <div className="d-flex align-items-center">
+                            <Badge className="mr-3" style={{ 
+                                width: '32px', 
+                                height: '32px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                backgroundColor: '#667eea'
+                            }}>
+                                <i className="feather icon-globe text-white" style={{ fontSize: '16px' }} />
+                            </Badge>
+                            <a href={user.linkedinProfile} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                                <span className="info-value">{user.linkedinProfile}</span>
+                            </a>
+                        </div>
                     </div>
                 )}
             </div>
@@ -113,7 +137,7 @@ const ContactInformationCard = ({
                 <div style={{ padding: '1.5rem' }}>
                     <Row className="mb-3">
                         <Col md={12}>
-                            <label className="info-label mb-2 d-block">Mobile Number</label>
+                            <label className="info-label mb-2 d-block">Mobile number</label>
                             <SingaporePhoneInput
                                 name="mobile"
                                 value={mobileValue || user?.mobile || ''}
@@ -128,7 +152,7 @@ const ContactInformationCard = ({
                     </Row>
                     <Row className="mb-3">
                         <Col md={12}>
-                            <label className="info-label mb-2 d-block">Email Address</label>
+                            <label className="info-label mb-2 d-block">Email address</label>
                             <input
                                 type="email"
                                 className="form-control"
@@ -141,7 +165,7 @@ const ContactInformationCard = ({
                     </Row>
                     <Row className="mb-3">
                         <Col md={12}>
-                            <label className="info-label mb-2 d-block">LinkedIn Profile</label>
+                            <label className="info-label mb-2 d-block">LinkedIn profile</label>
                             <input
                                 type="text"
                                 className="form-control"

@@ -407,7 +407,7 @@
                     <label for="serverUrl">Server URL</label>
                     <input type="text" id="serverUrl" placeholder="https://events.isca.org.sg:5000 or http://localhost:5000">
                     <small style="color: #6c757d; font-size: 0.85em; display: block; margin-top: 5px;">
-                        Use <strong>https://</strong> or <strong>wss://</strong> for production (Socket.IO will auto-detect secure connection)
+                        Use <strong>wss://</strong> for production (secure WebSocket). Don't include /qna - it's added automatically.
                     </small>
                 </div>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
@@ -709,24 +709,31 @@
             // Disconnect existing test socket if any
             let testSocket = null;
 
-            // Normalize URL
+            // Normalize URL - Use wss:// directly if provided
             let normalizedUrl = serverUrl.trim();
+            
+            // Remove /qna namespace if user included it
+            normalizedUrl = normalizedUrl.replace(/\/qna\/?$/, '');
+            
             if (normalizedUrl.endsWith('/')) {
                 normalizedUrl = normalizedUrl.slice(0, -1);
             }
             
-            if (normalizedUrl.startsWith('wss://')) {
-                normalizedUrl = normalizedUrl.replace('wss://', 'https://');
+            // Convert https:// to wss:// for direct WebSocket
+            if (normalizedUrl.startsWith('https://')) {
+                normalizedUrl = normalizedUrl.replace('https://', 'wss://');
             }
-            if (normalizedUrl.startsWith('ws://')) {
-                normalizedUrl = normalizedUrl.replace('ws://', 'http://');
+            // Convert http:// to ws:// for direct WebSocket
+            if (normalizedUrl.startsWith('http://')) {
+                normalizedUrl = normalizedUrl.replace('http://', 'ws://');
             }
+            // Keep wss:// and ws:// as is
 
             testSocket = io(`${normalizedUrl}/qna`, {
                 transports: ['websocket', 'polling'],
                 reconnection: false, // Don't reconnect for test
                 timeout: 5000,
-                secure: normalizedUrl.startsWith('https://')
+                secure: normalizedUrl.startsWith('wss://')
             });
 
             const testTimeout = setTimeout(() => {
@@ -740,11 +747,11 @@
             testSocket.on('connect', () => {
                 clearTimeout(testTimeout);
                 const transport = testSocket.io.engine.transport.name;
-                const isSecure = window.location.protocol === 'https:' || normalizedUrl.startsWith('https://');
+                const isSecure = testSocket.io.engine.secure;
                 
                 addEventLog(`✅ Connection successful!`, 'success');
                 addEventLog(`   Transport: ${transport}`, 'success');
-                addEventLog(`   Using secure connection: ${isSecure ? 'Yes (WSS)' : 'No (WS)'}`, 'success');
+                addEventLog(`   Using secure WebSocket (WSS): ${isSecure ? 'Yes' : 'No'}`, 'success');
                 addEventLog(`   Socket ID: ${testSocket.id}`, 'success');
                 
                 updateStatus('connected', 'Connection Test Passed');
@@ -805,35 +812,72 @@
                 socket.disconnect();
             }
 
-            // Normalize URL - Socket.IO handles wss:// automatically if using https://
+            // Normalize URL - Use wss:// directly if provided
             // Remove trailing slash and ensure proper protocol
             let normalizedUrl = serverUrl.trim();
+            const isWss = normalizedUrl.startsWith('wss://');
+            const isWs = normalizedUrl.startsWith('ws://');
+            const isHttps = normalizedUrl.startsWith('https://');
+            const isHttp = normalizedUrl.startsWith('http://');
+            
+            // Remove /qna namespace if user included it (Socket.IO will add it)
+            normalizedUrl = normalizedUrl.replace(/\/qna\/?$/, '');
+            
+            // Remove trailing slash
             if (normalizedUrl.endsWith('/')) {
                 normalizedUrl = normalizedUrl.slice(0, -1);
             }
             
-            // Convert wss:// to https:// (Socket.IO expects https:// and auto-converts to wss:// for WebSocket)
-            if (normalizedUrl.startsWith('wss://')) {
-                normalizedUrl = normalizedUrl.replace('wss://', 'https://');
-            }
-            // Convert ws:// to http://
-            if (normalizedUrl.startsWith('ws://')) {
+            // If user wants wss://, keep it as wss:// (Socket.IO can handle it)
+            // Otherwise convert ws:// to http:// for Socket.IO compatibility
+            if (normalizedUrl.startsWith('ws://') && !isWss) {
                 normalizedUrl = normalizedUrl.replace('ws://', 'http://');
             }
             
-            // Socket.IO will automatically use wss:// if the URL is https://
-            socket = io(`${normalizedUrl}/qna`, {
+            // If using https://, convert to wss:// for direct WebSocket connection
+            if (normalizedUrl.startsWith('https://')) {
+                normalizedUrl = normalizedUrl.replace('https://', 'wss://');
+            }
+            
+            // If using http://, convert to ws:// for direct WebSocket connection
+            if (normalizedUrl.startsWith('http://')) {
+                normalizedUrl = normalizedUrl.replace('http://', 'ws://');
+            }
+            
+            const connectionUrl = `${normalizedUrl}/qna`;
+            
+            addEventLog(`Connecting to: ${connectionUrl}`, 'info');
+            console.log('Socket.IO connection URL:', connectionUrl);
+            console.log('Using WSS:', isWss || connectionUrl.startsWith('wss://'));
+            
+            // Use wss:// directly - Socket.IO will handle it
+            socket = io(connectionUrl, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionAttempts: 5,
-                // Force secure connection if using https://
-                secure: normalizedUrl.startsWith('https://')
+                // Force secure connection if using wss://
+                secure: connectionUrl.startsWith('wss://'),
+                // Add timeout for connection
+                timeout: 10000,
+                // Add path if needed (default is /socket.io/)
+                path: '/socket.io/'
+            });
+            
+            // Log all socket events for debugging
+            socket.onAny((event, ...args) => {
+                console.log(`[Socket.IO Event] ${event}:`, args);
             });
 
             socket.on('connect', () => {
                 updateStatus('connected', 'Connected');
+                const transport = socket.io.engine.transport.name;
+                const isSecure = socket.io.engine.secure;
                 addEventLog('Connected to server', 'success');
+                addEventLog(`Transport: ${transport}`, 'success');
+                addEventLog(`Secure (WSS): ${isSecure ? 'Yes' : 'No'}`, 'success');
+                addEventLog(`Socket ID: ${socket.id}`, 'success');
+                console.log('Connection established - Using WSS:', isSecure, 'Transport:', transport);
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
                 document.getElementById('mainContent').style.display = 'block';
@@ -859,12 +903,14 @@
             });
 
             socket.on('joined_engagement', async (data) => {
+                console.log('[Socket.IO] joined_engagement event:', data);
                 addEventLog(`Successfully joined engagement room: ${data.engagementId}`, 'success');
                 // Fetch existing questions after joining
                 await fetchExistingQuestions('engagement', data.engagementId);
             });
 
             socket.on('joined_session', async (data) => {
+                console.log('[Socket.IO] joined_session event:', data);
                 addEventLog(`Successfully joined session room: ${data.sessionId}`, 'success');
                 // Fetch existing questions after joining
                 await fetchExistingQuestions('session', data.sessionId);
@@ -880,6 +926,7 @@
             });
 
             socket.on('question_update', (data) => {
+                console.log('[Socket.IO] question_update event:', data);
                 addEventLog(`Question update: ${data.type}`, 'info');
                 
                 if (data.type === 'question_created') {
@@ -937,9 +984,10 @@
                 }
             });
 
-            socket.on('disconnect', () => {
+            socket.on('disconnect', (reason) => {
                 updateStatus('disconnected', 'Disconnected');
-                addEventLog('Disconnected from server', 'error');
+                addEventLog(`Disconnected from server. Reason: ${reason}`, 'error');
+                console.log('Socket disconnected, reason:', reason);
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('disconnectBtn').disabled = true;
             });
@@ -947,6 +995,12 @@
             socket.on('connect_error', (error) => {
                 updateStatus('disconnected', 'Connection Failed');
                 addEventLog(`Connection error: ${error.message}`, 'error');
+                addEventLog(`Error type: ${error.type || 'unknown'}`, 'error');
+                addEventLog(`Error description: ${error.description || 'No description'}`, 'error');
+                addEventLog(`Full error: ${JSON.stringify(error)}`, 'error');
+                addEventLog(`Check: Server URL, SSL certificate, firewall, and port accessibility`, 'error');
+                addEventLog(`Trying to connect to namespace: /qna`, 'error');
+                console.error('Socket.IO connection error:', error);
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('disconnectBtn').disabled = true;
             });

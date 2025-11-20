@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Card } from 'react-bootstrap';
+import { Row, Col, Card, Badge } from 'react-bootstrap';
 
 const PersonalDetailsCard = ({ 
     user, 
@@ -58,19 +58,7 @@ const PersonalDetailsCard = ({
         <Card style={profileStyles.infoCard} className="info-card-hover">
             <div style={profileStyles.sectionHeader}>
                 <div className="d-flex align-items-center">
-                    <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: '1rem'
-                    }}>
-                        <i className="feather icon-user text-white" />
-                    </div>
-                    <h5 className="section-title mb-0">Personal Details</h5>
+                    <h5 className="section-title mb-0">Personal details</h5>
                 </div>
                 <button
                     type="button"
@@ -85,20 +73,46 @@ const PersonalDetailsCard = ({
             {/* View Mode */}
             <div className={isEditMode ? 'collapse' : 'collapse show'}>
                 <div style={profileStyles.infoItem} className="info-item-hover">
-                    <div className="info-label mb-2">Full Name</div>
-                    <div className="info-value">{fullName || 'Not provided'}</div>
+                    <div className="info-label mb-2">Full name</div>
+                    <div className="d-flex align-items-center">
+                        <Badge className="mr-3" style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            backgroundColor: '#667eea'
+                        }}>
+                            <i className="feather icon-user text-white" style={{ fontSize: '16px' }} />
+                        </Badge>
+                        <div className="info-value">{fullName || 'Not provided'}</div>
+                    </div>
                 </div>
                 <div style={profileStyles.infoItem} className="info-item-hover">
                     <div className="info-label mb-2">Location</div>
-                    <div className="info-value">
-                        {user?.address && <div>{user.address}</div>}
-                        {(user?.city || user?.state) && (
-                            <div>{[user.city, user.state].filter(Boolean).join(', ')}</div>
-                        )}
-                        {user?.postalCode && <div>{user.postalCode}</div>}
-                        {!user?.address && !user?.city && !user?.state && !user?.postalCode && (
-                            <span style={{ color: '#a0aec0' }}>Not provided</span>
-                        )}
+                    <div className="d-flex align-items-center">
+                        <Badge className="mr-3" style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            backgroundColor: '#667eea'
+                        }}>
+                            <i className="feather icon-map-pin text-white" style={{ fontSize: '16px' }} />
+                        </Badge>
+                        <div className="info-value">
+                            {user?.address && <div>{user.address}</div>}
+                            {(user?.city || user?.state) && (
+                                <div>{[user.city, user.state].filter(Boolean).join(', ')}</div>
+                            )}
+                            {user?.postalCode && <div>{user.postalCode}</div>}
+                            {!user?.address && !user?.city && !user?.state && !user?.postalCode && (
+                                <span style={{ color: '#a0aec0' }}>Not provided</span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -108,7 +122,7 @@ const PersonalDetailsCard = ({
                 <div style={{ padding: '1.5rem' }}>
                     <Row className="mb-3">
                         <Col md={6}>
-                            <label className="info-label mb-2 d-block">First Name</label>
+                            <label className="info-label mb-2 d-block">First name</label>
                             <input
                                 type="text"
                                 className="form-control"
@@ -119,7 +133,7 @@ const PersonalDetailsCard = ({
                             />
                         </Col>
                         <Col md={6}>
-                            <label className="info-label mb-2 d-block">Last Name</label>
+                            <label className="info-label mb-2 d-block">Last name</label>
                             <input
                                 type="text"
                                 className="form-control"
@@ -167,7 +181,7 @@ const PersonalDetailsCard = ({
                             />
                         </Col>
                         <Col md={3}>
-                            <label className="info-label mb-2 d-block">Postal Code</label>
+                            <label className="info-label mb-2 d-block">Postal code</label>
                             <input
                                 type="text"
                                 className="form-control"
