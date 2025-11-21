@@ -307,6 +307,28 @@ export class EventService {
         today.setHours(0, 0, 0, 0);
         
         filteredEvents = events.filter((event) => {
+          // First check publish dates if they exist
+          if (event.publishStartDate || event.publishEndDate) {
+            const publishStart = event.publishStartDate ? new Date(event.publishStartDate) : null;
+            const publishEnd = event.publishEndDate ? new Date(event.publishEndDate) : null;
+            
+            if (publishStart) {
+              publishStart.setHours(0, 0, 0, 0);
+              if (today < publishStart) {
+                return false; // Event not yet published
+              }
+            }
+            
+            if (publishEnd) {
+              publishEnd.setHours(0, 0, 0, 0);
+              if (today > publishEnd) {
+                return false; // Event publish period has ended
+              }
+            }
+          }
+          
+          // Also filter out past events (only exclude events where endDate < today)
+          // Include all events from today onwards (today's events should be shown)
           const eventEndDate = new Date(event.endDate);
           eventEndDate.setHours(0, 0, 0, 0);
           
@@ -607,6 +629,15 @@ export class EventService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       queryBuilder.where('event.endDate >= :today', { today });
+      // Also filter by publish dates if they exist
+      queryBuilder.andWhere(
+        '(event.publishStartDate IS NULL OR event.publishStartDate <= :today)',
+        { today }
+      );
+      queryBuilder.andWhere(
+        '(event.publishEndDate IS NULL OR event.publishEndDate >= :today)',
+        { today }
+      );
     }
 
     const events = await queryBuilder

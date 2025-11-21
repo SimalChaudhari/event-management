@@ -8,6 +8,11 @@ import { ExpandableDescription } from '../ExpandableDescription';
  * @param {Object} eventData - Event data object
  */
 const EventBasicComponent = ({ eventData }) => {
+    // Early return if eventData is not available
+    if (!eventData) {
+        return <div className="p-2 bg-light">No event data available.</div>;
+    }
+
     // Format timestamp to readable date
     const formatTimestamp = (timestamp) => {
         if (!timestamp) return 'N/A';
@@ -38,7 +43,9 @@ const EventBasicComponent = ({ eventData }) => {
             'fas fa-gift': '#e91e63', // Pink for lucky draw
             'fa fa-sticky-note': '#6c757d', // Gray for text
             'fas fa-info-circle': '#17a2b8', // Teal for info
-            'fa fa-sticky-note': '#007bff'
+            'fa fa-sticky-note': '#007bff',
+            'fas fa-calendar-check': '#28a745', // Green for publish start
+            'fas fa-calendar-times': '#dc3545' // Red for publish end
         };
         return colorMap[iconClass] || '#495057';
     };
@@ -96,8 +103,6 @@ const EventBasicComponent = ({ eventData }) => {
         </div>
     );
 
-
-
     const renderCategories = () => {
         if (!eventData?.categories?.length) {
             return <p className="text-muted">No categories listed.</p>;
@@ -119,10 +124,7 @@ const EventBasicComponent = ({ eventData }) => {
                                     ></i>
                                     Description:
                                 </div>
-                                <ExpandableDescription 
-                                    text={category.description}
-                                    maxLines={2}
-                                />
+                                <ExpandableDescription text={category.description} maxLines={2} />
                             </div>
                         </div>
                     </Col>
@@ -203,6 +205,32 @@ const EventBasicComponent = ({ eventData }) => {
                             />
                         </div>
                     </Col>
+
+                    <Col lg={12} md={12}>
+                        {eventData?.publishStartDate && (
+                            <InfoField
+                                label="Publish Start Date"
+                                value={new Date(eventData.publishStartDate).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                })}
+                                iconClass="fas fa-calendar-check"
+                            />
+                        )}
+                        {eventData?.publishEndDate && (
+                            <InfoField
+                                label="Publish End Date"
+                                value={new Date(eventData.publishEndDate).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                })}
+                                iconClass="fas fa-calendar-times"
+                            />
+                        )}
+                    </Col>
+
                     <Col lg={12} md={12}>
                         <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
                             <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
@@ -212,10 +240,7 @@ const EventBasicComponent = ({ eventData }) => {
                                 ></i>
                                 Event Description:
                             </div>
-                            <ExpandableDescription 
-                                text={eventData.description}
-                                maxLines={2}
-                            />
+                            <ExpandableDescription text={eventData.description} maxLines={2} />
                         </div>
                     </Col>
                 </Row>

@@ -18,6 +18,7 @@ import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
 import useFilterLogic from '../../../hooks/useFilterLogic';
+import { renderPublishDates } from '../../../components/events/PublishDatesRenderer.jsx';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -142,6 +143,13 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
                 title: 'Event Date',
                 render: function (data, type, row) {
                     return formatDateTimeForTable(row.startDate, row.startTime);
+                }
+            },
+            {
+                data: 'publishStartDate',
+                title: 'Publish Dates',
+                render: function (data, type, row) {
+                    return renderPublishDates(row);
                 }
             },
             {
@@ -460,6 +468,7 @@ const UpcomingEvents = () => {
                                         <th>Price</th>
                                         <th>Location</th> 
                                         <th>Event Date</th>
+                                        <th>Publish Dates</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

@@ -18,6 +18,7 @@ import FilterComponent from '../../../components/common/FilterComponent';
 import useFilterLogic from '../../../hooks/useFilterLogic';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
+import { renderPublishDates } from '../../../components/events/PublishDatesRenderer.jsx';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -179,6 +180,13 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGal
                 render: function (data, type, row) {
                     // Display formatting is handled by columnDefs render function
                     return formatDateTimeForTable(row.startDate, row.startTime);
+                }
+            },
+            {
+                data: 'publishStartDate',
+                title: 'Publish Dates',
+                render: function (data, type, row) {
+                    return renderPublishDates(row);
                 }
             },
             {
@@ -515,6 +523,7 @@ const EventView = () => {
                                         <th>Price</th>
                                         <th>Location</th>
                                         <th>Event Date</th>
+                                        <th>Publish Dates</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

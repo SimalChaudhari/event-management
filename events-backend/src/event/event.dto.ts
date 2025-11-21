@@ -56,6 +56,15 @@ export class EventDto {
   @Validate(IsTimeFormat)
   endTime!: string;
 
+  // Publish dates - determines when event is visible on the app
+  @IsOptional()
+  @IsDateString()
+  publishStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  publishEndDate?: string;
+
   @IsOptional()
   @IsString()
   location?: string;

@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import axiosInstance from '../../../configs/axiosInstance';
 import { SETTINGS_PATHS } from '../../../utils/constants';
 import useTableNavigation from '../../../hooks/useTableNavigation';
+// import CkUpdateEditor, { uploadEditorImages } from '../../../App/components/CkEditor/CkUpdateEditor';
 import SettingsEditor from '../../../App/components/CkEditor/SettingsEditor';
 
 const AddEmailTemplatePage = () => {
@@ -113,8 +114,19 @@ const AddEmailTemplatePage = () => {
                 return params.get('page') || location.state?.page || previousPageRef.current;
             };
 
+            // Upload base64 images and replace with server URLs
+            let finalBody = formData.body;
+            if (formData.body) {
+                // finalBody = await uploadEditorImages(formData.body);
+            }
+
+            const submitData = {
+                ...formData,
+                body: finalBody
+            };
+
             if (id) {
-                const response = await axiosInstance.put(`/email-templates/update/${id}`, formData);
+                const response = await axiosInstance.put(`/email-templates/update/${id}`, submitData);
                 if (response.data.success) {
                     toast.success('Email template updated successfully');
                     const targetPage = getReturnPage();
@@ -125,7 +137,7 @@ const AddEmailTemplatePage = () => {
                     }
                 }
             } else {
-                const response = await axiosInstance.post('/email-templates/create', formData);
+                const response = await axiosInstance.post('/email-templates/create', submitData);
                 if (response.data.success) {
                     toast.success('Email template created successfully');
                     navigate(SETTINGS_PATHS.EMAIL_TEMPLATES);
@@ -246,14 +258,14 @@ const AddEmailTemplatePage = () => {
                                                     </Button>
                                                 </div>
                                             )}
-                                            <SettingsEditor
+                                            {/* <SettingsEditor
                                                 key={editorKey}
                                                 data={formData.body}
                                                 onChange={(event, editor) => {
                                                     setFormData({ ...formData, body: editor.getData() });
                                                 }}
                                                 placeholder="Enter email body content. Use {{variableName}} for dynamic content..."
-                                            />
+                                            /> */}
                                             <Form.Text className="text-muted" style={{ marginTop: '10px', display: 'block' }}>
                                                 <strong>Variables:</strong> Use {'{{'}variableName{'}}'} for dynamic content
                                             </Form.Text>

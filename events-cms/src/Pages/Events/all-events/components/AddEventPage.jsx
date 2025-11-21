@@ -54,6 +54,8 @@ function AddEventPage() {
         startTime: '',
         endDate: '',
         endTime: '',
+        publishStartDate: '',
+        publishEndDate: '',
         location: '',
         venue: '',
         country: '',
@@ -454,6 +456,8 @@ function AddEventPage() {
                         startTime: editData.startTime || '',
                         endDate: editData.endDate ? editData.endDate.split('T')[0] : '',
                         endTime: editData.endTime || '',
+                        publishStartDate: editData.publishStartDate ? editData.publishStartDate.split('T')[0] : '',
+                        publishEndDate: editData.publishEndDate ? editData.publishEndDate.split('T')[0] : '',
                         location: editData.location || '',
                         venue: editData.venue || '',
                         latitude: editData.latitude || '',
@@ -700,6 +704,8 @@ function AddEventPage() {
             startTime: '',
             endDate: '',
             endTime: '',
+            publishStartDate: '',
+            publishEndDate: '',
             location: '',
             venue: '',
             country: '',
@@ -1532,6 +1538,37 @@ function AddEventPage() {
                                                 value={formData.endTime}
                                                 onChange={handleChange}
                                                 required
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="publishStartDate">
+                                                Publish Start Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                name="publishStartDate"
+                                                value={formData.publishStartDate}
+                                                onChange={handleChange}
+                                                title="Date when event becomes visible on the app"
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="publishEndDate">
+                                                Publish End Date
+                                            </label>
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                name="publishEndDate"
+                                                value={formData.publishEndDate}
+                                                onChange={handleChange}
+                                                title="Date when event stops being visible on the app"
                                             />
                                         </div>
                                     </Col>

@@ -5,6 +5,7 @@
     "homepage": "/",
     "dependencies": {
         "@ckeditor/ckeditor5-build-classic": "^32.0.0",
+        "@ckeditor/ckeditor5-image": "^47.2.0",
         "@ckeditor/ckeditor5-react": "^4.0.1",
         "@fullcalendar/core": "^5.10.1",
         "@fullcalendar/daygrid": "^5.10.1",

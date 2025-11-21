@@ -54,6 +54,13 @@ export class Event {
   @Column({ type: 'time' })
   endTime!: string;
 
+  // Publish dates - determines when event is visible on the app
+  @Column({ type: 'date', nullable: true })
+  publishStartDate?: Date;
+
+  @Column({ type: 'date', nullable: true })
+  publishEndDate?: Date;
+
   @Column({ type: 'varchar', nullable: true })
   location?: string;
 
