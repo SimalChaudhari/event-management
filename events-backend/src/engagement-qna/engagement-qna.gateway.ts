@@ -18,8 +18,8 @@ import { EngagementQnaService } from './engagement-qna.service';
     // credentials: true // Removed - not needed for public Q&A, and conflicts with origin: '*'
   },
   namespace: '/qna',
-  transports: ['websocket', 'polling'],
-  allowEIO3: true
+  // transports: ['websocket', 'polling'],
+  // allowEIO3: true
 })
 @Injectable()
 export class EngagementQnaGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
