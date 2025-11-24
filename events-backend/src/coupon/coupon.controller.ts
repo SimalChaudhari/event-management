@@ -18,7 +18,7 @@ export class CouponController {
   }
 
   @Get()
-  @Roles(UserRole.Admin)
+  // @Roles(UserRole.Admin)
   async getAllCoupons() {
     return this.couponService.getAllCoupons();
   }

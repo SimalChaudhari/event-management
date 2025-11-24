@@ -20,8 +20,10 @@ export class CheckoutResponseUtils {
       totalAmount: Number(checkout.totalAmount),
       discount: Number(checkout.discount || 0),
       originalTotal: Number(checkout.totalAmount) + Number(checkout.discount || 0),
-      cartItems: checkout.cartItems,
-      itemCount: checkout.cartItems.length,
+      cartItems: checkout.checkoutCartItems && checkout.checkoutCartItems.length > 0
+        ? checkout.checkoutCartItems.map(item => ({ cartId: item.cartId, eventId: item.eventId }))
+        : [],
+      itemCount: checkout.checkoutCartItems ? checkout.checkoutCartItems.length : 0,
       user: {
         id: checkout.user.id,
         firstName: checkout.user.firstName,
@@ -76,7 +78,7 @@ export class CheckoutResponseUtils {
         isCompleted: checkout.isCompleted,
         paymentCompleted: true,
         discountApplied: Number(checkout.discount || 0) > 0,
-        totalItems: checkout.cartItems.length
+        totalItems: checkout.checkoutCartItems ? checkout.checkoutCartItems.length : 0
       }
     };
 

@@ -10,6 +10,7 @@ import { WooShPayService } from './wooshpay.service';
 import { PaymentMethodService } from './payment-method.service';
 import { UserPaymentMethod } from './payment-method.entity';
 import { Checkout } from './checkout.entity';
+import { CheckoutCartItem } from './checkout-cart-item.entity';
 import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
 import { Cart } from 'cart/cart.entity';
@@ -25,6 +26,7 @@ import { JwtModule } from '@nestjs/jwt';
     imports: [
         TypeOrmModule.forFeature([
             Checkout,
+            CheckoutCartItem,
             UserPaymentMethod,
             UserEntity,
             Event,

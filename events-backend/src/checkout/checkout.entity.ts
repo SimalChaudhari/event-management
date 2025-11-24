@@ -1,6 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { UserEntity } from 'user/users.entity';
 import { CheckoutStatus, PaymentGateway } from './checkout.dto';
+import { CheckoutCartItem } from './checkout-cart-item.entity';
 
 @Entity('checkouts')
 export class Checkout {
@@ -13,8 +14,8 @@ export class Checkout {
     @Column({ type: 'varchar', unique: true })
     checkoutId!: string;
 
-    @Column({ type: 'json' })
-    cartItems!: any[]; // Store cart items as JSON
+    @OneToMany(() => CheckoutCartItem, (checkoutCartItem) => checkoutCartItem.checkout, { cascade: true })
+    checkoutCartItems!: CheckoutCartItem[];
 
     @Column({ type: 'decimal' })
     totalAmount!: number;

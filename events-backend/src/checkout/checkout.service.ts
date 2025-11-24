@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
+import { CheckoutCartItem } from './checkout-cart-item.entity';
 import { validateCard, detectCardTypeRealtime } from '../utils/card-validation.utils';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import { CheckoutResponseUtils } from '../utils/checkout-response.utils';
@@ -34,6 +35,8 @@ export class CheckoutService {
   constructor(
     @InjectRepository(Checkout)
     private checkoutRepository: Repository<Checkout>,
+    @InjectRepository(CheckoutCartItem)
+    private checkoutCartItemRepository: Repository<CheckoutCartItem>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Event)
@@ -164,6 +167,13 @@ export class CheckoutService {
     const existingCheckout = await this.findExistingPendingCheckout(userId, validatedCartItems, discount, dto.couponCode);
     if (existingCheckout) {
       console.log('🔄 Found existing pending checkout, returning existing one:', existingCheckout.checkoutId);
+      // Convert checkoutCartItems to cartItems format for response
+      const existingCartItems = existingCheckout.checkoutCartItems?.map(item => ({
+        eventId: item.eventId,
+        price: 0, // Will be fetched from event if needed
+        eventName: '' // Will be fetched from event if needed
+      })) || validatedCartItems;
+      
       return {
         id: existingCheckout.id,
         checkoutId: existingCheckout.checkoutId,
@@ -172,7 +182,7 @@ export class CheckoutService {
         discount: existingCheckout.discount,
         couponCode: existingCheckout.couponCode,
         promoCode: existingCheckout.promoCode,
-        cartItems: existingCheckout.cartItems,
+        cartItems: existingCartItems,
         user: {
           id: user.id,
           firstName: user.firstName,
@@ -191,7 +201,6 @@ export class CheckoutService {
     const checkout = this.checkoutRepository.create({
       checkoutId,
       user,
-      cartItems: validatedCartItems,
       totalAmount: finalAmount,
       discount,
       couponCode: dto.couponCode,
@@ -200,6 +209,25 @@ export class CheckoutService {
     });
 
     const savedCheckout = await this.checkoutRepository.save(checkout);
+
+    // Create CheckoutCartItem records for each cart item (store IDs only)
+    const checkoutCartItems = [];
+    for (const item of cartItemsToProcess) {
+      // Get cartId from cart repository
+      const cartItem = await this.cartRepository.findOne({
+        where: { userId, eventId: item.eventId },
+      });
+      if (cartItem) {
+        const checkoutCartItem = this.checkoutCartItemRepository.create({
+          checkout: savedCheckout,
+          checkoutId: savedCheckout.checkoutId,
+          cartId: cartItem.id,
+          eventId: item.eventId,
+        });
+        const savedItem = await this.checkoutCartItemRepository.save(checkoutCartItem);
+        checkoutCartItems.push(savedItem);
+      }
+    }
 
     // Get coupon details if coupon code exists
     let couponDetails = null;
@@ -264,6 +292,7 @@ export class CheckoutService {
         isCompleted: false,
         isDeleted: false
       },
+      relations: ['checkoutCartItems'],
       order: { createdAt: 'DESC' }
     });
 
@@ -275,7 +304,7 @@ export class CheckoutService {
         checkoutId: checkout.checkoutId,
         checkoutDiscount: checkout.discount,
         checkoutCouponCode: checkout.couponCode,
-        checkoutCartItems: checkout.cartItems?.length
+        checkoutCartItems: checkout.checkoutCartItems?.length || 0
       });
 
       // Skip discount comparison - use same checkout regardless of discount changes
@@ -292,11 +321,15 @@ export class CheckoutService {
         note: 'Coupon comparison skipped - using same checkout for same cart items'
       });
 
-      // Check if cart items match
-      const cartItemsMatch = this.compareCartItems(checkout.cartItems, cartItems);
+      // Check if cart items match - use checkoutCartItems from database
+      const checkoutCartItems = checkout.checkoutCartItems || [];
+      const checkoutEventIds = checkoutCartItems.map(item => item.eventId).sort();
+      const currentEventIds = cartItems.map(item => item.eventId).sort();
+      const cartItemsMatch = JSON.stringify(checkoutEventIds) === JSON.stringify(currentEventIds);
+      
       console.log('🔍 Cart items comparison:', {
-        checkoutItems: checkout.cartItems?.map(item => item.eventId),
-        currentItems: cartItems.map(item => item.eventId),
+        checkoutItems: checkoutEventIds,
+        currentItems: currentEventIds,
         match: cartItemsMatch
       });
       
@@ -362,10 +395,13 @@ export class CheckoutService {
 
       const savedOrder = await manager.save(Order, order);
 
+      // Get checkout cart items from CheckoutCartItem table
+      const checkoutCartItems = checkout.checkoutCartItems || [];
+      
       // Create order items and register events
-      for (const cartItem of checkout.cartItems) {
+      for (const checkoutCartItem of checkoutCartItems) {
         const event = await manager.findOne(Event, {
-          where: { id: cartItem.eventId },
+          where: { id: checkoutCartItem.eventId },
         });
         if (event) {
           // Create order item
@@ -413,12 +449,30 @@ export class CheckoutService {
   async getCheckoutById(checkoutId: string, userId: string): Promise<any> {
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId, user: { id: userId } },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
       throw new NotFoundException('Checkout session not found');
     }
+
+    // Get cart items from CheckoutCartItem table (IDs only)
+    // If relation is empty, try direct query as fallback
+    let cartItemsFromDb = checkout.checkoutCartItems || [];
+    
+    if (!cartItemsFromDb || cartItemsFromDb.length === 0) {
+      console.log('⚠️ CheckoutCartItems relation is empty, trying direct query...');
+      // Fallback: Direct query from checkout_cart_items table
+      cartItemsFromDb = await this.checkoutCartItemRepository.find({
+        where: { checkoutId: checkout.checkoutId },
+      });
+      console.log('🔍 Direct query result:', cartItemsFromDb.length, 'items');
+    }
+
+    const cartItems = cartItemsFromDb.map(item => ({
+      cartId: item.cartId,
+      eventId: item.eventId,
+    }));
 
     return {
       id: checkout.id,
@@ -430,10 +484,112 @@ export class CheckoutService {
       paymentGateway: checkout.paymentGateway,
       paymentMethod: checkout.paymentMethod,
       transactionId: checkout.transactionId,
-      cartItems: checkout.cartItems,
+      cartItems: cartItems, // IDs only from CheckoutCartItem table
       isCompleted: checkout.isCompleted,
       createdAt: checkout.createdAt,
       completedAt: checkout.completedAt,
+    };
+  }
+
+  async updateCheckoutCartItems(checkoutId: string, cartItemsMinimal: any[]): Promise<void> {
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId },
+      relations: ['checkoutCartItems'],
+    });
+
+    if (!checkout) {
+      throw new NotFoundException('Checkout session not found');
+    }
+
+    // Delete existing checkout cart items
+    if (checkout.checkoutCartItems && checkout.checkoutCartItems.length > 0) {
+      await this.checkoutCartItemRepository.remove(checkout.checkoutCartItems);
+    }
+
+    // Create new checkout cart items
+    for (const item of cartItemsMinimal) {
+      const checkoutCartItem = this.checkoutCartItemRepository.create({
+        checkout: checkout,
+        checkoutId: checkout.checkoutId,
+        cartId: item.cartId,
+        eventId: item.eventId,
+      });
+      await this.checkoutCartItemRepository.save(checkoutCartItem);
+    }
+  }
+
+  async applyCouponToCheckout(checkoutId: string, userId: string, couponCode: string): Promise<any> {
+    // Get checkout with cart items
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId, user: { id: userId } },
+      relations: ['user', 'checkoutCartItems'],
+    });
+
+    if (!checkout) {
+      throw new NotFoundException('Checkout session not found');
+    }
+
+    // Check if checkout is already completed
+    if (checkout.isCompleted) {
+      throw new BadRequestException('Cannot apply coupon to completed checkout');
+    }
+
+    // Get cart items from CheckoutCartItem table
+    const checkoutCartItems = checkout.checkoutCartItems || [];
+    if (checkoutCartItems.length === 0) {
+      throw new BadRequestException('No cart items found in checkout');
+    }
+
+    // Calculate total from cart items
+    let totalAmount = 0;
+    for (const item of checkoutCartItems) {
+      const event = await this.eventRepository.findOne({
+        where: { id: item.eventId },
+      });
+      if (event) {
+        totalAmount += Number(event.price || 0);
+      }
+    }
+
+    // Validate and apply coupon
+    const couponResult = await this.couponService.validateAndApplyCoupon(
+      couponCode,
+      userId,
+      totalAmount,
+    );
+
+    const { discount, finalAmount } = couponResult;
+
+    // Update checkout with coupon details
+    checkout.couponCode = couponCode;
+    checkout.discount = discount;
+    checkout.totalAmount = finalAmount; // Update totalAmount to reflect discounted amount
+
+    await this.checkoutRepository.save(checkout);
+
+    // Return updated checkout with coupon details
+    return {
+      checkoutId: checkout.checkoutId,
+      status: checkout.status,
+      totalAmount: finalAmount,
+      originalTotal: totalAmount,
+      discount: discount,
+      couponCode: couponCode,
+      coupon: {
+        id: couponResult.coupon.id,
+        code: couponResult.coupon.code,
+        discountValue: couponResult.coupon.discountValue,
+        discountType: couponResult.coupon.discountType,
+        actualValue: couponResult.coupon.actualValue,
+        expiryDate: couponResult.coupon.expiryDate,
+      },
+      priceBreakdown: {
+        subtotal: totalAmount,
+        discount: discount,
+        total: finalAmount,
+        currency: 'USD',
+        gstInclusive: true,
+      },
     };
   }
 
@@ -441,7 +597,7 @@ export class CheckoutService {
   async getCheckoutByIdPublic(checkoutId: string): Promise<any> {
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
@@ -453,7 +609,16 @@ export class CheckoutService {
       throw new NotFoundException('Payment not completed yet');
     }
 
-    return checkout;
+    // Convert checkoutCartItems to cartItems format for response
+    const cartItems = checkout.checkoutCartItems?.map(item => ({
+      cartId: item.cartId,
+      eventId: item.eventId,
+    })) || [];
+
+    return {
+      ...checkout,
+      cartItems: cartItems,
+    };
   }
 
   async getUserCheckouts(userId: string): Promise<any[]> {
@@ -505,9 +670,18 @@ export class CheckoutService {
     const eventType = webhookData.type;
     const eventData = webhookData.data?.object;
 
+    console.log('🔔 Processing webhook event:', {
+      type: eventType,
+      paymentIntentId: eventData?.id,
+      status: eventData?.status,
+      checkoutId: eventData?.metadata?.checkout_id,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       switch (eventType) {
         case 'payment_intent.succeeded':
+          console.log('✅ Payment intent succeeded, completing checkout...');
           await this.completeCheckoutFromPaymentIntent(eventData);
           break;
         case 'payment_intent.requires_action':
@@ -607,19 +781,31 @@ export class CheckoutService {
 
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
+      console.error(`❌ Checkout not found for ID: ${checkoutId}`);
       return;
     }
+
+    // Check if already completed to avoid duplicate processing
+    if (checkout.isCompleted && checkout.status === CheckoutStatus.Completed) {
+      console.log(`⚠️ Checkout ${checkoutId} is already completed, skipping duplicate webhook...`);
+      return;
+    }
+
+    console.log(`🔄 Completing checkout ${checkoutId} from webhook...`);
+    console.log(`📊 Current status: ${checkout.status}, isCompleted: ${checkout.isCompleted}, transactionId: ${checkout.transactionId}`);
 
     // Complete the checkout
     checkout.status = CheckoutStatus.Completed;
     checkout.isCompleted = true;
     checkout.completedAt = new Date();
-    await this.checkoutRepository.save(checkout);
+    
+    const savedCheckout = await this.checkoutRepository.save(checkout);
+    console.log(`✅ Checkout ${checkoutId} status updated to Completed`);
+    console.log(`📊 New status: ${savedCheckout.status}, isCompleted: ${savedCheckout.isCompleted}, completedAt: ${savedCheckout.completedAt}`);
 
     // Create order and process items
     await this.createOrderFromCheckout(checkout);
@@ -660,7 +846,7 @@ export class CheckoutService {
 
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
@@ -696,7 +882,7 @@ export class CheckoutService {
 
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
@@ -888,7 +1074,7 @@ export class CheckoutService {
     // Find checkout session
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId: dto.checkoutId, user: { id: userId } },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
@@ -931,6 +1117,13 @@ export class CheckoutService {
         formattedNumber: cardValidation.formattedNumber
       });
 
+      // Get event names from checkoutCartItems
+      const eventIds = checkout.checkoutCartItems?.map(item => item.eventId) || [];
+      const events = await Promise.all(
+        eventIds.map(eventId => this.eventRepository.findOne({ where: { id: eventId } }))
+      );
+      const eventNames = events.filter((e): e is Event => e !== null).map(e => e.name).join(', ');
+
       // Process payment with WooShPay Direct API
       const paymentResult = await this.wooShPayService.processInAppPaymentWithCard(
         checkout.totalAmount,
@@ -949,7 +1142,7 @@ export class CheckoutService {
         {
           checkout_id: checkout.checkoutId,
           user_id: userId,
-          events: checkout.cartItems.map((item: any) => item.eventName).join(', '),
+          events: eventNames || eventIds.join(', '),
           payment_type: 'in_app',
         }
       );
@@ -1077,7 +1270,7 @@ export class CheckoutService {
     // Find checkout session
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId: dto.checkoutId, user: { id: userId } },
-      relations: ['user'],
+      relations: ['user', 'checkoutCartItems'],
     });
 
     if (!checkout) {
@@ -1123,6 +1316,13 @@ export class CheckoutService {
     checkout.paymentMethod = savedPaymentMethod.getDisplayName();
     await this.checkoutRepository.save(checkout);
 
+    // Get event names from checkoutCartItems
+    const eventIds = checkout.checkoutCartItems?.map(item => item.eventId) || [];
+    const events = await Promise.all(
+      eventIds.map(eventId => this.eventRepository.findOne({ where: { id: eventId } }))
+    );
+    const eventNames = events.filter((e): e is Event => e !== null).map(e => e.name).join(', ');
+
     try {
       // Process payment with saved method
       const paymentResult = await this.wooShPayService.processInAppPaymentWithSavedMethod(
@@ -1133,7 +1333,7 @@ export class CheckoutService {
         {
           checkout_id: checkout.checkoutId,
           user_id: userId,
-          events: checkout.cartItems.map((item: any) => item.eventName).join(', '),
+          events: eventNames || eventIds.join(', '),
           payment_type: 'in_app_saved',
           saved_payment_method_id: dto.paymentMethodId,
         }
@@ -1145,16 +1345,22 @@ export class CheckoutService {
         requiresAction: paymentResult.requiresAction,
       });
 
-      // Update checkout with transaction details
+      // Update checkout with transaction details FIRST (before checking status)
       checkout.transactionId = paymentResult.paymentIntent.id;
       checkout.paymentNotes = 'In-app payment with saved method processed';
+      
+      // Save transactionId immediately so webhook can find it
+      await this.checkoutRepository.save(checkout);
+      console.log('💾 Checkout transactionId saved:', checkout.transactionId);
 
       // If payment is successful, complete the checkout immediately
       if (paymentResult.paymentIntent.status === 'succeeded') {
+        console.log('✅ Payment succeeded immediately, completing checkout...');
         checkout.status = CheckoutStatus.Completed;
         checkout.isCompleted = true;
         checkout.completedAt = new Date();
         await this.checkoutRepository.save(checkout);
+        console.log('💾 Checkout status updated to Completed');
 
         // Create order and process items
         await this.createOrderFromCheckout(checkout);
@@ -1181,6 +1387,12 @@ export class CheckoutService {
           currency: 'USD',
           message: 'Payment completed instantly with saved method!',
         };
+      }
+      
+      // If payment is processing or requires action, webhook will handle completion
+      if (paymentResult.paymentIntent.status === 'processing' || paymentResult.paymentIntent.status === 'requires_action') {
+        console.log('⏳ Payment is processing, webhook will complete checkout when payment succeeds');
+        console.log('📝 Checkout status:', checkout.status, 'TransactionId:', checkout.transactionId);
       }
 
       // If payment requires additional action
@@ -1287,7 +1499,7 @@ export class CheckoutService {
           status: CheckoutStatus.Completed,
           isCompleted: true
         },
-        relations: ['user'],
+        relations: ['user', 'checkoutCartItems'],
         order: { createdAt: 'DESC' }
       });
       console.log('completedCheckouts', completedCheckouts);
@@ -1322,7 +1534,7 @@ export class CheckoutService {
           status: CheckoutStatus.Completed,
           isCompleted: true
         },
-        relations: ['user']
+        relations: ['user', 'checkoutCartItems']
       });
 
       if (!checkout) {

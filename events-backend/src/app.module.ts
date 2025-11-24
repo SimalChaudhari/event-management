@@ -44,10 +44,12 @@ import { EngagementQnaModule } from './engagement-qna/engagement-qna.module';
 import { ModeratorModule } from './moderator/moderator.module';
 import { ScheduledPushNotificationModule } from './scheduled-push-notification/scheduled-push-notification.module';
 import { EmailTemplateModule } from './email-template/email-template.module';
+import { JwtAuthModule } from './jwt/jwt-auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // Load environment variables
+    JwtAuthModule, // Import JwtAuthModule globally so JwtAuthGuard is available everywhere
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
