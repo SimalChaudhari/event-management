@@ -22,11 +22,15 @@ import { NotificationUtil } from '../utils/notification.util';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 import { EngagementModule } from '../engagement/engagement.module';
+import { CheckoutModule } from '../checkout/checkout.module';
+import { Checkout } from '../checkout/checkout.entity';
+import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem]), UtilsModule,
         EngagementModule,
+        CheckoutModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

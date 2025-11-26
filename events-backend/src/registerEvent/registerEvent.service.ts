@@ -31,6 +31,9 @@ import { AgendaUtils, FormattedAgenda } from '../utils/agenda.utils';
 import { AdminInfo } from './admin-info.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { EngagementService } from '../engagement/engagement.service';
+import { Checkout } from '../checkout/checkout.entity';
+import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
+import { CheckoutUtils } from '../utils/checkout.utils';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -68,6 +71,15 @@ export class RegisterEventService {
 
     @InjectRepository(Engagement)
     private readonly engagementRepository: Repository<Engagement>,
+
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
+
+    @InjectRepository(Checkout)
+    private readonly checkoutRepository: Repository<Checkout>,
+
+    @InjectRepository(CheckoutCartItem)
+    private readonly checkoutCartItemRepository: Repository<CheckoutCartItem>,
 
     private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
@@ -309,6 +321,22 @@ export class RegisterEventService {
               attendanceCount: attendanceCount,
             } : null;
 
+            // Fetch checkout data if order exists
+            let checkoutData = null;
+            if (registerEvent.order?.id) {
+              try {
+                checkoutData = await CheckoutUtils.getCheckoutByOrderId(
+                  registerEvent.order.id,
+                  this.orderRepository,
+                  this.checkoutRepository,
+                  this.checkoutCartItemRepository
+                );
+              } catch (error) {
+                // If checkout not found, continue without checkout data
+                console.log('Checkout data not found for order:', registerEvent.order.id);
+              }
+            }
+
             return {
               id: registerEvent.id,
               status: registerEvent.status,
@@ -319,7 +347,7 @@ export class RegisterEventService {
               user: cleanedUser,
               order: registerEvent.order || null,
               adminInfo: registerEvent.adminInfo || null,
-              billingDetails: registerEvent.billingDetails || null,
+              checkout: checkoutData || null,
             };
           } else {
             // For regular users: Keep full details
@@ -445,13 +473,29 @@ export class RegisterEventService {
               ...cleanRegisterEvent
             } = registerEvent;
 
+            // Fetch checkout data if order exists
+            let checkoutData = null;
+            if (registerEvent.order?.id) {
+              try {
+                checkoutData = await CheckoutUtils.getCheckoutByOrderId(
+                  registerEvent.order.id,
+                  this.orderRepository,
+                  this.checkoutRepository,
+                  this.checkoutCartItemRepository
+                );
+              } catch (error) {
+                // If checkout not found, continue without checkout data
+                console.log('Checkout data not found for order:', registerEvent.order.id);
+              }
+            }
+
             return {
               ...cleanRegisterEvent,
               event,
               user: cleanedUser,
               isCreatedByAdmin: registerEvent.isCreatedByAdmin,
               adminInfo: registerEvent.adminInfo || null,
-              billingDetails: registerEvent.billingDetails || [],
+              checkout: checkoutData || null,
             };
           }
         }),
@@ -740,6 +784,22 @@ export class RegisterEventService {
           }
         : null;
 
+      // Fetch checkout data if order exists
+      let checkoutData = null;
+      if (registerEvent.order?.id) {
+        try {
+          checkoutData = await CheckoutUtils.getCheckoutByOrderId(
+            registerEvent.order.id,
+            this.orderRepository,
+            this.checkoutRepository,
+            this.checkoutCartItemRepository
+          );
+        } catch (error) {
+          // If checkout not found, continue without checkout data
+          console.log('Checkout data not found for order:', registerEvent.order.id);
+        }
+      }
+
       return {
         success: true,
         message: 'Register event fetched successfully',
@@ -749,7 +809,7 @@ export class RegisterEventService {
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
           adminInfo, // Add admin info
-          billingDetails: registerEvent.billingDetails || [], // Add billing details
+          checkout: checkoutData || null, // Add checkout data as separate field
           // Add user's personal agenda data
         },
       };
@@ -955,6 +1015,69 @@ export class RegisterEventService {
         error,
         'Get public event participants',
       );
+    }
+  }
+
+  /**
+   * Get receipt data for PDF generation
+   */
+  async getReceiptData(
+    registrationId: string,
+    userId: string,
+    role: string,
+  ): Promise<any> {
+    try {
+      const registerEvent = await this.findOne(registrationId, userId, role);
+
+      if (!registerEvent?.data) {
+        throw new NotFoundException('Registration not found');
+      }
+
+      const data = registerEvent.data;
+
+      // Check if checkout exists and is completed
+      if (!data.checkout || data.checkout.status !== 'Completed') {
+        return null;
+      }
+
+      const checkout = data.checkout;
+      const user = data.user;
+      const event = data.event;
+      const order = data.order;
+
+      // Prepare receipt data
+      return {
+        checkoutId: checkout.checkoutId,
+        transactionId: checkout.transactionId,
+        totalAmount: parseFloat(checkout.totalAmount?.toString() || '0'),
+        discount: checkout.discount ? parseFloat(checkout.discount.toString()) : undefined,
+        couponCode: checkout.couponCode,
+        promoCode: checkout.promoCode,
+        paymentGateway: checkout.paymentGateway,
+        paymentMethod: checkout.paymentMethod,
+        status: checkout.status,
+        createdAt: checkout.createdAt ? new Date(checkout.createdAt) : new Date(),
+        completedAt: checkout.completedAt ? new Date(checkout.completedAt) : undefined,
+        user: {
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          email: user?.email || '',
+          mobile: user?.mobile || undefined,
+        },
+        event: {
+          name: event?.name || '',
+          startDate: event?.startDate || '',
+          endDate: event?.endDate || event?.startDate || '',
+          location: event?.location || undefined,
+          venue: event?.venue || undefined,
+        },
+        orderNo: order?.orderNo || undefined,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Get receipt data');
     }
   }
 }

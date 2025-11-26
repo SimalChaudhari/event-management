@@ -5,13 +5,14 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
 import { CheckoutCartItem } from './checkout-cart-item.entity';
 import { validateCard, detectCardTypeRealtime } from '../utils/card-validation.utils';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import { CheckoutResponseUtils } from '../utils/checkout-response.utils';
+import { CheckoutUtils } from '../utils/checkout.utils';
 import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
 import { Cart } from 'cart/cart.entity';
@@ -489,6 +490,15 @@ export class CheckoutService {
       createdAt: checkout.createdAt,
       completedAt: checkout.completedAt,
     };
+  }
+
+  async getCheckoutByOrderId(orderId: string): Promise<any> {
+    return CheckoutUtils.getCheckoutByOrderId(
+      orderId,
+      this.orderRepository,
+      this.checkoutRepository,
+      this.checkoutCartItemRepository
+    );
   }
 
   async updateCheckoutCartItems(checkoutId: string, cartItemsMinimal: any[]): Promise<void> {

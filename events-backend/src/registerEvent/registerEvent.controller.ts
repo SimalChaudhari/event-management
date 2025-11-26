@@ -235,6 +235,34 @@ export class RegisterEventController {
       throw error;
     }
   }
+
+  @Get(':id/receipt')
+  async downloadReceipt(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const role = req.user.role;
+
+      const receiptData = await this.registerEventService.getReceiptData(id, userId, role);
+      
+      if (!receiptData) {
+        return response.status(HttpStatus.NOT_FOUND).json({
+          success: false,
+          message: 'Receipt not found or checkout not completed',
+        });
+      }
+
+      // Generate and send PDF
+      const { PDFReceiptUtils } = await import('../utils/pdf-receipt.utils');
+      PDFReceiptUtils.generateReceiptPDF(receiptData, response);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Download receipt', req.user?.id);
+      throw error;
+    }
+  }
 }
 
 @Controller('api/public/events')
