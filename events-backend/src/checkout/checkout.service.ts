@@ -1123,7 +1123,6 @@ export class CheckoutService {
         eventIds.map(eventId => this.eventRepository.findOne({ where: { id: eventId } }))
       );
       const eventNames = events.filter((e): e is Event => e !== null).map(e => e.name).join(', ');
-
       // Process payment with WooShPay Direct API
       const paymentResult = await this.wooShPayService.processInAppPaymentWithCard(
         checkout.totalAmount,

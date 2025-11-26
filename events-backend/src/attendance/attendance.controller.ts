@@ -621,5 +621,35 @@ export class AttendanceController {
     }
   }
 
+  /**
+   * Get registered participants with their attendance status (Admin only)
+   * Returns all registered participants and whether they marked attendance (QR scanned)
+   */
+  @Get('event/:eventId/registered-participants')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async getRegisteredParticipantsWithAttendance(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.attendanceService.getRegisteredParticipantsWithAttendance(eventId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Registered participants with attendance status retrieved successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get registered participants with attendance', req.user?.id);
+      throw error;
+    }
+  }
 
 }

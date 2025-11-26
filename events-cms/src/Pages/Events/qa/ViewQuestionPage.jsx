@@ -931,7 +931,7 @@ const ViewQuestionPage = () => {
                                                                         className="fas fa-users"
                                                                         style={{ marginRight: '8px', color: '#007bff' }}
                                                                     ></i>
-                                                                    Attendance Count:
+                                                                    Registered Participants:
                                                                 </span>
                                                                 <span
                                                                     className="field-value"

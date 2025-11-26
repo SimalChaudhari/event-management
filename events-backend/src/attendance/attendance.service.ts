@@ -692,14 +692,23 @@ export class AttendanceService {
       }
 
       // Get the count of checked-in attendees for this event to determine sequence
+      // Note: This function is called AFTER attendance is saved, so count includes current check-in
       const checkedInCount = await this.attendanceRepository
         .createQueryBuilder('attendance')
         .where('attendance.eventId = :eventId', { eventId })
         .andWhere('attendance.status = :status', { status: AttendanceStatus.CheckedIn })
         .getCount();
 
-      // Generate lucky draw number based on sequence (001, 002, 003, etc.)
-      const luckyDrawNumber = String(checkedInCount).padStart(3, '0');
+      // Generate lucky draw number based on sequence (0001, 0002, 0003, etc.) - 4 digits
+      // Since count already includes the current check-in, we use it directly as sequence number
+      // First person: count = 1 -> 0001, Second person: count = 2 -> 0002, etc.
+      const sequenceNumber = checkedInCount;
+      const luckyDrawNumber = String(sequenceNumber).padStart(4, '0');
+      
+      // Validate that number doesn't exceed 9999
+      if (sequenceNumber > 9999) {
+        throw new BadRequestException('Maximum lucky draw numbers (9999) reached for this event');
+      }
 
       // Create or update admin info with lucky draw number
       if (existingAdminInfo) {
@@ -773,6 +782,119 @@ export class AttendanceService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Attendance deletion');
+    }
+  }
+
+  /**
+   * Get registered participants with their attendance status
+   * Returns all registered participants and whether they marked attendance (QR scanned)
+   */
+  async getRegisteredParticipantsWithAttendance(eventId: string): Promise<{
+    participants: Array<{
+      registrationId: string;
+      userId: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      mobile?: string;
+      company?: string;
+      designation?: string;
+      type: string;
+      registeredAt: Date;
+      hasMarkedAttendance: boolean;
+      attendanceStatus?: AttendanceStatus;
+      checkInTime?: Date;
+      checkInMethod?: CheckInMethod;
+      checkOutTime?: Date;
+      luckyDrawNumber?: string; // 4-digit lucky draw number (0001-9999)
+    }>;
+    summary: {
+      totalRegistered: number;
+      totalAttended: number;
+      totalNotAttended: number;
+      attendanceRate: number;
+    };
+  }> {
+    try {
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Get all registered participants for the event
+      const registrations = await this.registerEventRepository.find({
+        where: {
+          eventId: eventId,
+          isRegister: true,
+        },
+        relations: ['user', 'adminInfo'],
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+
+      // Get all attendance records for the event
+      const attendanceRecords = await this.attendanceRepository.find({
+        where: { eventId: eventId },
+      });
+
+      // Create a map of userId -> attendance record for quick lookup
+      const attendanceMap = new Map<string, EventAttendance>();
+      attendanceRecords.forEach((attendance) => {
+        attendanceMap.set(attendance.userId, attendance);
+      });
+
+      // Build participants list with attendance status
+      const participants = registrations.map((registration) => {
+        const attendance = attendanceMap.get(registration.userId || '');
+        const hasMarkedAttendance = !!attendance && 
+          (attendance.status === AttendanceStatus.CheckedIn || 
+           attendance.status === AttendanceStatus.CheckedOut);
+
+        return {
+          registrationId: registration.id,
+          userId: registration.userId || '',
+          firstName: registration.user?.firstName || '',
+          lastName: registration.user?.lastName || '',
+          email: registration.user?.email || '',
+          mobile: registration.user?.mobile || undefined,
+          company: registration.user?.company || undefined,
+          designation: registration.user?.designation || undefined,
+          type: registration.type || 'Attendee',
+          registeredAt: registration.createdAt,
+          hasMarkedAttendance,
+          attendanceStatus: attendance?.status,
+          checkInTime: attendance?.checkInTime,
+          checkInMethod: attendance?.checkInMethod,
+          checkOutTime: attendance?.checkOutTime,
+          luckyDrawNumber: registration.adminInfo?.luckyDrawNumber || undefined,
+        };
+      });
+
+      // Calculate summary statistics
+      const totalRegistered = participants.length;
+      const totalAttended = participants.filter((p) => p.hasMarkedAttendance).length;
+      const totalNotAttended = totalRegistered - totalAttended;
+      const attendanceRate = totalRegistered > 0 ? (totalAttended / totalRegistered) * 100 : 0;
+
+      return {
+        participants,
+        summary: {
+          totalRegistered,
+          totalAttended,
+          totalNotAttended,
+          attendanceRate: Math.round(attendanceRate * 100) / 100, // Round to 2 decimal places
+        },
+      };
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Get registered participants with attendance');
     }
   }
 }

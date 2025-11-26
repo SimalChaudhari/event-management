@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Row, Col, Card, Table, Form, Button, InputGroup } from 'react-bootstrap';
+import { Row, Col, Card, Table, Form, Button, InputGroup, Alert, Modal } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter, exportRegisteredUsersByEvent } from '../../../store/actions/eventActions';
+import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter, exportRegisteredUsersByEvent, downloadAdminInfoCsvTemplate, uploadAdminInfoCsv, updateEventAdminInfo, getEventAdminInfo } from '../../../store/actions/eventActions';
 import FilterComponent from '../../../components/common/FilterComponent';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useFilterLogic from '../../../hooks/useFilterLogic';
@@ -12,6 +12,8 @@ import '../../../assets/css/register.css';
 import RegisterEventModal from './modal/RegisterEventModal';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import ExportConfirmationModal from '../../../components/modal/ExportConfirmationModal';
+import CsvUploadDetailsModal from './modal/CsvUploadDetailsModal';
+import EventAdminInfoModal from './modal/EventAdminInfoModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
@@ -162,7 +164,7 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
                                 <span class="badge ${badgeClass}">${statusText}</span>
                     
                             </p>
-                              <span class="badge badge-primary font-weight-bold mt-2">Total Attendance: ${row.event.attendanceCount}</span>
+                              <span class="badge badge-primary font-weight-bold mt-2">Registered Participants: ${row.event.attendanceCount}</span>
                         </div>
                     `;
                 }
@@ -424,6 +426,16 @@ const RegisteredEvents = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
+    // CSV Upload states (using selectedEventId from filter)
+    const [csvFile, setCsvFile] = useState(null);
+    const [csvUploading, setCsvUploading] = useState(false);
+    const [csvUploadError, setCsvUploadError] = useState('');
+    const [csvUploadSuccess, setCsvUploadSuccess] = useState('');
+    const [csvUploadDetails, setCsvUploadDetails] = useState(null); // Store upload details (successful/failed counts and errors)
+    const [showErrorDetailsModal, setShowErrorDetailsModal] = useState(false);
+    const [showEventAdminInfoModal, setShowEventAdminInfoModal] = useState(false);
+    const [eventAdminInfoData, setEventAdminInfoData] = useState(null);
+
     // Add handler for Add Register Event button
     const handleAddRegisterEvent = useCallback(() => {
         handleAdd();
@@ -479,9 +491,116 @@ const RegisteredEvents = () => {
         window.open(qrPath, '_blank', 'noopener,noreferrer');
     };
 
+    // CSV Upload handlers
+    const handleDownloadTemplate = async () => {
+        await dispatch(downloadAdminInfoCsvTemplate());
+    };
+
+    const handleCsvFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+                setCsvUploadError('Please select a valid CSV file');
+                setCsvFile(null);
+                return;
+            }
+            setCsvFile(file);
+            setCsvUploadError('');
+            setCsvUploadSuccess('');
+        }
+    };
+
+    const handleCsvUpload = async () => {
+        if (!csvFile) {
+            setCsvUploadError('Please select a CSV file');
+            return;
+        }
+
+        if (!selectedEventId) {
+            setCsvUploadError('Please select an event from the filter above');
+            return;
+        }
+
+        setCsvUploading(true);
+        setCsvUploadError('');
+        setCsvUploadSuccess('');
+        setCsvUploadDetails(null);
+
+        try {
+            const result = await dispatch(uploadAdminInfoCsv(csvFile, selectedEventId));
+            if (result.success) {
+                const data = result.data || {};
+                const successfulCount = data.successfulUpdates || 0;
+                const failedCount = data.failedUpdates || 0;
+                const totalProcessed = data.totalProcessed || 0;
+                const errors = data.errors || [];
+
+                // Set upload details
+                setCsvUploadDetails({
+                    successful: successfulCount,
+                    failed: failedCount,
+                    total: totalProcessed,
+                    errors: errors
+                });
+
+                if (failedCount === 0) {
+                    // All successful
+                    setCsvUploadSuccess(`CSV uploaded successfully! All ${successfulCount} records processed.`);
+                    setCsvFile(null);
+                    // Reset file input
+                    const fileInput = document.getElementById('csvFileInput');
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                    // Refresh registrations list
+                    dispatch(participatedEvents());
+                    
+                    // Load existing admin info and show modal
+                    const adminInfoResult = await dispatch(getEventAdminInfo(selectedEventId));
+                    if (adminInfoResult.success) {
+                        setEventAdminInfoData(adminInfoResult.data);
+                    }
+                    setShowEventAdminInfoModal(true);
+                } else {
+                    // Some failed
+                    const successMsg = successfulCount > 0 
+                        ? `${successfulCount} record(s) uploaded successfully. ` 
+                        : '';
+                    const failMsg = `${failedCount} record(s) failed.`;
+                    setCsvUploadSuccess(successMsg + failMsg);
+                    // Clear file input even if some failed
+                    setCsvFile(null);
+                    const fileInput = document.getElementById('csvFileInput');
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                    // Error details will be shown in modal via button
+                }
+            } else {
+                setCsvUploadError(result.message || 'Upload failed');
+            }
+        } catch (error) {
+            setCsvUploadError('An error occurred during upload');
+        } finally {
+            setCsvUploading(false);
+        }
+    };
+
     // Get selected event name for modal
     const selectedEvent = events.find(event => event.id === selectedEventId);
     const selectedEventName = selectedEvent ? selectedEvent.name : '';
+
+    // Handle save event admin info
+    const handleSaveEventAdminInfo = async (eventId, data) => {
+        const result = await dispatch(updateEventAdminInfo(eventId, data));
+        if (result.success) {
+            // Refresh registrations list
+            dispatch(participatedEvents());
+            // Update local data
+            setEventAdminInfoData(data);
+        }
+        return result;
+    };
 
     // Handle export confirmation
     const handleExportConfirm = async () => {
@@ -572,6 +691,143 @@ const RegisteredEvents = () => {
                     </>
                 }
             />
+
+            {/* CSV Upload Section */}
+            <Row className="mb-4">
+                <Col sm={12}>
+                    <Card>
+                        <Card.Header>
+                            <h5 className="mb-0">
+                                <i className="feather icon-upload mr-2"></i>
+                                Upload Table Numbers (CSV)
+                            </h5>
+                        </Card.Header>
+                        <Card.Body>
+                            {!selectedEventId && (
+                                <Alert variant="warning" className="mb-3">
+                                    <i className="feather icon-alert-triangle mr-2"></i>
+                                    <strong>Please select an event from the filter above</strong> to upload CSV file.
+                                </Alert>
+                            )}
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group>
+                                        <Form.Label>CSV File <span className="text-danger">*</span></Form.Label>
+                                        <div>
+                                            <input
+                                                type="file"
+                                                id="csvFileInput"
+                                                className="form-control"
+                                                accept=".csv"
+                                                onChange={handleCsvFileChange}
+                                            />
+                                            {csvFile && (
+                                                <small className="text-muted d-block mt-1">
+                                                    Selected: {csvFile.name}
+                                                </small>
+                                            )}
+                                        </div>
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group>
+                                        <Form.Label>&nbsp;</Form.Label>
+                                        <div className="d-flex gap-2 flex-wrap">
+                                            <Button
+                                                variant="primary"
+                                                onClick={handleCsvUpload}
+                                                disabled={!csvFile || !selectedEventId || csvUploading}
+                                                className="flex-fill"
+                                            >
+                                                {csvUploading ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+                                                        Uploading...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <i className="feather icon-upload mr-1"></i>
+                                                        Upload CSV
+                                                    </>
+                                                )}
+                                            </Button>
+                                            <Button
+                                                variant="outline-primary"
+                                                onClick={handleDownloadTemplate}
+                                                className="flex-fill"
+                                            >
+                                                <i className="feather icon-download mr-1"></i>
+                                                Download Template
+                                            </Button>
+                                            {selectedEventId && (
+                                                <Button
+                                                    variant="outline-secondary"
+                                                    onClick={async () => {
+                                                        const adminInfoResult = await dispatch(getEventAdminInfo(selectedEventId));
+                                                        if (adminInfoResult.success) {
+                                                            setEventAdminInfoData(adminInfoResult.data);
+                                                        }
+                                                        setShowEventAdminInfoModal(true);
+                                                    }}
+                                                    className="flex-fill"
+                                                >
+                                                    <i className="feather icon-edit mr-1"></i>
+                                                    Update Admin Info
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {selectedEventId && (
+                                            <small className="text-muted d-block mt-2">
+                                                <i className="feather icon-info mr-1"></i>
+                                                Selected Event: <strong>{selectedEvent?.name || 'N/A'}</strong>
+                                            </small>
+                                        )}
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                            {csvUploadError && (
+                                <Alert variant="danger" className="mt-3 mb-0">
+                                    <i className="feather icon-alert-circle mr-2"></i>
+                                    {csvUploadError}
+                                </Alert>
+                            )}
+                            {csvUploadSuccess && (
+                                <Alert variant={csvUploadDetails?.failed > 0 ? "warning" : "success"} className="mt-3 mb-0">
+                                    <div className="d-flex justify-content-between align-items-center">
+                                        <span>
+                                            <i className={`feather icon-${csvUploadDetails?.failed > 0 ? 'alert-triangle' : 'check-circle'} mr-2`}></i>
+                                            {csvUploadSuccess}
+                                        </span>
+                                        {csvUploadDetails && (
+                                            <Button
+                                                variant="outline-primary"
+                                                size="sm"
+                                                onClick={() => setShowErrorDetailsModal(true)}
+                                            >
+                                                <i className="feather icon-eye mr-1"></i>
+                                                View Record Details
+                                            </Button>
+                                        )}
+                                    </div>
+                                </Alert>
+                            )}
+                            <Alert variant="info" className="mt-3 mb-2">
+                                <small>
+                                    <strong>Note:</strong> CSV format should be: User ID, Table Number, Dress Code, Hall. 
+                                    Lucky Draw Number is auto-generated when participants mark attendance.
+                                </small>
+                            </Alert>
+                            <Alert variant="warning" className="mb-0">
+                                <small>
+                                    <i className="feather icon-alert-triangle mr-2"></i>
+                                    <strong>Important:</strong> Upload results are temporary. If you refresh the page or navigate away, 
+                                    these details will not be available again. Please review failed records in the modal before closing.
+                                </small>
+                            </Alert>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
             
             <Row>
               
@@ -613,6 +869,23 @@ const RegisteredEvents = () => {
                 isLoading={isExporting}
                 exportType="registrations"
                 eventName={selectedEventName}
+            />
+
+            {/* CSV Upload Record Details Modal */}
+            <CsvUploadDetailsModal
+                show={showErrorDetailsModal}
+                onHide={() => setShowErrorDetailsModal(false)}
+                csvUploadDetails={csvUploadDetails}
+            />
+
+            {/* Event Admin Info Modal */}
+            <EventAdminInfoModal
+                show={showEventAdminInfoModal}
+                onHide={() => setShowEventAdminInfoModal(false)}
+                eventId={selectedEventId}
+                eventName={selectedEventName}
+                onSave={handleSaveEventAdminInfo}
+                initialData={eventAdminInfoData}
             />
         </>
     );

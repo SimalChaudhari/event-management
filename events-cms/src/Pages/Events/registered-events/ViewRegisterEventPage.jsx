@@ -100,9 +100,17 @@ const ViewRegisterEventPage = () => {
                                             Registration Information
                                         </Nav.Link>
                                     </Nav.Item>
+                                    {eventData?.adminInfo && (
+                                        <Nav.Item>
+                                            <Nav.Link eventKey="adminInfo">
+                                                <i className="fas fa-info-circle" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
+                                                Admin Information
+                                            </Nav.Link>
+                                        </Nav.Item>
+                                    )}
                                     <Nav.Item>
                                         <Nav.Link eventKey="details">
-                                            <i className="fas fa-info-circle" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                            <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                             Event Details
                                         </Nav.Link>
                                     </Nav.Item>
@@ -275,87 +283,6 @@ const ViewRegisterEventPage = () => {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                        </div>
-                                    </div>
-
-                                    {/* Registration Status Section */}
-                                    <div
-                                        className="mb-4"
-                                        style={{
-                                            backgroundColor: '#fff',
-                                            borderRadius: '8px',
-                                            padding: '20px',
-                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                            border: '1px solid #e9ecef',
-                                            borderLeft: '4px solid #28a745'
-                                        }}
-                                    >
-                                        <div style={{ padding: '24px' }}>
-                                            <h5
-                                                style={{
-                                                    fontSize: '18px',
-                                                    fontWeight: '600',
-                                                    color: '#2c3e50',
-                                                    marginBottom: '20px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '10px',
-                                                    borderBottom: '2px solid #28a745',
-                                                    paddingBottom: '8px'
-                                                }}
-                                            >
-                                                <i className="fas fa-clipboard-check" style={{ fontSize: '20px', color: '#28a745' }}></i>
-                                                Registration Status
-                                            </h5>
-                                            <Row>
-                                                <Col lg={12} md={12}>
-                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className={`fas ${
-                                                                            eventData.status === 'Success'
-                                                                                ? 'fa-check-circle'
-                                                                                : eventData.status === 'Withdraw'
-                                                                                ? 'fa-times-circle'
-                                                                                : 'fa-clock'
-                                                                        }`}
-                                                                        style={{
-                                                                            marginRight: '8px',
-                                                                            color:
-                                                                                eventData.status === 'Success'
-                                                                                    ? '#28a745'
-                                                                                    : eventData.status === 'Withdraw'
-                                                                                    ? '#dc3545'
-                                                                                    : '#ffc107'
-                                                                        }}
-                                                                    ></i>
-                                                                    Registration Status:
-                                                                </div>
-                                                                <div className="field-value">
-                                                                    <Badge
-                                                                        bg={
-                                                                            eventData.status === 'Success'
-                                                                                ? 'success'
-                                                                                : eventData.status === 'Withdraw'
-                                                                                ? 'danger'
-                                                                                : 'warning'
-                                                                        }
-                                                                        className="px-3 py-2"
-                                                                        style={{ fontSize: '14px' }}
-                                                                    >
-                                                                        {eventData.status}
-                                                                    </Badge>
-                                                                </div>
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 </Col>
                                             </Row>
@@ -548,6 +475,181 @@ const ViewRegisterEventPage = () => {
                                     `}</style>
                                 </div>
                             </Tab.Pane>
+
+                            {/* Admin Information Tab */}
+                            {eventData?.adminInfo && (
+                                <Tab.Pane eventKey="adminInfo">
+                                    <div className="p-2 bg-light">
+                                        <div
+                                            className="mb-4"
+                                            style={{
+                                                backgroundColor: '#fff',
+                                                borderRadius: '8px',
+                                                padding: '20px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                                border: '1px solid #e9ecef',
+                                                borderLeft: '4px solid #6f42c1'
+                                            }}
+                                        >
+                                            <div style={{ padding: '24px' }}>
+                                                <h5
+                                                    style={{
+                                                        fontSize: '18px',
+                                                        fontWeight: '600',
+                                                        color: '#2c3e50',
+                                                        marginBottom: '20px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '10px',
+                                                        borderBottom: '2px solid #6f42c1',
+                                                        paddingBottom: '8px'
+                                                    }}
+                                                >
+                                                    <i className="fas fa-info-circle" style={{ fontSize: '20px', color: '#6f42c1' }}></i>
+                                                    Admin Information
+                                                </h5>
+                                                <Row>
+                                                    <Col lg={6} md={12}>
+                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                            {eventData.adminInfo.tableNumber && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-table" style={{ marginRight: '8px', color: '#007bff' }}></i>
+                                                                            Table Number:
+                                                                        </div>
+                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                            {eventData.adminInfo.tableNumber}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {eventData.adminInfo.dressCode && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-tshirt" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
+                                                                            Dress Code:
+                                                                        </div>
+                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                            {eventData.adminInfo.dressCode}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {eventData.adminInfo.luckyDrawNumber && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-ticket-alt" style={{ marginRight: '8px', color: '#ffc107' }}></i>
+                                                                            Lucky Draw Number:
+                                                                        </div>
+                                                                        <div className="field-value">
+                                                                            <Badge bg="warning" className="px-3 py-1" style={{ fontSize: '14px' }}>
+                                                                                {eventData.adminInfo.luckyDrawNumber}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </Col>
+
+                                                    <Col lg={6} md={12}>
+                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                                            {eventData.adminInfo.hall && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-building" style={{ marginRight: '8px', color: '#28a745' }}></i>
+                                                                            Hall:
+                                                                        </div>
+                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                            {eventData.adminInfo.hall}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {eventData.adminInfo.additionalInformation && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-sticky-note" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
+                                                                            Additional Information:
+                                                                        </div>
+                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                            {eventData.adminInfo.additionalInformation}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {eventData.adminInfo.luckyDrawDateTime && (
+                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
+                                                                    <div className="info-field-container">
+                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
+                                                                            <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
+                                                                            Lucky Draw Date/Time:
+                                                                        </div>
+                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                            {new Date(eventData.adminInfo.luckyDrawDateTime).toLocaleString('en-GB', {
+                                                                                day: '2-digit',
+                                                                                month: 'short',
+                                                                                year: 'numeric',
+                                                                                hour: '2-digit',
+                                                                                minute: '2-digit'
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                            </div>
+                                        </div>
+
+                                        {/* Custom CSS for Responsive Behavior */}
+                                        <style jsx>{`
+                                            /* Desktop: side-by-side layout */
+                                            .info-field-container {
+                                                display: flex;
+                                                justify-content: space-between;
+                                                align-items: center;
+                                            }
+
+                                            .field-label {
+                                                min-width: 140px;
+                                            }
+
+                                            .field-value {
+                                                text-align: right;
+                                                flex: 1;
+                                            }
+
+                                            /* Mobile: stacked layout */
+                                            @media (max-width: 768px) {
+                                                .info-field-container {
+                                                    display: block !important;
+                                                    text-align: left !important;
+                                                }
+
+                                                .field-label {
+                                                    margin-bottom: 5px;
+                                                }
+
+                                                .field-value {
+                                                    text-align: left !important;
+                                                    margin-left: 20px;
+                                                }
+                                            }
+                                        `}</style>
+                                    </div>
+                                </Tab.Pane>
+                            )}
 
                             {/* Event Details Tab */}
                             <Tab.Pane eventKey="details">

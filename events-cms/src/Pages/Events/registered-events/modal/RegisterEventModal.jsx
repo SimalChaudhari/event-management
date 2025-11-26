@@ -80,7 +80,7 @@ function RegisterEventModal({ show, onHide, eventData }) {
                     >
                         <i className="fas fa-users text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
                         <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                            Attendance
+                            Registered Participants
                         </h6>
                         <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
                             {eventData.event?.attendanceCount || 0}

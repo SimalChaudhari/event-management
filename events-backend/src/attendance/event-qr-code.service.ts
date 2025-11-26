@@ -13,6 +13,7 @@ import { EventAttendance, AttendanceStatus, CheckInMethod } from './attendance.e
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
+import { AdminInfo } from '../registerEvent/admin-info.entity';
 import { Status } from '../registerEvent/registerEvent.dto';
 import { 
 
@@ -41,6 +42,8 @@ export class EventQRCodeService {
     private eventRepository: Repository<Event>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(AdminInfo)
+    private adminInfoRepository: Repository<AdminInfo>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -214,6 +217,11 @@ export class EventQRCodeService {
 
       const savedAttendance = await this.attendanceRepository.save(attendance);
 
+      // Auto-generate lucky draw number if feature is enabled and this is first check-in
+      if (event.enableLuckyDrawFeature && savedAttendance.status === AttendanceStatus.CheckedIn && registration) {
+        await this.generateLuckyDrawNumber(registration.id, eventId);
+      }
+
       return {
         success: true,
         message: autoRegistered 
@@ -245,6 +253,56 @@ export class EventQRCodeService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Self check-in');
+    }
+  }
+
+  /**
+   * Generate lucky draw number based on check-in sequence
+   */
+  private async generateLuckyDrawNumber(registerEventId: string, eventId: string): Promise<void> {
+    try {
+      // Check if admin info already exists for this registration
+      const existingAdminInfo = await this.adminInfoRepository.findOne({
+        where: { registerEventId },
+      });
+
+      if (existingAdminInfo && existingAdminInfo.luckyDrawNumber) {
+        // Lucky draw number already exists, don't regenerate
+        return;
+      }
+
+      // Get the count of checked-in attendees for this event to determine sequence
+      // Note: This function is called AFTER attendance is saved, so count includes current check-in
+      const checkedInCount = await this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .where('attendance.eventId = :eventId', { eventId })
+        .andWhere('attendance.status = :status', { status: AttendanceStatus.CheckedIn })
+        .getCount();
+
+      // Generate lucky draw number based on sequence (0001, 0002, 0003, etc.) - 4 digits
+      // Since count already includes the current check-in, we use it directly as sequence number
+      // First person: count = 1 -> 0001, Second person: count = 2 -> 0002, etc.
+      const sequenceNumber = checkedInCount;
+      const luckyDrawNumber = String(sequenceNumber).padStart(4, '0');
+      
+      // Validate that number doesn't exceed 9999
+      if (sequenceNumber > 9999) {
+        throw new BadRequestException('Maximum lucky draw numbers (9999) reached for this event');
+      }
+
+      // Create or update admin info with lucky draw number
+      if (existingAdminInfo) {
+        existingAdminInfo.luckyDrawNumber = luckyDrawNumber;
+        await this.adminInfoRepository.save(existingAdminInfo);
+      } else {
+        const newAdminInfo = this.adminInfoRepository.create({
+          registerEventId,
+          luckyDrawNumber,
+        });
+        await this.adminInfoRepository.save(newAdminInfo);
+      }
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Lucky draw number generation');
     }
   }
 

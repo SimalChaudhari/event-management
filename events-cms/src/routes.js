@@ -60,6 +60,9 @@ const eventComponents = {
     // Q&A
     QA: React.lazy(() => import('./Pages/Events/qa/QAPage.jsx')),
     ViewQuestion: React.lazy(() => import('./Pages/Events/qa/ViewQuestionPage.jsx')),
+    
+    // Attendance Tracking
+    Attendance: React.lazy(() => import('./Pages/Events/attendance/AttendancePage.jsx')),
 };
 
 const MediaManagerComponents = {
@@ -483,6 +486,14 @@ const eventRoutes = [
         exact: true,
         name: 'View Question',
         component: eventComponents.ViewQuestion
+    },
+    
+    // Attendance Tracking
+    {
+        path: EVENT_PATHS.ATTENDANCE,
+        exact: true,
+        name: 'Attendance Tracking',
+        component: eventComponents.Attendance
     }
 ];
 

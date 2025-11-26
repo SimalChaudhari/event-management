@@ -74,6 +74,9 @@ export const EVENT_PATHS = {
     // Q&A
     QA: '/events/qa',
 
+    // Attendance Tracking
+    ATTENDANCE: '/events/attendance/:eventId',
+
     // Public facing pages
     PUBLIC_EVENT_QR: '/events/participants-qr/:eventId',
 };  

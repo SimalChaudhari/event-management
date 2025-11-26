@@ -2,9 +2,19 @@ import { Type } from 'class-transformer';
 import { IsOptional, IsString, IsArray, IsUUID, IsBoolean, ValidateNested } from 'class-validator';
 
 // DTO for creating/updating individual admin info
+// Accepts either registerEventId OR (eventId + userId)
 export class CreateAdminInfoDto {
+  @IsOptional()
   @IsUUID()
-  registerEventId!: string;
+  registerEventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 
   @IsOptional()
   @IsString()
@@ -143,4 +153,18 @@ export class BulkUpdateResponseDto {
   successfulUpdates!: number;
   failedUpdates!: number;
   errors?: string[];
+}
+
+// DTO for updating event-level admin info
+export class UpdateEventAdminInfoDto {
+  @IsUUID()
+  eventId!: string;
+
+  @IsOptional()
+  @IsString()
+  luckyDrawDateTime?: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInformation?: string;
 }

@@ -64,18 +64,39 @@ export const getGalleryById = (id) => async (dispatch) => {
     return false;
 };
 
-export const createOrUpdateGallery = (data , id) => async (dispatch) => {
-
+export const createOrUpdateGallery = (data, eventId) => async (dispatch) => {
     try {
-        const response = await axiosInstance.post(`/gallery/create-or-update/${id}`, data);
+        // Extract eventId from FormData if not provided, or use the provided eventId
+        let finalEventId = eventId;
+        
+        // If eventId is not provided or is null, try to get it from FormData
+        if (!finalEventId && data instanceof FormData) {
+            // FormData doesn't have a direct get method that works in all browsers
+            // So we need to pass eventId separately
+            console.warn('EventId not provided to createOrUpdateGallery. Please pass eventId as second parameter.');
+        }
+        
+        // Validate eventId before making the request
+        if (!finalEventId || finalEventId === 'null' || finalEventId === 'undefined') {
+            toast.error('Event ID is required to create or update gallery');
+            return false;
+        }
+        
+        const response = await axiosInstance.post(`/gallery/create-or-update/${finalEventId}`, data, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Gallery saved successfully!');
-            await dispatch(getAllGalleries());
+            // Don't call getAllGalleries() here - it's unnecessary since user navigates away
+            // If gallery list needs to be refreshed, it will be done when the gallery page loads
             return true;
         }
         return true;
     } catch (error) {
-        const errorMessage = error?.response?.data?.message;
+        const errorMessage = error?.response?.data?.message || 'Failed to save gallery';
         toast.error(errorMessage);
     }
     return false;

@@ -15,11 +15,11 @@ export class CsvUtils {
       if (columns.length < 1) continue;
 
       const csvRow = {
-        registerEventId: columns[0],
-        luckyDrawNumber: columns[1] || undefined,
-        tableNumber: columns[2] || undefined,
-        dressCode: columns[3] || undefined,
-        hall: columns[4] || undefined,
+        userId: columns[0], // First column is User ID
+        // luckyDrawNumber removed - auto-generated on attendance check-in
+        tableNumber: columns[1] || undefined,
+        dressCode: columns[2] || undefined,
+        hall: columns[3] || undefined,
       };
 
       rows.push(csvRow);
@@ -47,14 +47,14 @@ export class CsvUtils {
 
       const columns = row.split(',').map((col) => col.trim());
       
-      // Check if registerEventId is provided
+      // Check if userId is provided
       if (!columns[0] || columns[0].trim() === '') {
-        errors.push(`Row ${i + 1}: Register Event ID is required`);
+        errors.push(`Row ${i + 1}: User ID is required`);
       }
 
-      // Check if registerEventId format is valid (UUID format)
+      // Check if userId format is valid (UUID format)
       if (columns[0] && !this.isValidUUID(columns[0])) {
-        errors.push(`Row ${i + 1}: Invalid Register Event ID format (must be UUID)`);
+        errors.push(`Row ${i + 1}: Invalid User ID format (must be UUID)`);
       }
     }
 
@@ -69,9 +69,9 @@ export class CsvUtils {
    * @returns CSV template string
    */
   static generateCsvTemplate(): string {
-    return `Register Event ID,Lucky Draw Number,Table Number,Dress Code,Hall
-register-event-uuid-1,LD001,T01,Business Casual,Hall A
-register-event-uuid-2,LD002,T02,Business Casual,Hall B`;
+    return `User ID,Table Number,Dress Code,Hall
+user-uuid-1,T01,Business Casual,Hall A
+user-uuid-2,T02,Business Casual,Hall B`;
   }
 
   /**

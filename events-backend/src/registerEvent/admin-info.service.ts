@@ -23,6 +23,7 @@ import {
   ValidationException,
 } from '../utils/exceptions/custom-exceptions';
 import { CsvUtils } from '../utils/csv-utils';
+import * as fs from 'fs';
 
 @Injectable()
 export class AdminInfoService {
@@ -39,39 +40,102 @@ export class AdminInfoService {
   ) {}
 
   // Create or update admin info for a registration
+  // Accepts either registerEventId OR (eventId + userId)
   async createOrUpdateAdminInfo(
     createAdminInfoDto: CreateAdminInfoDto,
   ): Promise<AdminInfo> {
     try {
-      // Check if registration exists
-      const registration = await this.registerEventRepository.findOne({
-        where: { id: createAdminInfoDto.registerEventId },
-      });
-      if (!registration) {
-        throw new ResourceNotFoundException(
-          'Registration',
-          createAdminInfoDto.registerEventId,
+      let registerEventId: string;
+      let registration;
+
+      // Check which format is provided: registerEventId OR (eventId + userId)
+      if (createAdminInfoDto.registerEventId) {
+        // Method 1: Direct registerEventId provided
+        registerEventId = createAdminInfoDto.registerEventId;
+        registration = await this.registerEventRepository.findOne({
+          where: { id: registerEventId },
+        });
+        if (!registration) {
+          throw new ResourceNotFoundException(
+            'Registration',
+            registerEventId,
+          );
+        }
+      } else if (createAdminInfoDto.eventId && createAdminInfoDto.userId) {
+        // Method 2: eventId + userId provided (Admin-friendly)
+        registration = await this.registerEventRepository.findOne({
+          where: {
+            eventId: createAdminInfoDto.eventId,
+            userId: createAdminInfoDto.userId,
+            isRegister: true,
+          },
+        });
+        if (!registration) {
+          throw new ResourceNotFoundException(
+            'Registration',
+            `Event: ${createAdminInfoDto.eventId}, User: ${createAdminInfoDto.userId}`,
+          );
+        }
+        registerEventId = registration.id;
+      } else {
+        throw new ValidationException(
+          'Either registerEventId OR (eventId + userId) must be provided',
         );
       }
 
       // Check if admin info already exists
       let adminInfo = await this.adminInfoRepository.findOne({
-        where: { registerEventId: createAdminInfoDto.registerEventId },
+        where: { registerEventId },
       });
 
+      // Prepare data for admin info (exclude eventId and userId as they're not in entity)
+      const { eventId, userId, registerEventId: _, ...adminInfoData } = createAdminInfoDto;
+      
+      // Convert empty strings to undefined for proper null handling
+      const cleanAdminInfoData = {
+        tableNumber: adminInfoData.tableNumber && adminInfoData.tableNumber.trim() !== '' 
+          ? adminInfoData.tableNumber.trim() 
+          : undefined,
+        dressCode: adminInfoData.dressCode && adminInfoData.dressCode.trim() !== '' 
+          ? adminInfoData.dressCode.trim() 
+          : undefined,
+        hall: adminInfoData.hall && adminInfoData.hall.trim() !== '' 
+          ? adminInfoData.hall.trim() 
+          : undefined,
+        additionalInformation: adminInfoData.additionalInformation && adminInfoData.additionalInformation.trim() !== '' 
+          ? adminInfoData.additionalInformation.trim() 
+          : undefined,
+        // Preserve luckyDrawNumber if it exists (auto-generated)
+        luckyDrawNumber: adminInfoData.luckyDrawNumber,
+        luckyDrawDateTime: adminInfoData.luckyDrawDateTime,
+      };
+
+      const finalAdminInfoDto = {
+        ...cleanAdminInfoData,
+        registerEventId,
+      };
+
       if (adminInfo) {
-        // Update existing admin info - only update non-lucky draw fields if lucky draw already exists
-        if (adminInfo.luckyDrawNumber && createAdminInfoDto.luckyDrawNumber) {
-          // Skip lucky draw number update if it already exists
-          const { luckyDrawNumber, ...updateData } = createAdminInfoDto;
-          Object.assign(adminInfo, updateData);
-        } else {
-          Object.assign(adminInfo, createAdminInfoDto);
+        // Update existing admin info - preserve lucky draw number if it already exists
+        // Update tableNumber, dressCode, hall, and additionalInformation from CSV
+        if (finalAdminInfoDto.tableNumber !== undefined) {
+          adminInfo.tableNumber = finalAdminInfoDto.tableNumber;
         }
+        if (finalAdminInfoDto.dressCode !== undefined) {
+          adminInfo.dressCode = finalAdminInfoDto.dressCode;
+        }
+        if (finalAdminInfoDto.hall !== undefined) {
+          adminInfo.hall = finalAdminInfoDto.hall;
+        }
+        if (finalAdminInfoDto.additionalInformation !== undefined) {
+          adminInfo.additionalInformation = finalAdminInfoDto.additionalInformation;
+        }
+        // Don't overwrite existing luckyDrawNumber or luckyDrawDateTime (auto-generated)
+        // registerEventId should not change
         return await this.adminInfoRepository.save(adminInfo);
       } else {
         // Create new admin info
-        adminInfo = this.adminInfoRepository.create(createAdminInfoDto);
+        adminInfo = this.adminInfoRepository.create(finalAdminInfoDto);
         return await this.adminInfoRepository.save(adminInfo);
       }
     } catch (error) {
@@ -140,6 +204,54 @@ export class AdminInfoService {
       throw this.errorHandler.handleDatabaseError(
         error,
         'Admin info retrieval by event',
+      );
+    }
+  }
+
+  // Update admin info for all registrations of an event
+  async updateEventAdminInfo(
+    eventId: string,
+    luckyDrawDateTime?: string,
+    additionalInformation?: string,
+  ): Promise<{ updatedCount: number }> {
+    try {
+      // Find all adminInfo records for registrations of this event
+      const adminInfoList = await this.adminInfoRepository
+        .createQueryBuilder('adminInfo')
+        .leftJoinAndSelect('adminInfo.registerEvent', 'registerEvent')
+        .leftJoinAndSelect('registerEvent.event', 'event')
+        .where('event.id = :eventId', { eventId })
+        .andWhere('adminInfo.isActive = :isActive', { isActive: true })
+        .getMany();
+
+      let updatedCount = 0;
+
+      for (const adminInfo of adminInfoList) {
+        let hasUpdate = false;
+
+        if (luckyDrawDateTime !== undefined) {
+          adminInfo.luckyDrawDateTime = luckyDrawDateTime
+            ? new Date(luckyDrawDateTime)
+            : undefined;
+          hasUpdate = true;
+        }
+
+        if (additionalInformation !== undefined) {
+          adminInfo.additionalInformation = additionalInformation || undefined;
+          hasUpdate = true;
+        }
+
+        if (hasUpdate) {
+          await this.adminInfoRepository.save(adminInfo);
+          updatedCount++;
+        }
+      }
+
+      return { updatedCount };
+    } catch (error) {
+      throw this.errorHandler.handleDatabaseError(
+        error,
+        'Event admin info update',
       );
     }
   }
@@ -216,8 +328,18 @@ export class AdminInfoService {
     eventId: string,
   ): Promise<BulkUpdateResponseDto> {
     try {
-      // Parse CSV file content
-      const csvContent = file.buffer.toString('utf-8');
+      // Parse CSV file content - handle both buffer (memory) and disk storage
+      let csvContent: string;
+      if (file.buffer) {
+        // File uploaded to memory
+        csvContent = file.buffer.toString('utf-8');
+      } else if (file.path) {
+        // File uploaded to disk (for large files up to 15MB)
+        csvContent = fs.readFileSync(file.path, 'utf-8');
+      } else {
+        throw new Error('File content not available');
+      }
+      
       const csvRows = csvContent.split('\n').filter((row) => row.trim() !== '');
 
       // Remove header row
@@ -243,12 +365,18 @@ export class AdminInfoService {
 
           if (columns.length < 1) continue;
 
+          // Helper function to convert empty strings to undefined
+          const cleanValue = (value: string | undefined) => {
+            if (!value || value.trim() === '') return undefined;
+            return value.trim();
+          };
+
           const csvRow = {
-            registerEventId: columns[0], // First column should be registerEventId
-            luckyDrawNumber: columns[1] || undefined, // Already inserted, so skip
-            tableNumber: columns[2] || undefined,
-            dressCode: columns[3] || undefined,
-            hall: columns[4] || undefined,
+            userId: columns[0]?.trim(), // First column is User ID
+            // luckyDrawNumber removed - auto-generated on attendance check-in
+            tableNumber: cleanValue(columns[1]),
+            dressCode: cleanValue(columns[2]),
+            hall: cleanValue(columns[3]),
           };
 
           await this.processBulkItem(csvRow, eventId);
@@ -295,7 +423,16 @@ export class AdminInfoService {
         );
       }
     } else if (item.userId) {
-      // Direct userId provided (from bulk upload)
+      // Direct userId provided (from CSV upload)
+      // First, check if user exists in the system
+      const user = await this.userRepository.findOne({
+        where: { id: item.userId },
+      });
+      if (!user) {
+        throw new Error(`User with ID ${item.userId} does not exist in the system`);
+      }
+
+      // Then, check if user is registered for this specific event
       registration = await this.registerEventRepository.findOne({
         where: {
           userId: item.userId,
@@ -304,44 +441,49 @@ export class AdminInfoService {
         },
       });
       if (!registration) {
-        throw new Error(`User ${item.userId} is not registered for this event`);
+        // Get event name for better error message
+        const event = await this.eventRepository.findOne({
+          where: { id: eventId },
+          select: ['name'],
+        });
+        const eventName = event?.name || 'this event';
+        throw new Error(
+          `User ${user.firstName} ${user.lastName} (${user.email}) is not registered for ${eventName}. Only registered users can be assigned table numbers.`,
+        );
       }
     } else {
       throw new Error('Either registerEventId or userId must be provided');
     }
 
-    // Check for duplicate lucky draw numbers
-    if (item.luckyDrawNumber) {
-      const existingLuckyDraw = await this.adminInfoRepository.findOne({
-        where: {
-          luckyDrawNumber: item.luckyDrawNumber,
-          isActive: true,
-        },
-      });
-      if (existingLuckyDraw) {
-        throw new Error(
-          `Lucky draw number ${item.luckyDrawNumber} already exists`,
-        );
+    // Lucky draw number is auto-generated on attendance check-in, skip validation
+    // No need to check for duplicate lucky draw numbers from CSV upload
+
+    // Check for duplicate table numbers within the same event only
+    // Table numbers can be same across different events, but not within the same event
+    if (item.tableNumber) {
+      const existingTable = await this.adminInfoRepository
+        .createQueryBuilder('adminInfo')
+        .leftJoin('adminInfo.registerEvent', 'registerEvent')
+        .where('adminInfo.tableNumber = :tableNumber', { tableNumber: item.tableNumber })
+        .andWhere('adminInfo.isActive = :isActive', { isActive: true })
+        .andWhere('registerEvent.eventId = :eventId', { eventId: eventId })
+        .andWhere('adminInfo.registerEventId != :currentRegistrationId', { currentRegistrationId: registration.id })
+        .getOne();
+      
+      if (existingTable) {
+        throw new Error(`Table number ${item.tableNumber} is already assigned to another user in this event`);
       }
     }
 
-    // Check for duplicate table numbers
-    if (item.tableNumber) {
-      const existingTable = await this.adminInfoRepository.findOne({
-        where: {
-          tableNumber: item.tableNumber,
-          isActive: true,
-        },
-      });
-      if (existingTable) {
-        throw new Error(`Table number ${item.tableNumber} already exists`);
-      }
-    }
+    // Hall and dress code duplicates are allowed - multiple people can have the same hall and dress code
+    // Only table number needs to be unique within the same event
+    // No validation needed for hall and dress code duplicates
 
     // Create or update admin info
+    // Note: luckyDrawNumber is auto-generated on attendance check-in, not from CSV
     const adminInfoDto: CreateAdminInfoDto = {
       registerEventId: registration.id,
-      luckyDrawNumber: item.luckyDrawNumber, // Skip if already exists
+      // luckyDrawNumber: not set from CSV - auto-generated on attendance check-in
       tableNumber: item.tableNumber,
       additionalInformation: item.additionalInformation,
       dressCode: item.dressCode,

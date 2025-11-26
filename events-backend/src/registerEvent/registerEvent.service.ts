@@ -733,11 +733,8 @@ export class RegisterEventService {
         ...cleanRegisterEvent
       } = registerEvent;
 
-      // Get admin info for this registration - show if lucky draw feature is enabled
-      const hasAdminInfo =
-        registerEvent.adminInfo && registerEvent.event?.enableLuckyDrawFeature;
-
-      const adminInfo = hasAdminInfo
+      // Get admin info for this registration - always show if it exists
+      const adminInfo = registerEvent.adminInfo
         ? {
             ...registerEvent.adminInfo,
           }

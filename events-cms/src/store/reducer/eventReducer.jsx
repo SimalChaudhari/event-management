@@ -1,4 +1,4 @@
-import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, CREATE_EVENT, UPDATE_EVENT } from "../constants/actionTypes";
+import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, CREATE_EVENT, UPDATE_EVENT, REGISTERED_PARTICIPANTS_WITH_ATTENDANCE, ATTENDANCE_LOADING, ATTENDANCE_ERROR } from "../constants/actionTypes";
 
 const initialState = {
     event: [],
@@ -7,8 +7,9 @@ const initialState = {
     eventByID: '',
     participatedEvents: []  ,
     upcomingEvents: [],
-    
- 
+    registeredParticipantsWithAttendance: null,
+    attendanceLoading: false,
+    attendanceError: null,
 };
 const eventReducer = (state = initialState, { type, payload } = {}) => {
     switch (type) {
@@ -102,6 +103,23 @@ const eventReducer = (state = initialState, { type, payload } = {}) => {
                 eventByID: state.eventByID?.id === updatedEventId ? updatedEvent : state.eventByID
             };
         }
+        case REGISTERED_PARTICIPANTS_WITH_ATTENDANCE:
+            return {
+                ...state,
+                registeredParticipantsWithAttendance: payload,
+                attendanceError: null
+            };
+        case ATTENDANCE_LOADING:
+            return {
+                ...state,
+                attendanceLoading: payload
+            };
+        case ATTENDANCE_ERROR:
+            return {
+                ...state,
+                attendanceError: payload,
+                registeredParticipantsWithAttendance: null
+            };
         default:
             return state;
     }

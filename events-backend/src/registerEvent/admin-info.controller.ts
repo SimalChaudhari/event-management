@@ -21,6 +21,7 @@ import {
   CreateAdminInfoDto,
   UpdateAdminInfoDto,
   BulkUploadAdminInfoDto,
+  UpdateEventAdminInfoDto,
 } from './admin-info.dto';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
@@ -30,6 +31,10 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { CsvUtils } from '../utils/csv-utils';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Controller('api/admin-info')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -284,7 +289,34 @@ export class AdminInfoController {
   }
 
   @Post('upload-csv')
-  @UseInterceptors(FileInterceptor('csvFile'))
+  @UseInterceptors(
+    FileInterceptor('csvFile', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const destinationPath = './uploads/temp';
+          // Create directory if it doesn't exist
+          if (!fs.existsSync(destinationPath)) {
+            fs.mkdirSync(destinationPath, { recursive: true });
+          }
+          cb(null, destinationPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = uuidv4() + path.extname(file.originalname);
+          cb(null, uniqueSuffix);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only CSV files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 15 * 1024 * 1024, // 15MB limit
+      },
+    }),
+  )
   @Roles(UserRole.Admin)
   async uploadCsvFile(
     @UploadedFile() file: Express.Multer.File,
@@ -301,12 +333,19 @@ export class AdminInfoController {
         throw new BadRequestException('Event ID is required');
       }
 
-      // Validate file type
-      if (file.mimetype !== 'text/csv' && !file.originalname.endsWith('.csv')) {
-        throw new BadRequestException('File must be a CSV file');
-      }
-
+      // File type validation is handled by fileFilter in interceptor
+      // Process the file
       const result = await this.adminInfoService.processCsvFile(file, eventId);
+      
+      // Clean up temporary file after processing
+      try {
+        if (file.path && fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (cleanupError) {
+        // Log but don't fail the request if cleanup fails
+        this.errorHandler.logError(cleanupError, 'CSV file cleanup', req.user?.id);
+      }
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -320,6 +359,42 @@ export class AdminInfoController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error: any) {
       this.errorHandler.logError(error, 'CSV file upload', req.user?.id);
+      throw error;
+    }
+  }
+
+  // Update admin info for all registrations of an event
+  @Put('event/:eventId')
+  @Roles(UserRole.Admin)
+  async updateEventAdminInfo(
+    @Param('eventId') eventId: string,
+    @Body() updateDto: Omit<UpdateEventAdminInfoDto, 'eventId'>,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.adminInfoService.updateEventAdminInfo(
+        eventId,
+        updateDto.luckyDrawDateTime,
+        updateDto.additionalInformation,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: `Admin info updated for ${result.updatedCount} registration(s)`,
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(
+        error,
+        'Event admin info update',
+        req.user?.id,
+      );
       throw error;
     }
   }

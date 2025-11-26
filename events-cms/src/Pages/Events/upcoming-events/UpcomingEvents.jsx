@@ -93,7 +93,7 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, restoreTa
                                         <span class="ml-1">${statusText}</span>
                                     </span>
                             </p>
-                                 <span class="badge badge-primary font-weight-bold">Total Attendance: ${row.attendanceCount}</span>
+                                 <span class="badge badge-primary font-weight-bold">Registered Participants: ${row.attendanceCount}</span>
 
                                </div>
                         </div> 

@@ -272,9 +272,11 @@ const AddGalleryPage = () => {
                 }
             }
 
-            const response = await dispatch(createOrUpdateGallery(submitData, galleryId));
+            // Pass eventId instead of galleryId - backend expects eventId in the URL
+            const response = await dispatch(createOrUpdateGallery(submitData, formData.eventId || id));
             if (response) {
-                navigate(`${EVENT_PATHS.LIST_EVENTS}`);
+                // Navigate to gallery page instead of events list
+                navigate(`${EVENT_PATHS.GALLERY}`);
             }
         } catch (error) {
             console.log('An error occurred while saving gallery');
@@ -284,7 +286,8 @@ const AddGalleryPage = () => {
     };
 
     const handleCancel = () => {
-        navigate(`${EVENT_PATHS.LIST_EVENTS}`);
+        // Navigate back to gallery page
+        navigate(`${EVENT_PATHS.GALLERY}`);
     };
 
     // Cleanup preview URLs

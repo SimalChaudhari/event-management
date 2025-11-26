@@ -15,7 +15,7 @@ import {
     deleteSession,
     getSessionsByEvent
 } from '../../store/actions/programmeActions';
-import { speakerList } from '../../store/actions/speakerActions';
+import { speakerList as fetchSpeakerList } from '../../store/actions/speakerActions';
 import { getEventSpeakers } from '../../store/actions/eventActions';
 import DeleteConfirmationModal from '../modal/DeleteConfirmationModal';
 
@@ -129,9 +129,9 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                 }
             }
             
-            // Fallback: fetch all speakers using speakerList action
-            await dispatch(speakerList());
-            // speakerList action updates Redux store, we'll use useEffect to sync
+            // Fallback: fetch all speakers using fetchSpeakerList action
+            await dispatch(fetchSpeakerList());
+            // fetchSpeakerList action updates Redux store, we'll use useEffect to sync
         } catch (error) {
             console.error('Error fetching speakers:', error);
             // toast.error('Failed to load speakers. Please try again.');

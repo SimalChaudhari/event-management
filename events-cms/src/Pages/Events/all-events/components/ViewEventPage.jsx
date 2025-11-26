@@ -205,7 +205,7 @@ const ViewEventPage = () => {
                 >
                     <i className="fas fa-users text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
                     <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                        Attendance
+                        Registered Participants
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
                         {eventData.attendanceCount || 0}
@@ -472,10 +472,20 @@ const ViewEventPage = () => {
                                 Manage Tabs
                             </Button>
 
-                            <Button variant="secondary" onClick={handleBack}>
-                                <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
-                                Back
-                            </Button>
+                            <div className="d-flex gap-2">
+                                <Button 
+                                    variant="primary" 
+                                    onClick={() => navigate(`/events/attendance/${id}`)}
+                                    style={{ marginRight: '8px' }}
+                                >
+                                    <i className="fas fa-clipboard-check" style={{ marginRight: '8px' }}></i>
+                                    Attendance Tracking
+                                </Button>
+                                <Button variant="secondary" onClick={handleBack}>
+                                    <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
+                                    Back
+                                </Button>
+                            </div>
                         </div>
                     </div>
                     <hr />

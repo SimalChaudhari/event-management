@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Row, Col, Badge, Container } from 'react-bootstrap';
+import { Button, Row, Col, Badge, Container, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { useDispatch, useSelector } from 'react-redux';
 import store from '../../../../store/store';
@@ -73,7 +73,8 @@ function AddEventPage() {
         exhibitorIds: [],
         exhibitorDescription: '',
         eventStampDescription: '',
-        eventStampImages: []
+        eventStampImages: [],
+        enableLuckyDrawFeature: false
     });
     const [showMapModal, setShowMapModal] = useState(false);
 
@@ -475,7 +476,8 @@ function AddEventPage() {
                         exhibitorIds: exhibitorIds,
                         exhibitorDescription: exhibitorDescription,
                         eventStampDescription: eventStampDescription,
-                        eventStampImages: eventStampImagesData
+                        eventStampImages: eventStampImagesData,
+                        enableLuckyDrawFeature: editData.enableLuckyDrawFeature || false
                     };
 
                     // Store the original event date to detect if it changes during edit
@@ -781,6 +783,13 @@ function AddEventPage() {
     // Handle form submission - Updated to handle event stamps correctly
     const handleSubmit = async (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        
+        // Prevent double submission
+        if (isSubmitting) {
+            return;
+        }
+        
         setIsSubmitting(true);
 
         // Validate document names before submission
@@ -817,6 +826,14 @@ function AddEventPage() {
             delete dataToSend.speakersData;
         }
 
+        // Clean up empty date strings - convert to null for optional dates
+        const dateFields = ['publishStartDate', 'publishEndDate'];
+        dateFields.forEach(field => {
+            if (dataToSend[field] === '' || dataToSend[field] === null || dataToSend[field] === undefined) {
+                dataToSend[field] = null;
+            }
+        });
+
         Object.keys(dataToSend).forEach((key) => {
             if (key === 'speakerIds') {
                 const speakersArray = Array.isArray(dataToSend.speakerIds) ? dataToSend.speakerIds : [];
@@ -841,6 +858,9 @@ function AddEventPage() {
                         }
                     });
                 }
+            } else if (key === 'enableLuckyDrawFeature') {
+                // Handle lucky draw feature toggle
+                formDataToSend.append('enableLuckyDrawFeature', dataToSend[key] ? 'true' : 'false');
             } else if (key === 'floorPlan') {
                 if (dataToSend[key] instanceof File) {
                     formDataToSend.append('floorPlan', dataToSend[key]);
@@ -872,7 +892,15 @@ function AddEventPage() {
                         formDataToSend.append('documentNames', name);
                     });
                 }
-            } else if (key !== 'speakersData' && dataToSend[key] !== null) {
+            } else if (key !== 'speakersData') {
+                // Skip empty/null/undefined values
+                if (dataToSend[key] === null || dataToSend[key] === undefined) {
+                    return;
+                }
+                // For optional date fields, skip empty strings
+                if (dateFields.includes(key) && (dataToSend[key] === '' || !dataToSend[key])) {
+                    return; // Don't send empty date strings - backend will keep existing value
+                }
                 formDataToSend.append(key, dataToSend[key]);
             }
         });
@@ -2847,6 +2875,64 @@ function AddEventPage() {
                                     {/* Event Stamp Modal */}
                                     {/* Remove the EventStampFormModal import and usage */}
                                     {/* <EventStampFormModal ... /> */}
+                                </Row>
+
+                                {/* Lucky Draw Feature Section */}
+                                <Row className="mt-4">
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <div style={{
+                                                padding: '20px',
+                                                backgroundColor: '#f8f9fa',
+                                                borderRadius: '8px',
+                                                border: '1px solid #e9ecef'
+                                            }}>
+                                                <div className="d-flex justify-content-between align-items-center flex-wrap">
+                                                    <div style={{ flex: '1', minWidth: '300px', marginBottom: '10px' }}>
+                                                        <label className="form-label" style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                                                            <i className="fas fa-gift mr-2" style={{ color: '#4680ff' }}></i>
+                                                            Lucky Draw Feature
+                                                        </label>
+                                                        <p className="text-muted mb-0" style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                                                            Enable lucky draw feature for this event. When participants mark their attendance, 
+                                                            they will automatically receive a 4-digit lucky draw number (0001-9999) based on check-in sequence.
+                                                        </p>
+                                                    </div>
+                                                    <div className="d-flex align-items-center" style={{ minWidth: '180px', justifyContent: 'flex-end' }}>
+                                                        <Form.Check
+                                                            type="switch"
+                                                            id="enableLuckyDrawFeature"
+                                                            label={
+                                                                <span style={{ 
+                                                                    fontWeight: '500',
+                                                                    color: formData.enableLuckyDrawFeature ? '#28a745' : '#6c757d',
+                                                                    marginLeft: '8px'
+                                                                }}>
+                                                                    {formData.enableLuckyDrawFeature ? (
+                                                                        <span><i className="fas fa-check-circle mr-1"></i>Enabled</span>
+                                                                    ) : (
+                                                                        <span><i className="fas fa-times-circle mr-1"></i>Disabled</span>
+                                                                    )}
+                                                                </span>
+                                                            }
+                                                            checked={formData.enableLuckyDrawFeature || false}
+                                                            onChange={(e) => {
+                                                                setFormData((prev) => ({
+                                                                    ...prev,
+                                                                    enableLuckyDrawFeature: e.target.checked
+                                                                }));
+                                                            }}
+                                                            style={{ 
+                                                                fontSize: '1rem',
+                                                                display: 'flex',
+                                                                alignItems: 'center'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
                                 </Row>
 
                                 {/* Programme Management Section - Available in both create and edit modes */}

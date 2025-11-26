@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST, CREATE_EVENT, UPDATE_EVENT } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST, CREATE_EVENT, UPDATE_EVENT, ATTENDANCE_LOADING, ATTENDANCE_ERROR, REGISTERED_PARTICIPANTS_WITH_ATTENDANCE } from '../constants/actionTypes';
 
 // Helper function to dispatch loading state
 const setEventLoading = (dispatch, loading) => {
@@ -201,7 +201,18 @@ export const createEvent = (data) => async (dispatch) => {
     }
 };
 
+// Track ongoing update requests to prevent duplicate calls
+const ongoingUpdates = new Map();
+
 export const editEvent = (id, data) => async (dispatch) => {
+    // Prevent duplicate update calls for the same event
+    if (ongoingUpdates.has(id)) {
+        console.warn(`Update already in progress for event ${id}`);
+        return { success: false, message: 'Update already in progress' };
+    }
+    
+    ongoingUpdates.set(id, true);
+    
     try {
         const response = await axiosInstance.put(`/events/update/${id}`, data);
 
@@ -209,11 +220,13 @@ export const editEvent = (id, data) => async (dispatch) => {
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Event updated successfully!');
             
-            // Get the updated event data from response or fetch full details
+            // Get the updated event data from response
             let updatedEvent = response.data?.data;
             
-            // If response doesn't have full event details, fetch it
-            if (!updatedEvent || (!updatedEvent.speakers && !updatedEvent.categories)) {
+            // Only fetch full event details if response doesn't have event data at all
+            // Don't check for speakers/categories as they might not be in the update response
+            if (!updatedEvent || !updatedEvent.id) {
+                // Only fetch if we don't have basic event data
                 const eventResponse = await axiosInstance.get(`/events/${id}`);
                 updatedEvent = eventResponse.data?.data || eventResponse.data;
             }
@@ -225,7 +238,7 @@ export const editEvent = (id, data) => async (dispatch) => {
                     payload: updatedEvent
                 });
                 
-                return { success: true, event: updatedEvent };
+                return { success: true, data: updatedEvent, event: updatedEvent };
             }
             
             return { success: true };
@@ -236,6 +249,9 @@ export const editEvent = (id, data) => async (dispatch) => {
         const errorMessage = error?.response?.data?.message;
         toast.error(errorMessage);
         return { success: false };
+    } finally {
+        // Remove from ongoing updates map
+        ongoingUpdates.delete(id);
     }
 };
 
@@ -635,6 +651,7 @@ export const getSpeakersForEvent = () => async (dispatch) => {
     try {
         // setEventLoading(dispatch, true);
         const response = await axiosInstance.get('users/speakers/get');
+        // console.log(response.data);
         if (response.data.success) {
             return response.data.data || [];
         }
@@ -649,11 +666,25 @@ export const getSpeakersForEvent = () => async (dispatch) => {
 };
 
 // Get speakers assigned to a specific event
+// Note: Speakers are included in event data, so we fetch event and extract speakers
 export const getEventSpeakers = (eventId) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get(`/events/get/${eventId}/speakers`);
+        const response = await axiosInstance.get(`/events/${eventId}`);
         if (response.data?.success) {
-            return { success: true, data: response.data.data || [] };
+            // Extract speakers from event data
+            const eventData = response.data.data;
+            const speakers = eventData?.speakers || eventData?.speakersData || [];
+            
+            // Transform speakers to match expected format if needed
+            const formattedSpeakers = Array.isArray(speakers) ? speakers.map(speaker => {
+                // Handle different speaker data structures
+                if (speaker.speaker) {
+                    return speaker.speaker; // If nested in eventSpeaker
+                }
+                return speaker; // If direct speaker object
+            }).filter(Boolean) : [];
+            
+            return { success: true, data: formattedSpeakers };
         }
         return { success: false, data: [] };
     } catch (error) {
@@ -678,6 +709,171 @@ export const getCategoriesForEvent = () => async (dispatch) => {
         return [];
     } finally {
         // setEventLoading(dispatch, false);
+    }
+};
+
+// Get registered participants with attendance status for an event
+export const getRegisteredParticipantsWithAttendance = (eventId) => async (dispatch) => {
+    try {
+        dispatch({
+            type: ATTENDANCE_LOADING,
+            payload: true
+        });
+
+        const response = await axiosInstance.get(`/attendance/event/${eventId}/registered-participants`);
+        
+        if (response.data.success) {
+            dispatch({
+                type: REGISTERED_PARTICIPANTS_WITH_ATTENDANCE,
+                payload: response.data.data
+            });
+            
+            return {
+                success: true,
+                data: response.data.data
+            };
+        }
+        
+        return {
+            success: false,
+            data: null
+        };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch attendance data';
+        dispatch({
+            type: ATTENDANCE_ERROR,
+            payload: errorMessage
+        });
+        toast.error(errorMessage);
+        return {
+            success: false,
+            data: null
+        };
+    } finally {
+        dispatch({
+            type: ATTENDANCE_LOADING,
+            payload: false
+        });
+    }
+};
+
+// Download CSV template for admin info
+export const downloadAdminInfoCsvTemplate = () => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get('/admin-info/csv-template', {
+            responseType: 'blob',
+        });
+        
+        // Create blob and download
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'admin-info-template.csv');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('CSV template downloaded successfully');
+        return true;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download CSV template';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Upload CSV file for admin info
+export const uploadAdminInfoCsv = (file, eventId) => async (dispatch) => {
+    try {
+        if (!file) {
+            toast.error('Please select a CSV file');
+            return { success: false, message: 'No file selected' };
+        }
+
+        if (!eventId) {
+            toast.error('Please select an event');
+            return { success: false, message: 'No event selected' };
+        }
+
+        const formData = new FormData();
+        formData.append('csvFile', file);
+        formData.append('eventId', eventId);
+
+        const response = await axiosInstance.post('/admin-info/upload-csv', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        if (response.data.success) {
+            const result = response.data.data;
+            const message = result.message || 'CSV uploaded successfully';
+            toast.success(message);
+            
+            // Show detailed results if available
+            if (result.successfulUpdates > 0 || result.failedUpdates > 0) {
+                const details = `Successful: ${result.successfulUpdates}, Failed: ${result.failedUpdates}`;
+                if (result.errors && result.errors.length > 0) {
+                    console.error('CSV Upload Errors:', result.errors);
+                }
+            }
+            
+            return { 
+                success: true, 
+                data: result,
+                message 
+            };
+        }
+        
+        return { success: false, message: response.data.message || 'Upload failed' };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to upload CSV file';
+        toast.error(errorMessage);
+        return { success: false, message: errorMessage };
+    }
+};
+
+// Update event-level admin info (luckyDrawDateTime and additionalInformation)
+export const updateEventAdminInfo = (eventId, data) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.put(`/admin-info/event/${eventId}`, data);
+        
+        if (response.data.success) {
+            toast.success(response.data.message || 'Admin information updated successfully');
+            return { success: true, data: response.data.data };
+        }
+        
+        return { success: false, message: response.data.message || 'Update failed' };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to update admin information';
+        toast.error(errorMessage);
+        return { success: false, message: errorMessage };
+    }
+};
+
+// Get event-level admin info
+export const getEventAdminInfo = (eventId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/admin-info/event/${eventId}`);
+        
+        if (response.data.success && response.data.data && response.data.data.length > 0) {
+            // Get the first adminInfo record to extract common values
+            const firstRecord = response.data.data[0];
+            return {
+                success: true,
+                data: {
+                    luckyDrawDateTime: firstRecord.luckyDrawDateTime,
+                    additionalInformation: firstRecord.additionalInformation
+                }
+            };
+        }
+        
+        return { success: true, data: null };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch admin information';
+        return { success: false, message: errorMessage };
     }
 };
 
