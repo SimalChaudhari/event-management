@@ -52,28 +52,19 @@ export class PDFReceiptUtils {
     const pageWidth = doc.page.width;
     const margin = 50;
     const contentWidth = pageWidth - (margin * 2);
+    let currentY = 50;
 
-    // Header Section - Company info on left, Receipt title on right
+    // ==================== HEADER SECTION ====================
+    
+    // Left side - Logo area (simplified, no border)
+    const logoAreaWidth = 100;
     doc
-      .fontSize(16)
+      .fontSize(12)
       .font('Helvetica-Bold')
-      .text('Your Company Inc.', margin, 50)
-      .fontSize(10)
-      .font('Helvetica')
-      .text('1234 Company St, Company Town, ST 12345', margin, 70);
+      .fillColor('#333333')
+      .text('LOGO', margin, currentY + 10);
 
-    // Receipt Title on right
-    doc
-      .fontSize(20)
-      .font('Helvetica-Bold')
-      .fillColor('#28a745')
-      .text('TAX INVOICE / RECEIPT', margin + contentWidth - 200, 50, {
-        width: 200,
-        align: 'right',
-      })
-      .fillColor('black');
-
-    // Receipt Number and Date
+    // Right side - Receipt Number and Date
     const receiptDate = receiptData.completedAt
       ? new Date(receiptData.completedAt).toLocaleDateString('en-US', {
           day: '2-digit',
@@ -88,156 +79,203 @@ export class PDFReceiptUtils {
 
     const receiptNumber = receiptData.orderNo || receiptData.checkoutId;
     
+    const rightAlignX = margin + contentWidth - 180;
+    
     doc
       .fontSize(10)
-      .font('Helvetica')
-      .text(`Receipt #: ${receiptNumber}`, margin + contentWidth - 200, 80, {
-        width: 200,
+      .font('Helvetica-Bold')
+      .fillColor('#333333')
+      .text('Receipt No:', rightAlignX, currentY, {
+        width: 180,
         align: 'right',
       })
-      .text(`Receipt date: ${receiptDate}`, margin + contentWidth - 200, 95, {
-        width: 200,
+      .fontSize(10)
+      .font('Helvetica')
+      .text(receiptNumber, rightAlignX, currentY + 12, {
+        width: 180,
+        align: 'right',
+      })
+      .fontSize(10)
+      .font('Helvetica-Bold')
+      .text('Receipt Date:', rightAlignX, currentY + 32, {
+        width: 180,
+        align: 'right',
+      })
+      .fontSize(10)
+      .font('Helvetica')
+      .text(receiptDate, rightAlignX, currentY + 44, {
+        width: 180,
         align: 'right',
       });
 
-    // Billed To Section
-    doc.y = 130;
+    // Center - TAX INVOICE / RECEIPT Title
+    currentY = 120;
     doc
-      .fontSize(10)
-      .font('Helvetica')
+      .fontSize(22)
+      .font('Helvetica-Bold')
       .fillColor('#28a745')
-      .text('Billed To:', margin)
-      .fillColor('black')
+      .text('TAX INVOICE / RECEIPT', margin, currentY, {
+        width: contentWidth,
+        align: 'center',
+      })
+      .fillColor('#000000');
+
+    // ==================== BILLED TO SECTION ====================
+    currentY = 170;
+    doc
+      .fontSize(11)
+      .font('Helvetica-Bold')
+      .fillColor('#28a745')
+      .text('Billed To:', margin, currentY)
+      .fillColor('#000000')
+      .fontSize(11)
       .font('Helvetica-Bold')
       .text(
         `${receiptData.user.firstName} ${receiptData.user.lastName}`,
         margin,
-        doc.y + 5,
+        currentY + 18,
       );
 
-    // Itemized List Section
-    doc.y = doc.y + 30;
+    // ==================== TABLE SECTION ====================
+    currentY = 220;
+    const tableTop = currentY;
+    const headerHeight = 35;
+    const rowHeight = 35;
     
+    // Column widths - only 3 columns: SNO, Name, Amount
+    const colWidths = {
+      sno: 50,
+      name: 300,
+      amount: 150,
+    };
+
+    // Calculate column X positions
+    const snoX = margin + 10;
+    const nameX = snoX + colWidths.sno;
+    const amountX = nameX + colWidths.name;
+
     // Table Header
-    const tableTop = doc.y;
-    const itemHeight = 25;
-    
-    // Column positions
-    const qtyX = margin + 10;
-    const descX = margin + 80;
-    const unitPriceX = margin + 380;
-    const amountX = margin + contentWidth - 10;
-    
-    // Header background
     doc
-      .rect(margin, tableTop, contentWidth, itemHeight)
+      .rect(margin, tableTop, contentWidth, headerHeight)
       .fill('#28a745');
-    
-    // Header text - 4 columns properly aligned
-    doc
-      .fontSize(10)
-      .font('Helvetica-Bold')
-      .fillColor('white')
-      .text('QTY', qtyX, tableTop + 8)
-      .text('Description', descX, tableTop + 8)
-      .text('Unit Price', unitPriceX, tableTop + 8, { align: 'right', width: 100 })
-      .text('Amount', amountX, tableTop + 8, { align: 'right' })
-      .fillColor('black');
-
-    // Event Item
-    const itemY = tableTop + itemHeight;
-    const eventDescription = receiptData.event.name;
-    const unitPrice = receiptData.discount
-      ? receiptData.totalAmount + receiptData.discount
-      : receiptData.totalAmount;
-    const quantity = 1;
-    const amount = receiptData.totalAmount;
-
-    // Item row - properly aligned with header
-    doc
-      .fontSize(10)
-      .font('Helvetica')
-      .text(quantity.toFixed(2), qtyX, itemY + 8)
-      .text(eventDescription, descX, itemY + 8, { width: 290 })
-      .text(`$${unitPrice.toFixed(2)}`, unitPriceX, itemY + 8, { align: 'right', width: 100 })
-      .text(`$${amount.toFixed(2)}`, amountX, itemY + 8, { align: 'right' });
-
-    // Divider line
-    const dividerY = itemY + itemHeight + 10;
-    doc
-      .moveTo(margin, dividerY)
-      .lineTo(margin + contentWidth, dividerY)
-      .stroke();
-
-    // Summary Section
-    doc.y = dividerY + 15;
-    const summaryStartX = margin + 300;
-    const summaryWidth = contentWidth - 300;
-    let summaryY = doc.y;
-
-    // Subtotal
-    if (receiptData.discount) {
-      doc
-        .fontSize(10)
-        .font('Helvetica')
-        .text('Subtotal:', summaryStartX, summaryY)
-        .text(`$${unitPrice.toFixed(2)}`, summaryStartX + summaryWidth - 10, summaryY, { align: 'right' });
-      summaryY += itemHeight;
-
-      // Discount
-      doc
-        .text('Discount:', summaryStartX, summaryY)
-        .text(`-$${receiptData.discount.toFixed(2)}`, summaryStartX + summaryWidth - 10, summaryY, { align: 'right' });
-      summaryY += itemHeight;
-    }
-
-    // Total Amount with background
-    const totalY = summaryY;
-    doc
-      .rect(summaryStartX - 5, totalY - 2, summaryWidth + 10, itemHeight)
-      .fill('#e8f5e9');
     
     doc
       .fontSize(11)
       .font('Helvetica-Bold')
-      .text('Total (USD):', summaryStartX, totalY + 3)
-      .text(`$${receiptData.totalAmount.toFixed(2)}`, summaryStartX + summaryWidth - 10, totalY + 3, { align: 'right' });
+      .fillColor('#FFFFFF');
+    
+    // Header text - 3 columns only
+    doc.text('SNO', snoX, tableTop + 12, { width: colWidths.sno - 10, align: 'center' });
+    doc.text('Name', nameX, tableTop + 12, { width: colWidths.name - 10 });
+    doc.text('Amount', amountX, tableTop + 12, { width: colWidths.amount - 10, align: 'right' });
 
-    // Transaction ID if available
-    if (receiptData.transactionId) {
-      doc.y = totalY + itemHeight + 20;
+    // Table Data Row
+    let rowY = tableTop + headerHeight;
+    const eventName = receiptData.event.name || 'Event Registration';
+    const originalAmount = receiptData.discount
+      ? receiptData.totalAmount + receiptData.discount
+      : receiptData.totalAmount;
+    const discountAmount = receiptData.discount || 0;
+    const couponCode = receiptData.couponCode || receiptData.promoCode || null;
+    const finalTotal = receiptData.totalAmount;
+
+    // Row background
+    doc
+      .rect(margin, rowY, contentWidth, rowHeight)
+      .fill('#F8F9FA');
+
+    // Row content - Main row with SNO, Name, Amount
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor('#000000')
+      .text('1', snoX, rowY + 12, { width: colWidths.sno - 10, align: 'center' })
+      .text(eventName, nameX, rowY + 12, { width: colWidths.name - 10, ellipsis: true })
+      .text(`$${originalAmount.toFixed(2)}`, amountX, rowY + 12, { width: colWidths.amount - 10, align: 'right' });
+
+    // Discount and Coupon info below the row (aligned with Name column)
+    let detailY = rowY + rowHeight;
+    
+    // Discount row
+    if (discountAmount > 0) {
       doc
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#666666')
-        .text(`Transaction ID: ${receiptData.transactionId}`, margin);
+        .text('Discount:', nameX, detailY + 8)
+        .fillColor('#000000')
+        .text(`-$${discountAmount.toFixed(2)}`, amountX, detailY + 8, { width: colWidths.amount - 10, align: 'right' });
+      detailY += 20;
     }
 
-    // Payment Method
-    if (receiptData.paymentMethod || receiptData.paymentGateway) {
-      doc.y = doc.y + 10;
+    // Coupon code row
+    if (couponCode) {
       doc
         .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text(`Apply Coupon No: ${couponCode}`, nameX, detailY + 8);
+      detailY += 20;
+    }
+
+    // Divider line before total
+    const dividerY = detailY + 10;
+    doc
+      .moveTo(margin, dividerY)
+      .lineTo(margin + contentWidth, dividerY)
+      .lineWidth(1)
+      .stroke();
+
+    // Total row
+    const totalY = dividerY + 15;
+    doc
+      .fontSize(12)
+      .font('Helvetica-Bold')
+      .fillColor('#000000')
+      .text('Total:', nameX, totalY)
+      .text(`$${finalTotal.toFixed(2)}`, amountX, totalY, { width: colWidths.amount - 10, align: 'right' });
+
+    const tableBottom = totalY + 25;
+
+    // ==================== TRANSACTION DETAILS ====================
+    currentY = tableBottom + 30;
+    
+    if (receiptData.transactionId) {
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text(`Transaction ID: ${receiptData.transactionId}`, margin, currentY);
+      currentY += 18;
+    }
+
+    if (receiptData.paymentMethod || receiptData.paymentGateway) {
+      doc
+        .fontSize(10)
         .font('Helvetica')
         .fillColor('#666666')
         .text(
           `Payment Method: ${receiptData.paymentMethod || receiptData.paymentGateway || 'N/A'}`,
           margin,
+          currentY,
         );
+      currentY += 25;
     }
 
-    // Notes Section
+    // ==================== NOTES SECTION ====================
     const pageHeight = doc.page.height;
     const notesY = pageHeight - 100;
     
     doc.y = notesY;
     doc
-      .fontSize(9)
-      .font('Helvetica')
+      .fontSize(10)
+      .font('Helvetica-Bold')
       .fillColor('#28a745')
-      .text('Notes', margin)
-      .fillColor('black')
-      .text('Thank you for your business!', margin, doc.y + 5);
+      .text('Notes:', margin)
+      .fillColor('#000000')
+      .fontSize(10)
+      .font('Helvetica')
+      .text('Thank you!', margin, doc.y + 18);
 
     // Finalize PDF
     doc.end();

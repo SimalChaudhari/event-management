@@ -33,8 +33,8 @@ export class Exhibitor {
   bothNumber?: string;
 
   // Add new fields: email, mobile, UEN, and logo
-  @Column({ type: 'varchar', nullable: true })
-  email?: string;
+  @Column({ type: 'varchar' })
+  email!: string;
 
   @Column({ type: 'varchar', nullable: true })
   mobile?: string;
@@ -71,6 +71,10 @@ export class Exhibitor {
   // Event booth relationship
   @OneToMany(() => EventBooth, (eventBooth) => eventBooth.exhibitor)
   eventBooths!: EventBooth[];
+
+  // Event Staff relationship
+  @OneToMany('EventStaff', 'exhibitor')
+  eventStaffs?: any[];
 
   @CreateDateColumn()
   createdAt!: Date;

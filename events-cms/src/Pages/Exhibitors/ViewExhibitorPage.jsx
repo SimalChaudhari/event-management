@@ -7,6 +7,7 @@ import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
+import EventStaffComponent from '../../components/events/EventStaffComponent';
 
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
@@ -668,7 +669,7 @@ const ViewExhibitorPage = () => {
                 </Row>
             </InfoCard>
 
-            {/* Exhibitor Overview - Clean Style */}
+            {/* Company Information & Details - Single Card with Logo */}
             <div className="mb-3">
                 <div style={{
                     backgroundColor: '#fff',
@@ -681,18 +682,18 @@ const ViewExhibitorPage = () => {
                         color: '#495057',
                         fontSize: '14px',
                         fontWeight: '600',
-                        marginBottom: '15px',
+                        marginBottom: '20px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         borderBottom: '2px solid #3498db',
                         paddingBottom: '8px'
                     }}>
-                        Exhibitor Overview
+                        Company Information & Details
                     </h6>
                     
                     <Row>
-                        {/* Company Logo - First */}
-                        <Col lg={4} md={12} className="mb-3">
+                        {/* Left Column - Logo */}
+                        <Col lg={3} md={12} className="mb-3">
                             <div className="text-center">
                                 <div style={{ 
                                     fontSize: '12px', 
@@ -750,161 +751,93 @@ const ViewExhibitorPage = () => {
                             </div>
                         </Col>
 
-                        {/* Company Information */}
-                        <Col lg={8} md={12}>
-                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Company Name:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.companyName}</span>
+                        {/* Middle Column - Contact Information */}
+                        <Col lg={4} md={12} className="mb-3">
+                            <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Company Name:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.companyName}</span>
+                                </div>
+                                
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Email:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.email}</span>
+                                </div>
+                                
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Mobile:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{formatPhoneDisplay(exhibitor.mobile)}</span>
+                                </div>
+                                
+                                <div className="d-flex justify-content-between align-items-center py-2">
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Created:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
+                                        {new Date(exhibitor.createdAt).toLocaleDateString()}
+                                    </span>
+                                </div>
+                                
+                              
                             </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Booth Number:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber}</span>
+                        </Col>
+
+                        {/* Right Column - Company Details */}
+                        <Col lg={5} md={12} className="mb-3">
+                            <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Booth Number:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber || 'Not provided'}</span>
+                                </div>
+
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>UEN Number:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
+                                </div>
+                                
+                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
+                                    borderBottom: '1px solid #f1f1f1'
+                                }}>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Status:</span>
+                                    <Badge 
+                                        bg={exhibitor.isActive ? 'success' : 'danger'} 
+                                        style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
+                                    >
+                                        {exhibitor.isActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </div>
+
+                      
+                                
+                                <div className="d-flex justify-content-between align-items-center py-2">
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Last Updated:</span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
+                                        {new Date(exhibitor.updatedAt).toLocaleDateString()}
+                                    </span>
+                                </div>
                             </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>UEN Number:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center py-2">
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Status:</span>
-                                <Badge 
-                                    bg={exhibitor.isActive ? 'success' : 'danger'} 
-                                    style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
-                                >
-                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </div>
-                        </div>
                         </Col>
                     </Row>
-                </div>
-            </div>
 
-            {/* Contact Information & Company Details - 2 Grid Layout */}
-            <Row className="mb-3">
-                {/* Left Column - Contact Information */}
-                <Col lg={6} md={12} className="mb-3">
-                    <div style={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e9ecef', 
-                        borderLeft: '4px solid #27ae60',
-                        borderRadius: '8px',
-                        padding: '20px',
-                        height: '100%'
-                    }}>
-                        <h6 style={{
-                            color: '#495057',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            marginBottom: '15px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            borderBottom: '2px solid #27ae60',
-                            paddingBottom: '8px'
-                        }}>
-                            Contact Information
-                        </h6>
-                        
-                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
+                    {/* Company Description - Full Width Below */}
+                    <Row className="mt-3">
+                        <Col xs={12}>
+                            <div style={{ 
+                                borderTop: '1px solid #e9ecef',
+                                paddingTop: '15px'
                             }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Email:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.email}</span>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Mobile:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{formatPhoneDisplay(exhibitor.mobile)}</span>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>UEN Number:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center py-2">
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '80px', fontSize: '14px' }}>Created:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
-                                    {new Date(exhibitor.createdAt).toLocaleDateString()}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </Col>
-
-                {/* Right Column - Company Details */}
-                <Col lg={6} md={12} className="mb-3">
-                    <div style={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e9ecef', 
-                        borderLeft: '4px solid #f39c12',
-                        borderRadius: '8px',
-                        padding: '20px',
-                        height: '100%'
-                    }}>
-                        <h6 style={{
-                            color: '#495057',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            marginBottom: '15px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            borderBottom: '2px solid #f39c12',
-                            paddingBottom: '8px'
-                        }}>
-                            Company Details
-                        </h6>
-                        
-                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Booth Number:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber}</span>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Status:</span>
-                                <Badge 
-                                    bg={exhibitor.isActive ? 'success' : 'danger'} 
-                                    style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
-                                >
-                                    {exhibitor.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </div>
-                            
-                            <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                borderBottom: '1px solid #f1f1f1'
-                            }}>
-                                <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '90px', fontSize: '14px' }}>Last Updated:</span>
-                                <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
-                                    {new Date(exhibitor.updatedAt).toLocaleDateString()}
-                                </span>
-                            </div>
-                            
-                            <hr style={{ margin: '12px 0', borderColor: '#f1f1f1' }} />
-                            
-                            <div className="mb-2">
                                 <div style={{ 
                                     fontWeight: 'bold', 
                                     color: '#495057', 
-                                    marginBottom: '8px',
+                                    marginBottom: '10px',
                                     fontSize: '14px'
                                 }}>
                                     Company Description:
@@ -913,19 +846,20 @@ const ViewExhibitorPage = () => {
                                     color: exhibitor.companyDescription ? '#212529' : '#6c757d',
                                     fontStyle: exhibitor.companyDescription ? 'normal' : 'italic',
                                     fontSize: '14px',
-                                    lineHeight: '1.5',
-                                    maxHeight: '70px',
-                                    overflowY: 'auto',
-                                    fontWeight: exhibitor.companyDescription ? '500' : 'normal'
+                                    lineHeight: '1.6',
+                                    padding: '12px',
+                                    backgroundColor: '#f8f9fa',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e9ecef',
+                                    fontWeight: exhibitor.companyDescription ? '400' : 'normal'
                                 }}>
                                     {exhibitor.companyDescription || 'No description provided'}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </Col>
-            </Row>
-
+                        </Col>
+                    </Row>
+                </div>
+            </div>
 
             {/* Additional Resources Section */}
             <InfoCard title="Additional Resources" icon="📁" borderColor="#e74c3c">
@@ -991,6 +925,22 @@ const ViewExhibitorPage = () => {
                                 📁 Documents ({exhibitor.documents?.length || 0})
                             </Nav.Link>
                         </Nav.Item>
+                        {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
+                            <Nav.Item>
+                                <Nav.Link 
+                                    eventKey="eventStaff"
+                                    style={{
+                                        borderRadius: '8px',
+                                        fontWeight: '500',
+                                        border: '1px solid #dee2e6',
+                                        fontSize: '14px',
+                                        padding: '8px 16px'
+                                    }}
+                                >
+                                    👥 Event Staff ({exhibitor.eventStaff.length})
+                                </Nav.Link>
+                            </Nav.Item>
+                        )}
                     </Nav>
 
                     <Tab.Content style={{ marginTop: '20px' }}>
@@ -1038,6 +988,22 @@ const ViewExhibitorPage = () => {
                                 {renderDocuments()}
                             </div>
                         </Tab.Pane>
+                        {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
+                            <Tab.Pane eventKey="eventStaff">
+                                <div style={{
+                                    backgroundColor: '#fff',
+                                    padding: '20px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}>
+                                    <p className="text-muted mb-3" style={{ fontSize: '14px' }}>
+                                        Users who have switched to exhibitor role for this company using booth code.
+                                    </p>
+                                    <EventStaffComponent eventStaff={exhibitor.eventStaff} showTitle={false} />
+                                </div>
+                            </Tab.Pane>
+                        )}
                     </Tab.Content>
                 </Tab.Container>
             </InfoCard>

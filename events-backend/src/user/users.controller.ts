@@ -31,12 +31,14 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { UserUtils } from '../utils/user.utils';
 import { RoleSwitchDto, CreateSpeakerDto } from './users.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('api/users')
 export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly errorHandler: ErrorHandlerService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get('')
@@ -654,16 +656,36 @@ export class UserController {
         });
       }
 
-      const updatedUser = await this.userService.switchRole(
+      await this.userService.switchRole(
         userId, 
         roleSwitchDto.newRole, 
         roleSwitchDto.boothCode
       );
+
+      // Get full user entity after role switch for token generation
+      const fullUserEntity = await this.userService.getFullUserEntity(userId);
+
+      // Generate new tokens with updated role using AuthService
+      const { accessToken, refreshToken } = this.authService.generateTokensForUser(fullUserEntity);
+      
+      // Get sanitized user data for response
+      const updatedUser = await this.userService.getById(userId);
+
+      // Format user data to match expected response format
+      const { password, ...userData } = updatedUser;
+      const formattedUser = {
+        id: userData.id,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
+        mobile: userData.mobile,
+        isVerify: userData.isVerify,
+      };
       
       const successResponse = {
-        success: true,
-        message: 'Role switched successfully',
-        data: updatedUser,
+        user: formattedUser,
+        accessToken,
+        refreshToken,
       };
       
       return response.status(HttpStatus.OK).json(successResponse);

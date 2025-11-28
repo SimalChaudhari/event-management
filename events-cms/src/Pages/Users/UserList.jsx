@@ -100,6 +100,40 @@ function userTable(
                 }
             },
             {
+                data: 'role',
+                title: 'Role',
+                render: function (data, type, row) {
+                    const role = row.role || 'user';
+                    let badgeClass = 'badge-light-primary';
+                    let roleText = role.charAt(0).toUpperCase() + role.slice(1);
+                    let iconClass = 'feather icon-user';
+                    
+                    // Set different colors and icons based on role
+                    if (role === 'exhibitor') {
+                        badgeClass = 'badge-light-warning';
+                        iconClass = 'feather icon-briefcase';
+                    } else if (role === 'speaker') {
+                        badgeClass = 'badge-light-info';
+                        iconClass = 'feather icon-mic';
+                    } else if (role === 'admin') {
+                        badgeClass = 'badge-light-danger';
+                        iconClass = 'feather icon-shield';
+                    } else if (role === 'moderator') {
+                        badgeClass = 'badge-light-success';
+                        iconClass = 'feather icon-users';
+                    }
+                    
+                    return `
+                        <div class="d-inline-block align-middle">
+                            <span class="badge ${badgeClass}">
+                                <i class="${iconClass} mr-1"></i>
+                                ${roleText}
+                            </span>
+                        </div>
+                    `;
+                }
+            },
+            {
                 data: 'mobile',
                 title: 'Mobile',
                 render: function (data, type, row) {
@@ -504,6 +538,7 @@ const UserList = () => {
                                 <thead>
                                     <tr>
                                         <th>User Details</th>
+                                        <th>Role</th>
                                         <th>Contact & Location</th>
                                         <th>Address</th>
                                         <th>Last Updated</th>

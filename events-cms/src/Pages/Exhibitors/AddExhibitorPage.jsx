@@ -623,16 +623,10 @@ function AddExhibitorPage() {
             setError('Email is required');
             return false;
         }
-        if (!formData.mobile.trim()) {
-            setError('Mobile number is required');
-            return false;
-        }
-        if (!formData.uen.trim()) {
-            setError('UEN is required');
-            return false;
-        }
-        if (!formData.bothNumber.trim()) {
-            setError('Booth number is required');
+        // Email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email.trim())) {
+            setError('Please enter a valid email address');
             return false;
         }
         return true;
@@ -815,7 +809,7 @@ function AddExhibitorPage() {
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="companyName">
-                                                Company Name
+                                                Company Name <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -833,7 +827,7 @@ function AddExhibitorPage() {
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="email">
-                                                Email
+                                                Email <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="email"
@@ -854,8 +848,8 @@ function AddExhibitorPage() {
                                                 name="mobile"
                                                 value={formData.mobile}
                                                 onChange={handleChange}
-                                                label="Mobile"
-                                                required={true}
+                                                label="Mobile (Optional)"
+                                                required={false}
                                             />
                                         </div>
                                     </Col>
@@ -883,7 +877,7 @@ function AddExhibitorPage() {
                                     <Col sm={4}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="uen">
-                                                UEN Number
+                                                UEN Number (Optional)
                                             </label>
                                             <input
                                                 type="text"
@@ -892,7 +886,6 @@ function AddExhibitorPage() {
                                                 value={formData.uen}
                                                 onChange={handleChange}
                                                 placeholder="UEN Number"
-                                                required
                                             />
                                         </div>
                                     </Col>
@@ -900,7 +893,7 @@ function AddExhibitorPage() {
                                     <Col sm={4}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="bothNumber">
-                                                Booth Number
+                                                Booth Number (Optional)
                                             </label>
                                             <input
                                                 type="text"
@@ -909,7 +902,6 @@ function AddExhibitorPage() {
                                                 value={formData.bothNumber}
                                                 onChange={handleChange}
                                                 placeholder="Booth Number"
-                                                required
                                             />
                                         </div>
                                     </Col>

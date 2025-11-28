@@ -118,6 +118,14 @@ export class AuthService {
     }
   }
 
+  // Public method to generate tokens for role switch
+  generateTokensForUser(user: UserEntity): { accessToken: string; refreshToken: string } {
+    return {
+      accessToken: this.generateAccessToken(user),
+      refreshToken: this.generateRefreshToken(user),
+    };
+  }
+
   private generateOTP(): string {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
   }

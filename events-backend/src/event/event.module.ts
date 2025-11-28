@@ -5,6 +5,7 @@ import { EventService } from './event.service';
 import { EventController } from './event.controller';
 import { Event, EventExhibitor } from './event.entity';
 import { EventBooth } from './event-booth.entity';
+import { EventStaff } from './event-staff.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EventCategory, EventSpeaker } from './event-speaker.entity';
@@ -45,6 +46,7 @@ import { Engagement } from '../engagement/engagement.entity';
         FavoriteEvent,
         EventExhibitor,
         EventBooth,
+        EventStaff,
         EventAgenda,
         Exhibitor,
         Survey,

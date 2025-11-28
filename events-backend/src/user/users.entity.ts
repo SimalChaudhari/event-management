@@ -199,5 +199,9 @@ export class UserEntity {
   // Moderator relationship - when user has Moderator role
   @OneToMany('ModeratorEvent', 'moderator')
   moderatorEvents?: any[];
+
+  // Event Staff relationship - when user switches to exhibitor role for an event
+  @OneToMany('EventStaff', 'user')
+  eventStaffs?: any[];
   
 }

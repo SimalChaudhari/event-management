@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Button, Badge, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import StandardComponentTemplate from '../StandardComponentTemplate';
 import ImageModalComponent from './ImageModalComponent';
+import EventStaffComponent from './EventStaffComponent';
 
 /**
  * EventExhibitorsComponent - Component to display event exhibitors
@@ -11,6 +13,9 @@ import ImageModalComponent from './ImageModalComponent';
  * @param {Function} getImageSrc - Function to get image source URL
  */
 const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
+    // Get user role from Redux state to check if admin
+    const { authUser } = useSelector((state) => state.auth);
+    // const isAdmin = authUser?.role === 'admin';
     const navigate = useNavigate();
     const [showModal, setShowModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -62,10 +67,16 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
             <div className="mb-4">
                 <h6>Exhibitor Description:</h6>
                 <hr />
-                <p style={{ textAlign: 'justify',fontSize: '14px', lineHeight: '1.6' }}>
-                    {exhibitors.exhibitorDescription}
-                </p>
-            
+                <div 
+                    style={{ 
+                        textAlign: 'justify',
+                        fontSize: '14px', 
+                        lineHeight: '1.6' 
+                    }}
+                    dangerouslySetInnerHTML={{ 
+                        __html: exhibitors.exhibitorDescription || '' 
+                    }}
+                />
             </div>
         );
     };
@@ -80,7 +91,8 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
             'fas fa-sticky-note': '#6c757d', // Gray for description
             'fas fa-envelope': '#dc3545', // Red for email
             'fas fa-phone': '#28a745', // Green for phone
-            'fas fa-id-card': '#6f42c1' // Purple for UEN
+            'fas fa-id-card': '#6f42c1', // Purple for UEN
+            'fas fa-qrcode': '#28a745' // Green for booth code
         };
         return colorMap[iconClass] || '#495057';
     };
@@ -98,7 +110,7 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                 {label}:
             </span>
             <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
-                {value}
+                {typeof value === 'string' || typeof value === 'number' ? value : value}
             </span>
         </div>
     );
@@ -226,28 +238,101 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                                 iconClass="fas fa-id-card" 
                             />
 
-                         
-                            {/* View More Button */}
-                            <div className="mt-3 d-flex justify-content-end">
-                                <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    onClick={() => navigate(`${EXHIBITOR_PATHS.VIEW_EXHIBITOR}/${exhibitor.id}`)}
-                                    style={{
-                                        borderRadius: '8px',
-                                        padding: '8px 16px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        transition: 'none'
-                                    }}
-                                    className="no-hover"
-                                >
-                                    <i className="fas fa-eye me-2" style={{ marginRight: 5, color: getIconColor('fas fa-eye') }}></i>
-                                    View More
-                                </Button>
-                            </div>
+                            {/* Booth Code - Only visible to Admin */}
+                            {exhibitor.boothCode && (
+                                <InfoField 
+                                    label="Booth Code" 
+                                    value={
+                                        <Badge 
+                                            bg="success" 
+                                            style={{ 
+                                                fontSize: '14px', 
+                                                padding: '6px 12px',
+                                                fontWeight: '600',
+                                                letterSpacing: '1px'
+                                            }}
+                                        >
+                                            {exhibitor.boothCode}
+                                        </Badge>
+                                    } 
+                                    iconClass="fas fa-qrcode" 
+                                />
+                            )}
                         </Col>
                     </Row>
+
+                    {/* Event Staff Section - Full Width */}
+                    {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
+                        <div className="mt-4 pt-4" style={{ 
+                            borderTop: '2px solid #e9ecef',
+                            backgroundColor: '#f8f9fa',
+                            marginLeft: '-16px',
+                            marginRight: '-16px',
+                            paddingLeft: '16px',
+                            paddingRight: '16px',
+                            paddingBottom: '16px',
+                            borderRadius: '0 0 8px 8px',
+                            width: 'calc(100% + 32px)'
+                        }}>
+                            <div className="mb-3">
+                                <h6 style={{ 
+                                    fontSize: '17px', 
+                                    fontWeight: '700', 
+                                    color: '#2c3e50',
+                                    marginBottom: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}>
+                                    <i className="fas fa-users me-2" style={{ 
+                                        color: '#17a2b8',
+                                        fontSize: '18px',
+                                        backgroundColor: '#e7f3f5',
+                                        padding: '8px',
+                                        borderRadius: '8px',
+                                        width: '36px',
+                                        height: '36px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}></i>
+                                    <span>Event Staff</span>
+                                    <Badge 
+                                        bg="info" 
+                                        style={{ 
+                                            fontSize: '12px',
+                                            padding: '4px 10px',
+                                            borderRadius: '12px',
+                                            fontWeight: '600',
+                                            marginLeft: '12px'
+                                        }}
+                                    >
+                                        {exhibitor.eventStaff.length} {exhibitor.eventStaff.length === 1 ? 'Member' : 'Members'}
+                                    </Badge>
+                                </h6>
+                            </div>
+                            <EventStaffComponent eventStaff={exhibitor.eventStaff} showTitle={false} />
+                        </div>
+                    )}
+
+                    {/* View More Button - Below Event Staff */}
+                    <div className="mt-4 d-flex justify-content-end">
+                        <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => navigate(`${EXHIBITOR_PATHS.VIEW_EXHIBITOR}/${exhibitor.id}`)}
+                            style={{
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                transition: 'none'
+                            }}
+                            className="no-hover"
+                        >
+                            <i className="fas fa-eye me-2" style={{ marginRight: 5, color: getIconColor('fas fa-eye') }}></i>
+                            View More
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>

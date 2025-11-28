@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
 import { Event, EventExhibitor } from './event.entity';
 import { EventBooth } from './event-booth.entity';
+import { EventStaff } from './event-staff.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { Between, Not, In } from 'typeorm';
 import { UserEntity, UserRole } from '../user/users.entity';
@@ -56,6 +57,8 @@ export class EventService {
     private eventExhibitorRepository: Repository<EventExhibitor>,
     @InjectRepository(EventBooth)
     private eventBoothRepository: Repository<EventBooth>,
+    @InjectRepository(EventStaff)
+    private eventStaffRepository: Repository<EventStaff>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Category)
@@ -175,28 +178,48 @@ export class EventService {
               where: { id: exhibitorId.trim() },
             });
 
-            // Create EventExhibitor record
-            const eventExhibitor = new EventExhibitor();
-            eventExhibitor.eventId = savedEvent.id;
-            eventExhibitor.exhibitorId = exhibitorId.trim();
-            await this.eventExhibitorRepository.save(eventExhibitor);
+            // Check if EventExhibitor already exists
+            let eventExhibitor = await this.eventExhibitorRepository.findOne({
+              where: {
+                eventId: savedEvent.id,
+                exhibitorId: exhibitorId.trim(),
+              },
+            });
 
-            // Create EventBooth record with unique code
-            const eventBooth = new EventBooth();
-            eventBooth.eventId = savedEvent.id;
-            eventBooth.exhibitorId = exhibitorId.trim();
-            eventBooth.uniqueCode = this.generateUniqueCode();
-            await this.eventBoothRepository.save(eventBooth);
+            if (!eventExhibitor) {
+              // Create EventExhibitor record
+              eventExhibitor = new EventExhibitor();
+              eventExhibitor.eventId = savedEvent.id;
+              eventExhibitor.exhibitorId = exhibitorId.trim();
+              await this.eventExhibitorRepository.save(eventExhibitor);
+            }
 
-            // Send email to exhibitor if email exists
-            if (exhibitor && exhibitor.email) {
-              await this.sendBoothCodeEmail(
-                exhibitor.email,
-                eventBooth.uniqueCode,
-                savedEvent.name,
-                this.formatDateForEmail(savedEvent.startDate),
-                savedEvent.venue || savedEvent.location || 'To be announced',
-              );
+            // Check if EventBooth already exists (to avoid duplicate code generation)
+            let eventBooth = await this.eventBoothRepository.findOne({
+              where: {
+                eventId: savedEvent.id,
+                exhibitorId: exhibitorId.trim(),
+              },
+            });
+
+            if (!eventBooth) {
+              // Create EventBooth record with unique code
+              eventBooth = new EventBooth();
+              eventBooth.eventId = savedEvent.id;
+              eventBooth.exhibitorId = exhibitorId.trim();
+              eventBooth.uniqueCode = this.generateUniqueCode();
+              await this.eventBoothRepository.save(eventBooth);
+
+              // Send email to exhibitor if email exists (only for new booth codes)
+              if (exhibitor && exhibitor.email) {
+                await this.sendBoothCodeEmail(
+                  exhibitor.email,
+                  eventBooth.uniqueCode,
+                  savedEvent.name,
+                  this.formatDateForEmail(savedEvent.startDate),
+                  savedEvent.venue || savedEvent.location || 'To be announced',
+                );
+              }
             }
           }),
         );
@@ -444,15 +467,57 @@ export class EventService {
 
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
-              exhibitors:
-                event?.eventExhibitors
-                  ?.filter((ee) => ee.exhibitor.isActive)
-                  ?.map((ee) => {
-                    return {
+              exhibitors: await Promise.all(
+                (event?.eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive) || [])
+                  .map(async (ee) => {
+                    const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
+                    const exhibitorData = {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
                     };
-                  }) || [],
+
+                    // Add booth code only for admin users
+                    if (userRole === UserRole.Admin && exhibitorId) {
+                      const eventBooth = await this.eventBoothRepository.findOne({
+                        where: {
+                          eventId: event.id,
+                          exhibitorId: exhibitorId,
+                        },
+                      });
+                      if (eventBooth) {
+                        (exhibitorData as any).boothCode = eventBooth.uniqueCode;
+                      }
+                    }
+
+                    // Get Event Staff for this exhibitor
+                    if (exhibitorId) {
+                      const exhibitorStaffs = await this.eventStaffRepository.find({
+                        where: {
+                          eventId: event.id,
+                          exhibitorId: exhibitorId,
+                        },
+                        relations: ['user'],
+                      });
+
+                      // Format event staff data for this exhibitor
+                      (exhibitorData as any).eventStaff = exhibitorStaffs.map((es) => ({
+                        id: es.user?.id,
+                        firstName: es.user?.firstName || '',
+                        lastName: es.user?.lastName || '',
+                        email: es.user?.email || '',
+                        mobile: es.user?.mobile || '',
+                        profilePicture: es.user?.profilePicture || null,
+                        role: es.user?.role || 'exhibitor',
+                        createdAt: es.createdAt,
+                      }));
+                    } else {
+                      (exhibitorData as any).eventStaff = [];
+                    }
+
+                    return exhibitorData;
+                  }),
+              ),
             },
           };
 
@@ -762,6 +827,57 @@ export class EventService {
 
       const speakerSchedule = EventSpeakerUtils.buildSpeakerSchedule(event);
 
+      // Get booth codes and event staff for all exhibitors
+      const exhibitorsWithBoothCodes = await Promise.all(
+        eventExhibitors.map(async (ee) => {
+          const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
+          const exhibitorData = {
+            ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+            promotionalOffers: ee.exhibitor.promotionalOffers || [],
+          };
+
+          // Add booth code only for admin users
+          if (userRole === UserRole.Admin && exhibitorId) {
+            const eventBooth = await this.eventBoothRepository.findOne({
+              where: {
+                eventId: id,
+                exhibitorId: exhibitorId,
+              },
+            });
+            if (eventBooth) {
+              (exhibitorData as any).boothCode = eventBooth.uniqueCode;
+            }
+          }
+
+          // Get Event Staff for this exhibitor
+          if (exhibitorId) {
+            const exhibitorStaffs = await this.eventStaffRepository.find({
+              where: {
+                eventId: id,
+                exhibitorId: exhibitorId,
+              },
+              relations: ['user'],
+            });
+
+            // Format event staff data for this exhibitor
+            (exhibitorData as any).eventStaff = exhibitorStaffs.map((es) => ({
+              id: es.user?.id,
+              firstName: es.user?.firstName || '',
+              lastName: es.user?.lastName || '',
+              email: es.user?.email || '',
+              mobile: es.user?.mobile || '',
+              profilePicture: es.user?.profilePicture || null,
+              role: es.user?.role || 'exhibitor',
+              createdAt: es.createdAt,
+            }));
+          } else {
+            (exhibitorData as any).eventStaff = [];
+          }
+
+          return exhibitorData;
+        }),
+      );
+
       const eventResponse = {
         ...eventFilteredData,
         color: getEventColor(event.type),
@@ -775,12 +891,7 @@ export class EventService {
         },
         exhibitors: {
           exhibitorDescription: exhibitorDescription || '',
-          exhibitors: eventExhibitors.map((ee) => {
-            return {
-              ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-              promotionalOffers: ee.exhibitor.promotionalOffers || [],
-            };
-          }),
+          exhibitors: exhibitorsWithBoothCodes,
         },
         attendanceCount: attendanceCount,
         surveyDetails: surveyDetails,
@@ -1156,6 +1267,11 @@ export class EventService {
       if (eventDto.exhibitorIds) {
         const newExhibitorIdsArray = eventDto.exhibitorIds.split(',');
 
+        // Create set of new exhibitor IDs for comparison
+        const newExhibitorIdSet = new Set(
+          newExhibitorIdsArray.map((id) => id.trim()),
+        );
+
         // Process each exhibitor ID
         await Promise.all(
           newExhibitorIdsArray.map(async (exhibitorId) => {
@@ -1175,24 +1291,34 @@ export class EventService {
               eventExhibitor.exhibitorId = trimmedExhibitorId;
               await this.eventExhibitorRepository.save(eventExhibitor);
 
-              // Create new EventBooth record with unique code
-              const eventBooth = new EventBooth();
-              eventBooth.eventId = eventId;
-              eventBooth.exhibitorId = trimmedExhibitorId;
-              eventBooth.uniqueCode = this.generateUniqueCode();
-              await this.eventBoothRepository.save(eventBooth);
+              // Check if EventBooth already exists (to avoid duplicate code generation)
+              let eventBooth = await this.eventBoothRepository.findOne({
+                where: {
+                  eventId: eventId,
+                  exhibitorId: trimmedExhibitorId,
+                },
+              });
 
-              // Send email only to new exhibitors
-              if (exhibitor && exhibitor.email && currentEvent) {
-                await this.sendBoothCodeEmail(
-                  exhibitor.email,
-                  eventBooth.uniqueCode,
-                  currentEvent.name,
-                  this.formatDateForEmail(currentEvent.startDate),
-                  currentEvent.venue ||
-                    currentEvent.location ||
-                    'To be announced',
-                );
+              if (!eventBooth) {
+                // Create new EventBooth record with unique code
+                eventBooth = new EventBooth();
+                eventBooth.eventId = eventId;
+                eventBooth.exhibitorId = trimmedExhibitorId;
+                eventBooth.uniqueCode = this.generateUniqueCode();
+                await this.eventBoothRepository.save(eventBooth);
+
+                // Send email only to new exhibitors (only for new booth codes)
+                if (exhibitor && exhibitor.email && currentEvent) {
+                  await this.sendBoothCodeEmail(
+                    exhibitor.email,
+                    eventBooth.uniqueCode,
+                    currentEvent.name,
+                    this.formatDateForEmail(currentEvent.startDate),
+                    currentEvent.venue ||
+                      currentEvent.location ||
+                      'To be announced',
+                  );
+                }
               }
             }
             // If exhibitor already exists, no need to recreate booth or send email
@@ -1200,9 +1326,6 @@ export class EventService {
         );
 
         // Remove exhibitors who are no longer in the list
-        const newExhibitorIdSet = new Set(
-          newExhibitorIdsArray.map((id) => id.trim()),
-        );
         const exhibitorsToRemove = existingExhibitorIds.filter(
           (ee) => ee.exhibitorId && !newExhibitorIdSet.has(ee.exhibitorId),
         );

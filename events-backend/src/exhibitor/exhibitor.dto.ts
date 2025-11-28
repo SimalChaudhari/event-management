@@ -71,9 +71,9 @@ export class ExhibitorDto {
   bothNumber?: string;
 
   // Add new fields: email, mobile, UEN, and logo
-  @IsOptional()
+  @IsNotEmpty()
   @IsEmail()
-  email?: string;
+  email!: string;
 
   @IsOptional()
   @IsString()

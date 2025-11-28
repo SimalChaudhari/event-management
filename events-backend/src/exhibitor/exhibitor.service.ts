@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
@@ -60,7 +60,31 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
 
-      return exhibitor;
+      // Get Event Staff for this exhibitor
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      
+      const eventStaffs = await eventStaffRepository.find({
+        where: { exhibitorId: id },
+        relations: ['user'],
+      });
+
+      // Format event staff data
+      const formattedEventStaff = eventStaffs.map((es) => ({
+        id: es.user?.id,
+        firstName: es.user?.firstName || '',
+        lastName: es.user?.lastName || '',
+        email: es.user?.email || '',
+        mobile: es.user?.mobile || '',
+        profilePicture: es.user?.profilePicture || null,
+        role: es.user?.role || 'exhibitor',
+        createdAt: es.createdAt,
+      }));
+
+      return {
+        ...exhibitor,
+        eventStaff: formattedEventStaff,
+      };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -185,6 +209,415 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Exhibitor event images update');
+    }
+  }
+
+  /**
+   * Get all exhibitors with event-wise booth and staff information
+   * Access: Admin and Exhibitor roles only
+   * - If Exhibitor: Only show their own events
+   * - If Admin: Show all exhibitors and all events
+   */
+  async getAllExhibitorsWithEventDetails(userId?: string, userRole?: string, userEmail?: string): Promise<any> {
+    try {
+      const { EventBooth } = await import('../event/event-booth.entity');
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { Event } = await import('../event/event.entity');
+
+      const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+
+      let exhibitors = [];
+
+      // If user is Exhibitor, find their exhibitor record
+      if (userRole === 'exhibitor' && userId) {
+        // First try to find exhibitor by user email
+        let exhibitor = null;
+        if (userEmail) {
+          exhibitor = await this.exhibitorRepository.findOne({
+            where: { email: userEmail },
+            relations: ['promotionalOffers'],
+          });
+        }
+        
+        // If not found by email, try to find via EventStaff table
+        if (!exhibitor && userId) {
+          const userStaffRecords = await eventStaffRepository.find({
+            where: { userId: userId },
+            relations: ['exhibitor'],
+          });
+          
+          // Get unique exhibitor IDs from staff records
+          const exhibitorIds = [...new Set(userStaffRecords.map(es => es.exhibitorId).filter(Boolean))];
+          
+          if (exhibitorIds.length > 0) {
+            // Get the first exhibitor (or we could get all, but for exhibitor role, usually one)
+            exhibitor = await this.exhibitorRepository.findOne({
+              where: { id: exhibitorIds[0] },
+              relations: ['promotionalOffers'],
+            });
+          }
+        }
+        
+        if (exhibitor) {
+          exhibitors = [exhibitor];
+        } else {
+          // No exhibitor found for this user
+          return {
+            memberStaff: [],
+          };
+        }
+      } 
+      // If Admin, show all exhibitors
+      else {
+        exhibitors = await this.exhibitorRepository.find({
+          relations: ['promotionalOffers'],
+        });
+      }
+
+      // Combine all memberStaff from relevant exhibitors into one array
+      const allMemberStaff = [];
+
+      for (const exhibitor of exhibitors) {
+        const exhibitorData = await this.formatExhibitorWithEventDetails(
+          exhibitor,
+          eventBoothRepository,
+          eventStaffRepository,
+          eventRepository,
+        );
+        
+        if (exhibitorData?.memberStaff && exhibitorData.memberStaff.length > 0) {
+          // For non-admin users, filter to only show events where they are staff members
+          if (userRole !== 'admin' && userId) {
+            const filteredStaffData = exhibitorData.memberStaff.filter((staffEntry: any) => {
+              // Check if the logged-in user is in the staffs array for this event
+              const staffs = staffEntry?.eventBooth?.staffs || [];
+              return staffs.some((staff: any) => staff.id === userId);
+            });
+            
+            if (filteredStaffData.length > 0) {
+              allMemberStaff.push(...filteredStaffData);
+            }
+          } else {
+            // Admin sees all events
+            allMemberStaff.push(...exhibitorData.memberStaff);
+          }
+        }
+      }
+
+      return {
+        memberStaff: allMemberStaff || [],
+      };
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Exhibitors retrieval with event details');
+    }
+  }
+
+  /**
+   * Get exhibitor by ID with event-wise booth and staff information
+   * Access: Admin and Exhibitor users only
+   * Exhibitor users can only access their own exhibitor data
+   */
+  async getExhibitorByIdWithEventDetails(
+    id: string,
+    userId?: string,
+    userRole?: string,
+    userEmail?: string,
+  ): Promise<any> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id },
+        relations: ['promotionalOffers'],
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
+
+      // If user is Exhibitor (not Admin), verify they can access this exhibitor
+      if (userRole === 'exhibitor' && userId) {
+        let userCanAccess = false;
+
+        // Check if exhibitor email matches user email
+        if (userEmail && exhibitor.email === userEmail) {
+          userCanAccess = true;
+        }
+
+        // If not found by email, check via EventStaff table
+        if (!userCanAccess && userId) {
+          const { EventStaff } = await import('../event/event-staff.entity');
+          const eventStaffRepository =
+            this.exhibitorRepository.manager.getRepository(EventStaff);
+
+          const userStaffRecord = await eventStaffRepository.findOne({
+            where: {
+              exhibitorId: id,
+              userId: userId,
+            },
+          });
+
+          if (userStaffRecord) {
+            userCanAccess = true;
+          }
+        }
+
+        // If user cannot access this exhibitor, throw forbidden error
+        if (!userCanAccess) {
+          throw new ForbiddenException(
+            'You do not have permission to access this exhibitor data',
+          );
+        }
+      }
+
+      const { EventBooth } = await import('../event/event-booth.entity');
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { Event } = await import('../event/event.entity');
+
+      const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+
+      return await this.formatExhibitorWithEventDetails(
+        exhibitor,
+        eventBoothRepository,
+        eventStaffRepository,
+        eventRepository,
+      );
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor retrieval by ID with event details');
+    }
+  }
+
+  /**
+   * Format exhibitor with event-wise booth and staff information
+   */
+  private async formatExhibitorWithEventDetails(
+    exhibitor: Exhibitor,
+    eventBoothRepository: Repository<any>,
+    eventStaffRepository: Repository<any>,
+    eventRepository: Repository<any>,
+  ): Promise<any> {
+    // Get all event booths for this exhibitor
+    const eventBooths = await eventBoothRepository.find({
+      where: { exhibitorId: exhibitor.id },
+      relations: ['event'],
+    });
+
+    // Get all event staff for this exhibitor
+    const eventStaffs = await eventStaffRepository.find({
+      where: { exhibitorId: exhibitor.id },
+      relations: ['user', 'event'],
+    });
+
+    // Get all unique event IDs
+    const eventIds = new Set<string>();
+    eventBooths.forEach(booth => eventIds.add(booth.eventId));
+    eventStaffs.forEach(staff => eventIds.add(staff.eventId));
+
+    // Fetch all events at once
+    const events = await eventRepository.find({
+      where: Array.from(eventIds).map(id => ({ id })),
+    });
+
+    // Create event lookup map
+    const eventLookup = new Map<string, any>();
+    events.forEach(event => eventLookup.set(event.id, event));
+
+    // Build memberStaff array - one entry per event booth
+    const memberStaff = [];
+
+    // Process each event booth
+    for (const booth of eventBooths) {
+      const eventId = booth.eventId;
+      const event = eventLookup.get(eventId) || booth.event;
+      
+      // Get staff members for this specific event
+      const eventStaffMembers = eventStaffs
+        .filter(es => es.eventId === eventId && es.user)
+        .map((es) => ({
+          id: es.user.id,
+          firstName: es.user.firstName || '',
+          lastName: es.user.lastName || '',
+          email: es.user.email || '',
+          mobile: es.user.mobile || '',
+          profilePicture: es.user.profilePicture || null,
+          role: es.user.role || 'exhibitor',
+          createdAt: es.createdAt,
+        }));
+
+      // Remove duplicates from staff members
+      const uniqueStaffMembers = Array.from(
+        new Map(eventStaffMembers.map((staff) => [staff.id, staff])).values()
+      );
+
+      memberStaff.push({
+        eventBooth: {
+          event: {
+            id: event?.id || eventId,
+            name: event?.name || 'Unknown Event',
+            startDate: event?.startDate || null,
+            endDate: event?.endDate || null,
+            location: event?.location || null,
+            venue: event?.venue || null,
+          },
+          company: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+            email: exhibitor.email,
+            mobile: exhibitor.mobile,
+            uen: exhibitor.uen,
+            logo: exhibitor.logo,
+            booth: booth.uniqueCode || null,
+          },
+          staffs: uniqueStaffMembers,
+        },
+      });
+    }
+
+    // Also include events that have staff but no booth
+    const eventsWithStaffOnly = new Set<string>();
+    eventStaffs.forEach(staff => {
+      const hasBooth = eventBooths.some(booth => booth.eventId === staff.eventId);
+      if (!hasBooth) {
+        eventsWithStaffOnly.add(staff.eventId);
+      }
+    });
+
+    for (const eventId of eventsWithStaffOnly) {
+      const event = eventLookup.get(eventId);
+      
+      // Get staff members for this specific event
+      const eventStaffMembers = eventStaffs
+        .filter(es => es.eventId === eventId && es.user)
+        .map((es) => ({
+          id: es.user.id,
+          firstName: es.user.firstName || '',
+          lastName: es.user.lastName || '',
+          email: es.user.email || '',
+          mobile: es.user.mobile || '',
+          profilePicture: es.user.profilePicture || null,
+          role: es.user.role || 'exhibitor',
+          createdAt: es.createdAt,
+        }));
+
+      // Remove duplicates from staff members
+      const uniqueStaffMembers = Array.from(
+        new Map(eventStaffMembers.map((staff) => [staff.id, staff])).values()
+      );
+
+      memberStaff.push({
+        eventBooth: {
+          event: {
+            id: event?.id || eventId,
+            name: event?.name || 'Unknown Event',
+            startDate: event?.startDate || null,
+            endDate: event?.endDate || null,
+            location: event?.location || null,
+            venue: event?.venue || null,
+          },
+          company: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+            email: exhibitor.email,
+            mobile: exhibitor.mobile,
+            uen: exhibitor.uen,
+            logo: exhibitor.logo,
+            booth: null,
+          },
+          staffs: uniqueStaffMembers,
+        },
+      });
+    }
+
+    // Always return memberStaff as an array, even if empty
+    return {
+      memberStaff: memberStaff || [],
+    };
+  }
+
+  /**
+   * Get staff member user details
+   * Only allows access if logged-in user and requested staff member are in the same event(s)
+   */
+  async getStaffMemberUserDetails(
+    staffUserId: string,
+    loggedInUserId: string,
+    loggedInUserRole?: string,
+  ): Promise<any> {
+    try {
+      // Import UserEntity and EventStaff
+      const { UserEntity } = await import('../user/users.entity');
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { UserUtils } = await import('../utils/user.utils');
+
+      const userRepository = this.exhibitorRepository.manager.getRepository(UserEntity);
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+      // Get the staff member user - only basic fields needed
+      const staffUser = await userRepository.findOne({
+        where: { id: staffUserId },
+        select: ['id', 'firstName', 'lastName', 'email', 'mobile', 'profilePicture', 'role', 'createdAt'],
+      });
+
+      if (!staffUser) {
+        throw new ResourceNotFoundException('User', staffUserId);
+      }
+
+      // For non-admin users, verify they are in the same event(s)
+      if (loggedInUserRole !== 'admin' && loggedInUserId) {
+        // Get all events where logged-in user is a staff member
+        const loggedInUserEvents = await eventStaffRepository.find({
+          where: { userId: loggedInUserId },
+          select: ['eventId', 'exhibitorId'],
+        });
+
+        // Get all events where requested staff member is a staff member
+        const staffUserEvents = await eventStaffRepository.find({
+          where: { userId: staffUserId },
+          select: ['eventId', 'exhibitorId'],
+        });
+
+        // Check if they share at least one common event
+        const loggedInUserEventIds = new Set(
+          loggedInUserEvents.map((es) => `${es.eventId}_${es.exhibitorId}`),
+        );
+        const hasCommonEvent = staffUserEvents.some(
+          (es) => loggedInUserEventIds.has(`${es.eventId}_${es.exhibitorId}`),
+        );
+
+        if (!hasCommonEvent) {
+          throw new ForbiddenException(
+            'You do not have permission to view this staff member. You must be in the same event.',
+          );
+        }
+      }
+
+      // Return only basic user details
+      return {
+        id: staffUser.id,
+        firstName: staffUser.firstName,
+        lastName: staffUser.lastName,
+        email: staffUser.email,
+        mobile: staffUser.mobile || null,
+        profilePicture: staffUser.profilePicture || null,
+        role: staffUser.role,
+        createdAt: staffUser.createdAt,
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Staff member user details retrieval');
     }
   }
 }

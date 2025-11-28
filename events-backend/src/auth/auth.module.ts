@@ -1,5 +1,5 @@
 // src/auth/auth.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -31,7 +31,7 @@ dotenv.config(); // Load environment variables
     }),
     CsvUploadLogModule,
     SSOModule, // Import SSOModule to get OAuthAuthService
-    UserModule,
+    forwardRef(() => UserModule), // Use forwardRef to avoid circular dependency
     EmailTemplateModule, // Import EmailTemplateModule for email templates
   ],
   providers: [

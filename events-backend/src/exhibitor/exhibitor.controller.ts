@@ -124,6 +124,88 @@ export class ExhibitorController {
   }
 
   /**
+   * Get all exhibitors with event-wise booth and staff information
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('staff-members')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getAllExhibitorsWithEventDetails(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+      
+      const result = await this.exhibitorService.getAllExhibitorsWithEventDetails(userId, userRole, userEmail);
+      
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Staff members retrieved successfully',
+        data: result,
+        metadata: {
+          total: result?.memberStaff?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitors with event details retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get staff member user details by user ID
+   * Access: Admin and Exhibitor users only
+   * Non-admin users can only view staff members from the same event(s)
+   * This route must be defined BEFORE 'staff-member/:id' to avoid route conflicts
+   */
+  @Get('staff-member/user/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getStaffMemberUserDetails(
+    @Param('userId') userId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const loggedInUserId = req.user?.id;
+      const loggedInUserRole = req.user?.role;
+
+      if (!loggedInUserId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const staffMember = await this.exhibitorService.getStaffMemberUserDetails(
+        userId,
+        loggedInUserId,
+        loggedInUserRole,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Staff member details retrieved successfully',
+        data: staffMember,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Staff member user details retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Get exhibitor by ID
    * Access: All users (no authentication required)
    */

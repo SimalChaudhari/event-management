@@ -557,6 +557,7 @@ export class UserService {
           this.userRepository.manager.getRepository(EventBooth);
 
         // Verify the booth code exists and is active
+        // Multiple users can use the same booth code to become staff for the same exhibitor
         const eventBooth = await eventBoothRepository.findOne({
           where: {
             uniqueCode: boothCode,
@@ -571,56 +572,56 @@ export class UserService {
           );
         }
 
-        // Check if code is already used by another user
-        if (eventBooth.usedBy && eventBooth.usedBy !== userId) {
-          throw new ConflictException(
-            'This booth code has already been used by another user. Each code can only be used once.',
-          );
-        }
+        // Booth code remains active - multiple users can use the same code
+        // No need to update usedBy or isActive as the code should be reusable by multiple users
 
-        // If code is used by this user, allow reuse (reactivation case)
-        if (eventBooth.usedBy === userId) {
-          // Allow reuse - this is the same user reactivating their code
-          console.log(
-            `User ${userId} reusing their own booth code: ${boothCode}`,
-          );
-        }
+        // Create EventStaff entry for this event and exhibitor
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository =
+          this.userRepository.manager.getRepository(EventStaff);
 
-        // Mark the booth code as used by this user
-        await eventBoothRepository.update(
-          { id: eventBooth.id },
-          {
-            usedBy: userId,
-            usedAt: new Date(),
-            isActive: false, // Deactivate the code after use
+        // Check if user already has an EventStaff entry for this event with a different exhibitor
+        const existingEventStaffForEvent = await eventStaffRepository.findOne({
+          where: {
+            eventId: eventBooth.eventId,
+            userId: userId,
           },
-        );
-      }
-
-      // If switching FROM exhibitor role TO user role, reactivate their booth code
-      if (user.role === UserRole.Exhibitor && newRole === UserRole.User) {
-        // Find and reactivate the user's booth code
-        const { EventBooth } = await import('../event/event-booth.entity');
-        const eventBoothRepository =
-          this.userRepository.manager.getRepository(EventBooth);
-
-        // Find the booth code used by this user
-        const userBooth = await eventBoothRepository.findOne({
-          where: { usedBy: userId },
         });
 
-        if (userBooth) {
-          // Reactivate the booth code for future use by the same user
-          await eventBoothRepository.update(
-            { id: userBooth.id },
-            {
-              isActive: true,
-              usedBy: userId, // Keep the same user ID
-              usedAt: new Date(), // Update timestamp
-            },
+        // If user already has an entry for this event with a different exhibitor, prevent the switch
+        if (
+          existingEventStaffForEvent &&
+          existingEventStaffForEvent.exhibitorId !== eventBooth.exhibitorId
+        ) {
+          throw new ConflictException(
+            'You can only switch to one company per event. You have already switched to a different company for this event.',
           );
         }
+
+        // Check if EventStaff entry already exists for this specific exhibitor and event
+        const existingEventStaff = await eventStaffRepository.findOne({
+          where: {
+            eventId: eventBooth.eventId,
+            exhibitorId: eventBooth.exhibitorId,
+            userId: userId,
+          },
+        });
+
+        if (!existingEventStaff) {
+          // Create new EventStaff entry with exhibitorId
+          const eventStaff = eventStaffRepository.create({
+            eventId: eventBooth.eventId,
+            exhibitorId: eventBooth.exhibitorId,
+            userId: userId,
+          });
+          await eventStaffRepository.save(eventStaff);
+        }
       }
+
+      // If switching FROM exhibitor role TO user role
+      // Note: Booth code remains active for other users to use
+      // EventStaff entry is kept so user can still be tracked as staff member
+      // No need to deactivate/reactivate booth code since multiple users can share it
 
       // Update the role
       await this.userRepository.update(userId, { role: newRole });
@@ -645,6 +646,29 @@ export class UserService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Role switch');
+    }
+  }
+
+  /**
+   * Get full user entity by ID (for token generation)
+   * Returns full UserEntity with all fields
+   */
+  async getFullUserEntity(id: string): Promise<UserEntity> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', id);
+      }
+
+      return user;
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'User retrieval for token generation');
     }
   }
 
