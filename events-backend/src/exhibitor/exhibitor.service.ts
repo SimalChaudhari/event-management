@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
@@ -9,6 +9,7 @@ import {
   ResourceNotFoundException,
   DuplicateResourceException,
 } from '../utils/exceptions/custom-exceptions';
+import { EventService } from '../event/event.service';
 
 @Injectable()
 export class ExhibitorService {
@@ -16,6 +17,8 @@ export class ExhibitorService {
     @InjectRepository(Exhibitor)
     private exhibitorRepository: Repository<Exhibitor>,
     private readonly errorHandler: ErrorHandlerService,
+    @Inject(forwardRef(() => EventService))
+    private eventService: EventService,
   ) {}
 
   async createExhibitor(exhibitorDto: ExhibitorDto | Partial<ExhibitorDto>): Promise<any> {
@@ -618,6 +621,71 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Staff member user details retrieval');
+    }
+  }
+
+  /**
+   * Get all events where logged-in user is an exhibitor (staff member)
+   * Returns all events regardless of company/exhibitor with full event details
+   */
+  async getUserExhibitorEvents(userId: string, userRole?: string): Promise<any> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+      // Get all EventStaff records for this user
+      const userStaffRecords = await eventStaffRepository.find({
+        where: { userId: userId },
+        relations: ['event', 'exhibitor'],
+      });
+
+      if (!userStaffRecords || userStaffRecords.length === 0) {
+        return {
+          events: [],
+        };
+      }
+
+      // Get all unique event IDs
+      const uniqueEventIds = [...new Set(userStaffRecords.map(es => es.eventId).filter(Boolean))];
+      
+      // Fetch full event details for each unique event using EventService
+      const eventDetailsMap = new Map<string, any>();
+      await Promise.all(
+        uniqueEventIds.map(async (eventId) => {
+          try {
+            const fullEventDetails = await this.eventService.getEventById(eventId, userId, userRole);
+            eventDetailsMap.set(eventId, fullEventDetails);
+          } catch (error) {
+            // If event not found or error, skip it
+            console.warn(`Failed to fetch event details for eventId ${eventId}:`, error);
+          }
+        })
+      );
+
+      // Build events array with full event details only
+      const eventsList = [];
+      const processedEventIds = new Set<string>(); // Track processed event IDs
+
+      for (const eventStaff of userStaffRecords) {
+        const eventId = eventStaff.eventId;
+
+        // Skip if already processed (same event)
+        if (processedEventIds.has(eventId)) continue;
+        processedEventIds.add(eventId);
+
+        const fullEventDetails = eventDetailsMap.get(eventId);
+        if (!fullEventDetails) continue;
+
+        // Return only full event details without additional company/staff info
+        eventsList.push(fullEventDetails);
+      }
+
+      return {
+        events: eventsList,
+      };
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'User exhibitor events retrieval');
     }
   }
 }

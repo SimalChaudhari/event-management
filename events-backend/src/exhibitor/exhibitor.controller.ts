@@ -159,6 +159,48 @@ export class ExhibitorController {
   }
 
   /**
+   * Get all events where logged-in user is an exhibitor (staff member)
+   * Shows all events regardless of company
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('my-exhibitor-events')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getMyExhibitorEvents(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const result = await this.exhibitorService.getUserExhibitorEvents(userId, userRole);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Exhibitor events retrieved successfully',
+        data: result,
+        metadata: {
+          total: result?.events?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'My exhibitor events retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Get staff member user details by user ID
    * Access: Admin and Exhibitor users only
    * Non-admin users can only view staff members from the same event(s)
