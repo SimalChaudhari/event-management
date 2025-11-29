@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorDto, DocumentDto, EventImageDto } from './exhibitor.dto';
@@ -686,6 +686,160 @@ export class ExhibitorService {
       };
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'User exhibitor events retrieval');
+    }
+  }
+
+  /**
+   * Get simplified list of events for report (where user is staff member)
+   * Returns only: id, name, date, location
+   */
+  async getReportEventsList(userId: string): Promise<any> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { Event } = await import('../event/event.entity');
+
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+
+      // Get all EventStaff records for this user
+      const userStaffRecords = await eventStaffRepository.find({
+        where: { userId: userId },
+      });
+
+      if (!userStaffRecords || userStaffRecords.length === 0) {
+        return {
+          events: [],
+        };
+      }
+
+      // Get all unique event IDs
+      const uniqueEventIds = [...new Set(userStaffRecords.map(es => es.eventId).filter(Boolean))];
+      
+      // Fetch events with only required fields
+      const events = await eventRepository.find({
+        where: uniqueEventIds.map(id => ({ id })),
+        select: ['id', 'name', 'startDate', 'endDate', 'location'],
+      });
+
+      // Format events to simple structure
+      const eventsList = events.map(event => ({
+        id: event.id,
+        name: event.name,
+      }));
+
+      return {
+        events: eventsList,
+      };
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Report events list retrieval');
+    }
+  }
+
+  /**
+   * Get event statistics for report
+   * Returns: event name, likes count, monthly views, downloads count, total leads
+   */
+  async getEventReportStatistics(eventId: string, userId: string): Promise<any> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { Event } = await import('../event/event.entity');
+      const { FavoriteEvent } = await import('../favorite-event/favorite-event.entity');
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const { EventAttendance } = await import('../attendance/attendance.entity');
+
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+      const favoriteEventRepository = this.exhibitorRepository.manager.getRepository(FavoriteEvent);
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      const attendanceRepository = this.exhibitorRepository.manager.getRepository(EventAttendance);
+
+      // Verify user is staff member for this event
+      const userStaffRecord = await eventStaffRepository.findOne({
+        where: {
+          eventId: eventId,
+          userId: userId,
+        },
+      });
+
+      if (!userStaffRecord) {
+        throw new ForbiddenException('You do not have permission to view statistics for this event');
+      }
+
+      // Get event details
+      const event = await eventRepository.findOne({
+        where: { id: eventId },
+        select: ['id', 'name', 'startDate', 'endDate'],
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Get number of likes (favorites)
+      const likesCount = await favoriteEventRepository.count({
+        where: { eventId: eventId },
+      });
+
+      // Get total registrations (leads) for this event
+      const totalLeads = await registerEventRepository.count({
+        where: {
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      // Get monthly views - using attendance count as proxy (people who checked in)
+      // Or we can use registration count for current month
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const monthlyViews = await registerEventRepository.count({
+        where: {
+          eventId: eventId,
+          createdAt: Between(currentMonthStart, currentMonthEnd),
+        },
+      });
+
+      // Get number of downloads - count event documents
+      // For now, we'll count documents in the event
+      const eventWithDocuments = await eventRepository.findOne({
+        where: { id: eventId },
+        select: ['documents'],
+      });
+
+      const downloadsCount = eventWithDocuments?.documents?.length || 0;
+
+      // Get attendance count (people who actually attended)
+      const { AttendanceStatus } = await import('../attendance/attendance.entity');
+      const attendanceCount = await attendanceRepository.count({
+        where: {
+          eventId: eventId,
+          status: AttendanceStatus.CheckedIn,
+        },
+      });
+
+      return {
+        event: {
+          id: event.id,
+          name: event.name,
+        },
+        statistics: {
+          likes: likesCount,
+          monthlyViews: monthlyViews,
+          downloads: downloadsCount,
+          totalLeads: totalLeads,
+          attendanceCount: attendanceCount,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Event report statistics retrieval');
     }
   }
 }

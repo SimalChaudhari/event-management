@@ -490,8 +490,8 @@ export class EventService {
                       }
                     }
 
-                    // Get Event Staff for this exhibitor
-                    if (exhibitorId) {
+                    // Get Event Staff for this exhibitor - only show to admin
+                    if (userRole === UserRole.Admin && exhibitorId) {
                       const exhibitorStaffs = await this.eventStaffRepository.find({
                         where: {
                           eventId: event.id,
@@ -512,6 +512,7 @@ export class EventService {
                         createdAt: es.createdAt,
                       }));
                     } else {
+                      // For non-admin users (exhibitor, regular users), don't show event staff
                       (exhibitorData as any).eventStaff = [];
                     }
 
@@ -849,8 +850,8 @@ export class EventService {
             }
           }
 
-          // Get Event Staff for this exhibitor
-          if (exhibitorId) {
+          // Get Event Staff for this exhibitor - only show to admin
+          if (userRole === UserRole.Admin && exhibitorId) {
             const exhibitorStaffs = await this.eventStaffRepository.find({
               where: {
                 eventId: id,
@@ -871,6 +872,7 @@ export class EventService {
               createdAt: es.createdAt,
             }));
           } else {
+            // For non-admin users (exhibitor, regular users), don't show event staff
             (exhibitorData as any).eventStaff = [];
           }
 
@@ -901,6 +903,7 @@ export class EventService {
         registerEventId: registerEventId,
         programmeTracks: formattedProgrammeTracks,
         engagements: engagements,
+    
       };
 
       // Add Q&A data for admin users

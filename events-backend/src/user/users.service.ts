@@ -616,6 +616,40 @@ export class UserService {
           });
           await eventStaffRepository.save(eventStaff);
         }
+
+        // Auto-register user for the event if not already registered
+        const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+        const registerEventRepository =
+          this.userRepository.manager.getRepository(RegisterEvent);
+        
+        // Check if user is already registered for this event
+        const existingRegistration = await registerEventRepository.findOne({
+          where: {
+            userId: userId,
+            eventId: eventBooth.eventId,
+          },
+        });
+
+        if (!existingRegistration) {
+          // Auto-register user for the event as Exhibitor
+          const { Type } = await import('../registerEvent/registerEvent.dto');
+          const newRegistration = registerEventRepository.create({
+            userId: userId,
+            eventId: eventBooth.eventId,
+            type: Type.Exhibitor,
+            isRegister: true,
+            isCreatedByAdmin: true,
+          });
+          await registerEventRepository.save(newRegistration);
+        } else {
+          // If already registered, update type to Exhibitor if needed
+          const { Type } = await import('../registerEvent/registerEvent.dto');
+          if (existingRegistration.type !== Type.Exhibitor) {
+            existingRegistration.type = Type.Exhibitor;
+            existingRegistration.isRegister = true;
+            await registerEventRepository.save(existingRegistration);
+          }
+        }
       }
 
       // If switching FROM exhibitor role TO user role

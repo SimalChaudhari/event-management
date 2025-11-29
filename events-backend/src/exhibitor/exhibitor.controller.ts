@@ -565,6 +565,88 @@ export class ExhibitorController {
     }
   }
 
+  /**
+   * Get simplified list of events for report
+   * Shows only events where user is staff member
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('report/events')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getReportEventsList(
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const result = await this.exhibitorService.getReportEventsList(userId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Report events list retrieved successfully',
+        data: result,
+        metadata: {
+          total: result?.events?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Report events list retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get event statistics for report
+   * Shows: event name, likes, monthly views, downloads, total leads
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('report/event/statistics/:eventId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getEventReportStatistics(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const result = await this.exhibitorService.getEventReportStatistics(eventId, userId);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Event statistics retrieved successfully',
+        data: result,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event report statistics retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
   // Helper method to format exhibitor response
   private formatExhibitorResponse(exhibitor: any, response: Response, message: string, statusCode: number) {
     const successResponse: SuccessResponse = {
