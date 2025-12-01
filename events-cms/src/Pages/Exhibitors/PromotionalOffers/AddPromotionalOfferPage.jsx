@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Container, Alert, Badge, Form } from 'react-bootstrap';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { 
     createOrUpdatePromotionalOffer, 
@@ -12,19 +12,23 @@ import { exhibitorById } from '../../../store/actions/exhibitorsActions';
 import { API_URL } from '../../../configs/env';
 import { toast } from 'react-toastify';
 import { EXHIBITOR_PATHS } from '../../../utils/constants';
+import SettingsEditor from '../../../App/components/CkEditor/SettingsEditor';
 
 const AddPromotionalOfferPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { id } = useParams(); // Edit mode के लिए
+    const { id } = useParams(); // Edit mode 
     const [searchParams] = useSearchParams();
     const exhibitorId = searchParams.get('exhibitorId');
+    
+    // Get exhibitor from Redux if available
+    const { exhibitorById: exhibitorData } = useSelector((state) => state.exhibitor);
     
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         validDate: '',
-        exhibitorId: exhibitorId || '',
+        exhibitorBoothId: exhibitorId || '', // Changed from exhibitorId to exhibitorBoothId
         companyName: '',
         image: null
     });
@@ -45,7 +49,7 @@ const AddPromotionalOfferPage = () => {
                             title: offer.title || '',
                             description: offer.description || '',
                             validDate: offer.validDate ? offer.validDate.split('T')[0] : '', // Parse date properly
-                            exhibitorId: offer.exhibitorId || '',
+                            exhibitorBoothId: offer.exhibitorId || '', // Changed from exhibitorId to exhibitorBoothId (using exhibitorId from response)
                             companyName: offer.companyName || '',
                             image: null // Don't populate file input
                         });
@@ -63,20 +67,33 @@ const AddPromotionalOfferPage = () => {
         }
     }, [id, dispatch]);
 
-    // Load exhibitor data
+    // Load exhibitor data - only fetch if not already in Redux
     useEffect(() => {
         if (exhibitorId) {
-            dispatch(exhibitorById(exhibitorId)).then((data) => {
-                if (data?.data) {
-                    setExhibitor(data.data);
-                    setFormData(prev => ({
-                        ...prev,
-                        companyName: data.data.companyName || ''
-                    }));
-                }
-            });
+            // Check if exhibitor already exists in Redux
+            const currentExhibitor = exhibitorData?.data || exhibitorData;
+            if (currentExhibitor && currentExhibitor.id === exhibitorId) {
+                // Use exhibitor from Redux
+                setExhibitor(currentExhibitor);
+                setFormData(prev => ({
+                    ...prev,
+                    companyName: currentExhibitor.companyName || ''
+                }));
+            } else {
+                // Fetch exhibitor if not in Redux
+                dispatch(exhibitorById(exhibitorId)).then((data) => {
+                    if (data?.data) {
+                        setExhibitor(data.data);
+                        setFormData(prev => ({
+                            ...prev,
+                            companyName: data.data.companyName || ''
+                        }));
+                    }
+                });
+            }
         }
-    }, [exhibitorId, dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [exhibitorId, dispatch]); // Only run when exhibitorId changes
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -127,7 +144,7 @@ const AddPromotionalOfferPage = () => {
             submitData.append('title', formData.title);
             submitData.append('description', formData.description);
             submitData.append('validDate', formData.validDate);
-            submitData.append('exhibitorId', formData.exhibitorId);
+            submitData.append('exhibitorBoothId', formData.exhibitorBoothId); // Changed from exhibitorId to exhibitorBoothId
             submitData.append('companyName', formData.companyName);
 
             if (formData.image) {
@@ -149,7 +166,7 @@ const AddPromotionalOfferPage = () => {
             }
             
             if (response) {
-                navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${formData.exhibitorId}`);
+                navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${formData.exhibitorBoothId}`);
             }
         } catch (error) {
             console.log('An error occurred while saving promotional offer');
@@ -159,8 +176,8 @@ const AddPromotionalOfferPage = () => {
     };
 
     const handleCancel = () => {
-        if (formData.exhibitorId) {
-            navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${formData.exhibitorId}`);
+        if (formData.exhibitorBoothId) {
+            navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${formData.exhibitorBoothId}`);
         } else {
             navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
         }
@@ -197,7 +214,7 @@ const AddPromotionalOfferPage = () => {
                                     <Col md={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="title">
-                                                Offer Title *
+                                                Offer Title <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -214,7 +231,7 @@ const AddPromotionalOfferPage = () => {
                                     <Col md={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="validDate">
-                                                Valid Date *
+                                                Valid Date <span style={{ color: 'red' }}>*</span>
                                             </label>
                                             <input
                                                 type="date"
@@ -232,16 +249,18 @@ const AddPromotionalOfferPage = () => {
                                     <Col sm={12}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="description">
-                                                Description *
+                                                Description 
                                             </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="description"
-                                                rows="4"
-                                                value={formData.description}
-                                                onChange={handleInputChange}
-                                                placeholder="Enter offer description"
-                                                required
+                                            <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
+                                            <SettingsEditor
+                                                data={formData.description || ''}
+                                                onChange={(event, editor) => {
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        description: editor.getData()
+                                                    }));
+                                                }}
+                                                placeholder="Enter offer description..."
                                             />
                                         </div>
                                     </Col>
@@ -359,7 +378,7 @@ const AddPromotionalOfferPage = () => {
                                                 disabled={
                                                     loading ||
                                                     !formData.title.trim() ||
-                                                    !formData.description.trim() ||
+                                                    // !formData.description.trim() ||
                                                     !formData.validDate.trim()
                                                 }
                                             >

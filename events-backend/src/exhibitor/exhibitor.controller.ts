@@ -362,7 +362,18 @@ export class ExhibitorController {
         }
       }
 
-      const updatedExhibitor = await this.exhibitorService.updateExhibitor(id, exhibitorDto);
+      // Get user info for permission check
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+
+      const updatedExhibitor = await this.exhibitorService.updateExhibitor(
+        id,
+        exhibitorDto,
+        userId,
+        userRole,
+        userEmail,
+      );
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -643,6 +654,58 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Event report statistics retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Scan attendee QR code to collect lead
+   * Exhibitor scans attendee's QR code to collect their contact details as a lead
+   * Access: Admin and Exhibitor users only
+   */
+  @Post('scan-attendee-qr')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async scanAttendeeQRCode(
+    @Body() body: { qrCodeId: string; eventId: string; exhibitorId: string; notes?: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const { qrCodeId, eventId, exhibitorId, notes } = body;
+      const scannedBy = req.user?.id;
+
+      if (!scannedBy) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!qrCodeId || !eventId || !exhibitorId) {
+        throw new BadRequestException('Missing required fields: qrCodeId, eventId, exhibitorId');
+      }
+
+      const result = await this.exhibitorService.scanAttendeeQRCodeForLead(
+        qrCodeId,
+        eventId,
+        exhibitorId,
+        scannedBy,
+        notes,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Attendee QR code scanning for lead collection', req.user?.id);
       throw error;
     }
   }

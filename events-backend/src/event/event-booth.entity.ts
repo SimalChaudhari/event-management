@@ -44,7 +44,9 @@ export class EventBooth {
   @JoinColumn({ name: 'eventId' })
   event!: Event;
 
-  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventBooths)
+  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventBooths, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'exhibitorId' })
   exhibitor!: Exhibitor;
 }

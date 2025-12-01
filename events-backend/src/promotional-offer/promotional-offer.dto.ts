@@ -27,7 +27,7 @@ export class CreatePromotionalOfferDto {
 
   @IsNotEmpty()
   @IsUUID()
-  exhibitorId!: string;
+  exhibitorBoothId!: string; // EventBooth ID - will be used to get exhibitorId
 }
 
 export class UpdatePromotionalOfferDto {
@@ -54,4 +54,8 @@ export class UpdatePromotionalOfferDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  exhibitorBoothId?: string; // EventBooth ID - will be used to get exhibitorId (optional for update)
 } 

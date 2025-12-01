@@ -197,7 +197,18 @@ const ViewExhibitorPage = () => {
                             )}
                             <Card.Body>
                                 <Card.Title className="h6">{offer.title}</Card.Title>
-                                <Card.Text className="small text-muted">{offer.description}</Card.Text>
+                                <div 
+                                    className="small text-muted"
+                                    style={{ 
+                                        textAlign: 'justify',
+                                        fontSize: '13px', 
+                                        lineHeight: '1.5',
+                                        marginBottom: '10px'
+                                    }}
+                                    dangerouslySetInnerHTML={{ 
+                                        __html: offer.description || 'No description available' 
+                                    }}
+                                />
                                 <div className="d-flex justify-content-between align-items-center">
                                     <small className="text-muted">Valid until: {new Date(offer.validDate).toLocaleDateString()}</small>
                                     <Badge variant={offer.isActive ? 'success' : 'danger'}>{offer.isActive ? 'Active' : 'Inactive'}</Badge>

@@ -57,9 +57,12 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
             };
 
         case CREATE_EXHIBITOR:
+            // Add new exhibitor to the exhibitors list (at the beginning like events)
+            const newExhibitor = payload;
+            const currentExhibitors = state.exhibitors || [];
             return {
                 ...state,
-                exhibitors: [...state.exhibitors, payload],
+                exhibitors: [newExhibitor, ...currentExhibitors],
                 loading: false,
                 
             };
@@ -85,15 +88,18 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
         case FETCH_PROMOTIONAL_OFFERS:
             return {
                 ...state,
-                promotionalOffers: payload,
+                promotionalOffers: Array.isArray(payload) ? payload : [],
                 loading: false,
                 
             };
 
         case CREATE_PROMOTIONAL_OFFER:
+            // Add new promotional offer to the list (at the beginning like events)
+            const newOffer = payload;
+            const currentOffers = Array.isArray(state.promotionalOffers) ? state.promotionalOffers : [];
             return {
                 ...state,
-                promotionalOffers: [...state.promotionalOffers, payload],
+                promotionalOffers: [newOffer, ...currentOffers],
                 loading: false,
 
             };
@@ -101,7 +107,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
         case UPDATE_PROMOTIONAL_OFFER:
             return {
                 ...state,
-                promotionalOffers: state.promotionalOffers.map((offer) => (offer.id === payload.id ? payload : offer)),
+                promotionalOffers: (Array.isArray(state.promotionalOffers) ? state.promotionalOffers : []).map((offer) => (offer.id === payload.id ? payload : offer)),
                 loading: false,
                 
             };
@@ -109,7 +115,7 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
         case DELETE_PROMOTIONAL_OFFER:
             return {
                 ...state,
-                promotionalOffers: state.promotionalOffers.filter((offer) => offer.id !== payload),
+                promotionalOffers: (Array.isArray(state.promotionalOffers) ? state.promotionalOffers : []).filter((offer) => offer.id !== payload),
                 loading: false,
                 
             };

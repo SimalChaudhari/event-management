@@ -118,7 +118,18 @@ const ViewPromotionalOfferPage = () => {
                                 </Col>
                                 <Col xs={12} className="mb-3">
                                     <strong>Description:</strong><br />
-                                    <span className="text-muted">{offerData.description}</span>
+                                    <div 
+                                        className="text-muted"
+                                        style={{ 
+                                            textAlign: 'justify',
+                                            fontSize: '14px', 
+                                            lineHeight: '1.6',
+                                            marginTop: '8px'
+                                        }}
+                                        dangerouslySetInnerHTML={{ 
+                                            __html: offerData.description || 'No description available' 
+                                        }}
+                                    />
                                 </Col>
                             </Row>
                             <hr />
@@ -213,6 +224,25 @@ const ViewPromotionalOfferPage = () => {
                                                 <span className="text-muted">
                                                     {new Date(offerData.updatedAt).toLocaleString()}
                                                 </span>
+                                            </Col>
+                                            <Col xs={12} className="mb-3">
+                                                <strong>Description:</strong><br />
+                                                <div 
+                                                    className="text-muted"
+                                                    style={{ 
+                                                        textAlign: 'justify',
+                                                        fontSize: '14px', 
+                                                        lineHeight: '1.6',
+                                                        marginTop: '8px',
+                                                        padding: '12px',
+                                                        backgroundColor: '#f8f9fa',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid #e9ecef'
+                                                    }}
+                                                    dangerouslySetInnerHTML={{ 
+                                                        __html: offerData.description || 'No description available' 
+                                                    }}
+                                                />
                                             </Col>
                                         </Row>
                                     </Card.Body>

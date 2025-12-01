@@ -639,11 +639,16 @@ const RegisteredEvents = () => {
             setCurrentTable(table);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [registrations, destroyTable, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);
+    }, [registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);
 
     useEffect(() => {
         initializeTable();
-        return () => destroyTable();
+        return () => {
+            if (tableRef.current) {
+                destroyTable();
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [registrations]);
 
 

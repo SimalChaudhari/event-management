@@ -11,6 +11,7 @@ import {
   UploadedFile,
   UseGuards,
   Query,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -32,7 +33,7 @@ export class PromotionalOfferController {
   constructor(private readonly promotionalOfferService: PromotionalOfferService) {}
 
   @Post('create')
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -62,13 +63,23 @@ export class PromotionalOfferController {
     @Body() createDto: CreatePromotionalOfferDto,
     @UploadedFile() file: Express.Multer.File,
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+
       if (file) {
         createDto.image = `uploads/promotional-offers/${file.filename}`;
       }
 
-      const promotionalOffer = await this.promotionalOfferService.createPromotionalOffer(createDto);
+      const promotionalOffer = await this.promotionalOfferService.createPromotionalOffer(
+        createDto,
+        userId,
+        userRole,
+        userEmail,
+      );
       return response.status(201).json({
         success: true,
         message: 'Promotional offer created successfully',
@@ -131,7 +142,7 @@ export class PromotionalOfferController {
   }
 
   @Put('update/:id')
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   @UseInterceptors(
     FileInterceptor('image', {
       storage: diskStorage({
@@ -162,8 +173,13 @@ export class PromotionalOfferController {
     @Body() updateDto: UpdatePromotionalOfferDto,
     @UploadedFile() file: Express.Multer.File,
     @Res() response: Response,
+    @Request() req: any,
   ) {
     try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+
       const existingOffer = await this.promotionalOfferService.getPromotionalOfferById(id);
 
       if (file) {
@@ -177,7 +193,13 @@ export class PromotionalOfferController {
         updateDto.image = `uploads/promotional-offers/${file.filename}`;
       }
 
-      const updatedOffer = await this.promotionalOfferService.updatePromotionalOffer(id, updateDto);
+      const updatedOffer = await this.promotionalOfferService.updatePromotionalOffer(
+        id,
+        updateDto,
+        userId,
+        userRole,
+        userEmail,
+      );
       return response.status(200).json({
         success: true,
         message: 'Promotional offer updated successfully',
@@ -196,12 +218,22 @@ export class PromotionalOfferController {
   }
 
   @Put('toggle-status/:id')
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   async togglePromotionalOfferStatus(
     @Param('id') id: string,
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    const promotionalOffer = await this.promotionalOfferService.togglePromotionalOfferStatus(id);
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const userEmail = req.user?.email;
+
+    const promotionalOffer = await this.promotionalOfferService.togglePromotionalOfferStatus(
+      id,
+      userId,
+      userRole,
+      userEmail,
+    );
     return response.status(200).json({
       success: true,
       message: 'Promotional offer status toggled successfully',
@@ -210,12 +242,17 @@ export class PromotionalOfferController {
   }
 
   @Delete('delete/:id')
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   async deletePromotionalOffer(
     @Param('id') id: string,
     @Res() response: Response,
+    @Request() req: any,
   ) {
-    await this.promotionalOfferService.deletePromotionalOffer(id);
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const userEmail = req.user?.email;
+
+    await this.promotionalOfferService.deletePromotionalOffer(id, userId, userRole, userEmail);
     return response.status(200).json({
       success: true,
       message: 'Promotional offer deleted successfully',

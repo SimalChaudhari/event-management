@@ -64,11 +64,28 @@ export const createExhibitor = (data) => async (dispatch) => {
     try {
         const response = await axiosInstance.post('/exhibitors/create', data);
         if (response && response.status >= 200 && response.status < 300) {
-            dispatch({
-                type: CREATE_EXHIBITOR,
-                payload: response.data.data
-            });
             toast.success(response.data.message || 'Exhibitor created successfully!');
+            
+            // Get the created exhibitor data from response or fetch full details
+            let createdExhibitor = response.data?.data;
+            
+            // If response doesn't have full exhibitor details, fetch it
+            if (createdExhibitor?.id && (!createdExhibitor.promotionalOffers)) {
+                const exhibitorId = createdExhibitor.id;
+                const exhibitorResponse = await axiosInstance.get(`/exhibitors/${exhibitorId}`);
+                createdExhibitor = exhibitorResponse.data?.data || exhibitorResponse.data;
+            }
+            
+            // Update Redux store directly with the new exhibitor
+            if (createdExhibitor?.id) {
+                dispatch({
+                    type: CREATE_EXHIBITOR,
+                    payload: createdExhibitor
+                });
+                
+                return true;
+            }
+            
             return true;
         }
         return false;
@@ -85,11 +102,28 @@ export const updateExhibitor = (id, data) => async (dispatch) => {
     try {
         const response = await axiosInstance.put(`/exhibitors/update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {
-            dispatch({
-                type: UPDATE_EXHIBITOR,
-                payload: response.data.data
-            });
             toast.success(response.data.message || 'Exhibitor updated successfully!');
+            
+            // Get the updated exhibitor data from response
+            let updatedExhibitor = response.data?.data;
+            
+            // Only fetch full exhibitor details if response doesn't have exhibitor data at all
+            if (!updatedExhibitor || !updatedExhibitor.id) {
+                // Only fetch if we don't have basic exhibitor data
+                const exhibitorResponse = await axiosInstance.get(`/exhibitors/${id}`);
+                updatedExhibitor = exhibitorResponse.data?.data || exhibitorResponse.data;
+            }
+            
+            // Update Redux store directly with the updated exhibitor
+            if (updatedExhibitor?.id) {
+                dispatch({
+                    type: UPDATE_EXHIBITOR,
+                    payload: updatedExhibitor
+                });
+                
+                return true;
+            }
+            
             return true;
         }
         return false;

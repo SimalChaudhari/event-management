@@ -56,7 +56,11 @@ const breadcrumbNavigation = {
                     children: [
                         { id: 'add-exhibitor', title: 'Add Exhibitor', type: 'item', url: '/exhibitors/add-exhibitor' },
                         { id: 'edit-exhibitor', title: 'Edit Exhibitor', type: 'item', url: '/exhibitors/edit-exhibitor/:id' },
-                        { id: 'view-exhibitor', title: 'View Exhibitor', type: 'item', url: '/exhibitors/view-exhibitor/:id' }
+                        { id: 'view-exhibitor', title: 'View Exhibitor', type: 'item', url: '/exhibitors/view-exhibitor/:id' },
+                        { id: 'promotional-offers', title: 'Promotional Offers', type: 'item', url: '/exhibitors/promotional-offers' },
+                        { id: 'add-promotional-offer', title: 'Add Promotional Offer', type: 'item', url: '/exhibitors/promotional-offers/add' },
+                        { id: 'edit-promotional-offer', title: 'Edit Promotional Offer', type: 'item', url: '/exhibitors/promotional-offers/edit/:id' },
+                        { id: 'view-promotional-offer', title: 'View Promotional Offer', type: 'item', url: '/exhibitors/promotional-offers/view/:id' }
                     ]
                 },
                 {

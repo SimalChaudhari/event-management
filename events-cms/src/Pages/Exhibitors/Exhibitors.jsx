@@ -199,9 +199,15 @@ const Exhibitors = () => {
     
 
     useEffect(() => {
-        dispatch(exhibitorList());
+        // Only fetch if exhibitors are not already loaded in Redux
+        // This prevents unnecessary API calls when navigating back after create/update/delete
+        // Since create/update/delete already update Redux, we don't need to fetch again
+        if (!exhibitors || exhibitors.length === 0) {
+            dispatch(exhibitorList());
+        }
         return () => destroyTable(); 
-    }, [dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty array = only run once on mount
 
     useEffect(() => {
         initializeTable();
@@ -259,7 +265,8 @@ const Exhibitors = () => {
                 setIsDeleteModalOpen(false);
                 setSelectedExhibitorId(null);
                 destroyTable();
-                await dispatch(exhibitorList());
+                // No need to fetch again - deleteExhibitor already updates Redux via DELETE_EXHIBITOR action
+                // The table will re-initialize automatically when exhibitors state changes
             }
         } catch (error) {
             console.error('Delete failed:', error);

@@ -216,7 +216,9 @@ export class EventExhibitor {
   })
   event?: Event;
 
-  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventExhibitors)
+  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventExhibitors, {
+    onDelete: 'CASCADE',
+  })
   exhibitor!: Exhibitor;
 
   

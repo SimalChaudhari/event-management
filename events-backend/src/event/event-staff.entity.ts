@@ -23,7 +23,9 @@ export class EventStaff {
   })
   event?: Event;
 
-  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventStaffs)
+  @ManyToOne(() => Exhibitor, (exhibitor) => exhibitor.eventStaffs, {
+    onDelete: 'CASCADE',
+  })
   exhibitor?: Exhibitor; // Exhibitor (Company) this staff belongs to
 
   @ManyToOne(() => UserEntity, (user) => user.eventStaffs)

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { Repository, Between } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
+import { ExhibitorLead } from './exhibitor-lead.entity';
 import { ExhibitorDto, DocumentDto, EventImageDto } from './exhibitor.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { ExhibitorFileUtils } from '../utils/exhibitor-file.utils';
@@ -10,12 +11,20 @@ import {
   DuplicateResourceException,
 } from '../utils/exceptions/custom-exceptions';
 import { EventService } from '../event/event.service';
+import { UserEntity } from '../user/users.entity';
+import { Event } from '../event/event.entity';
 
 @Injectable()
 export class ExhibitorService {
   constructor(
     @InjectRepository(Exhibitor)
     private exhibitorRepository: Repository<Exhibitor>,
+    @InjectRepository(ExhibitorLead)
+    private exhibitorLeadRepository: Repository<ExhibitorLead>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+    @InjectRepository(Event)
+    private eventRepository: Repository<Event>,
     private readonly errorHandler: ErrorHandlerService,
     @Inject(forwardRef(() => EventService))
     private eventService: EventService,
@@ -111,10 +120,51 @@ export class ExhibitorService {
     }
   }
 
-  async updateExhibitor(id: string, exhibitorDto: Partial<ExhibitorDto>): Promise<any> {
+  async updateExhibitor(
+    id: string,
+    exhibitorDto: Partial<ExhibitorDto>,
+    userId?: string,
+    userRole?: string,
+    userEmail?: string,
+  ): Promise<any> {
     try {
       const existingExhibitor = await this.getExhibitorEntityById(id);
-      
+
+      // If user is Exhibitor (not Admin), verify they can update this exhibitor
+      if (userRole === 'exhibitor' && userId) {
+        let userCanUpdate = false;
+
+        // Check if exhibitor email matches user email
+        if (userEmail && existingExhibitor.email === userEmail) {
+          userCanUpdate = true;
+        }
+
+        // If not found by email, check via EventStaff table
+        if (!userCanUpdate && userId) {
+          const { EventStaff } = await import('../event/event-staff.entity');
+          const eventStaffRepository =
+            this.exhibitorRepository.manager.getRepository(EventStaff);
+
+          const userStaffRecord = await eventStaffRepository.findOne({
+            where: {
+              exhibitorId: id,
+              userId: userId,
+            },
+          });
+
+          if (userStaffRecord) {
+            userCanUpdate = true;
+          }
+        }
+
+        // If user cannot update this exhibitor, throw forbidden error
+        if (!userCanUpdate) {
+          throw new ForbiddenException(
+            'You do not have permission to update this exhibitor. You can only update your own exhibitor profile.',
+          );
+        }
+      }
+
       // Clean up old files that are no longer needed
       await ExhibitorFileUtils.cleanupRemovedFiles(existingExhibitor, exhibitorDto, this.errorHandler);
       
@@ -130,7 +180,8 @@ export class ExhibitorService {
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
-        error instanceof DuplicateResourceException
+        error instanceof DuplicateResourceException ||
+        error instanceof ForbiddenException
       ) {
         throw error;
       }
@@ -840,6 +891,221 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Event report statistics retrieval');
+    }
+  }
+
+  /**
+   * Scan attendee QR code and collect lead for exhibitor
+   * @param qrCodeId QR code identifier (user ID) - actual user ID
+   * @param eventId Event ID where the lead is being collected
+   * @param exhibitorId Exhibitor ID who is collecting the lead
+   * @param scannedBy User ID of the exhibitor staff member who scanned
+   * @param notes Optional notes about the lead
+   * @returns Lead information with attendee contact details
+   */
+  async scanAttendeeQRCodeForLead(
+    qrCodeId: string,
+    eventId: string,
+    exhibitorId: string,
+    scannedBy: string,
+    notes?: string,
+  ): Promise<any> {
+    try {
+      // QR code ID is the actual user ID
+      const userId = qrCodeId;
+
+      // Get attendee (user) data
+      const attendee = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!attendee) {
+        throw new ResourceNotFoundException('Attendee', userId);
+      }
+
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Check if attendee is registered for this event
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      
+      const registration = await registerEventRepository.findOne({
+        where: {
+          userId: userId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
+        throw new BadRequestException('Attendee is not registered for this event');
+      }
+
+      // Verify exhibitor exists
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      // Check if exhibitor is associated with this event
+      const { EventExhibitor } = await import('../event/event.entity');
+      const { EventBooth } = await import('../event/event-booth.entity');
+      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+      const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
+
+      // Check via EventExhibitor table
+      const eventExhibitor = await eventExhibitorRepository.findOne({
+        where: {
+          eventId: eventId,
+          exhibitorId: exhibitorId,
+        },
+      });
+
+      // Check via EventBooth table
+      const eventBooth = await eventBoothRepository.findOne({
+        where: {
+          eventId: eventId,
+          exhibitorId: exhibitorId,
+        },
+      });
+
+      if (!eventExhibitor && !eventBooth) {
+        throw new ForbiddenException('Exhibitor is not associated with this event');
+      }
+
+      // Verify scanner (exhibitor staff) exists
+      const scanner = await this.userRepository.findOne({
+        where: { id: scannedBy },
+      });
+
+      if (!scanner) {
+        throw new ResourceNotFoundException('Scanner', scannedBy);
+      }
+
+      // Verify scanner is staff member for this exhibitor at this event
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+      const staffRecord = await eventStaffRepository.findOne({
+        where: {
+          userId: scannedBy,
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+        },
+      });
+
+      if (!staffRecord) {
+        throw new ForbiddenException('You do not have permission to collect leads for this exhibitor at this event');
+      }
+
+      // Check if lead already exists for this exhibitor-attendee-event combination
+      const existingLead = await this.exhibitorLeadRepository.findOne({
+        where: {
+          exhibitorId: exhibitorId,
+          attendeeId: userId,
+          eventId: eventId,
+        },
+      });
+
+      if (existingLead) {
+        // Return existing lead information
+        return {
+          success: true,
+          message: 'Lead already collected for this attendee',
+          data: {
+            lead: {
+              id: existingLead.id,
+              collectedAt: existingLead.createdAt,
+            },
+            attendee: {
+              id: attendee.id,
+              firstName: attendee.firstName,
+              lastName: attendee.lastName,
+              email: attendee.email,
+              mobile: attendee.mobile,
+              company: attendee.company,
+              designation: attendee.designation,
+              profilePicture: attendee.profilePicture,
+            },
+            event: {
+              id: event.id,
+              name: event.name,
+            },
+            exhibitor: {
+              id: exhibitor.id,
+              companyName: exhibitor.companyName,
+            },
+            isNewLead: false,
+          },
+        };
+      }
+
+      // Create new lead
+      const lead = this.exhibitorLeadRepository.create({
+        exhibitorId: exhibitorId,
+        attendeeId: userId,
+        eventId: eventId,
+        scannedBy: scannedBy,
+        firstName: attendee.firstName,
+        lastName: attendee.lastName,
+        email: attendee.email,
+        mobile: attendee.mobile || undefined,
+        company: attendee.company || undefined,
+        designation: attendee.designation || undefined,
+        notes: notes || undefined,
+      });
+
+      const savedLead = await this.exhibitorLeadRepository.save(lead);
+
+      return {
+        success: true,
+        message: 'Lead collected successfully',
+        data: {
+          lead: {
+            id: savedLead.id,
+            collectedAt: savedLead.createdAt,
+          },
+          attendee: {
+            id: attendee.id,
+            firstName: attendee.firstName,
+            lastName: attendee.lastName,
+            email: attendee.email,
+            mobile: attendee.mobile,
+            company: attendee.company,
+            designation: attendee.designation,
+            profilePicture: attendee.profilePicture,
+          },
+          event: {
+            id: event.id,
+            name: event.name,
+          },
+          exhibitor: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+          },
+          isNewLead: true,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Attendee QR code scanning for lead collection');
     }
   }
 }

@@ -81,10 +81,12 @@ function promotionalOffersTable(data, exhibitor, handleAdd, handleEdit, handleDe
                 title: 'Description',
                 render: function (data, type, row) {
                     const description = row.description || 'No description';
-                    const truncated = description.length > 100 ? 
-                        description.substring(0, 100) + '...' : description;
+                    // Strip HTML tags for table display
+                    const strippedDescription = description.replace(/<[^>]*>/g, '').trim();
+                    const truncated = strippedDescription.length > 100 ? 
+                        strippedDescription.substring(0, 100) + '...' : strippedDescription;
                     
-                    return `<span class="text-wrap">${truncated}</span>`;
+                    return `<span class="text-wrap">${truncated || 'No description'}</span>`;
                 }
             },
             {
@@ -172,7 +174,7 @@ const PromotionalOffersPage = () => {
     const [searchParams] = useSearchParams();
     const exhibitorId = searchParams.get('exhibitorId');
     
-    const { promotionalOffers } = useSelector((state) => state.exhibitor);
+    const { promotionalOffers, exhibitorById: exhibitorData } = useSelector((state) => state.exhibitor);
     
     const [exhibitor, setExhibitor] = useState(null);
     const [currentTable, setCurrentTable] = useState(null);
@@ -180,7 +182,11 @@ const PromotionalOffersPage = () => {
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const offers = promotionalOffers || [];
+    // Filter offers by exhibitorId - GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR already filters,
+    // but we filter again to ensure we only show offers for current exhibitor
+    const offers = exhibitorId 
+        ? (promotionalOffers || []).filter(offer => offer.exhibitorId === exhibitorId)
+        : (promotionalOffers || []);
 
     const destroyTable = () => {
         if (currentTable) {
@@ -207,17 +213,34 @@ const PromotionalOffersPage = () => {
 
     useEffect(() => {
         if (exhibitorId) {
-            // Fetch exhibitor details
-            dispatch(exhibitorById(exhibitorId)).then((data) => {
-                if (data) {
-                    setExhibitor(data.data);
-                }
-            });
-            // Fetch promotional offers
-            dispatch(getPromotionalOffersByExhibitor(exhibitorId));
+            // Only fetch exhibitor details if not already in Redux or if it's a different exhibitor
+            // This prevents unnecessary API calls when navigating back after create/update
+            const currentExhibitor = exhibitorData?.data || exhibitorData;
+            if (!currentExhibitor || currentExhibitor.id !== exhibitorId) {
+                dispatch(exhibitorById(exhibitorId)).then((data) => {
+                    if (data) {
+                        setExhibitor(data.data);
+                    }
+                });
+            } else {
+                // Use exhibitor from Redux
+                setExhibitor(currentExhibitor);
+            }
+            
+            // Only fetch promotional offers if they don't exist in Redux or don't match current exhibitorId
+            // This prevents unnecessary API calls when navigating back after create/update/delete
+            // Since create/update/delete already update Redux, we don't need to fetch again
+            const currentOffers = promotionalOffers || [];
+            // Check if we have offers and if they match the current exhibitorId
+            const hasMatchingOffers = currentOffers.length > 0 && 
+                                     currentOffers.some(offer => offer.exhibitorId === exhibitorId);
+            if (!hasMatchingOffers) {
+                dispatch(getPromotionalOffersByExhibitor(exhibitorId));
+            }
         }
         return () => destroyTable();
-    }, [exhibitorId, dispatch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [exhibitorId, dispatch]); // Only run when exhibitorId changes
 
     useEffect(() => {
         initializeTable();
@@ -250,7 +273,8 @@ const PromotionalOffersPage = () => {
             setShowDeleteModal(false);
             setItemToDelete(null);
             destroyTable();
-            await dispatch(getPromotionalOffersByExhibitor(exhibitorId));
+            // No need to fetch again - deletePromotionalOffer already updates Redux via DELETE_PROMOTIONAL_OFFER action
+            // The table will re-initialize automatically when promotionalOffers state changes
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {

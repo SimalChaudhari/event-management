@@ -81,14 +81,23 @@ export const getPromotionalOfferById = (id) => async (dispatch) => {
 // Create promotional offer
 export const createPromotionalOffer = (data) => async (dispatch) => {
     try {
-       
         const response = await axiosInstance.post('/promotional-offers/create', data);
         if (response && response.status >= 200 && response.status < 300) {
-            dispatch({
-                type: CREATE_PROMOTIONAL_OFFER,
-                payload: response.data.data
-            });
             toast.success(response.data.message || 'Promotional offer created successfully!');
+            
+            // Get the created offer data from response - use it directly, no need to fetch again
+            const createdOffer = response.data?.data;
+            
+            // Update Redux store directly with the new offer from response
+            if (createdOffer?.id) {
+                dispatch({
+                    type: CREATE_PROMOTIONAL_OFFER,
+                    payload: createdOffer
+                });
+                
+                return true;
+            }
+            
             return true;
         }
         return false;
@@ -103,14 +112,23 @@ export const createPromotionalOffer = (data) => async (dispatch) => {
 // Update promotional offer
 export const updatePromotionalOffer = (id, data) => async (dispatch) => {
     try {
-       
         const response = await axiosInstance.put(`/promotional-offers/update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {
-            dispatch({
-                type: UPDATE_PROMOTIONAL_OFFER,
-                payload: response.data.data
-            });
             toast.success(response.data.message || 'Promotional offer updated successfully!');
+            
+            // Get the updated offer data from response - use it directly, no need to fetch again
+            const updatedOffer = response.data?.data;
+            
+            // Update Redux store directly with the updated offer from response
+            if (updatedOffer?.id) {
+                dispatch({
+                    type: UPDATE_PROMOTIONAL_OFFER,
+                    payload: updatedOffer
+                });
+                
+                return response.data;
+            }
+            
             return response.data;
         }
         return false;
