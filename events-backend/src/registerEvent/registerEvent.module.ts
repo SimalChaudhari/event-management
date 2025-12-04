@@ -25,10 +25,11 @@ import { EngagementModule } from '../engagement/engagement.module';
 import { CheckoutModule } from '../checkout/checkout.module';
 import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
+import { EventStaff } from '../event/event-staff.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem, EventStaff]), UtilsModule,
         EngagementModule,
         CheckoutModule,
         JwtModule.register({

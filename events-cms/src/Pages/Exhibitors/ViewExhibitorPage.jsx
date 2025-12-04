@@ -176,48 +176,203 @@ const ViewExhibitorPage = () => {
     // Render promotional offers section
     const renderPromotionalOffers = () => {
         if (!exhibitor.promotionalOffers || exhibitor.promotionalOffers.length === 0) {
-            return <p className="text-muted">No promotional offers available.</p>;
+            return (
+                <div style={{
+                    textAlign: 'center',
+                    padding: '40px 20px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px dashed #dee2e6'
+                }}>
+                    <i className="fas fa-gift fa-3x text-muted mb-3"></i>
+                    <p className="text-muted mb-0" style={{ fontSize: '16px' }}>No promotional offers available.</p>
+                </div>
+            );
         }
 
         return (
-            <Row>
-                {exhibitor.promotionalOffers.map((offer, index) => (
-                    <Col md={6} lg={4} key={offer.id} className="mb-3">
-                        <Card className="h-100">
-                            {offer.image && (
-                                <Card.Img 
-                                    variant="top" 
-                                    src={`${API_URL}/${offer.image}`}
-                                    style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
-                                    onClick={() => handleOfferImageClick(index)}
-                                    onError={(e) => {
-                                        e.target.src = '/assets/images/placeholder.jpg';
-                                    }}
-                                />
-                            )}
-                            <Card.Body>
-                                <Card.Title className="h6">{offer.title}</Card.Title>
-                                <div 
-                                    className="small text-muted"
-                                    style={{ 
-                                        textAlign: 'justify',
-                                        fontSize: '13px', 
-                                        lineHeight: '1.5',
-                                        marginBottom: '10px'
-                                    }}
-                                    dangerouslySetInnerHTML={{ 
-                                        __html: offer.description || 'No description available' 
-                                    }}
-                                />
-                                <div className="d-flex justify-content-between align-items-center">
-                                    <small className="text-muted">Valid until: {new Date(offer.validDate).toLocaleDateString()}</small>
-                                    <Badge variant={offer.isActive ? 'success' : 'danger'}>{offer.isActive ? 'Active' : 'Inactive'}</Badge>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {exhibitor.promotionalOffers.map((offer, index) => {
+                    // Priority: offer.image > exhibitor.logo > colored circle with icon
+                    const offerImage = offer.image ? `${API_URL}/${offer.image.replace(/\\/g, '/')}` : null;
+                    const exhibitorLogo = exhibitor.logo ? `${API_URL}/${exhibitor.logo.replace(/\\/g, '/')}` : null;
+                    
+                    // Different colors for different offers if no image
+                    const colors = ['#28a745', '#dc3545', '#007bff', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+                    const circleColor = offer.isActive 
+                        ? (offerImage || exhibitorLogo ? 'transparent' : colors[index % colors.length])
+                        : '#dc3545';
+                    
+                    return (
+                        <div
+                            key={offer.id || index}
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '12px',
+                                border: '1px solid #e9ecef',
+                                padding: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '16px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                            }}
+                        >
+                            {/* Logo Section - Left */}
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: '50%',
+                                backgroundColor: circleColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                overflow: 'hidden',
+                                border: '2px solid #fff',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }}>
+                                {offerImage ? (
+                                    <img
+                                        src={offerImage}
+                                        alt={offer.title || 'Offer Image'}
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                        }}
+                                        onClick={() => handleOfferImageClick(index)}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (exhibitorLogo) {
+                                                const fallbackImg = document.createElement('img');
+                                                fallbackImg.src = exhibitorLogo;
+                                                fallbackImg.style.width = '100%';
+                                                fallbackImg.style.height = '100%';
+                                                fallbackImg.style.objectFit = 'cover';
+                                                e.target.parentElement.appendChild(fallbackImg);
+                                            } else {
+                                                e.target.nextElementSibling.style.display = 'flex';
+                                            }
+                                        }}
+                                    />
+                                ) : exhibitorLogo ? (
+                                    <img
+                                        src={exhibitorLogo}
+                                        alt={exhibitor.companyName || 'Company Logo'}
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover'
+                                        }}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextElementSibling.style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                <div style={{
+                                    display: (offerImage || exhibitorLogo) ? 'none' : 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '100%',
+                                    height: '100%'
+                                }}>
+                                    <i className="fas fa-gift" style={{ 
+                                        color: '#fff', 
+                                        fontSize: '32px' 
+                                    }}></i>
                                 </div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
+                            </div>
+
+                            {/* Vertical Dashed Line */}
+                            <div style={{
+                                width: '1px',
+                                height: '80px',
+                                borderLeft: '1px dashed #dee2e6',
+                                flexShrink: 0
+                            }}></div>
+
+                            {/* Content Section - Right */}
+                            <div style={{
+                                flex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            }}>
+                                {/* Offer Title */}
+                                <div style={{
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    color: '#2c3e50',
+                                    lineHeight: '1.3'
+                                }}>
+                                    {offer.title || 'Untitled Offer'}
+                                </div>
+
+                                {/* Company Name */}
+                                <div style={{
+                                    fontSize: '14px',
+                                    color: '#6c757d',
+                                    fontWeight: '500'
+                                }}>
+                                    {offer.companyName || exhibitor.companyName || 'Company Name'}
+                                </div>
+
+                                {/* Valid Date */}
+                                {offer.validDate ? (
+                                    <div style={{
+                                        fontSize: '12px',
+                                        color: '#6c757d',
+                                        marginTop: '4px'
+                                    }}>
+                                        Valid until {new Date(offer.validDate).toLocaleDateString('en-GB', { 
+                                            day: '2-digit', 
+                                            month: 'long', 
+                                            year: 'numeric' 
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        fontSize: '12px',
+                                        color: '#adb5bd',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        No expiry date
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Status Indicator - Right Side */}
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-end',
+                                gap: '4px',
+                                flexShrink: 0
+                            }}>
+                                <Badge 
+                                    bg={offer.isActive ? 'success' : 'danger'}
+                                    style={{
+                                        fontSize: '10px',
+                                        padding: '4px 8px',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    {offer.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         );
     };
 
@@ -289,6 +444,101 @@ const ViewExhibitorPage = () => {
                         </Card>
                     </Col>
                 ))}
+            </Row>
+        );
+    };
+
+    // Render booth banner section
+    const renderBoothBanner = () => {
+        if (!exhibitor.boothBanner || exhibitor.boothBanner.length === 0) {
+            return <p className="text-muted">No booth banner items available.</p>;
+        }
+
+        return (
+            <Row>
+                {exhibitor.boothBanner.map((banner, index) => {
+                    // Handle both formats: {id, value} or direct string
+                    const bannerValue = typeof banner === 'object' && banner.value ? banner.value : (typeof banner === 'string' ? banner : banner.banner || '');
+                    const isLink = bannerValue && (bannerValue.startsWith('http://') || bannerValue.startsWith('https://'));
+                    const isVideo = bannerValue && (bannerValue.includes('.mp4') || bannerValue.includes('.mpeg') || bannerValue.includes('.mov'));
+                    const bannerUrl = isLink 
+                        ? bannerValue 
+                        : `${API_URL}/${bannerValue.replace(/\\/g, '/')}`;
+
+                    return (
+                        <Col md={4} lg={3} key={index} className="mb-3">
+                            <Card>
+                                {isLink ? (
+                                    <Card.Body className="text-center p-4">
+                                        <i className="fas fa-link fa-3x text-primary mb-3"></i>
+                                        <Card.Title className="h6">External Link</Card.Title>
+                                        <Button 
+                                            variant="outline-primary" 
+                                            size="sm"
+                                            href={bannerUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <i className="fas fa-external-link-alt me-1"></i>
+                                            Open Link
+                                        </Button>
+                                    </Card.Body>
+                                ) : isVideo ? (
+                                    <>
+                                        <video
+                                            src={bannerUrl}
+                                            style={{ height: '200px', objectFit: 'cover', width: '100%' }}
+                                            controls
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                            }}
+                                        />
+                                        <Card.Body className="p-2">
+                                            <div style={{ 
+                                                fontSize: '14px', 
+                                                fontWeight: 'bold', 
+                                                color: '#495057',
+                                                textAlign: 'center'
+                                            }}>
+                                                Video {index + 1}
+                                            </div>
+                                        </Card.Body>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Card.Img 
+                                            variant="top" 
+                                            src={bannerUrl}
+                                            style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                                            onClick={() => {
+                                                const bannerImages = exhibitor.boothBanner
+                                                    .map(b => typeof b === 'object' && b.value ? b.value : b)
+                                                    .filter(b => !b.startsWith('http'));
+                                                setCurrentImages(bannerImages);
+                                                setCurrentImageIndex(index);
+                                                setCurrentImageType('boothBanner');
+                                                setShowImageModal(true);
+                                            }}
+                                            onError={(e) => {
+                                                e.target.src = '/assets/images/placeholder.jpg';
+                                            }}
+                                        />
+                                        <Card.Body className="p-2">
+                                            <div style={{ 
+                                                fontSize: '14px', 
+                                                fontWeight: 'bold', 
+                                                color: '#495057',
+                                                textAlign: 'center'
+                                            }}>
+                                                Banner {index + 1}
+                                            </div>
+                                        </Card.Body>
+                                    </>
+                                )}
+                            </Card>
+                        </Col>
+                    );
+                })}
             </Row>
         );
     };
@@ -372,32 +622,6 @@ const ViewExhibitorPage = () => {
         );
     };
 
-    // Render exhibitor statistics
-    const renderExhibitorStats = () => (
-        <div className="exhibitor-stats">
-            <div className="text-center p-3 bg-light rounded">
-                <div className="row text-center">
-                    <div className="col-3">
-                        <h6 className="mb-0">{exhibitor.promotionalOffers?.length || 0}</h6>
-                        <small className="text-muted">Offers</small>
-                    </div>
-                    <div className="col-3">
-                        <h6 className="mb-0">{exhibitor.documents?.length || 0}</h6>
-                        <small className="text-muted">Documents</small>
-                    </div>
-                    <div className="col-3">
-                        <h6 className="mb-0">{exhibitor.flyers?.length || 0}</h6>
-                        <small className="text-muted">Flyers</small>
-                    </div>
-                    <div className="col-3">
-                        <h6 className="mb-0">{exhibitor.eventImages?.length || 0}</h6>
-                        <small className="text-muted">Images</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
     // Render image modal for zoom functionality
     const renderImageModal = () => {
         if (!currentImages || currentImages.length === 0) return null;
@@ -418,6 +642,9 @@ const ViewExhibitorPage = () => {
         } else if (currentImageType === 'logo') {
             imageSrc = getImageSrc(currentImage);
             imageTitle = 'Company Logo';
+        } else if (currentImageType === 'boothBanner') {
+            imageSrc = getImageSrc(currentImage);
+            imageTitle = `Booth Banner ${currentImageIndex + 1}`;
         }
 
         return (
@@ -618,68 +845,6 @@ const ViewExhibitorPage = () => {
                 </div>
             </div>
 
-            {/* Statistics Section - First */}
-            <InfoCard title="Statistics" icon="📊" borderColor="#9b59b6">
-                <Row className="text-center">
-                    <Col lg={3} md={6} className="mb-3">
-                        <div style={{
-                            backgroundColor: '#fff',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            border: '1px solid #e9ecef',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                            <h4 style={{ color: '#3498db', marginBottom: '10px' }}>
-                                {exhibitor.flyers?.length || 0}
-                            </h4>
-                            <small className="text-muted">🖼️ Flyers</small>
-                        </div>
-                    </Col>
-                    <Col lg={3} md={6} className="mb-3">
-                        <div style={{
-                            backgroundColor: '#fff',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            border: '1px solid #e9ecef',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                            <h4 style={{ color: '#27ae60', marginBottom: '10px' }}>
-                                {exhibitor.eventImages?.length || 0}
-                            </h4>
-                            <small className="text-muted">📸 Images</small>
-                        </div>
-                    </Col>
-                    <Col lg={3} md={6} className="mb-3">
-                        <div style={{
-                            backgroundColor: '#fff',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            border: '1px solid #e9ecef',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                            <h4 style={{ color: '#f39c12', marginBottom: '10px' }}>
-                                {exhibitor.documents?.length || 0}
-                            </h4>
-                            <small className="text-muted">📁 Documents</small>
-                        </div>
-                    </Col>
-                    <Col lg={3} md={6} className="mb-3">
-                        <div style={{
-                            backgroundColor: '#fff',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            border: '1px solid #e9ecef',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}>
-                            <h4 style={{ color: '#e74c3c', marginBottom: '10px' }}>
-                                {exhibitor.promotionalOffers?.length || 0}
-                            </h4>
-                            <small className="text-muted">🎁 Offers</small>
-                        </div>
-                    </Col>
-                </Row>
-            </InfoCard>
-
             {/* Company Information & Details - Single Card with Logo */}
             <div className="mb-3">
                 <div style={{
@@ -869,6 +1034,39 @@ const ViewExhibitorPage = () => {
                             </div>
                         </Col>
                     </Row>
+
+                    {/* Address - Full Width Below */}
+                    {exhibitor.address && (
+                        <Row className="mt-3">
+                            <Col xs={12}>
+                                <div style={{ 
+                                    borderTop: '1px solid #e9ecef',
+                                    paddingTop: '15px'
+                                }}>
+                                    <div style={{ 
+                                        fontWeight: 'bold', 
+                                        color: '#495057', 
+                                        marginBottom: '10px',
+                                        fontSize: '14px'
+                                    }}>
+                                        Address:
+                                    </div>
+                                    <div style={{
+                                        color: '#212529',
+                                        fontSize: '14px',
+                                        lineHeight: '1.6',
+                                        padding: '12px',
+                                        backgroundColor: '#f8f9fa',
+                                        borderRadius: '6px',
+                                        border: '1px solid #e9ecef',
+                                        fontWeight: '400'
+                                    }}>
+                                        {exhibitor.address}
+                                    </div>
+                                </div>
+                            </Col>
+                        </Row>
+                    )}
                 </div>
             </div>
 
@@ -936,6 +1134,22 @@ const ViewExhibitorPage = () => {
                                 📁 Documents ({exhibitor.documents?.length || 0})
                             </Nav.Link>
                         </Nav.Item>
+                        {exhibitor.boothBanner && exhibitor.boothBanner.length > 0 && (
+                            <Nav.Item>
+                                <Nav.Link 
+                                    eventKey="boothBanner"
+                                    style={{
+                                        borderRadius: '8px',
+                                        fontWeight: '500',
+                                        border: '1px solid #dee2e6',
+                                        fontSize: '14px',
+                                        padding: '8px 16px'
+                                    }}
+                                >
+                                    🎨 Booth Banner ({exhibitor.boothBanner.length})
+                                </Nav.Link>
+                            </Nav.Item>
+                        )}
                         {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
                             <Nav.Item>
                                 <Nav.Link 
@@ -999,6 +1213,19 @@ const ViewExhibitorPage = () => {
                                 {renderDocuments()}
                             </div>
                         </Tab.Pane>
+                        {exhibitor.boothBanner && exhibitor.boothBanner.length > 0 && (
+                            <Tab.Pane eventKey="boothBanner">
+                                <div style={{
+                                    backgroundColor: '#fff',
+                                    padding: '20px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}>
+                                    {renderBoothBanner()}
+                                </div>
+                            </Tab.Pane>
+                        )}
                         {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
                             <Tab.Pane eventKey="eventStaff">
                                 <div style={{

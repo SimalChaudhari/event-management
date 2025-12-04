@@ -16,6 +16,7 @@ import {
     HttpStatus,
     UseGuards,
     BadRequestException,
+    ForbiddenException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -33,6 +34,7 @@ import { RolesGuard } from '../jwt/roles.guard';
 import { Roles } from '../jwt/roles.decorator';
 import { UserRole } from '../user/users.entity';
 import { ExhibitorFileUtils, ExhibitorFileUploadConfig } from '../utils/exhibitor-file.utils';
+import { ExhibitorUpdatePermissionGuard } from './exhibitor-update-permission.guard';
 
 /**
  * Exhibitor Controller
@@ -75,9 +77,42 @@ export class ExhibitorController {
         throw new BadRequestException(`File validation failed: ${fileProcessing.errors?.join(', ')}`);
       }
 
+      // Handle booth banner from body (can be JSON string or array)
+      if (exhibitorDto.boothBanner) {
+        if (typeof exhibitorDto.boothBanner === 'string') {
+          try {
+            exhibitorDto.boothBanner = JSON.parse(exhibitorDto.boothBanner);
+          } catch (e) {
+            // If parsing fails, treat as empty array
+            exhibitorDto.boothBanner = [];
+          }
+        }
+      }
+
       // Apply processed files to DTO
       if (fileProcessing.processedFiles) {
-        Object.assign(exhibitorDto, fileProcessing.processedFiles);
+        // Handle booth banner - combine existing from DTO with new uploaded files
+        if (fileProcessing.processedFiles.boothBanner) {
+          const allBoothBanner = exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner) 
+            ? [...exhibitorDto.boothBanner] 
+            : [];
+          
+          // Add new uploaded booth banner files (format: {value: "path"})
+          allBoothBanner.push(...fileProcessing.processedFiles.boothBanner);
+          exhibitorDto.boothBanner = allBoothBanner;
+        } else if (exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner)) {
+          // Normalize format: convert strings to {value: string} objects
+          exhibitorDto.boothBanner = exhibitorDto.boothBanner.map((item: any) => {
+            if (typeof item === 'object' && item.value) {
+              return { value: item.value };
+            }
+            return { value: typeof item === 'string' ? item : item.value || item };
+          });
+        }
+        
+        // Apply other processed files
+        const { boothBanner, ...otherFiles } = fileProcessing.processedFiles;
+        Object.assign(exhibitorDto, otherFiles);
       }
 
       const exhibitor = await this.exhibitorService.createExhibitor(exhibitorDto);
@@ -298,7 +333,7 @@ export class ExhibitorController {
    * Access: Admin and Exhibitor users only
    */
   @Put('update/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, ExhibitorUpdatePermissionGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   @UseInterceptors(ExhibitorFileUtils.createExhibitorFileInterceptor())
   async updateExhibitor(
@@ -309,6 +344,18 @@ export class ExhibitorController {
     @Request() req: any,
   ) {
     try {
+      // Handle booth banner from body (can be JSON string or array)
+      if (exhibitorDto.boothBanner) {
+        if (typeof exhibitorDto.boothBanner === 'string') {
+          try {
+            exhibitorDto.boothBanner = JSON.parse(exhibitorDto.boothBanner);
+          } catch (e) {
+            // If parsing fails, treat as empty array
+            exhibitorDto.boothBanner = [];
+          }
+        }
+      }
+
       // Process new files safely
       const fileProcessing = ExhibitorFileUtils.processFilesSafely(files, {
         flyerNames: exhibitorDto.flyerNames,
@@ -377,12 +424,51 @@ export class ExhibitorController {
         if (fileProcessing.processedFiles.logo) {
           exhibitorDto.logo = fileProcessing.processedFiles.logo;
         }
-      }
 
-      // Get user info for permission check
+        // Handle booth banner - REPLACES all existing banners with new array
+        // Old files not in the new array will be automatically deleted by updateExhibitorBoothBanner
+        if (fileProcessing.processedFiles.boothBanner) {
+          // Combine DTO array (existing banners to keep) with new uploaded files
+          // This array will REPLACE all existing banners - old files not in this array will be deleted
+          const allBoothBanner = exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner) 
+            ? [...exhibitorDto.boothBanner] 
+            : [];
+          
+          // Add new uploaded booth banner files (format: {value: "path"})
+          allBoothBanner.push(...fileProcessing.processedFiles.boothBanner);
+          exhibitorDto.boothBanner = allBoothBanner;
+        } else if (exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner)) {
+          // Normalize format: convert strings to {value: string} objects
+          // This array REPLACES all existing banners - old files not in this array will be deleted
+          exhibitorDto.boothBanner = exhibitorDto.boothBanner.map((item: any) => {
+            if (typeof item === 'object' && item.value) {
+              return { value: item.value }; // Ignore id, DB will generate new one
+            }
+            return { value: typeof item === 'string' ? item : item.value || item };
+          });
+        }
+        // If boothBanner is not provided in DTO and no new files, it will remain undefined
+        // and won't overwrite existing values (preserves existing booth banner)
+      } else if (exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner)) {
+        // Normalize format: convert strings to {value: string} objects
+        // This array REPLACES all existing banners - old files not in this array will be deleted
+        exhibitorDto.boothBanner = exhibitorDto.boothBanner.map((item: any) => {
+          if (typeof item === 'object' && item.value) {
+            return { value: item.value };
+          }
+          return { value: typeof item === 'string' ? item : item.value || item };
+        });
+      }
+      // If boothBanner is not provided in DTO and no files uploaded, leave it undefined
+      // This preserves existing booth banner in database
+
+      // Get user info
       const userId = req.user?.id;
       const userRole = req.user?.role;
       const userEmail = req.user?.email;
+
+      // Permission check is now handled by ExhibitorUpdatePermissionGuard (runs BEFORE interceptor)
+      // So files are only uploaded if permission is granted
 
       const updatedExhibitor = await this.exhibitorService.updateExhibitor(
         id,
@@ -589,6 +675,62 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Exhibitor event image removal', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove individual item from booth banner (image, video, or link)
+   * Access: Admin and Exhibitor users only
+   */
+  @Delete('boothBanner/:id/:bannerId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async removeBoothBannerItem(
+    @Param('id') id: string, // Exhibitor ID
+    @Param('bannerId') bannerId: string, // Booth Banner ID
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Get user info for permission check
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+
+      // Check permission: Only admin or the exhibitor owner can delete booth banner items
+      if (userRole === 'exhibitor' && userId) {
+        const userCanUpdate = await this.exhibitorService.canUserUpdateExhibitor(
+          id,
+          userId,
+          userEmail,
+        );
+
+        if (!userCanUpdate) {
+          throw new ForbiddenException(
+            'You do not have permission to delete booth banner items from this exhibitor. You can only delete items from your own exhibitor profile.',
+          );
+        }
+      }
+
+      // Delete the booth banner using the new table structure
+      await this.exhibitorService.deleteBoothBanner(bannerId, id);
+
+      // Get updated exhibitor
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Booth banner item removed successfully',
+        data: updatedExhibitor,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Booth banner item removal', req.user?.id);
       throw error;
     }
   }

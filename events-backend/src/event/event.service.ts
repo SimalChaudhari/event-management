@@ -515,31 +515,12 @@ export class EventService {
                       }
                     }
 
-                    // Get Event Staff for this exhibitor - only show to admin
-                    if (userRole === UserRole.Admin && exhibitorId) {
-                      const exhibitorStaffs = await this.eventStaffRepository.find({
-                        where: {
-                          eventId: event.id,
-                          exhibitorId: exhibitorId,
-                        },
-                        relations: ['user'],
-                      });
-
-                      // Format event staff data for this exhibitor
-                      (exhibitorData as any).eventStaff = exhibitorStaffs.map((es) => ({
-                        id: es.user?.id,
-                        firstName: es.user?.firstName || '',
-                        lastName: es.user?.lastName || '',
-                        email: es.user?.email || '',
-                        mobile: es.user?.mobile || '',
-                        profilePicture: es.user?.profilePicture || null,
-                        role: es.user?.role || 'exhibitor',
-                        createdAt: es.createdAt,
-                      }));
-                    } else {
-                      // For non-admin users (exhibitor, regular users), don't show event staff
-                      (exhibitorData as any).eventStaff = [];
-                    }
+                    // Get Event Staff for this exhibitor - show to all users
+                    (exhibitorData as any).eventStaff = await ExhibitorUtils.getEventStaffForExhibitor(
+                      this.eventStaffRepository,
+                      event.id,
+                      exhibitorId,
+                    );
 
                     return exhibitorData;
                   }),
@@ -883,31 +864,12 @@ export class EventService {
             }
           }
 
-          // Get Event Staff for this exhibitor - only show to admin
-          if (userRole === UserRole.Admin && exhibitorId) {
-            const exhibitorStaffs = await this.eventStaffRepository.find({
-              where: {
-                eventId: id,
-                exhibitorId: exhibitorId,
-              },
-              relations: ['user'],
-            });
-
-            // Format event staff data for this exhibitor
-            (exhibitorData as any).eventStaff = exhibitorStaffs.map((es) => ({
-              id: es.user?.id,
-              firstName: es.user?.firstName || '',
-              lastName: es.user?.lastName || '',
-              email: es.user?.email || '',
-              mobile: es.user?.mobile || '',
-              profilePicture: es.user?.profilePicture || null,
-              role: es.user?.role || 'exhibitor',
-              createdAt: es.createdAt,
-            }));
-          } else {
-            // For non-admin users (exhibitor, regular users), don't show event staff
-            (exhibitorData as any).eventStaff = [];
-          }
+          // Get Event Staff for this exhibitor - show to all users
+          (exhibitorData as any).eventStaff = await ExhibitorUtils.getEventStaffForExhibitor(
+            this.eventStaffRepository,
+            id,
+            exhibitorId,
+          );
 
           return exhibitorData;
         }),
@@ -1377,7 +1339,7 @@ export class EventService {
                   .filter((id) => id !== undefined),
               ),
             },
-            relations: ['exhibitor'],
+            relations: ['exhibitor', 'exhibitor.boothBanners'],
           });
 
           // Send removal emails before deleting records

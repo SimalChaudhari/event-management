@@ -17,7 +17,7 @@ import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../hooks/useTableNavigation';
 import { SPEAKER_PATHS } from '../../utils/constants';
 import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
-import axiosInstance from '../../configs/axiosInstance';
+import axiosInstance from '../../configs/axiosInstance';    
 import { SPEAKER_LOADING } from '../../store/constants/actionTypes';
 
 // @ts-ignore

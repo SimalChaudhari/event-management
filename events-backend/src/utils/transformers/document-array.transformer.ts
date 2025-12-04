@@ -114,3 +114,45 @@ export const eventImageArrayTransformer = {
     }
   }
 };
+
+// Booth Banner Transformer - for booth banner array with IDs (images, videos, links)
+export const boothBannerTransformer = {
+  to: (value: any): string => {
+    if (!value) return '';
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return JSON.stringify(value);
+  },
+  from: (value: string): any => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        // Check if it's new format (array of objects with id) or old format (array of strings)
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].id && parsed[0].value) {
+          return parsed; // New format: array of objects with id
+        } else if (typeof parsed[0] === 'string') {
+          // Old format: array of strings, convert to new format with IDs
+          const { v4: uuidv4 } = require('uuid');
+          return parsed.map((item: string) => ({
+            id: uuidv4(),
+            value: item
+          }));
+        }
+        return parsed;
+      }
+      return [];
+    } catch (error) {
+      // If parsing fails, try to split as comma-separated string (backward compatibility)
+      if (typeof value === 'string' && value.includes(',')) {
+        const { v4: uuidv4 } = require('uuid');
+        return value.split(',').map((item: string) => ({
+          id: uuidv4(),
+          value: item.trim()
+        })).filter(item => item.value);
+      }
+      return [];
+    }
+  }
+};

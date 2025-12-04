@@ -10,11 +10,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { Engagement } from '../engagement/engagement.entity';
+import { EventStaff } from '../event/event-staff.entity';
 import { UtilsModule } from 'utils/utils.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FavoriteEvent, Event, UserEntity,
-     RegisterEvent, EventAgenda, Engagement]),
+     RegisterEvent, EventAgenda, Engagement, EventStaff]),
      UtilsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file

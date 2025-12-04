@@ -14,6 +14,7 @@ import { UserUtils } from '../utils/user.utils';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils } from '../utils/agenda.utils';
 import { Engagement } from '../engagement/engagement.entity';
+import { EventStaff } from '../event/event-staff.entity';
 
 @Injectable()
 export class FavoriteEventService {
@@ -30,6 +31,9 @@ export class FavoriteEventService {
     private agendaRepository: Repository<EventAgenda>,
     @InjectRepository(Engagement)
     private engagementRepository: Repository<Engagement>,
+
+    @InjectRepository(EventStaff)
+    private eventStaffRepository: Repository<EventStaff>,
 
     private readonly surveyUtils: SurveyUtils,
   ) {}
@@ -111,6 +115,7 @@ export class FavoriteEventService {
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
+      .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners') // Add booth banners
       .leftJoinAndSelect('event.programmeTracks', 'programmeTracks') // Add programme tracks
       .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions') // Add programme sessions
       .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers') // Add programme session speakers
@@ -249,15 +254,26 @@ export class FavoriteEventService {
             },
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',
-              exhibitors:
-                eventExhibitors
-                  ?.filter((ee) => ee.exhibitor.isActive)
-                  ?.map((ee) => {
-                    return {
+              exhibitors: await Promise.all(
+                (eventExhibitors
+                  ?.filter((ee) => ee.exhibitor.isActive) || [])
+                  .map(async (ee) => {
+                    const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
+                    const exhibitorData = {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
                       promotionalOffers: ee.exhibitor.promotionalOffers || [],
                     };
-                  }) || [],
+
+                    // Get Event Staff for this exhibitor - show to all users
+                    (exhibitorData as any).eventStaff = await ExhibitorUtils.getEventStaffForExhibitor(
+                      this.eventStaffRepository,
+                      favorite.eventId || '',
+                      exhibitorId,
+                    );
+
+                    return exhibitorData;
+                  })
+              ),
             },
             myAgendas: formattedAgendas || [],
 

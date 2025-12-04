@@ -19,6 +19,7 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
       .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+      .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners')
       .leftJoinAndSelect('event.galleries', 'galleries')
       .leftJoinAndSelect('event.surveys', 'surveys')
       .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')

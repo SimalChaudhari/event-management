@@ -194,6 +194,7 @@ function AddExhibitorPage() {
         mobile: '',
         companyName: '',
         companyDescription: '',
+        address: '',
         logo: null,
         uen: '',
         bothNumber: '',
@@ -203,13 +204,16 @@ function AddExhibitorPage() {
         eventImages: [],
         eventImageNames: [],
         documents: [],
-        documentNames: []
+        documentNames: [],
+        boothBanner: [] // Array of {value: string} or strings (images, videos, links)
     });
 
     // Preview states 
     const [flyerPreviewUrls, setFlyerPreviewUrls] = useState([]);
     const [eventImagePreviewUrls, setEventImagePreviewUrls] = useState([]);
     const [documentPreviewUrls, setDocumentPreviewUrls] = useState([]);
+    const [boothBannerPreviewUrls, setBoothBannerPreviewUrls] = useState([]);
+    const [boothBannerLinks, setBoothBannerLinks] = useState([]); // For URL links
 
     // Name arrays
     const [flyerNames, setFlyerNames] = useState([]);
@@ -319,11 +323,37 @@ function AddExhibitorPage() {
                             }
                         }
 
+                        // Handle booth banner data
+                        let boothBannerData = [];
+                        let boothBannerPreviewUrlsData = [];
+                        let boothBannerLinksData = [];
+
+                        if (editData.boothBanner && Array.isArray(editData.boothBanner)) {
+                            boothBannerData = editData.boothBanner.map((banner) => {
+                                if (typeof banner === 'object' && banner.value) {
+                                    return banner.value;
+                                }
+                                return typeof banner === 'string' ? banner : '';
+                            }).filter(Boolean);
+
+                            boothBannerData.forEach((banner) => {
+                                if (banner.startsWith('http://') || banner.startsWith('https://')) {
+                                    boothBannerLinksData.push(banner);
+                                } else {
+                                    const bannerUrl = banner.startsWith('http') 
+                                        ? banner 
+                                        : `${API_URL}/${banner.replace(/\\/g, '/')}`;
+                                    boothBannerPreviewUrlsData.push(bannerUrl);
+                                }
+                            });
+                        }
+
                         const formDataToSet = {
                             email: editData.email || '',
                             mobile: editData.mobile || '',
                             companyName: editData.companyName || '',
                             companyDescription: editData.companyDescription || '',
+                            address: editData.address || '',
                             logo: editData.logo || null,
                             uen: editData.uen || '',
                             bothNumber: editData.bothNumber || '',
@@ -333,7 +363,8 @@ function AddExhibitorPage() {
                             eventImages: eventImagesData,
                             eventImageNames: eventImageNamesData,
                             documents: documentsData,
-                            documentNames: documentNamesData
+                            documentNames: documentNamesData,
+                            boothBanner: boothBannerData
                         };
 
                         setFormData(formDataToSet);
@@ -343,6 +374,8 @@ function AddExhibitorPage() {
                         setFlyerNames(flyerNamesData);
                         setEventImageNames(eventImageNamesData);
                         setDocumentNames(documentNamesData);
+                        setBoothBannerPreviewUrls(boothBannerPreviewUrlsData);
+                        setBoothBannerLinks(boothBannerLinksData);
                     }
                 } catch (error) {
                     setError('Failed to load exhibitor data');
@@ -422,6 +455,21 @@ function AddExhibitorPage() {
                     ...prev,
                     documentNames: [...prev.documentNames, ...newDocumentNames]
                 }));
+            } else if (name === 'boothBanner') {
+                // Support images and videos for booth banner
+                const validFiles = newFiles.filter((file) => {
+                    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'video/mp4', 'video/mpeg', 'video/quicktime'];
+                    return allowedTypes.includes(file.type);
+                });
+
+                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+                setFormData((prev) => ({
+                    ...prev,
+                    boothBanner: [...prev.boothBanner, ...validFiles]
+                }));
+
+                setBoothBannerPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
             }
         } else if (type === 'checkbox') {
             setFormData((prev) => ({
@@ -579,6 +627,58 @@ function AddExhibitorPage() {
         }));
     };
 
+    // Booth Banner handlers
+    const handleBoothBannerDragOver = (e) => {
+        e.preventDefault();
+    };
+
+    const handleBoothBannerDrop = (e) => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files);
+        const validFiles = files.filter((file) => {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'video/mp4', 'video/mpeg', 'video/quicktime'];
+            return allowedTypes.includes(file.type);
+        });
+
+        if (validFiles.length > 0) {
+            const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
+
+            setFormData((prev) => ({
+                ...prev,
+                boothBanner: [...prev.boothBanner, ...validFiles]
+            }));
+
+            setBoothBannerPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+        }
+    };
+
+    const handleAddBoothBannerLink = () => {
+        const link = prompt('Enter URL for booth banner (image, video, or link):');
+        if (link && link.trim()) {
+            setFormData((prev) => ({
+                ...prev,
+                boothBanner: [...prev.boothBanner, link.trim()]
+            }));
+            setBoothBannerLinks((prev) => [...prev, link.trim()]);
+        }
+    };
+
+    const handleRemoveBoothBanner = (indexToRemove) => {
+        const item = formData.boothBanner[indexToRemove];
+        const isLink = typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'));
+
+        setFormData((prev) => ({
+            ...prev,
+            boothBanner: prev.boothBanner.filter((_, index) => index !== indexToRemove)
+        }));
+
+        if (isLink) {
+            setBoothBannerLinks((prev) => prev.filter((_, index) => index !== indexToRemove));
+        } else {
+            setBoothBannerPreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+        }
+    };
+
     // Name change handlers 
     const handleFlyerNameChange = (index, newName) => {
         setFormData((prev) => {
@@ -691,6 +791,25 @@ function AddExhibitorPage() {
                         formData[key].forEach((file) => {
                             if (file instanceof File) {
                                 formDataToSend.append('documents', file);
+                            }
+                        });
+                    }
+                } else if (key === 'boothBanner') {
+                    // Handle booth banner - send existing URLs/links as JSON array
+                    // New files will be uploaded separately
+                    if (formData[key] && Array.isArray(formData[key])) {
+                        const existingBanners = formData[key]
+                            .filter(item => typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://') || item.startsWith('uploads/')))
+                            .map(item => ({ value: item }));
+                        
+                        if (existingBanners.length > 0) {
+                            formDataToSend.append('boothBanner', JSON.stringify(existingBanners));
+                        }
+                        
+                        // Upload new files
+                        formData[key].forEach((item) => {
+                            if (item instanceof File) {
+                                formDataToSend.append('boothBanner', item);
                             }
                         });
                     }
@@ -867,6 +986,23 @@ function AddExhibitorPage() {
                                                 onChange={handleChange}
                                                 placeholder="Enter company description..."
                                                 rows={4}
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* Address */}
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="address">
+                                                Address (Optional)
+                                            </label>
+                                            <textarea
+                                                className="form-control"
+                                                name="address"
+                                                value={formData.address}
+                                                onChange={handleChange}
+                                                placeholder="Enter company address..."
+                                                rows={3}
                                             />
                                         </div>
                                     </Col>
@@ -1519,6 +1655,219 @@ function AddExhibitorPage() {
                                                         }}
                                                     >
                                                         💡 Document names are optional. Leave empty if not needed.
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Col>
+
+                                    {/* Booth Banner Section */}
+                                    <Col sm={12}>
+                                        <div className="form-group fill">
+                                            <Badge bg="info">
+                                                <span>Booth Banner </span> {formData.boothBanner.length}/20
+                                            </Badge>
+                                            <p className="text-muted small mt-2 mb-2">
+                                                Upload images, videos, or add links for booth banner display
+                                            </p>
+
+                                            {/* Drag and Drop Zone for Booth Banner */}
+                                            <div
+                                                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
+                                                onDragOver={handleBoothBannerDragOver}
+                                                onDrop={handleBoothBannerDrop}
+                                                style={{
+                                                    border: '2px dashed #ccc',
+                                                    borderRadius: '8px',
+                                                    padding: '20px',
+                                                    textAlign: 'center',
+                                                    backgroundColor: '#f9f9f9',
+                                                    marginBottom: '10px',
+                                                    minHeight: '120px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <div className="mb-3">
+                                                    <i className="fas fa-images fa-3x text-muted"></i>
+                                                </div>
+                                                <p
+                                                    className="text-muted mb-2"
+                                                    style={{
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.4',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
+                                                    Drag and drop images/videos here, or click to select files
+                                                </p>
+                                                <p
+                                                    className="text-muted small"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.3',
+                                                        maxWidth: '100%',
+                                                        wordWrap: 'break-word'
+                                                    }}
+                                                >
+                                                    Supported: JPG, PNG, GIF, MP4. Max size: 10MB per file. Max 20 items.
+                                                </p>
+                                                <input
+                                                    type="file"
+                                                    className="form-control"
+                                                    name="boothBanner"
+                                                    onChange={handleChange}
+                                                    accept="image/*,video/*"
+                                                    multiple
+                                                    style={{ display: 'none' }}
+                                                    id="boothBannerInput"
+                                                />
+                                                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                                    <Button
+                                                        variant="outline-primary"
+                                                        onClick={() => document.getElementById('boothBannerInput').click()}
+                                                    >
+                                                        Choose Files
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline-success"
+                                                        onClick={handleAddBoothBannerLink}
+                                                    >
+                                                        <i className="fas fa-link me-1"></i>
+                                                        Add Link
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            {/* Booth Banner Preview Grid */}
+                                            {formData.boothBanner && formData.boothBanner.length > 0 && (
+                                                <div className="mt-3">
+                                                    <h6
+                                                        style={{
+                                                            fontSize: '16px',
+                                                            fontWeight: '600',
+                                                            marginBottom: '15px',
+                                                            color: '#333'
+                                                        }}
+                                                    >
+                                                        Booth Banner Items ({formData.boothBanner.length})
+                                                    </h6>
+                                                    <div
+                                                        style={{
+                                                            display: 'grid',
+                                                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                                            gap: '15px',
+                                                            marginTop: '10px'
+                                                        }}
+                                                    >
+                                                        {formData.boothBanner.map((item, index) => {
+                                                            let itemSrc = '';
+                                                            let isLink = false;
+                                                            let isExisting = false;
+
+                                                            if (typeof item === 'string') {
+                                                                isLink = item.startsWith('http://') || item.startsWith('https://');
+                                                                isExisting = item.startsWith('uploads/');
+                                                                
+                                                                if (isLink) {
+                                                                    itemSrc = item;
+                                                                } else {
+                                                                    itemSrc = `${API_URL}/${item.replace(/\\/g, '/')}`;
+                                                                }
+                                                            } else if (item instanceof File) {
+                                                                itemSrc = boothBannerPreviewUrls[index] || URL.createObjectURL(item);
+                                                            }
+
+                                                            const isVideo = itemSrc && (itemSrc.includes('.mp4') || itemSrc.includes('.mpeg') || itemSrc.includes('.mov') || (item instanceof File && item.type.startsWith('video/')));
+
+                                                            return (
+                                                                <div
+                                                                    key={`boothBanner-${index}`}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        flexDirection: 'column',
+                                                                        padding: '12px',
+                                                                        border: '1px solid #e9ecef',
+                                                                        borderRadius: '8px',
+                                                                        backgroundColor: '#ffffff',
+                                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                                    }}
+                                                                >
+                                                                    <div style={{ position: 'relative', marginBottom: '8px' }}>
+                                                                        {isVideo ? (
+                                                                            <video
+                                                                                src={itemSrc}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    height: '120px',
+                                                                                    objectFit: 'cover',
+                                                                                    borderRadius: '4px'
+                                                                                }}
+                                                                                controls
+                                                                            />
+                                                                        ) : (
+                                                                            <img
+                                                                                src={itemSrc}
+                                                                                alt={`Banner ${index + 1}`}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    height: '120px',
+                                                                                    objectFit: 'cover',
+                                                                                    borderRadius: '4px'
+                                                                                }}
+                                                                                onError={(e) => {
+                                                                                    e.target.src = '/assets/images/placeholder.jpg';
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="danger"
+                                                                            onClick={() => handleRemoveBoothBanner(index)}
+                                                                            style={{
+                                                                                position: 'absolute',
+                                                                                top: '4px',
+                                                                                right: '4px',
+                                                                                padding: '4px 8px',
+                                                                                fontSize: '12px',
+                                                                                borderRadius: '50%',
+                                                                                width: '24px',
+                                                                                height: '24px',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'center'
+                                                                            }}
+                                                                        >
+                                                                            ×
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            color: '#666',
+                                                                            marginTop: '4px',
+                                                                            textAlign: 'center',
+                                                                            wordBreak: 'break-word'
+                                                                        }}
+                                                                    >
+                                                                        {isLink ? (
+                                                                            <a href={itemSrc} target="_blank" rel="noopener noreferrer" style={{ color: '#007bff' }}>
+                                                                                <i className="fas fa-link me-1"></i>
+                                                                                Link
+                                                                            </a>
+                                                                        ) : isExisting ? (
+                                                                            'Existing Item'
+                                                                        ) : (
+                                                                            `${(item.size / 1024 / 1024).toFixed(1)}MB`
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )}

@@ -34,6 +34,7 @@ import { EngagementService } from '../engagement/engagement.service';
 import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { CheckoutUtils } from '../utils/checkout.utils';
+import { EventStaff } from '../event/event-staff.entity';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -80,6 +81,9 @@ export class RegisterEventService {
 
     @InjectRepository(CheckoutCartItem)
     private readonly checkoutCartItemRepository: Repository<CheckoutCartItem>,
+
+    @InjectRepository(EventStaff)
+    private readonly eventStaffRepository: Repository<EventStaff>,
 
     private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
@@ -273,6 +277,7 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
           .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
           .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
+          .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners')
           .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
           .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
           .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
@@ -498,14 +503,28 @@ export class RegisterEventService {
               },
               exhibitorsData: {
                 exhibitorDescription: exhibitorDescription || '',
-                exhibitors: registerEvent.event?.eventExhibitors
-                  ?.filter((ee: any) => ee.exhibitor?.isActive)
-                  ?.map((ee: any) => {
-                    return {
-                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                      promotionalOffers: ee.exhibitor?.promotionalOffers || [],
-                    };
-                  }) || [],
+                exhibitors: await Promise.all(
+                  (registerEvent.event?.eventExhibitors
+                    ?.filter((ee: any) => ee.exhibitor?.isActive) || [])
+                    .map(async (ee: any) => {
+                      const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
+                      const exhibitorData = {
+                        ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                        promotionalOffers: ee.exhibitor?.promotionalOffers || [],
+                      };
+
+                      // Get Event Staff for this exhibitor - show to all users
+                      (exhibitorData as any).eventStaff = registerEvent.eventId
+                        ? await ExhibitorUtils.getEventStaffForExhibitor(
+                            this.eventStaffRepository,
+                            registerEvent.eventId,
+                            exhibitorId,
+                          )
+                        : [];
+
+                      return exhibitorData;
+                    })
+                ),
               },
               myAgendas: formattedAgendas || [],
               attendanceCount: attendanceCount,
@@ -693,6 +712,7 @@ export class RegisterEventService {
           'event.eventExhibitors',
           'event.eventExhibitors.exhibitor',
           'event.eventExhibitors.exhibitor.promotionalOffers',
+          'event.eventExhibitors.exhibitor.boothBanners',
           'event.programmeTracks',
           'event.programmeTracks.sessions',
           'event.programmeTracks.sessions.speakers',

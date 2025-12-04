@@ -3,6 +3,7 @@ import { Repository, Between } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorLead } from './exhibitor-lead.entity';
+import { BoothBanner } from './booth-banner.entity';
 import { ExhibitorDto, DocumentDto, EventImageDto } from './exhibitor.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { ExhibitorFileUtils } from '../utils/exhibitor-file.utils';
@@ -13,6 +14,7 @@ import {
 import { EventService } from '../event/event.service';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
+import { ExhibitorUtils } from '../utils/exhibitor.utils';
 
 @Injectable()
 export class ExhibitorService {
@@ -25,6 +27,8 @@ export class ExhibitorService {
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+    @InjectRepository(BoothBanner)
+    private boothBannerRepository: Repository<BoothBanner>,
     private readonly errorHandler: ErrorHandlerService,
     @Inject(forwardRef(() => EventService))
     private eventService: EventService,
@@ -32,12 +36,32 @@ export class ExhibitorService {
 
   async createExhibitor(exhibitorDto: ExhibitorDto | Partial<ExhibitorDto>): Promise<any> {
     try {
+      // Handle booth banners separately (stored in separate table)
+      const boothBannersToSave = exhibitorDto.boothBanner;
+      delete exhibitorDto.boothBanner; // Remove from DTO to avoid saving to exhibitor table
+
       const exhibitor = this.exhibitorRepository.create(exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(exhibitor);
       
+      // Create booth banners if provided
+      if (boothBannersToSave && boothBannersToSave.length > 0) {
+        // Normalize format: convert strings to {value: string} objects, then extract values
+        const bannerValues = boothBannersToSave.map(banner => {
+          return typeof banner === 'string' ? banner : (banner.value || String(banner));
+        });
+        
+        const newBanners = bannerValues.map(bannerValue => {
+          return this.boothBannerRepository.create({
+            exhibitorId: savedExhibitor.id,
+            banner: bannerValue,
+          });
+        });
+        await this.boothBannerRepository.save(newBanners);
+      }
+      
       const full = await this.exhibitorRepository.findOne({
         where: { id: savedExhibitor.id },
-        relations: ['promotionalOffers']
+        relations: ['promotionalOffers', 'boothBanners']
       });
 
       return full || savedExhibitor;
@@ -71,23 +95,25 @@ export class ExhibitorService {
         // Get exhibitors associated with this event
         const eventExhibitors = await eventExhibitorRepository.find({
           where: { eventId },
-          relations: ['exhibitor', 'exhibitor.promotionalOffers'],
+          relations: ['exhibitor', 'exhibitor.promotionalOffers', 'exhibitor.boothBanners'],
         });
 
-        // Extract exhibitor data
+        // Extract exhibitor data and format using utility
         const exhibitors = eventExhibitors
           .map(ee => ee.exhibitor)
-          .filter(Boolean);
+          .filter(Boolean)
+          .map(exhibitor => ExhibitorUtils.getBasicExhibitorInfo(exhibitor));
 
         return exhibitors;
       }
 
       // If no eventId, return all exhibitors
       const exhibitors = await this.exhibitorRepository.find({
-        relations: ['promotionalOffers'],
+        relations: ['promotionalOffers', 'boothBanners'],
       });
       
-      return exhibitors;
+      // Format using utility
+      return exhibitors.map(exhibitor => ExhibitorUtils.getBasicExhibitorInfo(exhibitor));
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -100,7 +126,7 @@ export class ExhibitorService {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({ 
         where: { id },
-        relations: ['promotionalOffers'],
+        relations: ['promotionalOffers', 'boothBanners'],
       });
       
       if (!exhibitor) {
@@ -128,8 +154,12 @@ export class ExhibitorService {
         createdAt: es.createdAt,
       }));
 
+      // Use utility to format exhibitor data
+      const basicExhibitorInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
+
       return {
-        ...exhibitor,
+        ...basicExhibitorInfo,
+        promotionalOffers: exhibitor.promotionalOffers || [],
         eventStaff: formattedEventStaff,
       };
     } catch (error) {
@@ -200,15 +230,31 @@ export class ExhibitorService {
         }
       }
 
-      // Clean up old files that are no longer needed
+      // Handle booth banners separately (stored in separate table)
+      const boothBannersToSave = exhibitorDto.boothBanner;
+      delete exhibitorDto.boothBanner; // Remove from DTO to avoid saving to exhibitor table
+
+      // Clean up old files that are no longer needed (for other fields like flyers, documents, etc.)
+      // Note: boothBanner cleanup is handled in updateExhibitorBoothBanner method
       await ExhibitorFileUtils.cleanupRemovedFiles(existingExhibitor, exhibitorDto, this.errorHandler);
       
       Object.assign(existingExhibitor, exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(existingExhibitor);
+
+      // Update booth banners if provided - this will REPLACE all existing banners
+      if (boothBannersToSave !== undefined) {
+        // Normalize format: convert strings to {value: string} objects, then extract values
+        const normalizedBanners = boothBannersToSave.map(banner => {
+          const value = typeof banner === 'string' ? banner : (banner.value || String(banner));
+          return { value };
+        });
+        // This method will delete old files and replace with new ones
+        await this.updateExhibitorBoothBanner(id, normalizedBanners);
+      }
       
       const full = await this.exhibitorRepository.findOne({
         where: { id: savedExhibitor.id },
-        relations: ['promotionalOffers']
+        relations: ['promotionalOffers', 'boothBanners']
       });
 
       return full || savedExhibitor;
@@ -278,6 +324,162 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Exhibitor documents update');
+    }
+  }
+
+  /**
+   * Update booth banners for an exhibitor
+   * Replaces all existing banners with new ones
+   * Deletes old files that are no longer in the new list
+   */
+  async updateExhibitorBoothBanner(
+    id: string,
+    boothBanners: Array<{ id?: string; value: string }>,
+  ): Promise<void> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({ 
+        where: { id },
+        relations: ['boothBanners'],
+      });
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', id);
+      }
+
+      // Get existing banner values for cleanup
+      const existingBannerValues = exhibitor.boothBanners 
+        ? exhibitor.boothBanners.map(bb => bb.banner)
+        : [];
+      
+      const newBannerValues = boothBanners.map(b => b.value);
+
+      // Delete old files that are no longer in the new list (only files, not URLs)
+      const fs = require('fs');
+      const path = require('path');
+      existingBannerValues.forEach((oldBanner: string) => {
+        // Only delete if it's a file path (starts with uploads/), not a URL
+        if (oldBanner && oldBanner.startsWith('uploads/') && !newBannerValues.includes(oldBanner)) {
+          const fullPath = path.join(__dirname, '..', '..', oldBanner);
+          if (fs.existsSync(fullPath)) {
+            try {
+              fs.unlinkSync(fullPath);
+            } catch (error) {
+              // Log but don't throw - file deletion is not critical
+              console.error(`Failed to delete old booth banner file: ${oldBanner}`, error);
+            }
+          }
+        }
+      });
+
+      // Delete all existing booth banners from database
+      if (exhibitor.boothBanners && exhibitor.boothBanners.length > 0) {
+        await this.boothBannerRepository.remove(exhibitor.boothBanners);
+      }
+
+      // Create new booth banners
+      if (boothBanners && boothBanners.length > 0) {
+        const newBanners = boothBanners.map(banner => {
+          const boothBanner = this.boothBannerRepository.create({
+            exhibitorId: id,
+            banner: banner.value,
+          });
+          return boothBanner;
+        });
+        await this.boothBannerRepository.save(newBanners);
+      }
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor booth banner update');
+    }
+  }
+
+  /**
+   * Get booth banners for an exhibitor
+   */
+  async getExhibitorBoothBanners(exhibitorId: string): Promise<BoothBanner[]> {
+    try {
+      return await this.boothBannerRepository.find({
+        where: { exhibitorId },
+        order: { createdAt: 'ASC' },
+      });
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Get exhibitor booth banners');
+      return [];
+    }
+  }
+
+  /**
+   * Delete a specific booth banner by ID
+   */
+  async deleteBoothBanner(bannerId: string, exhibitorId: string): Promise<void> {
+    try {
+      const banner = await this.boothBannerRepository.findOne({
+        where: { id: bannerId, exhibitorId },
+      });
+
+      if (!banner) {
+        throw new ResourceNotFoundException('Booth banner', bannerId);
+      }
+
+      // Delete file from filesystem if it's a file path
+      if (banner.banner.startsWith('uploads/')) {
+        const fs = require('fs');
+        const path = require('path');
+        const fullPath = path.join(__dirname, '..', '..', banner.banner);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+
+      await this.boothBannerRepository.remove(banner);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Delete booth banner');
+    }
+  }
+
+  /**
+   * Check if a user has permission to update an exhibitor
+   * Used by guards to check permissions before file uploads
+   */
+  async canUserUpdateExhibitor(
+    exhibitorId: string,
+    userId: string,
+    userEmail?: string,
+  ): Promise<boolean> {
+    try {
+      const existingExhibitor = await this.getExhibitorEntityById(exhibitorId);
+      let userCanUpdate = false;
+
+      // Check if exhibitor email matches user email
+      if (userEmail && existingExhibitor.email === userEmail) {
+        userCanUpdate = true;
+      }
+
+      // If not found by email, check via EventStaff table
+      if (!userCanUpdate && userId) {
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+        const userStaffRecord = await eventStaffRepository.findOne({
+          where: {
+            exhibitorId: exhibitorId,
+            userId: userId,
+          },
+        });
+
+        if (userStaffRecord) {
+          userCanUpdate = true;
+        }
+      }
+
+      return userCanUpdate;
+    } catch (error) {
+      // If exhibitor not found or other error, return false
+      return false;
     }
   }
 
