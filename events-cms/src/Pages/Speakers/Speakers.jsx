@@ -18,6 +18,7 @@ import useTableNavigation from '../../hooks/useTableNavigation';
 import { SPEAKER_PATHS } from '../../utils/constants';
 import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
 import axiosInstance from '../../configs/axiosInstance';
+import { SPEAKER_LOADING } from '../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -185,6 +186,8 @@ const Speakers = () => {
             columns: columns,
             ajaxParams: {},
             axiosInstance: axiosInstance,
+            dispatch: dispatch, // Pass dispatch for loading state
+            loadingActionType: SPEAKER_LOADING, // Use SPEAKER_LOADING to show GlobalLoader
             dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-speaker-button ml-2'>>>" +
                  "<'row'<'col-sm-12'tr>>" +
                  "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",

@@ -17,7 +17,9 @@ export const initializeServerSideDataTable = ({
     dom = null, // Custom DOM configuration
     pageLength = 10,
     lengthMenu = [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
-    order = null // Default sort order
+    order = null, // Default sort order
+    dispatch = null, // Redux dispatch for loading state
+    loadingActionType = null // Action type to dispatch for loading (e.g., 'EVENT_LOADING')
 }) => {
     const $ = window.$ || require('jquery');
     
@@ -31,6 +33,11 @@ export const initializeServerSideDataTable = ({
         serverSide: true,
         order: order || undefined, // Set default sort order if provided
         ajax: function (data, callback, settings) {
+            // Show loading state if dispatch and loadingActionType are provided
+            if (dispatch && loadingActionType) {
+                dispatch({ type: loadingActionType, payload: true });
+            }
+            
             // Get current ajaxParams (support both object and function)
             const currentAjaxParams = typeof ajaxParams === 'function' ? ajaxParams() : ajaxParams;
             
@@ -141,6 +148,10 @@ export const initializeServerSideDataTable = ({
                                 data: []
                             });
                         }
+                        // Hide loading state after successful response
+                        if (dispatch && loadingActionType) {
+                            dispatch({ type: loadingActionType, payload: false });
+                        }
                     })
                     .catch(error => {
                         console.error('DataTables AJAX error:', error);
@@ -150,6 +161,10 @@ export const initializeServerSideDataTable = ({
                             recordsFiltered: 0,
                             data: []
                         });
+                        // Hide loading state on error
+                        if (dispatch && loadingActionType) {
+                            dispatch({ type: loadingActionType, payload: false });
+                        }
                     });
             } else {
                 // Fallback to jQuery ajax

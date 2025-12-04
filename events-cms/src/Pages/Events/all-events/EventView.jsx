@@ -7,7 +7,7 @@ import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { eventDelete } from '../../../store/actions/eventActions';
-import { EVENT_FILTER_LIST, EVENT_LIST } from '../../../store/constants/actionTypes';
+import { EVENT_FILTER_LIST, EVENT_LIST, EVENT_LOADING } from '../../../store/constants/actionTypes';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
@@ -184,6 +184,8 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
         columns: columns,
         ajaxParams: ajaxParams,
         axiosInstance: axiosInstance,
+        dispatch: dispatch, // Pass dispatch for loading state
+        loadingActionType: EVENT_LOADING, // Use EVENT_LOADING to show GlobalLoader
         onDataLoaded: (data, metadata, fullResponse) => {
             // Extract filter data from response and store in Redux (only on first load)
             if (fullResponse?.filter?.events && dispatch) {

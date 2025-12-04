@@ -20,7 +20,7 @@ import useFilterLogic from '../../../hooks/useFilterLogic';
 import { renderPublishDates } from '../../../components/events/PublishDatesRenderer.jsx';
 import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
 import axiosInstance from '../../../configs/axiosInstance';
-import { EVENT_FILTER_LIST, UPCOMING_EVENT_LIST } from '../../../store/constants/actionTypes';
+import { EVENT_FILTER_LIST, UPCOMING_EVENT_LIST, EVENT_LOADING } from '../../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -162,6 +162,8 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
         columns: columns,
         ajaxParams: ajaxParams,
         axiosInstance: axiosInstance,
+        dispatch: dispatch, // Pass dispatch for loading state
+        loadingActionType: EVENT_LOADING, // Use EVENT_LOADING to show GlobalLoader
         onDataLoaded: (data, metadata, fullResponse) => {
             // Extract filter data from response and store in Redux
             if (fullResponse?.filter?.events && dispatch) {

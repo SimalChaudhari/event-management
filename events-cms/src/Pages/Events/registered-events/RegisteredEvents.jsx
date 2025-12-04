@@ -21,7 +21,7 @@ import useTableNavigation from '../../../hooks/useTableNavigation';
 import { useRef, useCallback, useMemo } from 'react';
 import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
 import axiosInstance from '../../../configs/axiosInstance';
-import { PARTICIPATED_EVENTS } from '../../../store/constants/actionTypes';
+import { PARTICIPATED_EVENTS, EVENT_LOADING } from '../../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -245,6 +245,8 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
         columns: columns,
         ajaxParams: ajaxParams,
         axiosInstance: axiosInstance,
+        dispatch: dispatch, // Pass dispatch for loading state
+        loadingActionType: EVENT_LOADING, // Use EVENT_LOADING to show GlobalLoader
         onDataLoaded: (data, metadata, fullResponse) => {
             // Extract filter data from response and store in Redux
             if (fullResponse?.filter && dispatch) {

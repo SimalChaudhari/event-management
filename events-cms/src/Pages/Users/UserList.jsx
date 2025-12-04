@@ -5,7 +5,7 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { FetchUsers } from './fetchApi/FetchApi';
@@ -20,6 +20,7 @@ import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../hooks/useTableNavigation';
 import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
 import axiosInstance from '../../configs/axiosInstance';
+import { USER_LOADING } from '../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -31,7 +32,7 @@ function userTable(
     handleDeleteUser,
     handleViewUser,
     handleExportUsers,
-    restoreTablePage
+    restoreTablePage, dispatch = null
 ) {
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -196,6 +197,8 @@ function userTable(
             role: roleFilter && roleFilter !== 'all' ? roleFilter : undefined
         },
         axiosInstance: axiosInstance,
+        dispatch: dispatch, // Pass dispatch for loading state
+        loadingActionType: USER_LOADING, // Use USER_LOADING to show GlobalLoader
         onDataLoaded: (data, metadata) => {
             // Optional: Store data in Redux or handle it
             console.log('Loaded', data.length, 'users. Total:', metadata?.total);
@@ -253,6 +256,7 @@ function userTable(
 }
 
 const UserList = () => {
+ 
     const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
     const { user } = useSelector((state) => state.user);
     const navigate = useNavigate();
@@ -400,7 +404,7 @@ const UserList = () => {
                 handleDeleteUser,
                 handleViewUser,
                 handleExportUsers,
-                restoreTablePage
+                restoreTablePage,
             );
             tableRef.current = table;
             setCurrentTable(table);
