@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { SpeakerProfile } from './speaker-profile.entity';
 import { UserEntity, UserRole } from './users.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { ResourceNotFoundException } from '../utils/exceptions/custom-exceptions';
 import { CreateSpeakerProfileDto, UpdateSpeakerProfileDto } from './speaker-profile.dto';
 import { UserUtils } from '../utils/user.utils';
+import { FilterService } from '../service/filter.service';
 
 @Injectable()
 export class SpeakerProfileService {
@@ -16,6 +17,7 @@ export class SpeakerProfileService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private readonly errorHandler: ErrorHandlerService,
+    private readonly filterService: FilterService,
   ) {}
 
   async createProfile(createProfileDto: CreateSpeakerProfileDto): Promise<SpeakerProfile> {
@@ -108,21 +110,101 @@ export class SpeakerProfileService {
     }
   }
 
-  async getAllSpeakersWithProfiles(): Promise<any[]> {
+  async getAllSpeakersWithProfiles(
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const speakers = await this.userRepository.find({
-        where: { role: UserRole.Speaker },
-        relations: ['speakerProfile', 'addresses'],
-        order: { firstName: 'ASC', lastName: 'ASC' },
-        select: [
-          'id', 'firstName', 'lastName', 'email', 'mobile', 'countryCurrency', 'profilePicture', 
-          'linkedinProfile', 'isVerify', 'role', 'createdAt', 'updatedAt'
-        ]
-      });
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'firstName';
+      const sortOrder = filters?.sortOrder || 'ASC';
 
-      return speakers.map((speaker) => 
-        UserUtils.getAdminSpeakerInfo(speaker)
+      // Build query builder
+      const queryBuilder = this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.speakerProfile', 'speakerProfile')
+        .leftJoinAndSelect('user.addresses', 'addresses')
+        .where('user.role = :role', { role: UserRole.Speaker })
+        .select([
+          'user.id',
+          'user.firstName',
+          'user.lastName',
+          'user.email',
+          'user.mobile',
+          'user.countryCurrency',
+          'user.profilePicture',
+          'user.linkedinProfile',
+          'user.isVerify',
+          'user.role',
+          'user.createdAt',
+          'user.updatedAt',
+          'speakerProfile',
+          'addresses',
+        ]);
+
+      // Apply search filter
+      if (search) {
+        const searchTerm = `%${search.toLowerCase()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(user.firstName) LIKE :searchTerm OR ' +
+          'LOWER(user.lastName) LIKE :searchTerm OR ' +
+          'LOWER(user.email) LIKE :searchTerm OR ' +
+          'LOWER(user.mobile) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      const orderBy = sortBy === 'firstName' || sortBy === 'lastName' 
+        ? `user.${sortBy}` 
+        : `user.${sortBy}`;
+      queryBuilder.orderBy(orderBy, sortOrder);
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const speakers = await queryBuilder.skip(skip).take(limit).getMany();
+
+      // Format speakers data
+      const formattedSpeakers = speakers.map((speaker) =>
+        UserUtils.getAdminSpeakerInfo(speaker),
       );
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      return {
+        data: formattedSpeakers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrev,
+        },
+      };
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Speakers with profiles retrieval');
     }

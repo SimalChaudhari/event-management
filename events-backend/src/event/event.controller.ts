@@ -144,6 +144,11 @@ export class EventController {
       category?: string;
       eventName?: string; // Event name filter
       globalSearch?: string; // Global search term
+      page?: number; // Pagination: page number
+      limit?: number; // Pagination: items per page
+      search?: string; // Pagination: search term
+      sortBy?: string; // Pagination: sort field
+      sortOrder?: 'ASC' | 'DESC'; // Pagination: sort order
     },
     @Request() req: any,
     @Res() response: Response,
@@ -152,13 +157,21 @@ export class EventController {
       const userId = req.user?.id; // Get user ID from JWT token
       const userRole = req?.user?.role; // Get actual role from JWT
 
+      // Extract pagination parameters
+      const { page, limit, sortBy, sortOrder, ...eventFilters } = filters;
+
       // Convert string query parameters to appropriate types
       const processedFilters = {
-        ...filters,
+        ...eventFilters,
         // globalSearch should be a string for search terms
-        globalSearch: typeof filters.globalSearch === 'string' ? filters.globalSearch : undefined,
+        globalSearch: typeof eventFilters.globalSearch === 'string' ? eventFilters.globalSearch : undefined,
         // eventName should be a string for event name filtering
-        eventName: typeof filters.eventName === 'string' ? filters.eventName : undefined,
+        eventName: typeof eventFilters.eventName === 'string' ? eventFilters.eventName : undefined,
+        // Add pagination parameters
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        sortBy: sortBy || undefined,
+        sortOrder: sortOrder || undefined,
       };
 
       const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);
@@ -166,10 +179,44 @@ export class EventController {
       // Filter data for each event based on tab visibility for non-admin users
       const filteredResult = TabVisibilityFilterUtil.filterEventResultByTabVisibility(result, userRole);
       
+      // Build metadata with pagination from service
+      const metadata: any = {
+        total: result.pagination?.total || filteredResult.events?.length || 0,
+        timestamp: new Date().toISOString(),
+        ...(result.metadata?.globalSearch !== undefined && { globalSearch: result.metadata.globalSearch }),
+        ...(result.metadata?.searchKeyword && { searchKeyword: result.metadata.searchKeyword }),
+      };
+
+      // Add pagination fields from service
+      if (result.pagination) {
+        metadata.page = result.pagination.page;
+        metadata.limit = result.pagination.limit;
+        metadata.totalPages = result.pagination.totalPages;
+        metadata.hasNext = result.pagination.hasNext;
+        metadata.hasPrev = result.pagination.hasPrev;
+      }
+
+      // Add additional metadata fields if they exist (for global search)
+      if (result.metadata) {
+        if (result.metadata.totalSpeakers !== undefined) metadata.totalSpeakers = result.metadata.totalSpeakers;
+        if (result.metadata.totalCategories !== undefined) metadata.totalCategories = result.metadata.totalCategories;
+        if (result.metadata.totalExhibitors !== undefined) metadata.totalExhibitors = result.metadata.totalExhibitors;
+        if (result.metadata.totalPromotionalOffers !== undefined) metadata.totalPromotionalOffers = result.metadata.totalPromotionalOffers;
+        if (result.metadata.totalSurveySessions !== undefined) metadata.totalSurveySessions = result.metadata.totalSurveySessions;
+        if (result.metadata.totalMatches !== undefined) metadata.totalMatches = result.metadata.totalMatches;
+      }
+
       const successResponse: any = {
         success: true,
         message: 'Events retrieved successfully',
-        ...filteredResult, // This will include events and metadata from the service
+        events: filteredResult.events || [],
+        ...(filteredResult.speakers && { speakers: filteredResult.speakers }),
+        ...(filteredResult.categories && { categories: filteredResult.categories }),
+        ...(filteredResult.exhibitors && { exhibitors: filteredResult.exhibitors }),
+        ...(filteredResult.promotionalOffers && { promotionalOffers: filteredResult.promotionalOffers }),
+        ...(filteredResult.surveySessions && { surveySessions: filteredResult.surveySessions }),
+        ...(filteredResult.filter && { filter: filteredResult.filter }),
+        metadata: metadata,
       };
 
       return response.status(HttpStatus.OK).json(successResponse);

@@ -19,6 +19,9 @@ export interface SuccessResponse<T = any> {
     total?: number;
     page?: number;
     limit?: number;
+    totalPages?: number;
+    hasNext?: boolean;
+    hasPrev?: boolean;
     timestamp?: string;
   };
 } 

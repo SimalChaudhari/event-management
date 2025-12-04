@@ -81,6 +81,10 @@ export class ExhibitorDto {
 
   @IsOptional()
   @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
   uen?: string;
 
   @IsOptional()

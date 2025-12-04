@@ -155,7 +155,12 @@ export class RegisterEventController {
     @Query('userId') filterUserId?: string,
     @Query('eventId') filterEventId?: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC'
   ) {
     try {
       const userId = req.user.id;
@@ -167,7 +172,12 @@ export class RegisterEventController {
         userId: filterUserId,
         eventId: filterEventId,
         startDate,
-        endDate
+        endDate,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search,
+        sortBy,
+        sortOrder
       });
       
       // Apply tab visibility filtering to events in the result

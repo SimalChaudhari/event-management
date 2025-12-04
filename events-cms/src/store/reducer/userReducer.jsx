@@ -3,6 +3,7 @@ import { USER_LIST, USER_LOADING, USER_ERROR, CREATE_USER, UPDATE_USER, DELETE_U
 const initialState = {
     user: [],
     userByID: '',
+    pagination: {},
     loading: false
 };
 
@@ -22,9 +23,20 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
             };
 
         case USER_LIST:
+            // Handle both old format (array) and new format (object with data and pagination)
+            if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.data) {
+                return {
+                    ...state,
+                    user: payload.data,
+                    pagination: payload.pagination,
+                    loading: false
+                };
+            }
+            // Backward compatibility: if payload is array, store it directly
             return {
                 ...state,
-                user: payload,
+                user: Array.isArray(payload) ? payload : [],
+                pagination: {},
                 loading: false
             };
 

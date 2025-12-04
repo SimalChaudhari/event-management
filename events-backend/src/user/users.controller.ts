@@ -14,6 +14,8 @@ import {
   Request,
   Post,
   Query,
+  ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
 
 import { Response } from 'express';
@@ -32,6 +34,7 @@ import { SuccessResponse } from '../utils/interfaces/error-response.interface';
 import { UserUtils } from '../utils/user.utils';
 import { RoleSwitchDto, CreateSpeakerDto } from './users.dto';
 import { AuthService } from '../auth/auth.service';
+import { UserFilterDto, BaseFilterDto } from '../service/filter.dto';
 
 @Controller('api/users')
 export class UserController {
@@ -43,17 +46,32 @@ export class UserController {
 
   @Get('')
   @Roles(UserRole.Admin)
-  async getAllUsers(@Res() response: Response, @Request() req: any, @Query('role') roleFilter?: string) {
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: false }))
+  async getAllUsers(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query() filterDto: UserFilterDto,
+  ) {
     try {
-      // Pass roleFilter to service method
+      const { role: roleFilter, ...filters } = filterDto;
+      
+      // Pass roleFilter and filters to service method
       // If no roleFilter, default behavior shows both users and exhibitors
-      const users = await this.userService.getAll([UserRole.User, UserRole.Exhibitor], roleFilter);
+      const result = await this.userService.getAll(
+        [UserRole.User, UserRole.Exhibitor],
+        roleFilter,
+        filters,
+      );
       
       let message = 'User details retrieved successfully';
       if (roleFilter === 'exhibitor') {
         message = 'Exhibitor details retrieved successfully';
       } else if (roleFilter === 'user') {
         message = 'User details retrieved successfully';
+      } else if (roleFilter === 'speaker') {
+        message = 'Speaker details retrieved successfully';
+      } else if (roleFilter === 'moderator') {
+        message = 'Moderator details retrieved successfully';
       } else {
         message = 'Users and Exhibitors retrieved successfully';
       }
@@ -61,9 +79,14 @@ export class UserController {
       const successResponse: SuccessResponse = {
         success: true,
         message: message,
-        data: users,
+        data: result.data,
         metadata: {
-          total: users.length,
+          total: result.pagination.total,
+          page: result.pagination.page,
+          limit: result.pagination.limit,
+          totalPages: result.pagination.totalPages,
+          hasNext: result.pagination.hasNext,
+          hasPrev: result.pagination.hasPrev,
           timestamp: new Date().toISOString(),
         },
       };
@@ -79,11 +102,15 @@ export class UserController {
   @Roles(UserRole.Admin)
   async exportUsers(@Res() response: Response, @Request() req: any) {
     try {
-      // Get only users with role "user" (no exhibitors, speakers, etc.)
-      const users = await this.userService.getAll([UserRole.User], 'user');
+      // Get all users with role "user" (no pagination for export)
+      // Use a large limit to get all users
+      const result = await this.userService.getAll([UserRole.User], 'user', {
+        page: 1,
+        limit: 10000, // Large limit to get all users
+      });
       
       // Sort users alphabetically by name (firstName + lastName)
-      const sortedUsers = users.sort((a, b) => {
+      const sortedUsers = result.data.sort((a: Partial<UserEntity>, b: Partial<UserEntity>) => {
         const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim().toLowerCase();
         const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim().toLowerCase();
         return nameA.localeCompare(nameB);
@@ -92,7 +119,7 @@ export class UserController {
       // Generate CSV content
       const headers = ['First Name', 'Last Name', 'Company', 'Designation', 'Email', 'Unique ID'];
       
-      const csvRows = sortedUsers.map(user => {
+      const csvRows = sortedUsers.map((user: Partial<UserEntity>) => {
         const firstName = user.firstName || 'N/A';
         const lastName = user.lastName || 'N/A';
         const company = user.company || 'N/A';
@@ -105,7 +132,7 @@ export class UserController {
       
       // Combine headers and rows, escape fields that contain commas
       const csvContent = [headers, ...csvRows]
-        .map(row => row.map(field => {
+        .map((row: (string | undefined)[]) => row.map((field: string | undefined) => {
           // Escape fields containing commas, quotes, or newlines
           const fieldStr = String(field || '');
           if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
@@ -261,16 +288,26 @@ export class UserController {
 
   // Speaker-specific endpoints
   @Get('speakers/get')
-  async getAllSpeakers(@Res() response: Response, @Request() req: any) {
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: false }))
+  async getAllSpeakers(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query() filterDto: BaseFilterDto,
+  ) {
     try {
-      const speakers = await this.userService.getAllSpeakers();
+      const result = await this.userService.getAllSpeakers(filterDto);
       
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Speakers retrieved successfully',
-        data: speakers,
+        data: result.data,
         metadata: {
-          total: speakers.length,
+          total: result.pagination.total,
+          page: result.pagination.page,
+          limit: result.pagination.limit,
+          totalPages: result.pagination.totalPages,
+          hasNext: result.pagination.hasNext,
+          hasPrev: result.pagination.hasPrev,
           timestamp: new Date().toISOString(),
         },
       };

@@ -13,6 +13,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { EmailService } from '../service/email.service';
 import { AuthModule } from '../auth/auth.module';
+import { FilterModule } from '../service/filter.module';
 
 @Module({
     imports: [
@@ -22,6 +23,7 @@ import { AuthModule } from '../auth/auth.module';
         signOptions: { }, // Set your token expiration
       }),
       forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
+      FilterModule, // Import FilterModule to use FilterService
     ],
     providers: [UserService, SpeakerProfileService, AddressService, ErrorHandlerService, EmailService],
     controllers: [UserController, QrScanController],

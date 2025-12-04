@@ -18,12 +18,14 @@ import UserFilterComponent from '../../components/common/UserFilterComponent';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../hooks/useTableNavigation';
+import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
+import axiosInstance from '../../configs/axiosInstance';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
 function userTable(
-    data,
+    roleFilter,
     handleAddUser,
     handleEditUser,
     handleDeleteUser,
@@ -34,30 +36,12 @@ function userTable(
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Ensure data is valid and has proper structure
-    const validData = Array.isArray(data) ? data.filter(item => item && item.id) : [];
-
     if ($.fn.DataTable.isDataTable(tableZero)) {
-        $(tableZero).DataTable().clear().destroy();
+        $(tableZero).DataTable().destroy();
     }
 
-    const dataTableInstance = $(tableZero).DataTable({
-        data: validData,
-        rowId: 'id', // Explicitly set the row ID field
-        order: [[0, 'asc']],
-        searching: true,
-        searchDelay: 500,
-        pageLength: 5, 
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers', 
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-user-button ml-1'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        columns: [
+    // Define columns
+    const columns = [
             {
                 data: 'firstName',
                 title: 'User Details',
@@ -198,14 +182,26 @@ function userTable(
                             </button>
                         </div>
                     `;
-                }
             }
-        ],
-        initComplete: function (settings, json) {
-            if (typeof restoreTablePage === 'function') {
-                const api = this.api();
-                restoreTablePage(api);
-            }
+        }
+    ];
+
+    // Initialize server-side DataTable
+    const dataTableInstance = initializeServerSideDataTable({
+        tableSelector: tableZero,
+        ajaxUrl: '/users',
+        ajaxMethod: 'GET',
+        columns: columns,
+        ajaxParams: {
+            role: roleFilter && roleFilter !== 'all' ? roleFilter : undefined
+        },
+        axiosInstance: axiosInstance,
+        onDataLoaded: (data, metadata) => {
+            // Optional: Store data in Redux or handle it
+            console.log('Loaded', data.length, 'users. Total:', metadata?.total);
+        },
+        restoreTablePage: restoreTablePage,
+        initCompleteCallback: function (settings, json, api) {
             if (!$('#addUserBtn').length) {
                 $('.add-user-button').html(`
                     <button class="btn btn-primary d-flex align-items-center ml-2" id="addUserBtn">
@@ -217,55 +213,29 @@ function userTable(
                 $('#addUserBtn').on('click', handleAddUser);
             }
 
-
-
-
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
-                // Get the row data directly from DataTables (more reliable than data-id attribute)
                 const table = $(tableZero).DataTable();
                 const rowData = table.row($(this).closest('tr')).data();
                 if (rowData && rowData.id) {
                     handleViewUser(rowData);
                 } else {
-                    // Fallback to data-id if row data not available
                     const id = $(this).data('id');
-                    const userData = validData.find((user) => user && String(user.id) === String(id));
-                    if (userData) {
-                        handleViewUser(userData);
-                    } else {
-                        console.error('User data not found for ID:', id);
+                    if (id) {
+                        handleViewUser({ id });
                     }
                 }
             });
 
             $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
-                // Get the row data directly from DataTables (more reliable than data-id attribute)
                 const table = $(tableZero).DataTable();
-                const row = $(this).closest('tr');
-                const rowData = table.row(row).data();
-                
-                // Verify we got valid data
+                const rowData = table.row($(this).closest('tr')).data();
                 if (rowData && rowData.id) {
-                    // Double-check: verify this user exists in validData
-                    const foundUser = validData.find((user) => user && String(user.id) === String(rowData.id));
-                    if (foundUser) {
-                        console.log('Editing user:', foundUser.firstName, foundUser.lastName, 'ID:', foundUser.id);
-                        handleEditUser(foundUser); // Use foundUser from validData to ensure consistency
-                    } else {
-                        console.error('User from row data not found in validData. Row ID:', rowData.id, 'Row data:', rowData);
-                        // Fallback to rowData if not found (shouldn't happen)
-                        handleEditUser(rowData);
-                    }
+                    handleEditUser(rowData);
                 } else {
-                    // Fallback to data-id if row data not available
                     const id = $(this).data('id');
-                    console.warn('Row data not available, using data-id:', id);
-                    const userData = validData.find((user) => user && String(user.id) === String(id));
-                    if (userData) {
-                        handleEditUser(userData);
-                    } else {
-                        console.error('User data not found for ID:', id);
+                    if (id) {
+                        handleEditUser({ id });
                     }
                 }
             });
@@ -274,19 +244,8 @@ function userTable(
                 const id = $(this).data('id');
                 if (id) {
                     handleDeleteUser(id);
-                } else {
-                    console.error('No user ID found for delete action');
                 }
             });
-        },
-        responsive: true,
-        language: {
-            search: 'Search Users:',
-            lengthMenu: 'Show _MENU_ users per page',
-            info: 'Showing _START_ to _END_ of _TOTAL_ users',
-            infoEmpty: 'No users found',
-            infoFiltered: '(filtered from _MAX_ total users)',
-            zeroRecords: 'No matching users found'
         }
     });
 
@@ -368,9 +327,12 @@ const UserList = () => {
     };
 
     const handleRoleFilterChange = async (newFilter) => {
+        // Update state first
         setRoleFilter(newFilter);
-        // Fetch data with new filter
-        await fetchData(newFilter === 'all' ? null : newFilter);
+        
+        // Immediately reinitialize table with new filter value (don't wait for state)
+        // This ensures the filter is applied right away
+        initializeTable(newFilter);
     };
 
     const handleClearFilters = async () => {
@@ -425,50 +387,36 @@ const UserList = () => {
         }
     };
 
-    const initializeTable = () => {
+    const initializeTable = (filterValue = null) => {
+        // Use provided filterValue or current roleFilter state
+        const currentFilter = filterValue !== null ? filterValue : roleFilter;
+        
         destroyTable();
-        // Check if user data exists and is an array
-        if (Array.isArray(user)) {
-            try {
-                const table = userTable(
-                    user,
-                    handleAddUser,
-                    handleEditUser,
-                    handleDeleteUser,
-                    handleViewUser,
-                    handleExportUsers,
-                    restoreTablePage
-                );
-                tableRef.current = table;
-                setCurrentTable(table);
-                // Check and adjust page if current page is now empty (after deletion)
-                if (table && typeof checkAndAdjustPage === 'function') {
-                    checkAndAdjustPage(table);
-                }
-            } catch (error) {
-                console.error('Error initializing user table:', error);
-              
-            }
-        } else {
-            console.log('User data is not an array or is undefined:', user);
+        try {
+            const table = userTable(
+                currentFilter,
+                handleAddUser,
+                handleEditUser,
+                handleDeleteUser,
+                handleViewUser,
+                handleExportUsers,
+                restoreTablePage
+            );
+            tableRef.current = table;
+            setCurrentTable(table);
+        } catch (error) {
+            console.error('Error initializing user table:', error);
         }
     };
 
     useEffect(() => {
-        // Only fetch if users are not already loaded in Redux
-        // This prevents unnecessary API calls when navigating back after create/update/delete
-        // Since create/update/delete already update Redux, we don't need to fetch again
-        if (!user || user.length === 0) {
-            fetchData(roleFilter === 'all' ? null : roleFilter);
+        // Only initialize on mount, filter changes are handled by handleRoleFilterChange
+        if (!tableRef.current) {
+            initializeTable();
         }
         return () => destroyTable();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        initializeTable();
-        return () => destroyTable();
-    }, [user]);
+    }, []); // Empty dependency array - only run on mount
 
 
     return (

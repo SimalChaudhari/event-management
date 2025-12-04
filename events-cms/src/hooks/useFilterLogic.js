@@ -16,7 +16,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
  * @param {String} config.filterMode - Filter mode: 'registered' (userFilter/eventFilter) or 'event' (eventName) - default: 'registered'
  */
 const useFilterLogic = ({
-    filterAction, // Redux action to dispatch for filtering (e.g., participatedEvents, eventList, upcomingEventList)
+    filterAction, // Redux action to dispatch for filtering (e.g., participatedEvents, eventList, upcomingEventList) - can be null to skip API calls
     loadUsersAction, // Action to load users for dropdown (e.g., getAllUsersForFilter) - optional
     loadEventsAction, // Action to load events for dropdown (e.g., getAllEventsForFilter) - optional
     dispatch,
@@ -84,9 +84,23 @@ const useFilterLogic = ({
             
             if (loadEventsAction) {
                 const eventIndex = loadUsersAction ? 1 : 0;
-                if (results[eventIndex]) {
+                const loadedEvents = results[eventIndex];
                 
-                    setEvents(results[eventIndex]);
+                if (loadedEvents) {
+                    // CRITICAL: Only update events if loaded events have more items than current events
+                    // This preserves initialEvents (from filterData) if they have more events
+                    // Compare with current events state, not initialEvents (which might be stale)
+                    setEvents(prevEvents => {
+                        const currentCount = prevEvents?.length || 0;
+                        const loadedCount = Array.isArray(loadedEvents) ? loadedEvents.length : 0;
+                        
+                        // Only update if loaded events have more items, or if we have no events
+                        if (loadedCount > currentCount || currentCount === 0) {
+                            return loadedEvents;
+                        }
+                        // Keep existing events if they have more or equal items
+                        return prevEvents;
+                    });
                 }
             }
         } catch (error) {
@@ -134,10 +148,11 @@ const useFilterLogic = ({
         // This avoids lookup issues when events array isn't populated yet
         const eventNameFromOverride = filterOverrides.eventName;
         
+        // Declare eventNameToUse outside the if block so it's accessible when building URL parameters
+        let eventNameToUse = null;
+        
         // Only add event filter if an event is actually selected (not empty)
         if (eventIdToUse) {
-            let eventNameToUse = null;
-            
             // Priority 1: Use eventName from filterOverrides (passed directly from FilterComponent)
             if (eventNameFromOverride) {
                 eventNameToUse = eventNameFromOverride;
@@ -201,8 +216,17 @@ const useFilterLogic = ({
             queryParams.append('userId', userIdToUse);
         }
         
+        // For event mode: add both eventName (for DataTable API) and eventId (for state management)
+        // For registered mode: add eventId to URL
         if (eventIdToUse) {
-            queryParams.append('eventId', eventIdToUse);
+            if (filterMode === 'event' && eventNameToUse) {
+                // For event listing pages: add both eventName (for API) and eventId (for state)
+                queryParams.append('eventName', eventNameToUse);
+                queryParams.append('eventId', eventIdToUse); // Keep eventId in URL to maintain dropdown selection
+            } else {
+                // For registered mode or if eventName not available: use eventId
+                queryParams.append('eventId', eventIdToUse);
+            }
         }
 
         if (startDateToUse) {
@@ -495,7 +519,10 @@ const useFilterLogic = ({
             
             // Dispatch with clean filters (no userId/userFilter) - do this immediately
             // The refs are already set, so useEffect won't interfere
-            dispatch(filterAction(finalFilters));
+            // Skip if filterAction is null (server-side DataTable handles API calls)
+            if (filterAction) {
+                dispatch(filterAction(finalFilters));
+            }
         }
         // For specific user selection, just update state - Apply button will handle it
     }, [selectedEventId, startDate, endDate, events, location.pathname, navigate, dispatch, filterAction, initialFilters, filterMode]);
@@ -600,7 +627,10 @@ const useFilterLogic = ({
             console.log('🔄 Dispatching "All Events" - filters:', finalFilters, 'URL:', newUrl);
             
             // Dispatch with clean filters (no eventId/eventFilter/eventName)
-            dispatch(filterAction(finalFilters));
+            // Skip if filterAction is null (server-side DataTable handles API calls)
+            if (filterAction) {
+                dispatch(filterAction(finalFilters));
+            }
         }
         // For specific event selection, just update state - Apply button will handle it
     }, [selectedUserId, startDate, endDate, location.pathname, navigate, dispatch, filterAction, initialFilters, filterMode]);
@@ -762,6 +792,7 @@ const useFilterLogic = ({
             const hasUrlFilters = userIdFromUrl || eventIdFromUrl || startDateFromUrl || endDateFromUrl;
             
             // Handle initial load based on filter mode and URL filters
+            // Skip if filterAction is null (server-side DataTable handles API calls)
             if (filterAction) {
                 if (hasUrlFilters) {
                     // Check if we have only date filters (no eventId, no userId)
@@ -775,7 +806,9 @@ const useFilterLogic = ({
                         if (endDateFromUrl) dateFilters.endDate = endDateFromUrl;
                         filtersAppliedRef.current = true;
                         lastUrlParamsRef.current = location.search;
-                        dispatch(filterAction(dateFilters));
+                        if (filterAction) {
+                            dispatch(filterAction(dateFilters));
+                        }
                     } else if (filterMode === 'registered') {
                         // For registered mode: backend supports userId and eventId directly
                         // We can apply filters immediately without waiting for users/events arrays
@@ -786,7 +819,9 @@ const useFilterLogic = ({
                         if (endDateFromUrl) filters.endDate = endDateFromUrl;
                         filtersAppliedRef.current = true;
                         lastUrlParamsRef.current = location.search;
-                        dispatch(filterAction(filters));
+                        if (filterAction) {
+                            dispatch(filterAction(filters));
+                        }
                     } else {
                         // For event mode with eventId: check if we already have events loaded
                         // If events are available, apply filter immediately
@@ -800,33 +835,48 @@ const useFilterLogic = ({
                                 if (endDateFromUrl) filters.endDate = endDateFromUrl;
                                 filtersAppliedRef.current = true;
                                 lastUrlParamsRef.current = location.search;
-                                dispatch(filterAction(filters));
+                                if (filterAction) {
+                                    dispatch(filterAction(filters));
+                                }
                             } else {
                                 // Event not found - load all data first
                                 filtersAppliedRef.current = false;
                                 lastUrlParamsRef.current = '';
-                                dispatch(filterAction({}));
+                                if (filterAction) {
+                                    dispatch(filterAction({}));
+                                }
                             }
                         } else {
                             // Events not loaded yet - load all data first to get filter dropdown options
                             // The filter application useEffect will handle applying filters when events are ready
                             filtersAppliedRef.current = false;
                             lastUrlParamsRef.current = '';
-                            dispatch(filterAction({}));
+                            if (filterAction) {
+                                dispatch(filterAction({}));
+                            }
                         }
                     }
                 } else {
                     // No URL filters, load all data
                     filtersAppliedRef.current = true;
                     lastUrlParamsRef.current = location.search;
-                    dispatch(filterAction({})); // Empty object = all data
+                    // Skip if filterAction is null (server-side DataTable handles API calls)
+                    if (filterAction) {
+                        dispatch(filterAction({})); // Empty object = all data
+                    }
                 }
             }
             
             if (!mounted) return;
             
-            // Only load dropdown data if initial data is not provided
-            if (initialUsers.length === 0 && initialEvents.length === 0) {
+            // Load dropdown data if actions are provided
+            // CRITICAL: Only load if initialEvents/initialUsers are empty
+            // This preserves events from filterData?.events (backend response) which contains all available events
+            // If initialEvents has data, it means we got events from the backend filter response - use those instead
+            const shouldLoadEvents = loadEventsAction && initialEvents.length === 0;
+            const shouldLoadUsers = loadUsersAction && initialUsers.length === 0;
+            
+            if (shouldLoadUsers || shouldLoadEvents) {
                 await loadDropdownData();
             }
         };
@@ -956,7 +1006,10 @@ const useFilterLogic = ({
         lastUrlParamsRef.current = currentUrlParams;
         
         // Dispatch the action - single API call
-        dispatch(filterAction(filters));
+        // Skip if filterAction is null (server-side DataTable handles API calls)
+        if (filterAction) {
+            dispatch(filterAction(filters));
+        }
     }, [location.search, filterAction, dispatch, initialFilters, filterMode]); // Removed events from dependencies to prevent infinite loop
     
     // Separate effect to handle when events load (for eventId to eventName conversion)
@@ -1018,7 +1071,10 @@ const useFilterLogic = ({
         // Apply filters
         filtersAppliedRef.current = true;
         lastUrlParamsRef.current = location.search;
-        dispatch(filterAction(filters));
+        // Skip if filterAction is null (server-side DataTable handles API calls)
+        if (filterAction) {
+            dispatch(filterAction(filters));
+        }
     }, [events, location.search, filterAction, dispatch, initialFilters, filterMode]);
 
     return {

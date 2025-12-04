@@ -6,7 +6,8 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { eventDelete, eventList } from '../../../store/actions/eventActions';
+import { eventDelete } from '../../../store/actions/eventActions';
+import { EVENT_FILTER_LIST, EVENT_LIST } from '../../../store/constants/actionTypes';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
@@ -19,65 +20,18 @@ import useFilterLogic from '../../../hooks/useFilterLogic';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
 import { renderPublishDates } from '../../../components/events/PublishDatesRenderer.jsx';
+import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
+import axiosInstance from '../../../configs/axiosInstance';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage) {
+function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams = {}, dispatch = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Destroy existing table if it exists
-    if ($.fn.DataTable.isDataTable(tableZero)) {
-        $(tableZero).DataTable().clear().destroy();
-    }
-
-    const dataTableInstance = $(tableZero).DataTable({
-        data: data || [],
-        rowId: 'id', // Explicitly set the row ID field
-        ordering: true, // Allow column sorting
-        order: [[4, 'desc']], // Sort by Event Date column (index 4) in descending order (newest first)
-        // Backend already sorts the data, but DataTable will maintain this order on initial load
-        // Configure date sorting to handle YYYY-MM-DD format correctly
-        columnDefs: [
-            {
-                targets: 4, // Event Date column (index 4)
-                type: 'num', // Use numeric type for proper date comparison
-                render: function (data, type, row) {
-                    if (type === 'sort' || type === 'type') {
-                        // Return timestamp for sorting - ensures Dec 1, 2 come before Nov 28, 30
-                        if (row.startDate) {
-                            const dateStr = String(row.startDate);
-                            const parts = dateStr.split('T')[0].split('-');
-                            if (parts.length === 3) {
-                                const year = parseInt(parts[0], 10);
-                                const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-                                const day = parseInt(parts[2], 10);
-                                // Use UTC to avoid timezone issues
-                                return new Date(Date.UTC(year, month, day)).getTime();
-                            }
-                            return new Date(row.startDate).getTime();
-                        }
-                        return 0;
-                    }
-                    // For display, use the formatted date
-                    return formatDateTimeForTable(row.startDate, row.startTime);
-                }
-            }
-        ],
-        searching: true,
-        searchDelay: 500,
-        pageLength: 5,
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers',
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        columns: [
+    // Define columns
+    const columns = [
             {
                 data: 'name',
 
@@ -220,8 +174,39 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGal
                     `;
                 }
             }
-        ],
-        initComplete: function (settings, json) {
+    ];
+
+    // Initialize server-side DataTable
+    const dataTableInstance = initializeServerSideDataTable({
+        tableSelector: tableZero,
+        ajaxUrl: '/events',
+        ajaxMethod: 'GET',
+        columns: columns,
+        ajaxParams: ajaxParams,
+        axiosInstance: axiosInstance,
+        onDataLoaded: (data, metadata, fullResponse) => {
+            // Extract filter data from response and store in Redux (only on first load)
+            if (fullResponse?.filter?.events && dispatch) {
+                dispatch({
+                    type: EVENT_FILTER_LIST,
+                    payload: fullResponse.filter.events
+                });
+                // Also update the event filter in Redux store
+                dispatch({
+                    type: EVENT_LIST,
+                    payload: {
+                        ...fullResponse,
+                        filter: fullResponse.filter
+                    }
+                });
+            }
+            console.log('Loaded', data.length, 'events. Total:', metadata?.total);
+        },
+        restoreTablePage: restoreTablePage,
+        pageLength: 10,
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+        order: [[4, 'desc']], // Sort by Event Date column (index 4) in descending order
+        initCompleteCallback: function (settings, json, api) {
             // Add button initialization
             if (!$('#addEventBtn').length) {
                 $('.add-event-button').html(`
@@ -234,70 +219,80 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGal
                 $('#addEventBtn').on('click', handleAdd);
             }
 
-            // Restore the current page using the hook function after table is fully initialized
-            // This sets up the page change listener and restores page from URL if needed
-            if (typeof restoreTablePage === 'function') {
-                const api = this.api();
-                // Always call restoreTablePage - it will check if page needs to be changed
-                // and will set up the page change listener to sync URL on pagination
-                restoreTablePage(api);
-            }
-        },
-        responsive: true
-    });
-
-    // Attach event listeners for actions
-    $(document).on('click', '.btn-icon', function () {
-        const eventId = $(this).data('id');
-        const dataEvent = data.find((user) => user.id === eventId);
-        if (dataEvent) {
-            // Get current page from DataTable instance before navigating
-            // This ensures we always have the correct page number
-            let currentPage = null;
-            try {
-                const pageInfo = dataTableInstance.page.info();
-                if (pageInfo && pageInfo.page !== undefined) {
-                    // DataTable uses 0-based indexing, URL uses 1-based
-                    currentPage = (pageInfo.page + 1).toString();
+            // Add event listeners for action buttons
+            $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    // Get current page from DataTable
+                    let currentPage = null;
+                    try {
+                        const pageInfo = table.page.info();
+                        if (pageInfo && pageInfo.page !== undefined) {
+                            currentPage = (pageInfo.page + 1).toString();
+                        }
+                    } catch (e) {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        currentPage = urlParams.get('page');
+                    }
+                    handleView(rowData, currentPage);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleView({ id }, null);
+                    }
                 }
-            } catch (e) {
-                // DataTable page info not available, fallback to URL
-                const urlParams = new URLSearchParams(window.location.search);
-                currentPage = urlParams.get('page');
-            }
-            
-            // Always pass the page parameter if available
-            handleView(dataEvent, currentPage);
-        }
-    });
+            });
 
-    $(document).on('click', '.gallery-btn', function () {
-        const eventId = $(this).data('id');
-        const dataEvent = data.find((event) => event.id === eventId);
-        if (dataEvent) {
-            handleGallery(dataEvent);
-        }
-    });
+            $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    handleEdit(rowData);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleEdit({ id });
+                    }
+                }
+            });
 
-    $(document).on('click', '.edit-btn', function () {
-        const eventId = $(this).data('id');
-        const dataEvent = data.find((user) => user.id === eventId);
-        if (dataEvent) {
-            handleEdit(dataEvent);
-        }
-    });
+            $(tableZero + ' tbody').off('click', '.delete-btn').on('click', '.delete-btn', function () {
+                const id = $(this).data('id');
+                if (id) {
+                    handleDelete(id);
+                }
+            });
 
-    $(document).on('click', '.delete-btn', function () {
-        const eventId = $(this).data('id');
-        handleDelete(eventId);
-    });
+            $(tableZero + ' tbody').off('click', '.gallery-btn').on('click', '.gallery-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    handleGallery(rowData);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleGallery({ id });
+                    }
+                }
+            });
 
-    $(document).on('click', '.qa-btn', function () {
-        const eventId = $(this).data('id');
-        const dataEvent = data.find((event) => event.id === eventId);
-        if (dataEvent) {
-            handleQA(dataEvent);
-        }
+            $(tableZero + ' tbody').off('click', '.qa-btn').on('click', '.qa-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    handleQA(rowData);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleQA({ id });
+                    }
+                }
+            });
+        },
+        dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
+             "<'row'<'col-sm-12'tr>>" +
+             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
     });
 
     return dataTableInstance;
@@ -305,7 +300,6 @@ function atable(data, handleAdd, handleEdit, handleDelete, handleView, handleGal
 
 const EventView = () => {
     const dispatch = useDispatch();
-    const events = useSelector((state) => state.event?.event?.events);
     const filterData = useSelector((state) => state.event?.event?.filter); // Get filter data from response
     const eventFilterList = useSelector((state) => state.event?.eventFilterList || []); // Get from Redux store
 
@@ -318,19 +312,24 @@ const EventView = () => {
     const tableRef = useRef(null);
 
     // Transform filter events data to match FilterComponent format
-    // IMPORTANT: Prioritize eventFilterList (full list) over filterData?.events (filtered results)
-    // This ensures the dropdown always shows all available events, not just filtered ones
+    // IMPORTANT: Prioritize filterData?.events (from backend filter response) as it contains ALL available events
+    // Use eventFilterList as fallback only if filterData?.events is not available
     const transformedFilterEvents = useMemo(() => {
-        // Use eventFilterList first (full list for dropdown), then filterData?.events as fallback
-        const eventsToUse = eventFilterList?.length > 0 ? eventFilterList : (filterData?.events || []);
+        // Use filterData?.events first (from backend - contains all events), then eventFilterList as fallback
+        const eventsToUse = filterData?.events?.length > 0 
+            ? filterData.events 
+            : (eventFilterList?.length > 0 ? eventFilterList : []);
         return eventsToUse.map(event => ({
             id: event.id,
             name: event.eventName || event.name || '',
-            location: event.location || '' // Location not in filter data, will be empty
+            // location: event.location || '' // Location not in filter data, will be empty
         }));
-    }, [eventFilterList, filterData?.events]);
+    }, [filterData?.events, eventFilterList]);
 
     // Use unified filter hook with event mode
+    // Note: We don't pass filterAction since DataTable handles all API calls server-side
+    // useFilterLogic is only used for filter UI state management
+    // Use events from eventList API response (filterData.events or eventFilterList) - no separate API call needed
     const { 
         selectedEventId, 
         startDate, 
@@ -344,7 +343,8 @@ const EventView = () => {
         setStartDate, 
         setEndDate 
     } = useFilterLogic({
-        filterAction: eventList,
+        filterAction: null, // Don't call API - DataTable handles it
+        // No loadEventsAction - use events from eventList API response instead
         dispatch,
         initialEvents: transformedFilterEvents,
         initialFilters: {},
@@ -407,64 +407,70 @@ const EventView = () => {
 
     const initializeTable = useCallback(() => {
         destroyTable();
-        if (Array.isArray(events) && events.length >= 0) {
-            // Sort events by startDate in descending order (newest first) to match backend sorting
-            // This ensures Dec 7, 6, 5, 4, 2, 1 show before Nov 30, 29, 28, etc.
-            const sortedEvents = [...events].sort((a, b) => {
-                const parseDate = (dateValue) => {
-                    if (!dateValue) return new Date(0);
-                    if (dateValue instanceof Date) return dateValue;
-                    const dateStr = String(dateValue);
-                    const parts = dateStr.split('T')[0].split('-');
-                    if (parts.length === 3) {
-                        // Create date in UTC to avoid timezone issues
-                        return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
-                    }
-                    return new Date(dateStr);
-                };
-                
-                const dateA = parseDate(a.startDate);
-                const dateB = parseDate(b.startDate);
-                
-                // Compare dates in descending order (newest first)
-                const dateComparison = dateB.getTime() - dateA.getTime();
-                if (dateComparison !== 0) {
-                    return dateComparison;
-                }
-                
-                // If dates are the same, sort by time (newest time first)
-                const timeA = a.startTime || '00:00:00';
-                const timeB = b.startTime || '00:00:00';
-                return timeB.localeCompare(timeA);
-            });
+        try {
+            // Use function for ajaxParams to read from URL dynamically on each request
+            const ajaxParams = () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const params = {};
+                if (urlParams.get('eventName')) params.eventName = urlParams.get('eventName');
+                if (urlParams.get('startDate')) params.startDate = urlParams.get('startDate');
+                if (urlParams.get('endDate')) params.endDate = urlParams.get('endDate');
+                if (urlParams.get('type')) params.type = urlParams.get('type');
+                if (urlParams.get('location')) params.location = urlParams.get('location');
+                if (urlParams.get('category')) params.category = urlParams.get('category');
+                if (urlParams.get('keyword')) params.keyword = urlParams.get('keyword');
+                if (urlParams.get('globalSearch')) params.globalSearch = urlParams.get('globalSearch');
+                return params;
+            };
             
-            // Only initialize table when events change, not when page changes
-            // This prevents flickering when user clicks next/previous page
-            // Note: restoreTablePage is NOT in dependencies to prevent reinitialization when URL changes
-            // It's captured via closure and will always have the latest version
-            const table = atable(sortedEvents, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage);
+            const table = eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams, dispatch);
             tableRef.current = table;
             setCurrentTable(table);
+        } catch (error) {
+            console.error('Error initializing event table:', error);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [events, destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
+    }, [destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
 
-    // Note: Initial event loading is handled by useEventFilter hook
-    // It will check for URL filters and apply them, or load all events if no filters exist
-    // No need to call eventList() here as it would override URL filters
-
-    // Initialize table when events change
-    // Note: We don't include location.search in dependencies to avoid reinitializing on every page change
-    // The restoreTablePage function in initComplete handles page restoration from URL
+    // Track previous URL to detect filter changes vs pagination changes
+    const prevUrlRef = useRef(location.search);
+    
+    // Initialize table on mount
     useEffect(() => {
-        if (events) {
+        if (!tableRef.current) {
             initializeTable();
+            prevUrlRef.current = location.search;
+        } else {
+            // Only reload if URL changed due to filters (not pagination)
+            // Check if the change is a filter change by comparing non-page params
+            const currentParams = new URLSearchParams(location.search);
+            const prevParams = new URLSearchParams(prevUrlRef.current);
+            
+            // Remove page parameter for comparison
+            currentParams.delete('page');
+            prevParams.delete('page');
+            
+            const currentParamsStr = currentParams.toString();
+            const prevParamsStr = prevParams.toString();
+            
+            // Only reload if filters changed (not just pagination)
+            if (currentParamsStr !== prevParamsStr) {
+                // Filters changed - reload table
+                tableRef.current.ajax.reload();
+            }
+            // If only page changed, DataTable already handled it - don't reload
+            
+            prevUrlRef.current = location.search;
         }
+        
         return () => {
-            destroyTable();
+            // Only destroy on unmount
+            if (!tableRef.current) {
+                destroyTable();
+            }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [events]);
+    }, [location.search]);
 
 
     const handleConfirmDelete = useCallback(async () => {
@@ -475,7 +481,10 @@ const EventView = () => {
             await dispatch(eventDelete(itemToDelete.id));
             setShowDeleteModal(false);
             setItemToDelete(null);
-            // Redux state is updated directly in the action, useEffect will handle table recreation
+            // Reload table after deletion
+            if (tableRef.current) {
+                tableRef.current.ajax.reload();
+            }
         } catch (error) {
             console.error('Delete failed:', error);
         } finally {

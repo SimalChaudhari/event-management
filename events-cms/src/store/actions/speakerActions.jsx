@@ -1,6 +1,7 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
 import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER, SPEAKER_LOADING } from "../constants/actionTypes";
+import { buildUrlWithParams } from "../../utils/buildQueryParams";
 
 // Helper function to dispatch loading state
 const setSpeakerLoading = (dispatch, loading) => {
@@ -10,23 +11,40 @@ const setSpeakerLoading = (dispatch, loading) => {
     });
 };
 
-// Get all speakers
-export const speakerList = () => async (dispatch) => {
+// Get all speakers with pagination support
+export const speakerList = (filters = {}) => async (dispatch) => {
     try {
         setSpeakerLoading(dispatch, true);
-        const response = await axiosInstance.get('/users/speakers/get');
+        
+        // Build URL with query parameters
+        const url = buildUrlWithParams('/users/speakers/get', filters);
+        
+        const response = await axiosInstance.get(url);
+        
         dispatch({
             type: SPEAKER_LIST,
-            payload: response.data.data,
+            payload: {
+                data: response.data?.data || [],
+                pagination: response.data?.metadata || {}
+            }
         });
-        return true;
+        
+        return {
+            success: true,
+            data: response.data?.data || [],
+            pagination: response.data?.metadata || {}
+        };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch speakers';
         toast.error(errorMessage);
+        return {
+            success: false,
+            data: [],
+            pagination: {}
+        };
     } finally {
         setSpeakerLoading(dispatch, false);
     }
-    return false;
 };
 
 export const speakerById = (id) => async (dispatch) => {

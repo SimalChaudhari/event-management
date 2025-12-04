@@ -49,14 +49,49 @@ export class ExhibitorService {
     }
   }
 
-  async getAllExhibitors(): Promise<any[]> {
+  async getAllExhibitors(eventId?: string): Promise<any[]> {
     try {
+      // If eventId is provided, filter exhibitors by event
+      if (eventId) {
+        const { EventExhibitor } = await import('../event/event.entity');
+        const { Event } = await import('../event/event.entity');
+        
+        const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+        const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+
+        // Check if event exists
+        const event = await eventRepository.findOne({
+          where: { id: eventId },
+        });
+
+        if (!event) {
+          throw new ResourceNotFoundException('Event', eventId);
+        }
+
+        // Get exhibitors associated with this event
+        const eventExhibitors = await eventExhibitorRepository.find({
+          where: { eventId },
+          relations: ['exhibitor', 'exhibitor.promotionalOffers'],
+        });
+
+        // Extract exhibitor data
+        const exhibitors = eventExhibitors
+          .map(ee => ee.exhibitor)
+          .filter(Boolean);
+
+        return exhibitors;
+      }
+
+      // If no eventId, return all exhibitors
       const exhibitors = await this.exhibitorRepository.find({
         relations: ['promotionalOffers'],
       });
       
       return exhibitors;
     } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
       this.errorHandler.handleDatabaseError(error, 'Exhibitors retrieval');
     }
   }

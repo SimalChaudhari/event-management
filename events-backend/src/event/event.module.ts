@@ -32,6 +32,7 @@ import { EventNotification, EventNotificationRead } from '../settings/event-noti
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 import { ProgrammeModule } from '../programme/programme.module';
 import { Engagement } from '../engagement/engagement.entity';
+import { FilterModule } from '../service/filter.module';
 
 @Module({
     imports: [
@@ -70,6 +71,7 @@ import { Engagement } from '../engagement/engagement.entity';
       OrderModule,
       AgendaModule,
       ProgrammeModule,
+      FilterModule, // Import FilterModule for pagination
     ],
     providers: [EventService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
     controllers: [EventController],

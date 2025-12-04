@@ -4,7 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { Row, Col, Card, Table, Form, Button, InputGroup, Alert, Modal } from 'react-bootstrap';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { participatedEvents, adminDeleteRegisterEvent, getAllUsersForFilter, getAllEventsForFilter, exportRegisteredUsersByEvent, downloadAdminInfoCsvTemplate, uploadAdminInfoCsv, updateEventAdminInfo, getEventAdminInfo } from '../../../store/actions/eventActions';
+import { adminDeleteRegisterEvent, exportRegisteredUsersByEvent, downloadAdminInfoCsvTemplate, uploadAdminInfoCsv, updateEventAdminInfo, getEventAdminInfo } from '../../../store/actions/eventActions';
 import FilterComponent from '../../../components/common/FilterComponent';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useFilterLogic from '../../../hooks/useFilterLogic';
@@ -19,6 +19,9 @@ import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
 import { useRef, useCallback, useMemo } from 'react';
+import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
+import axiosInstance from '../../../configs/axiosInstance';
+import { PARTICIPATED_EVENTS } from '../../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -33,44 +36,12 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
-function atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage) {
+function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage, ajaxParams = {}, dispatch = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
-    // Destroy existing table if it exists
-    if ($.fn.DataTable.isDataTable(tableZero)) {
-        $(tableZero).DataTable().clear().destroy();
-    }
-
-    // Sort registrations by event start date in descending order (newest first)
-    // This matches the backend sorting behavior
-    const sortedRegistrations = [...registrations].sort((a, b) => {
-        const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
-        const dateB = b.event?.startDate ? new Date(b.event.startDate) : new Date(0);
-        // Normalize to midnight (ignore time component)
-        dateA.setHours(0, 0, 0, 0);
-        dateB.setHours(0, 0, 0, 0);
-        // Sort in descending order (newest first)
-        return dateB.getTime() - dateA.getTime();
-    });
-
-    const dataTableInstance = $(tableZero).DataTable({
-        data: sortedRegistrations || [],
-        order: [[4, 'desc']], // Sort by Event Schedule column (index 4, 0-based) by default in descending order
-        searching: true,
-        searchDelay: 500,
-        pageLength: 5,
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers',
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-register-event-button ml-2'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-
-        columns: [
+    // Define columns
+    const columns = [
             {
                 data: 'user',
                 title: 'Registered By',
@@ -264,13 +235,36 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
                     `;
                 }
             }
-        ],
+    ];
 
-        initComplete: function (settings, json) {
+    // Initialize server-side DataTable
+    const dataTableInstance = initializeServerSideDataTable({
+        tableSelector: tableZero,
+        ajaxUrl: '/register-events/all',
+        ajaxMethod: 'GET',
+        columns: columns,
+        ajaxParams: ajaxParams,
+        axiosInstance: axiosInstance,
+        onDataLoaded: (data, metadata, fullResponse) => {
+            // Extract filter data from response and store in Redux
+            if (fullResponse?.filter && dispatch) {
+                dispatch({
+                    type: PARTICIPATED_EVENTS,
+                    payload: {
+                        ...fullResponse,
+                        filter: fullResponse.filter
+                    }
+                });
+            }
+            console.log('Loaded', data.length, 'registered events. Total:', metadata?.total);
+        },
+        restoreTablePage: restoreTablePage,
+        pageLength: 10,
+        lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+        order: [[4, 'desc']], // Sort by Event Schedule column (index 4) in descending order
+        initCompleteCallback: function (settings, json, api) {
             // Restore the current page using the hook function after table is fully initialized
-            // This sets up the page change listener and restores page from URL if needed
             if (typeof restoreTablePage === 'function') {
-                const api = this.api();
                 restoreTablePage(api);
             }
 
@@ -282,60 +276,72 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
                         Add
                     </button>
                 `);
-
                 $('#addRegisterEventBtn').on('click', handleAddRegisterEvent);
             }
+
+            // Add event listeners for action buttons
+            $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    let currentPage = null;
+                    try {
+                        const pageInfo = table.page.info();
+                        if (pageInfo && pageInfo.page !== undefined) {
+                            currentPage = (pageInfo.page + 1).toString();
+                        }
+                    } catch (e) {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        currentPage = urlParams.get('page');
+                    }
+                    handleView(rowData, currentPage);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleView({ id }, null);
+                    }
+                }
+            });
+
+            $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
+                const table = $(tableZero).DataTable();
+                const rowData = table.row($(this).closest('tr')).data();
+                if (rowData && rowData.id) {
+                    let currentPage = null;
+                    try {
+                        const pageInfo = table.page.info();
+                        if (pageInfo && pageInfo.page !== undefined) {
+                            currentPage = (pageInfo.page + 1).toString();
+                        }
+                    } catch (e) {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        currentPage = urlParams.get('page');
+                    }
+                    handleEdit(rowData, currentPage);
+                } else {
+                    const id = $(this).data('id');
+                    if (id) {
+                        handleEdit({ id }, null);
+                    }
+                }
+            });
+
+            $(tableZero + ' tbody').off('click', '.delete-btn').on('click', '.delete-btn', function () {
+                const id = $(this).data('id');
+                if (id) {
+                    const table = $(tableZero).DataTable();
+                    const rowData = table.row($(this).closest('tr')).data();
+                    if (rowData) {
+                        handleDelete(rowData);
+                    } else {
+                        handleDelete({ id });
+                    }
+                }
+            });
         },
-        responsive: true
-    });
-
-    // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
-        const registrationId = $(this).data('id');
-        const registration = registrations.find((reg) => reg.id === registrationId);
-        if (registration) {
-            // Get current page from DataTable instance before navigating
-            let currentPage = null;
-            try {
-                const pageInfo = dataTableInstance.page.info();
-                if (pageInfo && pageInfo.page !== undefined) {
-                    currentPage = (pageInfo.page + 1).toString();
-                }
-            } catch (e) {
-                const urlParams = new URLSearchParams(window.location.search);
-                currentPage = urlParams.get('page');
-            }
-            
-            handleView(registration, currentPage);
-        }
-    });
-
-    $(document).on('click', '.edit-btn', function () {
-        const registrationId = $(this).data('id');
-        const registration = registrations.find((reg) => reg.id === registrationId);
-        if (registration) {
-            // Get current page from DataTable instance before navigating
-            let currentPage = null;
-            try {
-                const pageInfo = dataTableInstance.page.info();
-                if (pageInfo && pageInfo.page !== undefined) {
-                    currentPage = (pageInfo.page + 1).toString();
-                }
-            } catch (e) {
-                const urlParams = new URLSearchParams(window.location.search);
-                currentPage = urlParams.get('page');
-            }
-            
-            handleEdit(registration, currentPage);
-        }
-    });
-
-    $(document).on('click', '.delete-btn', function () {
-        const registrationId = $(this).data('id');
-        const registration = registrations.find((reg) => reg.id === registrationId);
-        if (registration) {
-            handleDelete(registration);
-        }
+        dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-register-event-button ml-2'>>>" +
+             "<'row'<'col-sm-12'tr>>" +
+             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
     });
 
     return dataTableInstance;
@@ -344,7 +350,6 @@ function atable(registrations, handleView, handleEdit, handleDelete, handleAddRe
 const RegisteredEvents = () => {
     const dispatch = useDispatch();
     const participatedEventsData = useSelector((state) => state.event.participatedEvents || {});
-    const registrations = participatedEventsData.data || [];
     const filterData = participatedEventsData.filter || null; // Extract filter data from response
     
     const [currentTable, setCurrentTable] = useState(null);
@@ -379,6 +384,9 @@ const RegisteredEvents = () => {
     }, [filterData?.events]);
     
     // Filter logic using custom hook - pass filter data as initial data
+    // Note: We don't pass filterAction since DataTable handles all API calls server-side
+    // useFilterLogic is only used for filter UI state management
+    // Use events/users from register-events API response (filterData) - no separate API call needed
     const {
         selectedUserId,
         selectedEventId,
@@ -397,12 +405,12 @@ const RegisteredEvents = () => {
         handleUserChange,
         handleEventChange
     } = useFilterLogic({
-        filterAction: participatedEvents,
-        loadUsersAction: filterData ? null : getAllUsersForFilter, // Don't load if filter data available
-        loadEventsAction: filterData ? null : getAllEventsForFilter, // Don't load if filter data available
+        filterAction: null, // Don't call API - DataTable handles it
+        // No loadUsersAction or loadEventsAction - use data from register-events API response instead
+        dispatch,
         initialUsers: transformedFilterUsers, // Pass transformed filter users
         initialEvents: transformedFilterEvents, // Pass transformed filter events
-        dispatch
+        filterMode: 'registered' // Use registered mode for userFilter/eventFilter
     });
 
     // Use pagination persistence hook
@@ -457,8 +465,10 @@ const RegisteredEvents = () => {
             if (success) {
                 setShowDeleteModal(false);
                 setRegistrationToDelete(null);
-                // Refresh the data
-                dispatch(participatedEvents());
+                // Reload table after deletion
+                if (tableRef.current) {
+                    tableRef.current.ajax.reload();
+                }
             }
         } catch (error) {
             console.error('Error deleting registration:', error);
@@ -552,8 +562,10 @@ const RegisteredEvents = () => {
                     if (fileInput) {
                         fileInput.value = '';
                     }
-                    // Refresh registrations list
-                    dispatch(participatedEvents());
+                    // Reload table after CSV upload
+                    if (tableRef.current) {
+                        tableRef.current.ajax.reload();
+                    }
                     
                     // Load existing admin info and show modal
                     const adminInfoResult = await dispatch(getEventAdminInfo(selectedEventId));
@@ -594,8 +606,10 @@ const RegisteredEvents = () => {
     const handleSaveEventAdminInfo = async (eventId, data) => {
         const result = await dispatch(updateEventAdminInfo(eventId, data));
         if (result.success) {
-            // Refresh registrations list
-            dispatch(participatedEvents());
+            // Reload table after update
+            if (tableRef.current) {
+                tableRef.current.ajax.reload();
+            }
             // Update local data
             setEventAdminInfoData(data);
         }
@@ -633,23 +647,63 @@ const RegisteredEvents = () => {
 
     const initializeTable = useCallback(() => {
         destroyTable();
-        if (Array.isArray(registrations) && registrations.length >= 0) {
-            const table = atable(registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage);
+        try {
+            // Use function for ajaxParams to read from URL dynamically on each request
+            const ajaxParams = () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const params = {};
+                if (urlParams.get('userId')) params.userId = urlParams.get('userId');
+                if (urlParams.get('eventId')) params.eventId = urlParams.get('eventId');
+                if (urlParams.get('startDate')) params.startDate = urlParams.get('startDate');
+                if (urlParams.get('endDate')) params.endDate = urlParams.get('endDate');
+                // Support legacy filter parameters
+                if (urlParams.get('user')) params.userFilter = urlParams.get('user');
+                if (urlParams.get('event')) params.eventFilter = urlParams.get('event');
+                return params;
+            };
+            
+            const table = registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage, ajaxParams, dispatch);
             tableRef.current = table;
             setCurrentTable(table);
+        } catch (error) {
+            console.error('Error initializing registered events table:', error);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [registrations, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);
+    }, [destroyTable, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);
 
+    // Track previous URL to detect filter changes vs pagination changes
+    const prevUrlRef = useRef(location.search);
+    
+    // Initialize table on mount
     useEffect(() => {
-        initializeTable();
+        if (!tableRef.current) {
+            initializeTable();
+            prevUrlRef.current = location.search;
+        } else {
+            // Only reload if URL changed due to filters (not pagination)
+            const currentParams = new URLSearchParams(location.search);
+            const prevParams = new URLSearchParams(prevUrlRef.current);
+            
+            currentParams.delete('page');
+            prevParams.delete('page');
+            
+            const currentParamsStr = currentParams.toString();
+            const prevParamsStr = prevParams.toString();
+            
+            if (currentParamsStr !== prevParamsStr) {
+                tableRef.current.ajax.reload();
+            }
+            
+            prevUrlRef.current = location.search;
+        }
+        
         return () => {
-            if (tableRef.current) {
+            if (!tableRef.current) {
                 destroyTable();
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [registrations]);
+    }, [location.search]);
 
 
     return (

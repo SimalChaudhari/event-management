@@ -1,6 +1,7 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
 import { USER_LIST, USER_LOADING, USER_ERROR, CREATE_USER, UPDATE_USER, DELETE_USER, USER_BY_ID } from '../constants/actionTypes';
+import { buildUrlWithParams } from '../../utils/buildQueryParams';
 
 // Helper function to dispatch loading state
 const setLoading = (dispatch, loading) => {
@@ -10,26 +11,40 @@ const setLoading = (dispatch, loading) => {
     });
 };
 
-export const userList = (roleFilter = null) => async (dispatch) => {
+export const userList = (filters = {}) => async (dispatch) => {
     try {
         setLoading(dispatch, true);
 
-        // Build the URL with role filter if provided
-        let url = '/users';
-        if (roleFilter && (roleFilter === 'user' || roleFilter === 'exhibitor')) {
-            url += `?role=${roleFilter}`;
-        }
+        // Build URL with query parameters using reusable utility
+        const url = buildUrlWithParams('/users', filters, {
+            // Custom options can be added here if needed
+            // customFilters: { customKey: 'customParam' }
+        });
 
         const response = await axiosInstance.get(url);
+        
+        // Store both data and pagination metadata
         dispatch({
             type: USER_LIST,
-            payload: response.data?.data
+            payload: {
+                data: response.data?.data || [],
+                pagination: response.data?.metadata || {}
+            }
         });
-        return true;
+        
+        return {
+            success: true,
+            data: response.data?.data || [],
+            pagination: response.data?.metadata || {}
+        };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch users';
         toast.error(errorMessage);
-        return false;
+        return {
+            success: false,
+            data: [],
+            pagination: {}
+        };
     } finally {
         setLoading(dispatch, false);
     }
@@ -186,8 +201,8 @@ export const uploadCsvUsers = (csvData, options = {}) => async (dispatch) => {
             } else {
                 toast.success(result.message);
             }
-            // Refresh user list after successful upload
-            await dispatch(userList());
+            // Refresh user list after successful upload (with default pagination)
+            await dispatch(userList({ page: 1, limit: 10 }));
         } else {
             toast.error(result.message);
         }

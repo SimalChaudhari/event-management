@@ -65,28 +65,99 @@ export class UserService {
   }
 
 
-  async getAll(roles?: UserRole[], roleFilter?: string): Promise<Partial<UserEntity>[]> {
+  async getAll(
+    roles?: UserRole[],
+    roleFilter?: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      isActive?: boolean;
+    },
+  ): Promise<{
+    data: Partial<UserEntity>[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      let where = {};
-      
-      // If roleFilter is provided, override the roles parameter
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'updatedAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+      const isActive = filters?.isActive;
+
+      // Build query builder
+      const queryBuilder = this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.addresses', 'addresses');
+
+      // Apply role filter
       if (roleFilter) {
         if (roleFilter === 'exhibitor') {
-          where = { role: UserRole.Exhibitor };
+          queryBuilder.andWhere('user.role = :role', { role: UserRole.Exhibitor });
         } else if (roleFilter === 'user') {
-          where = { role: UserRole.User };
+          queryBuilder.andWhere('user.role = :role', { role: UserRole.User });
+        } else if (roleFilter === 'speaker') {
+          queryBuilder.andWhere('user.role = :role', { role: UserRole.Speaker });
+        } else if (roleFilter === 'moderator') {
+          queryBuilder.andWhere('user.role = :role', { role: UserRole.Moderator });
+        } else if (roleFilter === 'admin') {
+          queryBuilder.andWhere('user.role = :role', { role: UserRole.Admin });
         }
-        // If roleFilter is provided but not 'exhibitor' or 'user', show both (no where clause)
       } else if (roles && roles.length > 0) {
-        where = { role: In(roles) };
+        queryBuilder.andWhere('user.role IN (:...roles)', { roles });
       }
-      
-      const users = await this.userRepository.find({
-        where,
-        relations: ['addresses'],
-        order: { updatedAt: 'DESC' },
-      });
-      return users.map((user) => UserUtils.sanitizeUserData(user));
+
+      // Apply isActive filter
+      if (isActive !== undefined) {
+        queryBuilder.andWhere('user.isActive = :isActive', { isActive });
+      }
+
+      // Apply search filter
+      if (search) {
+        const searchTerm = `%${search.toLowerCase()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(user.firstName) LIKE :searchTerm OR LOWER(user.lastName) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm OR LOWER(user.company) LIKE :searchTerm OR LOWER(user.designation) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      queryBuilder.orderBy(`user.${sortBy}`, sortOrder);
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const users = await queryBuilder.skip(skip).take(limit).getMany();
+
+      // Sanitize user data
+      const sanitizedUsers = users.map((user) => UserUtils.sanitizeUserData(user));
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        data: sanitizedUsers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Users retrieval');
     }
@@ -270,10 +341,28 @@ export class UserService {
   }
 
   // Speaker-specific methods
-  async getAllSpeakers(): Promise<any[]> {
+  async getAllSpeakers(
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      // Use SpeakerProfileService to get speakers with their profiles
-      return await this.speakerProfileService.getAllSpeakersWithProfiles();
+      // Use SpeakerProfileService to get speakers with pagination
+      return await this.speakerProfileService.getAllSpeakersWithProfiles(filters);
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Speakers retrieval');
     }

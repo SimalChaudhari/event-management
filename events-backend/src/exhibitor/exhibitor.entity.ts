@@ -39,6 +39,9 @@ export class Exhibitor {
   @Column({ type: 'varchar', nullable: true })
   mobile?: string;
 
+  @Column({ type: 'text', nullable: true })
+  address?: string;
+
   @Column({ type: 'varchar', nullable: true })
   uen?: string;
 

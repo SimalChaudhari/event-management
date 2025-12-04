@@ -171,13 +171,23 @@ export class RegisterEventService {
     }
   }
 
-  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string }) {
+  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string; page?: number; limit?: number; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) {
     try {
-      let registerEvents;
+      // Extract pagination parameters
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'event.startDate';
+      const sortOrder = filters?.sortOrder || (role === 'admin' ? 'DESC' : 'ASC');
+      const skip = (page - 1) * limit;
+
+      let queryBuilder;
+      let totalCount = 0;
+      let registerEvents: RegisterEvent[];
+
       if (role === 'admin') {
         // Admin can see all register events
         // Optimized: Only load basic details - event, order, and registration details
-        const queryBuilder = this.registerEventRepository
+        queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
           .leftJoinAndSelect('registerEvent.event', 'event')
@@ -216,8 +226,31 @@ export class RegisterEventService {
           queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
         }
 
-        // Sort by event startDate in descending order (newest first)
-        queryBuilder.orderBy('event.startDate', 'DESC');
+        // Apply global search if provided
+        if (filters?.search && filters.search.trim() !== '') {
+          queryBuilder.andWhere(
+            '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search) OR LOWER(event.name) LIKE LOWER(:search) OR LOWER(event.location) LIKE LOWER(:search))',
+            { search: `%${filters.search.trim()}%` }
+          );
+        }
+
+        // Get total count before pagination
+        totalCount = await queryBuilder.getCount();
+
+        // Apply sorting
+        if (sortBy === 'event.startDate') {
+          queryBuilder.orderBy('event.startDate', sortOrder);
+        } else if (sortBy === 'user.firstName' || sortBy === 'user.lastName') {
+          queryBuilder.orderBy(sortBy, sortOrder);
+        } else if (sortBy === 'createdAt') {
+          queryBuilder.orderBy('registerEvent.createdAt', sortOrder);
+        } else {
+          // Default sorting
+          queryBuilder.orderBy('event.startDate', sortOrder);
+        }
+
+        // Apply pagination
+        queryBuilder.skip(skip).take(limit);
 
         registerEvents = await queryBuilder.getMany();
       } else {
@@ -226,7 +259,7 @@ export class RegisterEventService {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
         
-        const queryBuilder = this.registerEventRepository
+        queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
           .leftJoinAndSelect('registerEvent.event', 'event')
@@ -251,7 +284,6 @@ export class RegisterEventService {
           .where('user.id = :userId', { userId })
           .andWhere('registerEvent.isRegister = :isRegister', { isRegister: true })
           // Exclude past events - only show events where endDate is today or in the future
-          // Use MoreThanOrEqual for proper date comparison
           .andWhere('event.endDate >= :today', { today });
 
         // Apply event filter for regular users
@@ -270,8 +302,29 @@ export class RegisterEventService {
           queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
         }
 
-        // Sort by event startDate in ascending order (upcoming first)
-        queryBuilder.orderBy('event.startDate', 'ASC');
+        // Apply global search if provided
+        if (filters?.search && filters.search.trim() !== '') {
+          queryBuilder.andWhere(
+            '(LOWER(event.name) LIKE LOWER(:search) OR LOWER(event.location) LIKE LOWER(:search))',
+            { search: `%${filters.search.trim()}%` }
+          );
+        }
+
+        // Get total count before pagination
+        totalCount = await queryBuilder.getCount();
+
+        // Apply sorting
+        if (sortBy === 'event.startDate') {
+          queryBuilder.orderBy('event.startDate', sortOrder);
+        } else if (sortBy === 'createdAt') {
+          queryBuilder.orderBy('registerEvent.createdAt', sortOrder);
+        } else {
+          // Default sorting
+          queryBuilder.orderBy('event.startDate', sortOrder);
+        }
+
+        // Apply pagination
+        queryBuilder.skip(skip).take(limit);
 
         registerEvents = await queryBuilder.getMany();
         
@@ -280,7 +333,7 @@ export class RegisterEventService {
         const todayForFilter = new Date();
         todayForFilter.setHours(0, 0, 0, 0);
         
-        registerEvents = registerEvents.filter((registerEvent) => {
+        registerEvents = registerEvents.filter((registerEvent: RegisterEvent) => {
           if (!registerEvent.event?.endDate) return false;
           const eventEndDate = new Date(registerEvent.event.endDate);
           eventEndDate.setHours(0, 0, 0, 0);
@@ -291,7 +344,7 @@ export class RegisterEventService {
 
       // Add attendance count and favorite status to each registered event
       const registerEventsWithAttendance = await Promise.all(
-        registerEvents.map(async (registerEvent) => {
+        registerEvents.map(async (registerEvent: RegisterEvent) => {
           // Get attendance count for both admin and regular users
           const attendanceCount = registerEvent.eventId
             ? await this.getEventAttendanceCount(registerEvent.eventId)
@@ -373,7 +426,7 @@ export class RegisterEventService {
               registerEvent?.event?.documentNames
             ) {
               formattedDocuments = registerEvent.event.documents.map(
-                (doc, index) => ({
+                (doc: string, index: number) => ({
                   name:
                     registerEvent.event?.documentNames?.[index] ||
                     `Document ${index + 1}`,
@@ -383,7 +436,7 @@ export class RegisterEventService {
             } else if (registerEvent?.event?.documents) {
               // Fallback if no names are provided
               formattedDocuments = registerEvent.event.documents.map(
-                (doc, index) => ({
+                (doc: string, index: number) => ({
                   name: `Document ${index + 1}`,
                   document: doc,
                 }),
@@ -406,7 +459,7 @@ export class RegisterEventService {
             const speakers = registerEvent.event?.eventSpeakers 
               ? EventSpeakerUtils.buildSpeakerSchedule(registerEvent.event)
               : [];
-            const categories = registerEvent.event?.category?.map((ec) => ec.category) || [];
+            const categories = registerEvent.event?.category?.map((ec: any) => ec.category) || [];
             const formattedProgrammeTracks = registerEvent.event?.programmeTracks 
               ? UserUtils.formatProgrammeTracks(registerEvent.event.programmeTracks)
               : [];
@@ -446,8 +499,8 @@ export class RegisterEventService {
               exhibitorsData: {
                 exhibitorDescription: exhibitorDescription || '',
                 exhibitors: registerEvent.event?.eventExhibitors
-                  ?.filter((ee) => ee.exhibitor?.isActive)
-                  ?.map((ee) => {
+                  ?.filter((ee: any) => ee.exhibitor?.isActive)
+                  ?.map((ee: any) => {
                     return {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
                       promotionalOffers: ee.exhibitor?.promotionalOffers || [],
@@ -504,7 +557,7 @@ export class RegisterEventService {
       // Sort registrations by event startDate
       // For admin: descending order (newest first)
       // For regular users: ascending order (upcoming first) - already filtered to exclude past events
-      registerEventsWithAttendance.sort((a, b) => {
+      registerEventsWithAttendance.sort((a: any, b: any) => {
         // Create date objects and normalize to midnight (ignore time component)
         const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
         dateA.setHours(0, 0, 0, 0);
@@ -579,6 +632,18 @@ export class RegisterEventService {
         };
       }
 
+      // Build pagination metadata
+      const totalPages = Math.ceil(totalCount / limit);
+      const metadata = {
+        total: totalCount,
+        page: page,
+        limit: limit,
+        totalPages: totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+        timestamp: new Date().toISOString(),
+      };
+
       return {
         success: true,
         message:
@@ -587,6 +652,7 @@ export class RegisterEventService {
             : 'Your registered events fetched successfully',
         count: registerEventsWithAttendance.length,
         data: registerEventsWithAttendance,
+        metadata: metadata,
         ...(filterData && { filter: filterData }),
       };
     } catch (error) {

@@ -13,43 +13,19 @@ const setEventLoading = (dispatch, loading) => {
 export const eventList = (filters = {}) => async (dispatch, getState) => {
     try {
         setEventLoading(dispatch, true);
-        // Build query parameters
-        const queryParams = new URLSearchParams();
         
-        if (filters.eventName) {
-            queryParams.append('eventName', filters.eventName);
-        }
+        // Ensure pagination parameters are always included (defaults for server-side DataTable)
+        const filtersWithPagination = {
+            page: filters.page || 1,
+            limit: filters.limit || 10,
+            sortBy: filters.sortBy || 'startDate',
+            sortOrder: filters.sortOrder || 'DESC',
+            ...filters // Override with any provided filters
+        };
         
-        if (filters.keyword) {
-            queryParams.append('keyword', filters.keyword);
-        }
-        
-        if (filters.startDate) {
-            queryParams.append('startDate', filters.startDate);
-        }
-        
-        if (filters.endDate) {
-            queryParams.append('endDate', filters.endDate);
-        }
-        
-        if (filters.type) {
-            queryParams.append('type', filters.type);
-        }
-        
-        if (filters.location) {
-            queryParams.append('location', filters.location);
-        }
-        
-        if (filters.category) {
-            queryParams.append('category', filters.category);
-        }
-        
-        if (filters.globalSearch) {
-            queryParams.append('globalSearch', filters.globalSearch);
-        }
-        
-        const queryString = queryParams.toString();
-        const url = queryString ? `/events?${queryString}` : '/events';
+        // Build query parameters using reusable utility
+        const { buildUrlWithParams } = require('../../utils/buildQueryParams');
+        const url = buildUrlWithParams('/events', filtersWithPagination, {});
         
         const response = await axiosInstance.get(url);
         const eventsData = response.data;
@@ -59,21 +35,26 @@ export const eventList = (filters = {}) => async (dispatch, getState) => {
             payload: eventsData // Assuming response contains the customers data
         });
         
-        // Store filter data from response if available (for admin)
-        if (eventsData?.filter?.events) {
+        // CRITICAL: Always store filter.events when available - it contains ALL events for dropdown (not paginated)
+        // filter.events is provided by backend for admin users and contains all available events
+        if (eventsData?.filter?.events && Array.isArray(eventsData.filter.events)) {
+            // Always update eventFilterList with filter.events as it contains ALL events for dropdown
             dispatch({
                 type: EVENT_FILTER_LIST,
                 payload: eventsData.filter.events
             });
         } else {
-            // Fallback: Also store events for filter dropdown if not already stored
+            // Fallback: Only store events array if eventFilterList is empty
+            // This prevents overwriting with paginated results
             const state = getState();
             if (!state.event?.eventFilterList || state.event.eventFilterList.length === 0) {
-                const filterEvents = eventsData?.events || eventsData || [];
-                dispatch({
-                    type: EVENT_FILTER_LIST,
-                    payload: Array.isArray(filterEvents) ? filterEvents : []
-                });
+                const filterEvents = eventsData?.events || [];
+                if (Array.isArray(filterEvents) && filterEvents.length > 0) {
+                    dispatch({
+                        type: EVENT_FILTER_LIST,
+                        payload: filterEvents
+                    });
+                }
             }
         }
         
@@ -555,8 +536,18 @@ export const getAllEventsForFilter = () => async (dispatch, getState) => {
         }
 
         setEventLoading(dispatch, true);
-        const response = await axiosInstance.get('/events');
-        const events = response.data?.events || [];
+        // CRITICAL: Request ALL events for filter dropdown (not paginated)
+        // Use a very high limit to get all events, or fetch from filter response if available
+        const response = await axiosInstance.get('/events', {
+            params: {
+                limit: 10000, // High limit to get all events
+                page: 1
+            }
+        });
+        
+        // Try to get events from filter.events first (contains all events for dropdown)
+        // Otherwise use events array (might be paginated)
+        const events = response.data?.filter?.events || response.data?.events || [];
         
         // Store in Redux for future use
         dispatch({

@@ -7,6 +7,7 @@ import {
     Delete,
     Body,
     Param,
+    Query,
     Res,
     UseInterceptors,
     UploadedFiles,
@@ -96,19 +97,35 @@ export class ExhibitorController {
 
   /**
    * Get all exhibitors
-   * Access: All users (no authentication required)
+   * If eventId is provided, only returns exhibitors associated with that event
+   * Access: Admin and Exhibitor users only
    */
-  @Get()
+  @Get('')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
   async getAllExhibitors(
+    @Query('eventId') eventId: string | undefined,
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const exhibitors = await this.exhibitorService.getAllExhibitors();
+      const userRole = req.user?.role;
+
+      // Exhibitor users can only access data when eventId is provided
+      if (userRole === UserRole.Exhibitor && !eventId) {
+        return response.status(HttpStatus.FORBIDDEN).json({
+          success: false,
+          message: 'Event ID is required for exhibitor users',
+        });
+      }
+
+      const exhibitors = await this.exhibitorService.getAllExhibitors(eventId);
       
       const successResponse: SuccessResponse = {
         success: true,
-        message: 'Exhibitors retrieved successfully',
+        message: eventId 
+          ? 'Exhibitors for event retrieved successfully' 
+          : 'Exhibitors retrieved successfully',
         data: exhibitors,
         metadata: {
           total: exhibitors.length,

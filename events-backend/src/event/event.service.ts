@@ -43,6 +43,7 @@ import {
   GlobalSearchUtils,
 } from '../utils/searchEvent';
 import { QnaUtils } from '../utils/qna.utils';
+import { FilterService } from '../service/filter.service';
 
 @Injectable()
 export class EventService {
@@ -89,6 +90,7 @@ export class EventService {
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
     private readonly qnaUtils: QnaUtils,
+    private readonly filterService: FilterService,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -248,11 +250,21 @@ export class EventService {
       upcoming?: boolean;
       category?: string;
       eventName?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
     },
     userId?: string,
     userRole?: string,
   ) {
     try {
+      // Extract pagination parameters
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'startDate';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
       if (filters.type) {
         const validTypes = Object.values(EventType);
         if (!validTypes.includes(filters.type)) {
@@ -311,10 +323,17 @@ export class EventService {
       }
 
       if (filters.eventName) {
-        // Exact name match for dropdown filter
-        queryBuilder.andWhere('event.name = :eventName', {
-          eventName: filters.eventName,
-        });
+        // Trim eventName to handle leading/trailing spaces
+        // If empty after trimming, skip the filter
+        const trimmedEventName = filters.eventName.trim();
+        if (trimmedEventName.length > 0) {
+          // Exact name match for dropdown filter
+          // Use TRIM on both sides to handle cases where database has "Conference " but search is "Conference"
+          // This ensures "Conference " in DB matches "Conference" in search
+          queryBuilder.andWhere('TRIM(event.name) = TRIM(:eventName)', {
+            eventName: trimmedEventName,
+          });
+        }
       }
 
       const events = await queryBuilder.getMany();
@@ -379,8 +398,14 @@ export class EventService {
         return dateB.getTime() - dateA.getTime();
       });
 
+      // Apply pagination to filtered events
+      const total = filteredEvents.length;
+      const pagination = this.filterService.calculatePaginationMetadata(total, page, limit);
+      const skip = (page - 1) * limit;
+      const paginatedEvents = filteredEvents.slice(skip, skip + limit);
+
       const eventsWithAttendance = await Promise.all(
-        filteredEvents.map(async (event) => {
+        paginatedEvents.map(async (event) => {
           const attendanceCount = await this.getEventAttendanceCount(event.id);
           const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
 
@@ -604,6 +629,12 @@ export class EventService {
           return dateB.getTime() - dateA.getTime();
         });
 
+        // Apply pagination to filtered events
+        const total = completeEvents.length;
+        const pagination = this.filterService.calculatePaginationMetadata(total, page, limit);
+        const skip = (page - 1) * limit;
+        const paginatedEvents = completeEvents.slice(skip, skip + limit);
+
         // For admin role, include filter data from available events in response (not all events from database)
         let filterData = null;
         if (userRole === UserRole.Admin) {
@@ -618,14 +649,15 @@ export class EventService {
         }
 
         return {
-          events: completeEvents,
+          events: paginatedEvents,
           speakers: allSpeakers,
           categories: allCategories,
           exhibitors: allExhibitors,
           promotionalOffers: allPromotionalOffers,
           surveySessions: allSurveySessions,
+          pagination: pagination,
           metadata: {
-            total: completeEvents.length,
+            total: total,
             totalSpeakers: allSpeakers.length,
             totalCategories: allCategories.length,
             totalExhibitors: allExhibitors.length,
@@ -634,7 +666,7 @@ export class EventService {
             timestamp: new Date().toISOString(),
             globalSearch: true,
             searchKeyword: filters.globalSearch,
-            totalMatches: completeEvents.length
+            totalMatches: total
           },
           ...(filterData && { filter: filterData }), // Conditionally add filter data for admin
         };
@@ -647,7 +679,7 @@ export class EventService {
         // Use the actual available events from the response, not all events from database
         // If upcoming filter is applied, only include upcoming events in filter data
         // Otherwise, include all available events in filter data
-        const formattedEvents = eventsWithAttendance.map(event => ({
+        const formattedEvents = filteredEvents.map(event => ({
           id: event.id,
           eventName: event.name,
         }));
@@ -658,8 +690,9 @@ export class EventService {
 
       return {
         events: eventsWithAttendance,
+        pagination: pagination,
         metadata: {
-          total: eventsWithAttendance.length,
+          total: total,
           timestamp: new Date().toISOString(),
           globalSearch: false
         },

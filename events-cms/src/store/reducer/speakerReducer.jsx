@@ -2,6 +2,7 @@ import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER } from "..
 
 const initialState = {
     speakers: [],
+    pagination: {},
     loading: false,
     error: null
 };
@@ -9,9 +10,11 @@ const initialState = {
 const speakerReducer = (state = initialState, { type, payload } = {}) => {
     switch (type) {
         case SPEAKER_LIST:
+            // Handle payload as an object with data and pagination
             return {
                 ...state,
-                speakers: payload,
+                speakers: payload.data || payload, // Support both old format (array) and new format (object)
+                pagination: payload.pagination || {},
                 loading: false,
                 error: null
             };
