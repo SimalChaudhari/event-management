@@ -79,9 +79,11 @@ export class ExhibitorService {
       if (eventId) {
         const { EventExhibitor } = await import('../event/event.entity');
         const { Event } = await import('../event/event.entity');
+        const { EventStaff } = await import('../event/event-staff.entity');
         
         const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
         const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
 
         // Check if event exists
         const event = await eventRepository.findOne({
@@ -98,11 +100,33 @@ export class ExhibitorService {
           relations: ['exhibitor', 'exhibitor.promotionalOffers', 'exhibitor.boothBanners'],
         });
 
-        // Extract exhibitor data and format using utility
-        const exhibitors = eventExhibitors
-          .map(ee => ee.exhibitor)
-          .filter(Boolean)
-          .map(exhibitor => ExhibitorUtils.getBasicExhibitorInfo(exhibitor));
+        // Extract exhibitor data and format with promotional offers and event staff
+        const exhibitors = await Promise.all(
+          eventExhibitors
+            .map(ee => ee.exhibitor)
+            .filter(Boolean)
+            .map(async (exhibitor) => {
+              const basicInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
+              
+              // Get Event Staff for this exhibitor in this event
+              const eventStaffs = await eventStaffRepository.find({
+                where: {
+                  exhibitorId: exhibitor.id,
+                  eventId: eventId,
+                },
+                relations: ['user'],
+              });
+
+              // Format event staff data using utility
+              const formattedEventStaff = ExhibitorUtils.formatEventStaff(eventStaffs);
+
+              return {
+                ...basicInfo,
+                promotionalOffers: exhibitor.promotionalOffers || [],
+                eventStaff: formattedEventStaff,
+              };
+            })
+        );
 
         return exhibitors;
       }
@@ -112,8 +136,33 @@ export class ExhibitorService {
         relations: ['promotionalOffers', 'boothBanners'],
       });
       
-      // Format using utility
-      return exhibitors.map(exhibitor => ExhibitorUtils.getBasicExhibitorInfo(exhibitor));
+      // Get Event Staff repository
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      
+      // Format using utility and include promotional offers and event staff
+      const formattedExhibitors = await Promise.all(
+        exhibitors.map(async (exhibitor) => {
+          const basicInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
+          
+          // Get all Event Staff for this exhibitor (across all events)
+          const eventStaffs = await eventStaffRepository.find({
+            where: { exhibitorId: exhibitor.id },
+            relations: ['user'],
+          });
+
+          // Format event staff data using utility
+          const formattedEventStaff = ExhibitorUtils.formatEventStaff(eventStaffs);
+
+          return {
+            ...basicInfo,
+            promotionalOffers: exhibitor.promotionalOffers || [],
+            eventStaff: formattedEventStaff,
+          };
+        })
+      );
+
+      return formattedExhibitors;
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -142,17 +191,8 @@ export class ExhibitorService {
         relations: ['user'],
       });
 
-      // Format event staff data
-      const formattedEventStaff = eventStaffs.map((es) => ({
-        id: es.user?.id,
-        firstName: es.user?.firstName || '',
-        lastName: es.user?.lastName || '',
-        email: es.user?.email || '',
-        mobile: es.user?.mobile || '',
-        profilePicture: es.user?.profilePicture || null,
-        role: es.user?.role || 'exhibitor',
-        createdAt: es.createdAt,
-      }));
+      // Format event staff data using utility
+      const formattedEventStaff = ExhibitorUtils.formatEventStaff(eventStaffs);
 
       // Use utility to format exhibitor data
       const basicExhibitorInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
@@ -730,18 +770,8 @@ export class ExhibitorService {
       const event = eventLookup.get(eventId) || booth.event;
       
       // Get staff members for this specific event
-      const eventStaffMembers = eventStaffs
-        .filter(es => es.eventId === eventId && es.user)
-        .map((es) => ({
-          id: es.user.id,
-          firstName: es.user.firstName || '',
-          lastName: es.user.lastName || '',
-          email: es.user.email || '',
-          mobile: es.user.mobile || '',
-          profilePicture: es.user.profilePicture || null,
-          role: es.user.role || 'exhibitor',
-          createdAt: es.createdAt,
-        }));
+      const filteredEventStaffs = eventStaffs.filter(es => es.eventId === eventId && es.user);
+      const eventStaffMembers = ExhibitorUtils.formatEventStaff(filteredEventStaffs);
 
       // Remove duplicates from staff members
       const uniqueStaffMembers = Array.from(
@@ -785,18 +815,8 @@ export class ExhibitorService {
       const event = eventLookup.get(eventId);
       
       // Get staff members for this specific event
-      const eventStaffMembers = eventStaffs
-        .filter(es => es.eventId === eventId && es.user)
-        .map((es) => ({
-          id: es.user.id,
-          firstName: es.user.firstName || '',
-          lastName: es.user.lastName || '',
-          email: es.user.email || '',
-          mobile: es.user.mobile || '',
-          profilePicture: es.user.profilePicture || null,
-          role: es.user.role || 'exhibitor',
-          createdAt: es.createdAt,
-        }));
+      const filteredEventStaffs = eventStaffs.filter(es => es.eventId === eventId && es.user);
+      const eventStaffMembers = ExhibitorUtils.formatEventStaff(filteredEventStaffs);
 
       // Remove duplicates from staff members
       const uniqueStaffMembers = Array.from(

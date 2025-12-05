@@ -33,6 +33,24 @@ export class ExhibitorUtils {
   }
 
   /**
+   * Format event staff entities to a consistent format
+   * @param eventStaffs Array of EventStaff entities with user relation loaded
+   * @returns Array of formatted event staff data
+   */
+  static formatEventStaff(eventStaffs: EventStaff[]): any[] {
+    return eventStaffs.map((es) => ({
+      id: es.user?.id,
+      firstName: es.user?.firstName || '',
+      lastName: es.user?.lastName || '',
+      email: es.user?.email || '',
+      mobile: es.user?.mobile || '',
+      profilePicture: es.user?.profilePicture || null,
+      role: es.user?.role || 'exhibitor',
+      createdAt: es.createdAt,
+    }));
+  }
+
+  /**
    * Get event staff for an exhibitor in a specific event
    * @param eventStaffRepository Repository for EventStaff entity
    * @param eventId Event ID
@@ -56,16 +74,7 @@ export class ExhibitorUtils {
       relations: ['user'],
     });
 
-    // Format event staff data for this exhibitor
-    return exhibitorStaffs.map((es) => ({
-      id: es.user?.id,
-      firstName: es.user?.firstName || '',
-      lastName: es.user?.lastName || '',
-      email: es.user?.email || '',
-      mobile: es.user?.mobile || '',
-      profilePicture: es.user?.profilePicture || null,
-      role: es.user?.role || 'exhibitor',
-      createdAt: es.createdAt,
-    }));
+    // Format event staff data for this exhibitor using utility
+    return this.formatEventStaff(exhibitorStaffs);
   }
 }
