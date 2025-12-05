@@ -1,26 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsArray, IsBoolean, IsEmail } from 'class-validator';
-
-export class PromotionalOfferDto {
-  @IsNotEmpty()
-  @IsString()
-  companyName!: string;
-
-  @IsNotEmpty()
-  @IsString()
-  title!: string;
-
-  @IsNotEmpty()
-  @IsString()
-  validDate?: string;
-
-  @IsOptional()
-  @IsString()
-  image?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-}
+import { IsNotEmpty, IsString, IsOptional, IsArray, IsBoolean, IsEmail, IsObject } from 'class-validator';
 
 export class FlyerDto {
   @IsNotEmpty()
@@ -92,15 +70,31 @@ export class ExhibitorDto {
 
   @IsOptional()
   @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsString()
   uen?: string;
 
   @IsOptional()
   @IsString()
   logo?: string;
+
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  facebookUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  instagramUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedinUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  xUrl?: string;
 
   // Updated flyers structure - array of objects with name and flyer
   @IsOptional()
@@ -113,7 +107,8 @@ export class ExhibitorDto {
   flyerNames?: string;
 
   @IsOptional()
-  promotionalOffers?: PromotionalOfferDto[];
+  @IsString()
+  promotionalOfferNote?: string;
 
   // Updated documents structure - array of objects with name and document
   @IsOptional()

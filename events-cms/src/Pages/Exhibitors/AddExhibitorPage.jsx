@@ -6,6 +6,7 @@ import { createExhibitor, updateExhibitor, exhibitorById } from '../../store/act
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
+import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
 
 // DocumentNameInput component main component के बाहर define करें (Events जैसा ही)
 const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
@@ -59,7 +60,7 @@ const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onVali
     );
 };
 
-// FlyerNameInput component (Events pattern के अनुसार)
+// FlyerNameInput component 
 const FlyerNameInput = ({ index, fileName, flyerName, onNameChange, onValidationChange }) => {
     const [localError, setLocalError] = useState('');
 
@@ -194,10 +195,15 @@ function AddExhibitorPage() {
         mobile: '',
         companyName: '',
         companyDescription: '',
-        address: '',
         logo: null,
         uen: '',
         bothNumber: '',
+        website: '',
+        facebookUrl: '',
+        instagramUrl: '',
+        linkedinUrl: '',
+        xUrl: '',
+        promotionalOfferNote: '',
         isActive: true,
         flyers: [],
         flyerNames: [],
@@ -353,10 +359,15 @@ function AddExhibitorPage() {
                             mobile: editData.mobile || '',
                             companyName: editData.companyName || '',
                             companyDescription: editData.companyDescription || '',
-                            address: editData.address || '',
                             logo: editData.logo || null,
                             uen: editData.uen || '',
                             bothNumber: editData.bothNumber || '',
+                            website: editData.website || '',
+                            facebookUrl: editData.facebookUrl || '',
+                            instagramUrl: editData.instagramUrl || '',
+                            linkedinUrl: editData.linkedinUrl || '',
+                            xUrl: editData.xUrl || '',
+                            promotionalOfferNote: editData.promotionalOfferNote || '',
                             isActive: editData.isActive !== undefined ? editData.isActive : true,
                             flyers: flyersData,
                             flyerNames: flyerNamesData,
@@ -368,6 +379,7 @@ function AddExhibitorPage() {
                         };
 
                         setFormData(formDataToSet);
+                        
                         setFlyerPreviewUrls(flyerPreviewUrls);
                         setEventImagePreviewUrls(eventImagePreviewUrls);
                         setDocumentPreviewUrls(documentPreviewUrls);
@@ -813,7 +825,7 @@ function AddExhibitorPage() {
                             }
                         });
                     }
-                } else if (formData[key] !== null && !Array.isArray(formData[key])) {
+                } else if (formData[key] !== null && !Array.isArray(formData[key]) && typeof formData[key] !== 'object') {
                     formDataToSend.append(key, formData[key]);
                 }
             });
@@ -909,10 +921,12 @@ function AddExhibitorPage() {
                         <div className="card-header">
                             <div className="d-flex justify-content-between align-items-center">
                                 <h4 className="card-title">{id ? 'Edit Exhibitor' : 'Add Exhibitor'}</h4>
-                                <Button variant="secondary" onClick={handleNavigate}>
-                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                                    Back
-                                </Button>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <Button variant="secondary" onClick={handleNavigate}>
+                                        <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
+                                        Back
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                         <div className="card-body">
@@ -973,41 +987,162 @@ function AddExhibitorPage() {
                                         </div>
                                     </Col>
 
-                                    {/* Company Description */}
-                                    <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="companyDescription">
+                                    {/* Company Description - CKEditor */}
+                                    <Col sm={12} style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '15px', paddingRight: '15px' }}>
+                                        <div className="form-group fill" style={{ width: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'visible' }}>
+                                            <label className="floating-label" style={{ 
+                                                marginBottom: '10px', 
+                                                display: 'block',
+                                                wordWrap: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                whiteSpace: 'normal',
+                                                width: '100%',
+                                                maxWidth: '100%',
+                                                boxSizing: 'border-box',
+                                                overflow: 'visible',
+                                                lineHeight: '1.5',
+                                                position: 'relative',
+                                                left: '0',
+                                                right: '0'
+                                            }}>
                                                 Company Description (Optional)
                                             </label>
-                                            <textarea
-                                                className="form-control"
-                                                name="companyDescription"
-                                                value={formData.companyDescription}
-                                                onChange={handleChange}
-                                                placeholder="Enter company description..."
-                                                rows={4}
-                                            />
+                                            <div style={{ border: '1px solid #ced4da', borderRadius: '4px', width: '100%', boxSizing: 'border-box' }}>
+                                                <SettingsEditor
+                                                    data={formData.companyDescription || ''}
+                                                    onChange={(event, editor) => {
+                                                        const data = editor.getData();
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            companyDescription: data
+                                                        }));
+                                                    }}
+                                                    placeholder="Enter company description..."
+                                                />
+                                            </div>
                                         </div>
                                     </Col>
 
-                                    {/* Address */}
+                                    {/* Website */}
                                     <Col sm={12}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="address">
-                                                Address (Optional)
+                                            <label className="floating-label" htmlFor="website">
+                                                Website (Optional)
                                             </label>
-                                            <textarea
+                                            <input
+                                                type="text"
                                                 className="form-control"
-                                                name="address"
-                                                value={formData.address}
+                                                name="website"
+                                                value={formData.website}
                                                 onChange={handleChange}
-                                                placeholder="Enter company address..."
-                                                rows={3}
+                                                placeholder="https://example.com"
                                             />
                                         </div>
                                     </Col>
 
-                               
+                                    {/* Facebook URL */}
+                                    <Col sm={3}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="facebookUrl">
+                                                Facebook URL (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="facebookUrl"
+                                                value={formData.facebookUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://facebook.com/yourpage"
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* Instagram URL */}
+                                    <Col sm={3}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="instagramUrl">
+                                                Instagram URL (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="instagramUrl"
+                                                value={formData.instagramUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://instagram.com/yourpage"
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* LinkedIn URL */}
+                                    <Col sm={3}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="linkedinUrl">
+                                                LinkedIn URL (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="linkedinUrl"
+                                                value={formData.linkedinUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://linkedin.com/company/yourcompany"
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* X (Twitter) URL */}
+                                    <Col sm={3}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="xUrl">
+                                                X (Twitter) URL (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                name="xUrl"
+                                                value={formData.xUrl}
+                                                onChange={handleChange}
+                                                placeholder="https://x.com/yourhandle"
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* Promotional Offer Note - CKEditor */}
+                                    <Col sm={12} style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '15px', paddingRight: '15px' }}>
+                                        <div className="form-group fill" style={{ width: '100%', boxSizing: 'border-box', position: 'relative', overflow: 'visible' }}>
+                                            <label className="floating-label" style={{ 
+                                                marginBottom: '10px', 
+                                                display: 'block',
+                                                wordWrap: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                whiteSpace: 'normal',
+                                                width: '100%',
+                                                maxWidth: '100%',
+                                                boxSizing: 'border-box',
+                                                overflow: 'visible',
+                                                lineHeight: '1.5',
+                                                position: 'relative',
+                                                left: '0',
+                                                right: '0'
+                                            }}>
+                                                Promotional Offer Note (Optional)
+                                            </label>
+                                            <div style={{ border: '1px solid #ced4da', borderRadius: '4px', width: '100%', boxSizing: 'border-box' }}>
+                                                <SettingsEditor
+                                                    data={formData.promotionalOfferNote || ''}
+                                                    onChange={(event, editor) => {
+                                                        const data = editor.getData();
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            promotionalOfferNote: data
+                                                        }));
+                                                    }}
+                                                    placeholder="Enter promotional offer note..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </Col>
 
                                     {/* UEN, Booth Number, Status - 3 columns in one line */}
                                     <Col sm={4}>

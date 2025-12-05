@@ -1,25 +1,16 @@
 import {
-    ALL_PROMOTIONAL_OFFERS,
     CREATE_EXHIBITOR,
-    CREATE_PROMOTIONAL_OFFER,
     DELETE_EXHIBITOR,
-    DELETE_PROMOTIONAL_OFFER,
     EXHIBITOR_BY_ID,
     EXHIBITOR_LIST,
     EXHIBITOR_LOADING,
     EXHIBITOR_ERROR,
-    FETCH_PROMOTIONAL_OFFERS,
-    GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR,
-    PROMOTIONAL_OFFER_BY_ID,
-    UPDATE_EXHIBITOR,
-    UPDATE_PROMOTIONAL_OFFER
+    UPDATE_EXHIBITOR
 } from '../constants/actionTypes';
 
 const initialState = {
     exhibitors: [],
     exhibitorById: null,
-    promotionalOffers: [],
-    promotionalOfferById: null,
     loading: false,
     total: 0
 };
@@ -79,67 +70,6 @@ const exhibitorReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 exhibitors: state.exhibitors.filter((exhibitor) => exhibitor.id !== payload),
-                loading: false,
-                
-            };
-
-        //Promotional Offer
-
-        case FETCH_PROMOTIONAL_OFFERS:
-            return {
-                ...state,
-                promotionalOffers: Array.isArray(payload) ? payload : [],
-                loading: false,
-                
-            };
-
-        case CREATE_PROMOTIONAL_OFFER:
-            // Add new promotional offer to the list (at the beginning like events)
-            const newOffer = payload;
-            const currentOffers = Array.isArray(state.promotionalOffers) ? state.promotionalOffers : [];
-            return {
-                ...state,
-                promotionalOffers: [newOffer, ...currentOffers],
-                loading: false,
-
-            };
-
-        case UPDATE_PROMOTIONAL_OFFER:
-            return {
-                ...state,
-                promotionalOffers: (Array.isArray(state.promotionalOffers) ? state.promotionalOffers : []).map((offer) => (offer.id === payload.id ? payload : offer)),
-                loading: false,
-                
-            };
-
-        case DELETE_PROMOTIONAL_OFFER:
-            return {
-                ...state,
-                promotionalOffers: (Array.isArray(state.promotionalOffers) ? state.promotionalOffers : []).filter((offer) => offer.id !== payload),
-                loading: false,
-                
-            };
-
-        case GET_PROMOTIONAL_OFFERS_BY_EXHIBITOR:
-            return {
-                ...state,
-                promotionalOffers: payload.data?.data || [],
-                loading: false,
-                
-            };
-
-        case ALL_PROMOTIONAL_OFFERS:
-            return {
-                ...state,
-                allPromotionalOffers: payload,
-                loading: false,
-                
-            };
-
-        case PROMOTIONAL_OFFER_BY_ID:
-            return {
-                ...state,
-                promotionalOfferById: payload,
                 loading: false,
                 
             };

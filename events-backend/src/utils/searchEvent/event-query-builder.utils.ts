@@ -18,7 +18,6 @@ export class EventQueryBuilderUtils {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor')
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
-      .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
       .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners')
       .leftJoinAndSelect('event.galleries', 'galleries')
       .leftJoinAndSelect('event.surveys', 'surveys')
@@ -256,12 +255,6 @@ export class EventQueryBuilderUtils {
         LOWER(exhibitor.mobile) LIKE :searchTerm OR
         LOWER(exhibitor.uen) LIKE :searchTerm OR
         LOWER(exhibitor.bothNumber) LIKE :searchTerm OR
-        
-        -- Promotional offer fields
-        LOWER(promotionalOffers.title) LIKE :searchTerm OR 
-        LOWER(promotionalOffers.description) LIKE :searchTerm OR
-        LOWER(promotionalOffers.companyName) LIKE :searchTerm OR
-        LOWER(promotionalOffers.validDate) LIKE :searchTerm OR
         
         -- Survey fields
         LOWER(surveys.title) LIKE :searchTerm OR

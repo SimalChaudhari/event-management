@@ -10,6 +10,38 @@ export class ExhibitorUtils {
    * @returns Basic exhibitor info for event displays
    */
   static getBasicExhibitorInfo(exhibitor: Partial<Exhibitor>) {
+    // Build socialMedia array from individual URL fields
+    // Show platform name even if URL is empty
+    const socialMediaArray = [];
+    
+    socialMediaArray.push({
+      platform: 'Facebook',
+      link: exhibitor.facebookUrl || ''
+    });
+    
+    socialMediaArray.push({
+      platform: 'Instagram',
+      link: exhibitor.instagramUrl || ''
+    });
+    
+    socialMediaArray.push({
+      platform: 'LinkedIn',
+      link: exhibitor.linkedinUrl || ''
+    });
+    
+    socialMediaArray.push({
+      platform: 'X',
+      link: exhibitor.xUrl || ''
+    });
+    
+    // If old socialMedia array exists, merge it (for backward compatibility)
+    const oldSocialMedia = exhibitor.socialMedia && Array.isArray(exhibitor.socialMedia) 
+      ? exhibitor.socialMedia 
+      : [];
+    
+    // Combine new social media with old one (avoid duplicates)
+    const combinedSocialMedia = [...socialMediaArray, ...oldSocialMedia];
+
     return {
       id: exhibitor.id,
       companyName: exhibitor.companyName || '',
@@ -19,7 +51,9 @@ export class ExhibitorUtils {
       logo: exhibitor.logo || '',
       uen: exhibitor.uen || '',
       bothNumber: exhibitor.bothNumber || '',
-      address: exhibitor.address || '',
+      website: exhibitor.website || '',
+      socialMedia: combinedSocialMedia.length > 0 ? combinedSocialMedia : [],
+      promotionalOfferNote: exhibitor.promotionalOfferNote || '',
       isActive: exhibitor.isActive || false,
       flyers: exhibitor.flyers || [],
       documents: exhibitor.documents || [],

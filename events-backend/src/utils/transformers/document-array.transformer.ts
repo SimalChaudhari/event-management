@@ -156,3 +156,60 @@ export const boothBannerTransformer = {
     }
   }
 };
+
+// Social Media Transformer - for social media array with dynamic platforms
+export const socialMediaTransformer = {
+  to: (value: any): string => {
+    if (!value) return '';
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    // Backward compatibility: convert old object format to array format
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const array: any[] = [];
+      if (value.facebook) {
+        array.push({ platform: 'Facebook', ...value.facebook });
+      }
+      if (value.instagram) {
+        array.push({ platform: 'Instagram', ...value.instagram });
+      }
+      if (value.linkedin) {
+        array.push({ platform: 'LinkedIn', ...value.linkedin });
+      }
+      if (value.url) {
+        array.push({ platform: 'URL', ...value.url });
+      }
+      return JSON.stringify(array);
+    }
+    return JSON.stringify(value);
+  },
+  from: (value: string): any => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      // Backward compatibility: convert old object format to array format
+      if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const array: any[] = [];
+        if (parsed.facebook) {
+          array.push({ platform: 'Facebook', ...parsed.facebook });
+        }
+        if (parsed.instagram) {
+          array.push({ platform: 'Instagram', ...parsed.instagram });
+        }
+        if (parsed.linkedin) {
+          array.push({ platform: 'LinkedIn', ...parsed.linkedin });
+        }
+        if (parsed.url) {
+          array.push({ platform: 'URL', ...parsed.url });
+        }
+        return array;
+      }
+      return [];
+    } catch (error) {
+      return [];
+    }
+  }
+};

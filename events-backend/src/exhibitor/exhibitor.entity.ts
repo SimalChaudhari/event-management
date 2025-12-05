@@ -9,10 +9,9 @@ import {
   OneToMany,
 } from 'typeorm';
 
-import { PromotionalOffer } from '../promotional-offer/promotional-offer.entity';
 import { EventExhibitor } from 'event/event.entity';
 import { EventBooth } from '../event/event-booth.entity';
-import { documentArrayTransformer, fileArrayTransformer, eventImageArrayTransformer } from '../utils/transformers/document-array.transformer';
+import { documentArrayTransformer, fileArrayTransformer, eventImageArrayTransformer, socialMediaTransformer } from '../utils/transformers/document-array.transformer';
 import { BoothBanner } from './booth-banner.entity';
 
 @Entity('exhibitors')
@@ -44,14 +43,36 @@ export class Exhibitor {
   @Column({ type: 'varchar', nullable: true })
   mobile?: string;
 
-  @Column({ type: 'text', nullable: true })
-  address?: string;
-
   @Column({ type: 'varchar', nullable: true })
   uen?: string;
 
   @Column({ type: 'varchar', nullable: true })
   logo?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  website?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  facebookUrl?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  instagramUrl?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  linkedinUrl?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  xUrl?: string;
+
+  @Column({ type: 'text', nullable: true, transformer: socialMediaTransformer })
+  socialMedia?: Array<{
+    platform?: string;
+    icon?: string;
+    link?: string;
+  }>;
+
+  @Column({ type: 'text', nullable: true })
+  promotionalOfferNote?: string;
 
   // Updated flyers structure - array of objects with name and flyer
   @Column({ type: 'text', nullable: true, transformer: fileArrayTransformer })
@@ -64,13 +85,6 @@ export class Exhibitor {
   // Updated event images structure - array of objects with name and eventImage
   @Column({ type: 'text', nullable: true, transformer: eventImageArrayTransformer })
   eventImages?: Array<{ name: string; eventImage: string }>;
-
-  // Add the new relationship
-  @OneToMany(
-    () => PromotionalOffer,
-    (promotionalOffer) => promotionalOffer.exhibitor,
-  )
-  promotionalOffers!: PromotionalOffer[];
 
   // Event relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.exhibitor)

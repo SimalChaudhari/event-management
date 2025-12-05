@@ -499,7 +499,6 @@ export class EventService {
                     const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
                     const exhibitorData = {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
                     };
 
                     // Add booth code only for admin users
@@ -569,7 +568,6 @@ export class EventService {
         const allSpeakers: any[] = [];
         const allCategories: any[] = [];
         const allExhibitors: any[] = [];
-        const allPromotionalOffers: any[] = [];
         const allSurveySessions: any[] = [];
         
         eventsWithGlobalMatches.forEach(event => {
@@ -579,7 +577,6 @@ export class EventService {
             allSpeakers.push(...eventWithSearch.searchResult.matchedSpeakers);
             allCategories.push(...eventWithSearch.searchResult.matchedCategories);
             allExhibitors.push(...eventWithSearch.searchResult.matchedExhibitors);
-            allPromotionalOffers.push(...eventWithSearch.searchResult.matchedPromotionalOffers);
             allSurveySessions.push(...eventWithSearch.searchResult.matchedSurveySessions);
           }
         });
@@ -634,7 +631,6 @@ export class EventService {
           speakers: allSpeakers,
           categories: allCategories,
           exhibitors: allExhibitors,
-          promotionalOffers: allPromotionalOffers,
           surveySessions: allSurveySessions,
           pagination: pagination,
           metadata: {
@@ -642,7 +638,6 @@ export class EventService {
             totalSpeakers: allSpeakers.length,
             totalCategories: allCategories.length,
             totalExhibitors: allExhibitors.length,
-            totalPromotionalOffers: allPromotionalOffers.length,
             totalSurveySessions: allSurveySessions.length,
             timestamp: new Date().toISOString(),
             globalSearch: true,
@@ -848,7 +843,7 @@ export class EventService {
           const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
           const exhibitorData = {
             ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-            promotionalOffers: ee.exhibitor.promotionalOffers || [],
+           
           };
 
           // Add booth code only for admin users
@@ -1612,7 +1607,6 @@ export class EventService {
     matchedSpeakers: any[];
     matchedCategories: any[];
     matchedExhibitors: any[];
-    matchedPromotionalOffers: any[];
     matchedSurveySessions: any[];
   } {
     const keywordLower = keyword.toLowerCase();
@@ -1622,7 +1616,6 @@ export class EventService {
       matchedSpeakers: any[];
       matchedCategories: any[];
       matchedExhibitors: any[];
-      matchedPromotionalOffers: any[];
       matchedSurveySessions: any[];
     } = {
       hasMatch: false,
@@ -1630,7 +1623,6 @@ export class EventService {
       matchedSpeakers: [],
       matchedCategories: [],
       matchedExhibitors: [],
-      matchedPromotionalOffers: [],
       matchedSurveySessions: []
     };
 
@@ -1697,27 +1689,6 @@ export class EventService {
         }
       }
     }
-
-         // Check promotional offers
-     if (event.exhibitorsData?.exhibitors) {
-       for (const exhibitor of event.exhibitorsData.exhibitors) {
-         if (exhibitor.promotionalOffers && Array.isArray(exhibitor.promotionalOffers)) {
-           for (const offer of exhibitor.promotionalOffers) {
-             if (offer.title?.toLowerCase().includes(keywordLower) ||
-                 offer.description?.toLowerCase().includes(keywordLower)) {
-               result.matchedPromotionalOffers.push({
-                 ...offer,
-                 exhibitorId: exhibitor.id,
-                 exhibitorName: exhibitor.companyName,
-                 eventId: event.id,
-                 eventName: event.name
-               });
-               result.hasMatch = true;
-             }
-           }
-         }
-       }
-     }
 
            // Check survey sessions
       if (event.surveyDetails) {

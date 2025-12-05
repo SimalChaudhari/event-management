@@ -13,13 +13,12 @@ import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationMo
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
-import { getAllPromotionalOffers } from '../../store/actions/promotionalOfferActions';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, handleView, handleOffers) {
+function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, handleView) {
     let tableZero = '#exhibitor-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -122,10 +121,6 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-eye"></i>
                             </button>
-                            <button type="button" class="btn btn-info btn-circle btn-md offers-btn" data-id="${row.id}" title="Promotional Offers" 
-                                style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
-                                <i class="feather icon-percent"></i>
-                            </button>
                             <button type="button" class="btn btn-warning btn-circle btn-sm edit-btn" data-id="${row.id}" title="Edit" 
                                 style="margin-right: 10px; width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;">
                                 <i class="feather icon-edit"></i>
@@ -156,11 +151,6 @@ function exhibitorTable(data, handleAddExhibitor, handleEdit, handleDelete, hand
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const id = $(this).data('id');
                 handleView(id);
-            });
-
-            $(tableZero + ' tbody').off('click', '.offers-btn').on('click', '.offers-btn', function () {
-                const id = $(this).data('id');
-                handleOffers(id);
             });
 
             $(tableZero + ' tbody').off('click', '.edit-btn').on('click', '.edit-btn', function () {
@@ -231,8 +221,7 @@ const Exhibitors = () => {
                 handleAddExhibitor,
                 handleEdit,
                 handleDelete,
-                handleView,
-                handleOffers
+                handleView
             );
             setCurrentTable(table);
         }
@@ -278,22 +267,6 @@ const Exhibitors = () => {
         setSelectedExhibitorId(null);
     };
 
-    const handleOffers = async (exhibitorId) => {
-        try {
-            const response = await dispatch(getAllPromotionalOffers());
-            const allOffers = response?.data || [];
-            const existingOffers = allOffers.filter(offer => offer.exhibitorId === exhibitorId);
-            
-            if (existingOffers && existingOffers.length > 0) {
-                navigate(`${EXHIBITOR_PATHS.PROMOTIONAL_OFFERS}?exhibitorId=${exhibitorId}`);
-            } else {
-                navigate(`${EXHIBITOR_PATHS.ADD_PROMOTIONAL_OFFER}?exhibitorId=${exhibitorId}`);
-            }
-        } catch (error) {
-            console.error('Error checking promotional offers:', error);
-            navigate(`${EXHIBITOR_PATHS.ADD_PROMOTIONAL_OFFER}?exhibitorId=${exhibitorId}`);
-        }
-    };
 
     return (
         <>

@@ -15,7 +15,7 @@ const ViewExhibitorPage = () => {
     const { id } = useParams();
 
     // Get exhibitor data from Redux store
-    const { exhibitorById: exhibitorData, loading, error } = useSelector(state => state.exhibitor);
+    const { exhibitorById: exhibitorData, loading, error } = useSelector((state) => state.exhibitor);
     const exhibitor = exhibitorData?.data;
 
     // Image modal states for zoomable functionality
@@ -43,28 +43,33 @@ const ViewExhibitorPage = () => {
     };
 
     // InfoCard component for consistent styling similar to EventBasicComponent
-    const InfoCard = ({ title, icon, children, borderColor = "#4680ff", className = "" }) => (
-        <div className={`mb-4 ${className}`} style={{ 
-            backgroundColor: '#fff', 
-            borderRadius: '8px', 
-            padding: '20px', 
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            border: '1px solid #e9ecef',
-            borderLeft: `4px solid ${borderColor}`
-        }}>
+    const InfoCard = ({ title, icon, children, borderColor = '#4680ff', className = '' }) => (
+        <div
+            className={`mb-4 ${className}`}
+            style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                border: '1px solid #e9ecef',
+                borderLeft: `4px solid ${borderColor}`
+            }}
+        >
             <div style={{ padding: '24px' }}>
-                <h5 style={{ 
-                    fontSize: '18px', 
-                    fontWeight: '600', 
-                    color: '#2c3e50',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    borderBottom: `2px solid ${borderColor}`,
-                    paddingBottom: '8px',
-                    position: 'relative'
-                }}>
+                <h5
+                    style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#2c3e50',
+                        marginBottom: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderBottom: `2px solid ${borderColor}`,
+                        paddingBottom: '8px',
+                        position: 'relative'
+                    }}
+                >
                     <span style={{ fontSize: '20px' }}>{icon}</span>
                     {title}
                 </h5>
@@ -75,27 +80,31 @@ const ViewExhibitorPage = () => {
 
     const InfoField = ({ label, value, icon = null }) => (
         <div className="mb-3">
-            <div style={{ 
-                fontSize: '1rem', 
-                fontWeight: '600', 
-                color: '#495057',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-            }}>
+            <div
+                style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#495057',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}
+            >
                 {icon && <span style={{ fontSize: '16px' }}>{icon}</span>}
                 {label}:
             </div>
-            <div style={{ 
-                fontSize: '15px', 
-                color: '#2c3e50',
-                fontWeight: '500',
-                backgroundColor: '#f8f9fa',
-                padding: '10px 15px',
-                borderRadius: '8px',
-                border: '1px solid #e9ecef'
-            }}>
+            <div
+                style={{
+                    fontSize: '15px',
+                    color: '#2c3e50',
+                    fontWeight: '500',
+                    backgroundColor: '#f8f9fa',
+                    padding: '10px 15px',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef'
+                }}
+            >
                 {value || 'N/A'}
             </div>
         </div>
@@ -122,15 +131,11 @@ const ViewExhibitorPage = () => {
     };
 
     const goToPreviousImage = () => {
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === 0 ? currentImages.length - 1 : prevIndex - 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === 0 ? currentImages.length - 1 : prevIndex - 1));
     };
 
     const goToNextImage = () => {
-        setCurrentImageIndex((prevIndex) => 
-            prevIndex === currentImages.length - 1 ? 0 : prevIndex + 1
-        );
+        setCurrentImageIndex((prevIndex) => (prevIndex === currentImages.length - 1 ? 0 : prevIndex + 1));
     };
 
     const handleFlyerImageClick = (index) => {
@@ -147,234 +152,24 @@ const ViewExhibitorPage = () => {
         setShowImageModal(true);
     };
 
-    const handleOfferImageClick = (offerIndex) => {
-        const offersWithImages = exhibitor.promotionalOffers.filter(offer => offer.image);
-        setCurrentImages(offersWithImages);
-        setCurrentImageIndex(offerIndex);
-        setCurrentImageType('offers');
-        setShowImageModal(true);
-    };
-
 
     // No exhibitor found
-        if (!exhibitor) {
-            return (
-                <NoDataFound
-                    title="Exhibitor Not Found"
-                    message="The exhibitor you're looking for doesn't exist or has been removed."
-                    icon="fas fa-building-slash"
-                    variant="warning"
-                    size="medium"
-                    showBackButton={true}
-                    backButtonText="Back"
-                    backButtonPath={`${EXHIBITOR_PATHS.LIST_EXHIBITORS}`}
-                />
-            );
-        }
-    
-
-    // Render promotional offers section
-    const renderPromotionalOffers = () => {
-        if (!exhibitor.promotionalOffers || exhibitor.promotionalOffers.length === 0) {
-            return (
-                <div style={{
-                    textAlign: 'center',
-                    padding: '40px 20px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '8px',
-                    border: '1px dashed #dee2e6'
-                }}>
-                    <i className="fas fa-gift fa-3x text-muted mb-3"></i>
-                    <p className="text-muted mb-0" style={{ fontSize: '16px' }}>No promotional offers available.</p>
-                </div>
-            );
-        }
-
+    if (!exhibitor) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {exhibitor.promotionalOffers.map((offer, index) => {
-                    // Priority: offer.image > exhibitor.logo > colored circle with icon
-                    const offerImage = offer.image ? `${API_URL}/${offer.image.replace(/\\/g, '/')}` : null;
-                    const exhibitorLogo = exhibitor.logo ? `${API_URL}/${exhibitor.logo.replace(/\\/g, '/')}` : null;
-                    
-                    // Different colors for different offers if no image
-                    const colors = ['#28a745', '#dc3545', '#007bff', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
-                    const circleColor = offer.isActive 
-                        ? (offerImage || exhibitorLogo ? 'transparent' : colors[index % colors.length])
-                        : '#dc3545';
-                    
-                    return (
-                        <div
-                            key={offer.id || index}
-                            style={{
-                                backgroundColor: '#fff',
-                                borderRadius: '12px',
-                                border: '1px solid #e9ecef',
-                                padding: '16px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '16px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                transition: 'all 0.2s ease',
-                                cursor: 'pointer'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                            }}
-                        >
-                            {/* Logo Section - Left */}
-                            <div style={{
-                                width: '80px',
-                                height: '80px',
-                                borderRadius: '50%',
-                                backgroundColor: circleColor,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                overflow: 'hidden',
-                                border: '2px solid #fff',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                {offerImage ? (
-                                    <img
-                                        src={offerImage}
-                                        alt={offer.title || 'Offer Image'}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover'
-                                        }}
-                                        onClick={() => handleOfferImageClick(index)}
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            if (exhibitorLogo) {
-                                                const fallbackImg = document.createElement('img');
-                                                fallbackImg.src = exhibitorLogo;
-                                                fallbackImg.style.width = '100%';
-                                                fallbackImg.style.height = '100%';
-                                                fallbackImg.style.objectFit = 'cover';
-                                                e.target.parentElement.appendChild(fallbackImg);
-                                            } else {
-                                                e.target.nextElementSibling.style.display = 'flex';
-                                            }
-                                        }}
-                                    />
-                                ) : exhibitorLogo ? (
-                                    <img
-                                        src={exhibitorLogo}
-                                        alt={exhibitor.companyName || 'Company Logo'}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover'
-                                        }}
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.nextElementSibling.style.display = 'flex';
-                                        }}
-                                    />
-                                ) : null}
-                                <div style={{
-                                    display: (offerImage || exhibitorLogo) ? 'none' : 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: '100%',
-                                    height: '100%'
-                                }}>
-                                    <i className="fas fa-gift" style={{ 
-                                        color: '#fff', 
-                                        fontSize: '32px' 
-                                    }}></i>
-                                </div>
-                            </div>
-
-                            {/* Vertical Dashed Line */}
-                            <div style={{
-                                width: '1px',
-                                height: '80px',
-                                borderLeft: '1px dashed #dee2e6',
-                                flexShrink: 0
-                            }}></div>
-
-                            {/* Content Section - Right */}
-                            <div style={{
-                                flex: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px'
-                            }}>
-                                {/* Offer Title */}
-                                <div style={{
-                                    fontSize: '18px',
-                                    fontWeight: '600',
-                                    color: '#2c3e50',
-                                    lineHeight: '1.3'
-                                }}>
-                                    {offer.title || 'Untitled Offer'}
-                                </div>
-
-                                {/* Company Name */}
-                                <div style={{
-                                    fontSize: '14px',
-                                    color: '#6c757d',
-                                    fontWeight: '500'
-                                }}>
-                                    {offer.companyName || exhibitor.companyName || 'Company Name'}
-                                </div>
-
-                                {/* Valid Date */}
-                                {offer.validDate ? (
-                                    <div style={{
-                                        fontSize: '12px',
-                                        color: '#6c757d',
-                                        marginTop: '4px'
-                                    }}>
-                                        Valid until {new Date(offer.validDate).toLocaleDateString('en-GB', { 
-                                            day: '2-digit', 
-                                            month: 'long', 
-                                            year: 'numeric' 
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div style={{
-                                        fontSize: '12px',
-                                        color: '#adb5bd',
-                                        fontStyle: 'italic'
-                                    }}>
-                                        No expiry date
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Status Indicator - Right Side */}
-                            <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'flex-end',
-                                gap: '4px',
-                                flexShrink: 0
-                            }}>
-                                <Badge 
-                                    bg={offer.isActive ? 'success' : 'danger'}
-                                    style={{
-                                        fontSize: '10px',
-                                        padding: '4px 8px',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {offer.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+            <NoDataFound
+                title="Exhibitor Not Found"
+                message="The exhibitor you're looking for doesn't exist or has been removed."
+                icon="fas fa-building-slash"
+                variant="warning"
+                size="medium"
+                showBackButton={true}
+                backButtonText="Back"
+                backButtonPath={`${EXHIBITOR_PATHS.LIST_EXHIBITORS}`}
+            />
         );
-    };
+    }
+
+    // Render flyers section
 
     // Render flyers section
     const renderFlyers = () => {
@@ -387,8 +182,8 @@ const ViewExhibitorPage = () => {
                 {exhibitor.flyers.map((flyer, index) => (
                     <Col md={4} lg={3} key={index} className="mb-3">
                         <Card style={{ cursor: 'pointer' }} onClick={() => handleFlyerImageClick(index)}>
-                            <Card.Img 
-                                variant="top" 
+                            <Card.Img
+                                variant="top"
                                 src={`${API_URL}/${flyer.flyer || flyer}`}
                                 style={{ height: '200px', objectFit: 'cover' }}
                                 onError={(e) => {
@@ -396,12 +191,14 @@ const ViewExhibitorPage = () => {
                                 }}
                             />
                             <Card.Body className="p-2">
-                                <div style={{ 
-                                    fontSize: '14px', 
-                                    fontWeight: 'bold', 
-                                    color: '#495057',
-                                    textAlign: 'center'
-                                }}>
+                                <div
+                                    style={{
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        color: '#495057',
+                                        textAlign: 'center'
+                                    }}
+                                >
                                     {flyer.name || `Flyer ${index + 1}`}
                                 </div>
                             </Card.Body>
@@ -423,8 +220,8 @@ const ViewExhibitorPage = () => {
                 {exhibitor.eventImages.map((eventImage, index) => (
                     <Col md={4} lg={3} key={index} className="mb-3">
                         <Card style={{ cursor: 'pointer' }} onClick={() => handleEventImageClick(index)}>
-                            <Card.Img 
-                                variant="top" 
+                            <Card.Img
+                                variant="top"
                                 src={`${API_URL}/${eventImage.eventImage || eventImage}`}
                                 style={{ height: '200px', objectFit: 'cover' }}
                                 onError={(e) => {
@@ -432,12 +229,14 @@ const ViewExhibitorPage = () => {
                                 }}
                             />
                             <Card.Body className="p-2">
-                                <div style={{ 
-                                    fontSize: '14px', 
-                                    fontWeight: 'bold', 
-                                    color: '#495057',
-                                    textAlign: 'center'
-                                }}>
+                                <div
+                                    style={{
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        color: '#495057',
+                                        textAlign: 'center'
+                                    }}
+                                >
                                     {eventImage.name || `Event Image ${index + 1}`}
                                 </div>
                             </Card.Body>
@@ -458,12 +257,16 @@ const ViewExhibitorPage = () => {
             <Row>
                 {exhibitor.boothBanner.map((banner, index) => {
                     // Handle both formats: {id, value} or direct string
-                    const bannerValue = typeof banner === 'object' && banner.value ? banner.value : (typeof banner === 'string' ? banner : banner.banner || '');
+                    const bannerValue =
+                        typeof banner === 'object' && banner.value
+                            ? banner.value
+                            : typeof banner === 'string'
+                            ? banner
+                            : banner.banner || '';
                     const isLink = bannerValue && (bannerValue.startsWith('http://') || bannerValue.startsWith('https://'));
-                    const isVideo = bannerValue && (bannerValue.includes('.mp4') || bannerValue.includes('.mpeg') || bannerValue.includes('.mov'));
-                    const bannerUrl = isLink 
-                        ? bannerValue 
-                        : `${API_URL}/${bannerValue.replace(/\\/g, '/')}`;
+                    const isVideo =
+                        bannerValue && (bannerValue.includes('.mp4') || bannerValue.includes('.mpeg') || bannerValue.includes('.mov'));
+                    const bannerUrl = isLink ? bannerValue : `${API_URL}/${bannerValue.replace(/\\/g, '/')}`;
 
                     return (
                         <Col md={4} lg={3} key={index} className="mb-3">
@@ -472,8 +275,8 @@ const ViewExhibitorPage = () => {
                                     <Card.Body className="text-center p-4">
                                         <i className="fas fa-link fa-3x text-primary mb-3"></i>
                                         <Card.Title className="h6">External Link</Card.Title>
-                                        <Button 
-                                            variant="outline-primary" 
+                                        <Button
+                                            variant="outline-primary"
                                             size="sm"
                                             href={bannerUrl}
                                             target="_blank"
@@ -494,26 +297,28 @@ const ViewExhibitorPage = () => {
                                             }}
                                         />
                                         <Card.Body className="p-2">
-                                            <div style={{ 
-                                                fontSize: '14px', 
-                                                fontWeight: 'bold', 
-                                                color: '#495057',
-                                                textAlign: 'center'
-                                            }}>
+                                            <div
+                                                style={{
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    color: '#495057',
+                                                    textAlign: 'center'
+                                                }}
+                                            >
                                                 Video {index + 1}
                                             </div>
                                         </Card.Body>
                                     </>
                                 ) : (
                                     <>
-                                        <Card.Img 
-                                            variant="top" 
+                                        <Card.Img
+                                            variant="top"
                                             src={bannerUrl}
                                             style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
                                             onClick={() => {
                                                 const bannerImages = exhibitor.boothBanner
-                                                    .map(b => typeof b === 'object' && b.value ? b.value : b)
-                                                    .filter(b => !b.startsWith('http'));
+                                                    .map((b) => (typeof b === 'object' && b.value ? b.value : b))
+                                                    .filter((b) => !b.startsWith('http'));
                                                 setCurrentImages(bannerImages);
                                                 setCurrentImageIndex(index);
                                                 setCurrentImageType('boothBanner');
@@ -524,12 +329,14 @@ const ViewExhibitorPage = () => {
                                             }}
                                         />
                                         <Card.Body className="p-2">
-                                            <div style={{ 
-                                                fontSize: '14px', 
-                                                fontWeight: 'bold', 
-                                                color: '#495057',
-                                                textAlign: 'center'
-                                            }}>
+                                            <div
+                                                style={{
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    color: '#495057',
+                                                    textAlign: 'center'
+                                                }}
+                                            >
                                                 Banner {index + 1}
                                             </div>
                                         </Card.Body>
@@ -552,8 +359,8 @@ const ViewExhibitorPage = () => {
         return (
             <div className="documents-list">
                 {exhibitor.documents.map((doc, index) => (
-                    <div 
-                        key={index} 
+                    <div
+                        key={index}
                         style={{
                             backgroundColor: '#f8f9fa',
                             border: '1px solid #e9ecef',
@@ -567,41 +374,47 @@ const ViewExhibitorPage = () => {
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {/* PDF Icon */}
-                            <div style={{
-                                backgroundColor: '#dc3545',
-                                borderRadius: '4px',
-                                padding: '8px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '32px',
-                                height: '32px'
-                            }}>
+                            <div
+                                style={{
+                                    backgroundColor: '#dc3545',
+                                    borderRadius: '4px',
+                                    padding: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minWidth: '32px',
+                                    height: '32px'
+                                }}
+                            >
                                 <i className="fas fa-file-pdf" style={{ color: 'white', fontSize: '14px' }}></i>
                             </div>
-                            
+
                             {/* Document Name */}
                             <div>
-                                <div style={{
-                                    fontSize: '14px',
-                                    fontWeight: '500',
-                                    color: '#212529',
-                                    marginBottom: '2px'
-                                }}>
+                                <div
+                                    style={{
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        color: '#212529',
+                                        marginBottom: '2px'
+                                    }}
+                                >
                                     {doc.name || `Document ${index + 1}`}
                                 </div>
-                                <div style={{
-                                    fontSize: '12px',
-                                    color: '#6c757d'
-                                }}>
+                                <div
+                                    style={{
+                                        fontSize: '12px',
+                                        color: '#6c757d'
+                                    }}
+                                >
                                     PDF Document
                                 </div>
                             </div>
                         </div>
-                        
+
                         {/* View Button */}
-                        <Button 
-                            variant="outline-primary" 
+                        <Button
+                            variant="outline-primary"
                             size="sm"
                             href={`${API_URL}/${doc.document || doc}`}
                             target="_blank"
@@ -803,42 +616,48 @@ const ViewExhibitorPage = () => {
         <div className="p-2 bg-light">
             {/* Header Section */}
             <div className="mb-4">
-                <div style={{ 
-                    backgroundColor: '#fff', 
-                    borderRadius: '8px', 
-                    padding: '20px', 
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    marginBottom: '24px',
-                    borderTop: '4px solid #3498db'
-                }}>
+                <div
+                    style={{
+                        backgroundColor: '#fff',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        marginBottom: '24px',
+                        borderTop: '4px solid #3498db'
+                    }}
+                >
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 style={{ 
-                                margin: 0, 
-                                color: '#2c3e50',
-                                fontWeight: '600'
-                            }}>
+                            <h4
+                                style={{
+                                    margin: 0,
+                                    color: '#2c3e50',
+                                    fontWeight: '600'
+                                }}
+                            >
                                 🏢 Exhibitor Profile
                             </h4>
-                            <p style={{ 
-                                margin: '8px 0 0 0', 
-                                color: '#6c757d',
-                                fontSize: '14px'
-                            }}>
+                            <p
+                                style={{
+                                    margin: '8px 0 0 0',
+                                    color: '#6c757d',
+                                    fontSize: '14px'
+                                }}
+                            >
                                 View detailed exhibitor information and related data
                             </p>
                         </div>
-                        <Button 
-                            variant="outline-secondary" 
+                        <Button
+                            variant="outline-secondary"
                             onClick={handleBack}
-                            style={{ 
+                            style={{
                                 borderRadius: '8px',
                                 padding: '8px 16px',
                                 border: '1px solid #dee2e6',
                                 fontWeight: '500'
                             }}
                         >
-                            <i className="fas fa-arrow-left me-2" style={{marginRight: '10px'}}></i>
+                            <i className="fas fa-arrow-left me-2" style={{ marginRight: '10px' }}></i>
                             Back
                         </Button>
                     </div>
@@ -847,40 +666,46 @@ const ViewExhibitorPage = () => {
 
             {/* Company Information & Details - Single Card with Logo */}
             <div className="mb-3">
-                <div style={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e9ecef', 
-                    borderLeft: '4px solid #3498db',
-                    borderRadius: '8px',
-                    padding: '20px'
-                }}>
-                    <h6 style={{
-                        color: '#495057',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        marginBottom: '20px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        borderBottom: '2px solid #3498db',
-                        paddingBottom: '8px'
-                    }}>
+                <div
+                    style={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderLeft: '4px solid #3498db',
+                        borderRadius: '8px',
+                        padding: '20px'
+                    }}
+                >
+                    <h6
+                        style={{
+                            color: '#495057',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            marginBottom: '20px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            borderBottom: '2px solid #3498db',
+                            paddingBottom: '8px'
+                        }}
+                    >
                         Company Information & Details
                     </h6>
-                    
+
                     <Row>
                         {/* Left Column - Logo */}
                         <Col lg={3} md={12} className="mb-3">
                             <div className="text-center">
-                                <div style={{ 
-                                    fontSize: '12px', 
-                                    fontWeight: '500', 
-                                    color: '#6c757d',
-                                    marginBottom: '10px'
-                                }}>
+                                <div
+                                    style={{
+                                        fontSize: '12px',
+                                        fontWeight: '500',
+                                        color: '#6c757d',
+                                        marginBottom: '10px'
+                                    }}
+                                >
                                     Company Logo
                                 </div>
                                 {exhibitor.logo ? (
-                                    <img 
+                                    <img
                                         src={`${API_URL}/${exhibitor.logo.replace(/\\/g, '/')}`}
                                         alt="Company Logo"
                                         style={{
@@ -904,19 +729,21 @@ const ViewExhibitorPage = () => {
                                         }}
                                     />
                                 ) : (
-                                    <div style={{
-                                        width: '140px',
-                                        height: '100px',
-                                        backgroundColor: '#f8f9fa',
-                                        borderRadius: '6px',
-                                        border: '1px dashed #ced4da',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto',
-                                        color: '#adb5bd',
-                                        fontSize: '11px'
-                                    }}>
+                                    <div
+                                        style={{
+                                            width: '140px',
+                                            height: '100px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '6px',
+                                            border: '1px dashed #ced4da',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            margin: '0 auto',
+                                            color: '#adb5bd',
+                                            fontSize: '11px'
+                                        }}
+                                    >
                                         <div style={{ textAlign: 'center' }}>
                                             <i className="fas fa-image mb-1" style={{ fontSize: '20px' }}></i>
                                             <br />
@@ -930,71 +757,111 @@ const ViewExhibitorPage = () => {
                         {/* Middle Column - Contact Information */}
                         <Col lg={4} md={12} className="mb-3">
                             <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Company Name:</span>
-                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.companyName}</span>
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>
+                                        Company Name:
+                                    </span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>
+                                        {exhibitor.companyName}
+                                    </span>
                                 </div>
-                                
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Email:</span>
-                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.email}</span>
+
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>
+                                        Email:
+                                    </span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>
+                                        {exhibitor.email}
+                                    </span>
                                 </div>
-                                
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Mobile:</span>
-                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{formatPhoneDisplay(exhibitor.mobile)}</span>
+
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>
+                                        Mobile:
+                                    </span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>
+                                        {formatPhoneDisplay(exhibitor.mobile)}
+                                    </span>
                                 </div>
-                                
+
                                 <div className="d-flex justify-content-between align-items-center py-2">
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>Created:</span>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>
+                                        Created:
+                                    </span>
                                     <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
                                         {new Date(exhibitor.createdAt).toLocaleDateString()}
                                     </span>
                                 </div>
-                                
-                              
                             </div>
                         </Col>
 
                         {/* Right Column - Company Details */}
                         <Col lg={5} md={12} className="mb-3">
                             <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Booth Number:</span>
-                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.bothNumber || 'Not provided'}</span>
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>
+                                        Booth Number:
+                                    </span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>
+                                        {exhibitor.bothNumber || 'Not provided'}
+                                    </span>
                                 </div>
 
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>UEN Number:</span>
-                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>{exhibitor.uen || 'Not provided'}</span>
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '100px', fontSize: '14px' }}>
+                                        UEN Number:
+                                    </span>
+                                    <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontWeight: 'bold', fontSize: '15px' }}>
+                                        {exhibitor.uen || 'Not provided'}
+                                    </span>
                                 </div>
-                                
-                                <div className="d-flex justify-content-between align-items-center mb-2 py-2" style={{
-                                    borderBottom: '1px solid #f1f1f1'
-                                }}>
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Status:</span>
-                                    <Badge 
-                                        bg={exhibitor.isActive ? 'success' : 'danger'} 
+
+                                <div
+                                    className="d-flex justify-content-between align-items-center mb-2 py-2"
+                                    style={{
+                                        borderBottom: '1px solid #f1f1f1'
+                                    }}
+                                >
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>
+                                        Status:
+                                    </span>
+                                    <Badge
+                                        bg={exhibitor.isActive ? 'success' : 'danger'}
                                         style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 'bold' }}
                                     >
                                         {exhibitor.isActive ? 'Active' : 'Inactive'}
                                     </Badge>
                                 </div>
 
-                      
-                                
                                 <div className="d-flex justify-content-between align-items-center py-2">
-                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>Last Updated:</span>
+                                    <span style={{ fontWeight: 'bold', color: '#495057', minWidth: '120px', fontSize: '14px' }}>
+                                        Last Updated:
+                                    </span>
                                     <span style={{ color: '#212529', textAlign: 'right', flex: 1, fontSize: '14px', fontWeight: 'bold' }}>
                                         {new Date(exhibitor.updatedAt).toLocaleDateString()}
                                     </span>
@@ -1006,94 +873,226 @@ const ViewExhibitorPage = () => {
                     {/* Company Description - Full Width Below */}
                     <Row className="mt-3">
                         <Col xs={12}>
-                            <div style={{ 
-                                borderTop: '1px solid #e9ecef',
-                                paddingTop: '15px'
-                            }}>
-                                <div style={{ 
-                                    fontWeight: 'bold', 
-                                    color: '#495057', 
-                                    marginBottom: '10px',
-                                    fontSize: '14px'
-                                }}>
-                                    Company Description:
-                                </div>
-                                <div style={{
-                                    color: exhibitor.companyDescription ? '#212529' : '#6c757d',
-                                    fontStyle: exhibitor.companyDescription ? 'normal' : 'italic',
-                                    fontSize: '14px',
-                                    lineHeight: '1.6',
-                                    padding: '12px',
-                                    backgroundColor: '#f8f9fa',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e9ecef',
-                                    fontWeight: exhibitor.companyDescription ? '400' : 'normal'
-                                }}>
-                                    {exhibitor.companyDescription || 'No description provided'}
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
-
-                    {/* Address - Full Width Below */}
-                    {exhibitor.address && (
-                        <Row className="mt-3">
-                            <Col xs={12}>
-                                <div style={{ 
+                            <div
+                                style={{
                                     borderTop: '1px solid #e9ecef',
                                     paddingTop: '15px'
-                                }}>
-                                    <div style={{ 
-                                        fontWeight: 'bold', 
-                                        color: '#495057', 
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontWeight: 'bold',
+                                        color: '#495057',
                                         marginBottom: '10px',
                                         fontSize: '14px'
-                                    }}>
-                                        Address:
-                                    </div>
-                                    <div style={{
-                                        color: '#212529',
+                                    }}
+                                >
+                                    Company Description:
+                                </div>
+                                <div
+                                    style={{
+                                        color: exhibitor.companyDescription ? '#212529' : '#6c757d',
+                                        fontStyle: exhibitor.companyDescription ? 'normal' : 'italic',
                                         fontSize: '14px',
                                         lineHeight: '1.6',
                                         padding: '12px',
                                         backgroundColor: '#f8f9fa',
                                         borderRadius: '6px',
                                         border: '1px solid #e9ecef',
-                                        fontWeight: '400'
-                                    }}>
-                                        {exhibitor.address}
+                                        fontWeight: exhibitor.companyDescription ? '400' : 'normal'
+                                    }}
+                                    dangerouslySetInnerHTML={{
+                                        __html: exhibitor.companyDescription || '<em>No description provided</em>'
+                                    }}
+                                />
+                            </div>
+                        </Col>
+                    </Row>
+
+                    {/* Website - Full Width Below */}
+                    {exhibitor.website && (
+                        <Row className="mt-3">
+                            <Col xs={12}>
+                                <div
+                                    style={{
+                                        borderTop: '1px solid #e9ecef',
+                                        paddingTop: '15px'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 'bold',
+                                            color: '#495057',
+                                            marginBottom: '10px',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        Website:
+                                    </div>
+                                    <div
+                                        style={{
+                                            color: '#212529',
+                                            fontSize: '14px',
+                                            lineHeight: '1.6',
+                                            padding: '12px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '6px',
+                                            border: '1px solid #e9ecef',
+                                            fontWeight: '400'
+                                        }}
+                                    >
+                                        <a
+                                            href={exhibitor.website.startsWith('http') ? exhibitor.website : `https://${exhibitor.website}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ color: '#007bff', textDecoration: 'none' }}
+                                        >
+                                            {exhibitor.website}
+                                            <i className="fas fa-external-link-alt ms-2" style={{ fontSize: '12px' }}></i>
+                                        </a>
                                     </div>
                                 </div>
                             </Col>
                         </Row>
                     )}
+
+                    {/* Social Media - Full Width Below */}
+                    {exhibitor.socialMedia && Array.isArray(exhibitor.socialMedia) && exhibitor.socialMedia.length > 0 && (
+                        <Row className="mt-3">
+                            <Col xs={12}>
+                                <div
+                                    style={{
+                                        borderTop: '1px solid #e9ecef',
+                                        paddingTop: '15px'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 'bold',
+                                            color: '#495057',
+                                            marginBottom: '15px',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        Social Media:
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            gap: '15px'
+                                        }}
+                                    >
+                                        {exhibitor.socialMedia.map((item, index) => {
+                                            if (!item.link) return null;
+
+                                            // Get icon based on platform name (case-insensitive)
+                                            const getPlatformIcon = (platform) => {
+                                                if (!platform) return 'fas fa-link';
+                                                const platformLower = platform.toLowerCase();
+                                                if (platformLower.includes('facebook')) return 'fab fa-facebook';
+                                                if (platformLower.includes('instagram')) return 'fab fa-instagram';
+                                                if (platformLower.includes('linkedin')) return 'fab fa-linkedin';
+                                                if (platformLower.includes('twitter')) return 'fab fa-twitter';
+                                                if (platformLower.includes('youtube')) return 'fab fa-youtube';
+                                                if (platformLower.includes('tiktok')) return 'fab fa-tiktok';
+                                                if (platformLower.includes('whatsapp')) return 'fab fa-whatsapp';
+                                                if (platformLower.includes('telegram')) return 'fab fa-telegram';
+                                                if (platformLower.includes('snapchat')) return 'fab fa-snapchat';
+                                                if (platformLower.includes('pinterest')) return 'fab fa-pinterest';
+                                                return 'fas fa-link';
+                                            };
+
+                                            const getPlatformColor = (platform) => {
+                                                if (!platform) return '#6c757d';
+                                                const platformLower = platform.toLowerCase();
+                                                if (platformLower.includes('facebook')) return '#1877f2';
+                                                if (platformLower.includes('instagram')) return '#e4405f';
+                                                if (platformLower.includes('linkedin')) return '#0077b5';
+                                                if (platformLower.includes('twitter')) return '#1da1f2';
+                                                if (platformLower.includes('youtube')) return '#ff0000';
+                                                if (platformLower.includes('tiktok')) return '#000000';
+                                                if (platformLower.includes('whatsapp')) return '#25d366';
+                                                if (platformLower.includes('telegram')) return '#0088cc';
+                                                if (platformLower.includes('snapchat')) return '#fffc00';
+                                                if (platformLower.includes('pinterest')) return '#bd081c';
+                                                return '#6c757d';
+                                            };
+
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        padding: '10px 15px',
+                                                        backgroundColor: '#f8f9fa',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid #e9ecef'
+                                                    }}
+                                                >
+                                                    {item.icon ? (
+                                                        <img
+                                                            src={
+                                                                item.icon.startsWith('http')
+                                                                    ? item.icon
+                                                                    : `${API_URL}/${item.icon.replace(/\\/g, '/')}`
+                                                            }
+                                                            alt={item.platform || 'Social Media'}
+                                                            style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextElementSibling.style.display = 'flex';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div
+                                                        style={{
+                                                            display: item.icon ? 'none' : 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                    >
+                                                        <i
+                                                            className={getPlatformIcon(item.platform)}
+                                                            style={{ fontSize: '20px', color: getPlatformColor(item.platform) }}
+                                                        ></i>
+                                                    </div>
+                                                    <a
+                                                        href={item.link.startsWith('http') ? item.link : `https://${item.link}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{ color: '#007bff', textDecoration: 'none', fontSize: '14px', gap: '8px' }}
+                                                    >
+                                                        {item.platform || 'Link'}
+                                                    </a>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </Col>
+                        </Row>
+                    )}
+
                 </div>
             </div>
 
             {/* Additional Resources Section */}
             <InfoCard title="Additional Resources" icon="📁" borderColor="#e74c3c">
-                <Tab.Container defaultActiveKey="offers">
-                    <Nav variant="pills" className="mb-4" style={{ 
-                        borderBottom: '2px solid #e74c3c',
-                        paddingBottom: '12px',
-                        gap: '15px'
-                    }}>
+                <Tab.Container defaultActiveKey="flyers">
+                    <Nav
+                        variant="pills"
+                        className="mb-4"
+                        style={{
+                            borderBottom: '2px solid #e74c3c',
+                            paddingBottom: '12px',
+                            gap: '15px'
+                        }}
+                    >
                         <Nav.Item>
-                            <Nav.Link 
-                                eventKey="offers"
-                                style={{
-                                    borderRadius: '8px',
-                                    fontWeight: '500',
-                                    border: '1px solid #dee2e6',
-                                    fontSize: '14px',
-                                    padding: '8px 16px'
-                                }}
-                            >
-                                🎁 Promotional Offers ({exhibitor.promotionalOffers?.length || 0})
-                            </Nav.Link>
-                        </Nav.Item>
-                        <Nav.Item>
-                            <Nav.Link 
+                            <Nav.Link
                                 eventKey="flyers"
                                 style={{
                                     borderRadius: '8px',
@@ -1107,7 +1106,7 @@ const ViewExhibitorPage = () => {
                             </Nav.Link>
                         </Nav.Item>
                         <Nav.Item>
-                            <Nav.Link 
+                            <Nav.Link
                                 eventKey="images"
                                 style={{
                                     borderRadius: '8px',
@@ -1121,7 +1120,7 @@ const ViewExhibitorPage = () => {
                             </Nav.Link>
                         </Nav.Item>
                         <Nav.Item>
-                            <Nav.Link 
+                            <Nav.Link
                                 eventKey="documents"
                                 style={{
                                     borderRadius: '8px',
@@ -1136,7 +1135,7 @@ const ViewExhibitorPage = () => {
                         </Nav.Item>
                         {exhibitor.boothBanner && exhibitor.boothBanner.length > 0 && (
                             <Nav.Item>
-                                <Nav.Link 
+                                <Nav.Link
                                     eventKey="boothBanner"
                                     style={{
                                         borderRadius: '8px',
@@ -1152,7 +1151,7 @@ const ViewExhibitorPage = () => {
                         )}
                         {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
                             <Nav.Item>
-                                <Nav.Link 
+                                <Nav.Link
                                     eventKey="eventStaff"
                                     style={{
                                         borderRadius: '8px',
@@ -1169,72 +1168,71 @@ const ViewExhibitorPage = () => {
                     </Nav>
 
                     <Tab.Content style={{ marginTop: '20px' }}>
-                        <Tab.Pane eventKey="offers">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                {renderPromotionalOffers()}
-                            </div>
-                        </Tab.Pane>
                         <Tab.Pane eventKey="flyers">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                {renderFlyers()}
-                            </div>
-                        </Tab.Pane>
-                        <Tab.Pane eventKey="images">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                {renderEventImages()}
-                            </div>
-                        </Tab.Pane>
-                        <Tab.Pane eventKey="documents">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                {renderDocuments()}
-                            </div>
-                        </Tab.Pane>
-                        {exhibitor.boothBanner && exhibitor.boothBanner.length > 0 && (
-                            <Tab.Pane eventKey="boothBanner">
-                                <div style={{
+                            <div
+                                style={{
                                     backgroundColor: '#fff',
                                     padding: '20px',
                                     borderRadius: '8px',
                                     border: '1px solid #e9ecef',
                                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                }}>
+                                }}
+                            >
+                                {renderFlyers()}
+                            </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="images">
+                            <div
+                                style={{
+                                    backgroundColor: '#fff',
+                                    padding: '20px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                {renderEventImages()}
+                            </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="documents">
+                            <div
+                                style={{
+                                    backgroundColor: '#fff',
+                                    padding: '20px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                {renderDocuments()}
+                            </div>
+                        </Tab.Pane>
+                        {exhibitor.boothBanner && exhibitor.boothBanner.length > 0 && (
+                            <Tab.Pane eventKey="boothBanner">
+                                <div
+                                    style={{
+                                        backgroundColor: '#fff',
+                                        padding: '20px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e9ecef',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}
+                                >
                                     {renderBoothBanner()}
                                 </div>
                             </Tab.Pane>
                         )}
                         {exhibitor.eventStaff && exhibitor.eventStaff.length > 0 && (
                             <Tab.Pane eventKey="eventStaff">
-                                <div style={{
-                                    backgroundColor: '#fff',
-                                    padding: '20px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e9ecef',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                }}>
+                                <div
+                                    style={{
+                                        backgroundColor: '#fff',
+                                        padding: '20px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e9ecef',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}
+                                >
                                     <p className="text-muted mb-3" style={{ fontSize: '14px' }}>
                                         Users who have switched to exhibitor role for this company using booth code.
                                     </p>

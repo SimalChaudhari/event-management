@@ -10,7 +10,6 @@ import {
     SETTINGS_LOADING,
     WITHDRAW_LOADING,
     AUTH_LOADING,
-    PROMOTIONAL_OFFER_LOADING,
     ENGAGEMENT_LOADING,
     PROGRAMME_LOADING,
     PUSH_NOTIFICATION_LOADING,
@@ -81,13 +80,6 @@ const loadingReducer = (state = initialState, { type, payload } = {}) => {
             };
             break;
 
-        case PROMOTIONAL_OFFER_LOADING:
-            newState = {
-                ...state,
-                promotionalOffer: payload
-            };
-            break;
-        
         case BANNER_LOADING:
             newState = {
                 ...state,

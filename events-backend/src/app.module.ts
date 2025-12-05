@@ -26,7 +26,6 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { CategoryModule } from 'category/category.module';
 import { GalleryModule } from 'gallery/gallery.module';
 import { ExhibitorModule } from 'exhibitor/exhibitor.module';
-import { PromotionalOfferModule } from 'promotional-offer/promotional-offer.module';
 import { SurveyModule } from 'survey/survey.module';
 import { ErrorHandlerService } from './utils/services/error-handler.service';
 import { LoggerService } from './utils/services/logger.service';
@@ -70,7 +69,6 @@ import { JwtAuthModule } from './jwt/jwt-auth.module';
     GalleryModule,
     
     ExhibitorModule,
-    PromotionalOfferModule,
     SurveyModule,
     QnaModule,
     PollingModule,

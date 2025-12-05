@@ -276,7 +276,6 @@ export class RegisterEventService {
           .leftJoinAndSelect('event.galleries', 'galleries')
           .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitors')
           .leftJoinAndSelect('eventExhibitors.exhibitor', 'exhibitor')
-          .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers')
           .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners')
           .leftJoinAndSelect('event.programmeTracks', 'programmeTracks')
           .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions')
@@ -510,7 +509,6 @@ export class RegisterEventService {
                       const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
                       const exhibitorData = {
                         ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                        promotionalOffers: ee.exhibitor?.promotionalOffers || [],
                       };
 
                       // Get Event Staff for this exhibitor - show to all users
@@ -711,7 +709,6 @@ export class RegisterEventService {
           'event.galleries',
           'event.eventExhibitors',
           'event.eventExhibitors.exhibitor',
-          'event.eventExhibitors.exhibitor.promotionalOffers',
           'event.eventExhibitors.exhibitor.boothBanners',
           'event.programmeTracks',
           'event.programmeTracks.sessions',
@@ -797,7 +794,6 @@ export class RegisterEventService {
           ?.map((ee) => {
             return {
               ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-              promotionalOffers: ee.exhibitor.promotionalOffers || [],
             };
           }) || [];
 

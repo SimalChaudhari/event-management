@@ -61,7 +61,7 @@ export class ExhibitorService {
       
       const full = await this.exhibitorRepository.findOne({
         where: { id: savedExhibitor.id },
-        relations: ['promotionalOffers', 'boothBanners']
+        relations: ['boothBanners']
       });
 
       return full || savedExhibitor;
@@ -97,7 +97,7 @@ export class ExhibitorService {
         // Get exhibitors associated with this event
         const eventExhibitors = await eventExhibitorRepository.find({
           where: { eventId },
-          relations: ['exhibitor', 'exhibitor.promotionalOffers', 'exhibitor.boothBanners'],
+          relations: ['exhibitor', 'exhibitor.boothBanners'],
         });
 
         // Extract exhibitor data and format with promotional offers and event staff
@@ -122,7 +122,7 @@ export class ExhibitorService {
 
               return {
                 ...basicInfo,
-                promotionalOffers: exhibitor.promotionalOffers || [],
+              
                 eventStaff: formattedEventStaff,
               };
             })
@@ -133,7 +133,7 @@ export class ExhibitorService {
 
       // If no eventId, return all exhibitors
       const exhibitors = await this.exhibitorRepository.find({
-        relations: ['promotionalOffers', 'boothBanners'],
+        relations: ['boothBanners'],
       });
       
       // Get Event Staff repository
@@ -156,7 +156,7 @@ export class ExhibitorService {
 
           return {
             ...basicInfo,
-            promotionalOffers: exhibitor.promotionalOffers || [],
+            
             eventStaff: formattedEventStaff,
           };
         })
@@ -175,7 +175,7 @@ export class ExhibitorService {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({ 
         where: { id },
-        relations: ['promotionalOffers', 'boothBanners'],
+        relations: ['boothBanners'],
       });
       
       if (!exhibitor) {
@@ -199,7 +199,7 @@ export class ExhibitorService {
 
       return {
         ...basicExhibitorInfo,
-        promotionalOffers: exhibitor.promotionalOffers || [],
+     
         eventStaff: formattedEventStaff,
       };
     } catch (error) {
@@ -294,7 +294,7 @@ export class ExhibitorService {
       
       const full = await this.exhibitorRepository.findOne({
         where: { id: savedExhibitor.id },
-        relations: ['promotionalOffers', 'boothBanners']
+        relations: ['boothBanners']
       });
 
       return full || savedExhibitor;
@@ -568,7 +568,6 @@ export class ExhibitorService {
         if (userEmail) {
           exhibitor = await this.exhibitorRepository.findOne({
             where: { email: userEmail },
-            relations: ['promotionalOffers'],
           });
         }
         
@@ -586,7 +585,6 @@ export class ExhibitorService {
             // Get the first exhibitor (or we could get all, but for exhibitor role, usually one)
             exhibitor = await this.exhibitorRepository.findOne({
               where: { id: exhibitorIds[0] },
-              relations: ['promotionalOffers'],
             });
           }
         }
@@ -603,7 +601,6 @@ export class ExhibitorService {
       // If Admin, show all exhibitors
       else {
         exhibitors = await this.exhibitorRepository.find({
-          relations: ['promotionalOffers'],
         });
       }
 
@@ -659,7 +656,6 @@ export class ExhibitorService {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({
         where: { id },
-        relations: ['promotionalOffers'],
       });
 
       if (!exhibitor) {

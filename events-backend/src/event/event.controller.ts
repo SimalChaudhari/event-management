@@ -201,7 +201,6 @@ export class EventController {
         if (result.metadata.totalSpeakers !== undefined) metadata.totalSpeakers = result.metadata.totalSpeakers;
         if (result.metadata.totalCategories !== undefined) metadata.totalCategories = result.metadata.totalCategories;
         if (result.metadata.totalExhibitors !== undefined) metadata.totalExhibitors = result.metadata.totalExhibitors;
-        if (result.metadata.totalPromotionalOffers !== undefined) metadata.totalPromotionalOffers = result.metadata.totalPromotionalOffers;
         if (result.metadata.totalSurveySessions !== undefined) metadata.totalSurveySessions = result.metadata.totalSurveySessions;
         if (result.metadata.totalMatches !== undefined) metadata.totalMatches = result.metadata.totalMatches;
       }
@@ -213,7 +212,6 @@ export class EventController {
         ...(filteredResult.speakers && { speakers: filteredResult.speakers }),
         ...(filteredResult.categories && { categories: filteredResult.categories }),
         ...(filteredResult.exhibitors && { exhibitors: filteredResult.exhibitors }),
-        ...(filteredResult.promotionalOffers && { promotionalOffers: filteredResult.promotionalOffers }),
         ...(filteredResult.surveySessions && { surveySessions: filteredResult.surveySessions }),
         ...(filteredResult.filter && { filter: filteredResult.filter }),
         metadata: metadata,

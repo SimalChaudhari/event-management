@@ -114,7 +114,6 @@ export class FavoriteEventService {
       .leftJoinAndSelect('eventCategory.category', 'category')
       .leftJoinAndSelect('event.eventExhibitors', 'eventExhibitor') // Add exhibitors
       .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor') // Add exhibitor details
-      .leftJoinAndSelect('exhibitor.promotionalOffers', 'promotionalOffers') // Add promotional offers
       .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners') // Add booth banners
       .leftJoinAndSelect('event.programmeTracks', 'programmeTracks') // Add programme tracks
       .leftJoinAndSelect('programmeTracks.sessions', 'programmeSessions') // Add programme sessions
@@ -261,7 +260,6 @@ export class FavoriteEventService {
                     const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
                     const exhibitorData = {
                       ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                      promotionalOffers: ee.exhibitor.promotionalOffers || [],
                     };
 
                     // Get Event Staff for this exhibitor - show to all users

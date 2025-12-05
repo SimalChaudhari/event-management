@@ -70,7 +70,7 @@ export const createExhibitor = (data) => async (dispatch) => {
             let createdExhibitor = response.data?.data;
             
             // If response doesn't have full exhibitor details, fetch it
-            if (createdExhibitor?.id && (!createdExhibitor.promotionalOffers)) {
+            if (createdExhibitor?.id) {
                 const exhibitorId = createdExhibitor.id;
                 const exhibitorResponse = await axiosInstance.get(`/exhibitors/${exhibitorId}`);
                 createdExhibitor = exhibitorResponse.data?.data || exhibitorResponse.data;
@@ -157,21 +157,5 @@ export const deleteExhibitor = (id) => async (dispatch) => {
 };
 
 // Fetch promotional offers
-export const fetchPromotional = () => async (dispatch) => {
-    try {
-        setLoading(dispatch, true);
-        const response = await axiosInstance.get('/promotional-offers');
-        dispatch({
-            type: FETCH_PROMOTIONAL_OFFERS,
-            payload: response.data
-        });
-        return response.data;
-    } catch (error) {
-        const errorMessage = error?.response?.data?.message || 'Failed to fetch promotional offers';
 
-        toast.error(errorMessage);
-        return false;
-    } finally {
-        setLoading(dispatch, false);
-    }
-};
+
