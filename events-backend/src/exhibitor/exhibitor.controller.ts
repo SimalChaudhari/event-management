@@ -110,9 +110,76 @@ export class ExhibitorController {
           });
         }
         
-        // Apply other processed files
-        const { boothBanner, ...otherFiles } = fileProcessing.processedFiles;
+        // Handle flyers - ensure all have unique IDs
+        if (fileProcessing.processedFiles.flyers) {
+          const flyersWithIds = fileProcessing.processedFiles.flyers.map((flyer: { name: string; flyer: string }) => ({
+            ...flyer,
+            id: uuidv4(), // Always generate unique ID for new flyers
+          }));
+          exhibitorDto.flyers = flyersWithIds;
+        }
+        
+        // Handle documents - ensure all have unique IDs
+        if (fileProcessing.processedFiles.documents) {
+          const documentsWithIds = fileProcessing.processedFiles.documents.map((doc: { name: string; document: string }) => ({
+            ...doc,
+            id: uuidv4(), // Always generate unique ID for new documents
+          }));
+          exhibitorDto.documents = documentsWithIds;
+        }
+
+        // Handle event images - ensure all have unique IDs
+        if (fileProcessing.processedFiles.eventImages) {
+          const eventImagesWithIds = fileProcessing.processedFiles.eventImages.map((img: { name: string; eventImage: string }) => ({
+            ...img,
+            id: uuidv4(), // Always generate unique ID for new event images
+          }));
+          exhibitorDto.eventImages = eventImagesWithIds;
+        }
+        
+        // Apply other processed files (excluding boothBanner, flyers, documents, eventImages which are handled above)
+        const { boothBanner, flyers, documents, eventImages, ...otherFiles } = fileProcessing.processedFiles;
         Object.assign(exhibitorDto, otherFiles);
+      }
+      
+      // Ensure existing flyers in DTO also have IDs (if provided without file upload)
+      if (exhibitorDto.flyers && exhibitorDto.flyers.length > 0) {
+        exhibitorDto.flyers = exhibitorDto.flyers.map((flyer: any) => ({
+          ...flyer,
+          id: flyer.id || uuidv4(), // Generate ID if missing
+        }));
+      }
+
+      // Ensure existing documents in DTO also have IDs (if provided without file upload)
+      if (exhibitorDto.documents && exhibitorDto.documents.length > 0) {
+        exhibitorDto.documents = exhibitorDto.documents.map((doc: any) => ({
+          ...doc,
+          id: doc.id || uuidv4(), // Generate ID if missing
+        }));
+      }
+
+      // Ensure existing event images in DTO also have IDs (if provided without file upload)
+      if (exhibitorDto.eventImages && exhibitorDto.eventImages.length > 0) {
+        exhibitorDto.eventImages = exhibitorDto.eventImages.map((img: any) => ({
+          ...img,
+          id: img.id || uuidv4(), // Generate ID if missing
+        }));
+      }
+
+      // Ensure existing documents in DTO also have IDs (if provided without file upload)
+      if (exhibitorDto.documents && exhibitorDto.documents.length > 0) {
+        exhibitorDto.documents = exhibitorDto.documents.map((doc: any) => ({
+          ...doc,
+          id: doc.id || uuidv4(), // Generate ID if missing
+        }));
+      }
+
+      // Ensure existing event images in DTO also have IDs (if provided without file upload)
+      if (exhibitorDto.eventImages && exhibitorDto.eventImages.length > 0) {
+        exhibitorDto.eventImages = exhibitorDto.eventImages.map((img: any) => ({
+          ...img,
+          id: img.id || uuidv4(), // Generate ID if missing
+        }));
       }
 
       const exhibitor = await this.exhibitorService.createExhibitor(exhibitorDto);
@@ -367,57 +434,96 @@ export class ExhibitorController {
         throw new BadRequestException(`File validation failed: ${fileProcessing.errors?.join(', ')}`);
       }
 
+      // Get existing exhibitor to preserve existing flyers
+      const existingExhibitor = await this.exhibitorService.getExhibitorEntityById(id);
+
       // Handle combining existing and new files
       if (fileProcessing.processedFiles) {
         // Handle flyers - combine existing and new
         if (fileProcessing.processedFiles.flyers) {
           const allFlyers = [];
           
-          // Add existing flyers
-          if (exhibitorDto.originalFlyers) {
-            const originalFlyers = Array.isArray(exhibitorDto.originalFlyers) 
-              ? exhibitorDto.originalFlyers 
-              : [exhibitorDto.originalFlyers];
-            allFlyers.push(...originalFlyers);
+          // Add existing flyers from database (preserve all existing flyers)
+          if (existingExhibitor.flyers && existingExhibitor.flyers.length > 0) {
+            // Ensure existing flyers have IDs
+            const existingFlyersWithIds = existingExhibitor.flyers.map(flyer => ({
+              ...flyer,
+              id: flyer.id || uuidv4(), // Generate ID if missing
+            }));
+            allFlyers.push(...existingFlyersWithIds);
           }
           
-          // Add new flyers
-          allFlyers.push(...fileProcessing.processedFiles.flyers);
+          // Add new flyers with generated IDs
+          const newFlyers = fileProcessing.processedFiles.flyers.map((flyer: { name: string; flyer: string }) => ({
+            ...flyer,
+            id: uuidv4(), // Generate unique ID for new flyers
+          }));
+          allFlyers.push(...newFlyers);
           exhibitorDto.flyers = allFlyers;
         }
 
         // Handle documents - combine existing and new
         if (fileProcessing.processedFiles.documents) {
-          const allDocuments = [];
+          const allDocuments: Array<{ id: string; name: string; document: string }> = [];
           
-          // Add existing documents
-          if (exhibitorDto.originalDocuments) {
-            const originalDocuments = Array.isArray(exhibitorDto.originalDocuments) 
-              ? exhibitorDto.originalDocuments 
-              : [exhibitorDto.originalDocuments];
-            allDocuments.push(...originalDocuments);
+          // Add existing documents from database (preserve all existing documents)
+          if (existingExhibitor.documents && existingExhibitor.documents.length > 0) {
+            // Ensure existing documents have IDs (required field)
+            const existingDocumentsWithIds = existingExhibitor.documents.map(doc => ({
+              name: doc.name,
+              document: doc.document,
+              id: doc.id || uuidv4(), // Generate ID if missing (should always have ID)
+            }));
+            allDocuments.push(...existingDocumentsWithIds);
           }
           
-          // Add new documents
-          allDocuments.push(...fileProcessing.processedFiles.documents);
+          // Add new documents with generated IDs (always required)
+          const newDocuments: Array<{ id: string; name: string; document: string }> = fileProcessing.processedFiles.documents.map((doc: { name: string; document: string }) => ({
+            name: doc.name,
+            document: doc.document,
+            id: uuidv4(), // Always generate unique ID for new documents
+          }));
+          allDocuments.push(...newDocuments);
           exhibitorDto.documents = allDocuments;
+        } else if (exhibitorDto.documents && exhibitorDto.documents.length > 0) {
+          // If documents are provided in DTO without file upload, ensure they have IDs
+          exhibitorDto.documents = exhibitorDto.documents.map((doc: any) => ({
+            name: doc.name,
+            document: doc.document,
+            id: doc.id || uuidv4(), // Generate ID if missing
+          }));
         }
 
         // Handle event images - combine existing and new
         if (fileProcessing.processedFiles.eventImages) {
-          const allEventImages = [];
+          const allEventImages: Array<{ id: string; name: string; eventImage: string }> = [];
           
-          // Add existing event images
-          if (exhibitorDto.originalEventImages) {
-            const originalEventImages = Array.isArray(exhibitorDto.originalEventImages) 
-              ? exhibitorDto.originalEventImages 
-              : [exhibitorDto.originalEventImages];
-            allEventImages.push(...originalEventImages);
+          // Add existing event images from database (preserve all existing event images)
+          if (existingExhibitor.eventImages && existingExhibitor.eventImages.length > 0) {
+            // Ensure existing event images have IDs (required field)
+            const existingEventImagesWithIds = existingExhibitor.eventImages.map(img => ({
+              name: img.name,
+              eventImage: img.eventImage,
+              id: img.id || uuidv4(), // Generate ID if missing (should always have ID)
+            }));
+            allEventImages.push(...existingEventImagesWithIds);
           }
           
-          // Add new event images
-          allEventImages.push(...fileProcessing.processedFiles.eventImages);
+          // Add new event images with generated IDs (always required)
+          const newEventImages: Array<{ id: string; name: string; eventImage: string }> = fileProcessing.processedFiles.eventImages.map((img: { name: string; eventImage: string }) => ({
+            name: img.name,
+            eventImage: img.eventImage,
+            id: uuidv4(), // Always generate unique ID for new event images
+          }));
+          allEventImages.push(...newEventImages);
           exhibitorDto.eventImages = allEventImages;
+        } else if (exhibitorDto.eventImages && exhibitorDto.eventImages.length > 0) {
+          // If event images are provided in DTO without file upload, ensure they have IDs
+          exhibitorDto.eventImages = exhibitorDto.eventImages.map((img: any) => ({
+            name: img.name,
+            eventImage: img.eventImage,
+            id: img.id || uuidv4(), // Generate ID if missing
+          }));
         }
 
         // Handle logo
@@ -533,37 +639,49 @@ export class ExhibitorController {
   }
 
   /**
-   * Remove individual flyer from exhibitor
+   * Remove individual flyer from exhibitor by flyer ID
    * Access: Admin and Exhibitor users only
    */
   @Delete('flyers/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   async removeExhibitorFlyer(
-    @Param('id') id: string,
-    @Body() body: { flyerPath: string },
+    @Param('id') exhibitorId: string,
+    @Body() body: { flyerId: string },
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const exhibitor = await this.exhibitorService.getExhibitorEntityById(id);
-      const { flyerPath } = body;
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      const { flyerId } = body;
 
-      if (!exhibitor.flyers || !exhibitor.flyers.some(flyer => flyer.flyer === flyerPath)) {
-        throw new ResourceNotFoundException('Flyer', 'in this exhibitor');
+      if (!flyerId) {
+        throw new BadRequestException('flyerId is required');
+      }
+
+      // Find flyer by ID
+      if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
+        throw new ResourceNotFoundException('Flyer', flyerId);
+      }
+
+      const flyerToRemove = exhibitor.flyers.find(flyer => flyer.id === flyerId);
+      
+      if (!flyerToRemove) {
+        throw new ResourceNotFoundException('Flyer', flyerId);
       }
 
       // Remove flyer from filesystem
-      const fullPath = path.join(__dirname, '..', '..', flyerPath);
+      const fullPath = path.join(__dirname, '..', '..', flyerToRemove.flyer);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
 
-      const updatedFlyers = exhibitor.flyers.filter(flyer => flyer.flyer !== flyerPath);
-      await this.exhibitorService.updateExhibitorFlyers(id, updatedFlyers);
+      // Remove flyer from array by ID
+      const updatedFlyers = exhibitor.flyers.filter(flyer => flyer.id !== flyerId);
+      await this.exhibitorService.updateExhibitorFlyers(exhibitorId, updatedFlyers);
 
       // Get updated exhibitor
-      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(exhibitorId);
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -582,37 +700,49 @@ export class ExhibitorController {
   }
 
   /**
-   * Remove individual document from exhibitor
+   * Remove individual document from exhibitor by document ID
    * Access: Admin and Exhibitor users only
    */
   @Delete('documents/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   async removeExhibitorDocument(
-    @Param('id') id: string,
-    @Body() body: { documentPath: string },
+    @Param('id') exhibitorId: string,
+    @Body() body: { documentId: string },
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const exhibitor = await this.exhibitorService.getExhibitorEntityById(id);
-      const { documentPath } = body;
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      const { documentId } = body;
 
-      if (!exhibitor.documents || !exhibitor.documents.some(doc => doc.document === documentPath)) {
-        throw new ResourceNotFoundException('Document', 'in this exhibitor');
+      if (!documentId) {
+        throw new BadRequestException('documentId is required');
+      }
+
+      // Find document by ID
+      if (!exhibitor.documents || exhibitor.documents.length === 0) {
+        throw new ResourceNotFoundException('Document', documentId);
+      }
+
+      const documentToRemove = exhibitor.documents.find(doc => doc.id === documentId);
+      
+      if (!documentToRemove) {
+        throw new ResourceNotFoundException('Document', documentId);
       }
 
       // Remove document from filesystem
-      const fullPath = path.join(__dirname, '..', '..', documentPath);
+      const fullPath = path.join(__dirname, '..', '..', documentToRemove.document);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
 
-      const updatedDocuments = exhibitor.documents.filter(doc => doc.document !== documentPath);
-      await this.exhibitorService.updateExhibitorDocuments(id, updatedDocuments);
+      // Remove document from array by ID
+      const updatedDocuments = exhibitor.documents.filter(doc => doc.id !== documentId);
+      await this.exhibitorService.updateExhibitorDocuments(exhibitorId, updatedDocuments);
 
       // Get updated exhibitor
-      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(exhibitorId);
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -631,37 +761,49 @@ export class ExhibitorController {
   }
 
   /**
-   * Remove individual event image from exhibitor
+   * Remove individual event image from exhibitor by event image ID
    * Access: Admin and Exhibitor users only
    */
   @Delete('eventImages/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   async removeExhibitorEventImage(
-    @Param('id') id: string,
-    @Body() body: { eventImagePath: string },
+    @Param('id') exhibitorId: string,
+    @Body() body: { eventImageId: string },
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const exhibitor = await this.exhibitorService.getExhibitorEntityById(id);
-      const { eventImagePath } = body;
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      const { eventImageId } = body;
 
-      if (!exhibitor.eventImages || !exhibitor.eventImages.some(image => image.eventImage === eventImagePath)) {
-        throw new ResourceNotFoundException('Event image', 'in this exhibitor');
+      if (!eventImageId) {
+        throw new BadRequestException('eventImageId is required');
+      }
+
+      // Find event image by ID
+      if (!exhibitor.eventImages || exhibitor.eventImages.length === 0) {
+        throw new ResourceNotFoundException('Event image', eventImageId);
+      }
+
+      const eventImageToRemove = exhibitor.eventImages.find(img => img.id === eventImageId);
+      
+      if (!eventImageToRemove) {
+        throw new ResourceNotFoundException('Event image', eventImageId);
       }
 
       // Remove event image from filesystem
-      const fullPath = path.join(__dirname, '..', '..', eventImagePath);
+      const fullPath = path.join(__dirname, '..', '..', eventImageToRemove.eventImage);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
 
-      const updatedEventImages = exhibitor.eventImages.filter(image => image.eventImage !== eventImagePath);
-      await this.exhibitorService.updateExhibitorEventImages(id, updatedEventImages);
+      // Remove event image from array by ID
+      const updatedEventImages = exhibitor.eventImages.filter(img => img.id !== eventImageId);
+      await this.exhibitorService.updateExhibitorEventImages(exhibitorId, updatedEventImages);
 
       // Get updated exhibitor
-      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(exhibitorId);
 
       const successResponse: SuccessResponse = {
         success: true,
@@ -731,6 +873,264 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Booth banner item removal', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download single flyer by ID
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('flyers/:exhibitorId/:flyerId/download')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadFlyer(
+    @Param('exhibitorId') exhibitorId: string,
+    @Param('flyerId') flyerId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
+        throw new ResourceNotFoundException('Flyer', flyerId);
+      }
+
+      const flyer = exhibitor.flyers.find(f => f.id === flyerId);
+      if (!flyer) {
+        throw new ResourceNotFoundException('Flyer', flyerId);
+      }
+
+      const filePath = path.join(__dirname, '..', '..', flyer.flyer);
+      if (!fs.existsSync(filePath)) {
+        throw new ResourceNotFoundException('Flyer file', flyer.flyer);
+      }
+
+      const fileName = path.basename(flyer.flyer);
+      response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(flyer.name || fileName)}"`);
+      response.setHeader('Content-Type', 'application/octet-stream');
+      
+      return response.sendFile(path.resolve(filePath));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Flyer download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download all flyers as ZIP
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('flyers/:exhibitorId/download-all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadAllFlyers(
+    @Param('exhibitorId') exhibitorId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const archiver = require('archiver');
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
+        throw new BadRequestException('No flyers found to download');
+      }
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      response.attachment(`exhibitor-${exhibitorId}-flyers.zip`);
+      archive.pipe(response);
+
+      let addedFiles = 0;
+      for (const flyer of exhibitor.flyers) {
+        const filePath = path.join(__dirname, '..', '..', flyer.flyer);
+        if (fs.existsSync(filePath)) {
+          const fileName = flyer.name || path.basename(flyer.flyer);
+          archive.file(filePath, { name: fileName });
+          addedFiles++;
+        }
+      }
+
+      if (addedFiles === 0) {
+        throw new BadRequestException('No valid flyer files found to download');
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      this.errorHandler.logError(error, 'All flyers download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download single document by ID
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('documents/:exhibitorId/:documentId/download')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadDocument(
+    @Param('exhibitorId') exhibitorId: string,
+    @Param('documentId') documentId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.documents || exhibitor.documents.length === 0) {
+        throw new ResourceNotFoundException('Document', documentId);
+      }
+
+      const document = exhibitor.documents.find(d => d.id === documentId);
+      if (!document) {
+        throw new ResourceNotFoundException('Document', documentId);
+      }
+
+      const filePath = path.join(__dirname, '..', '..', document.document);
+      if (!fs.existsSync(filePath)) {
+        throw new ResourceNotFoundException('Document file', document.document);
+      }
+
+      const fileName = path.basename(document.document);
+      response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.name || fileName)}"`);
+      response.setHeader('Content-Type', 'application/octet-stream');
+      
+      return response.sendFile(path.resolve(filePath));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Document download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download all documents as ZIP
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('documents/:exhibitorId/download-all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadAllDocuments(
+    @Param('exhibitorId') exhibitorId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const archiver = require('archiver');
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.documents || exhibitor.documents.length === 0) {
+        throw new BadRequestException('No documents found to download');
+      }
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      response.attachment(`exhibitor-${exhibitorId}-documents.zip`);
+      archive.pipe(response);
+
+      let addedFiles = 0;
+      for (const document of exhibitor.documents) {
+        const filePath = path.join(__dirname, '..', '..', document.document);
+        if (fs.existsSync(filePath)) {
+          const fileName = document.name || path.basename(document.document);
+          archive.file(filePath, { name: fileName });
+          addedFiles++;
+        }
+      }
+
+      if (addedFiles === 0) {
+        throw new BadRequestException('No valid document files found to download');
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      this.errorHandler.logError(error, 'All documents download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download single event image by ID
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('eventImages/:exhibitorId/:eventImageId/download')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadEventImage(
+    @Param('exhibitorId') exhibitorId: string,
+    @Param('eventImageId') eventImageId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.eventImages || exhibitor.eventImages.length === 0) {
+        throw new ResourceNotFoundException('Event image', eventImageId);
+      }
+
+      const eventImage = exhibitor.eventImages.find(img => img.id === eventImageId);
+      if (!eventImage) {
+        throw new ResourceNotFoundException('Event image', eventImageId);
+      }
+
+      const filePath = path.join(__dirname, '..', '..', eventImage.eventImage);
+      if (!fs.existsSync(filePath)) {
+        throw new ResourceNotFoundException('Event image file', eventImage.eventImage);
+      }
+
+      const fileName = path.basename(eventImage.eventImage);
+      response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(eventImage.name || fileName)}"`);
+      response.setHeader('Content-Type', 'application/octet-stream');
+      
+      return response.sendFile(path.resolve(filePath));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event image download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Download all event images as ZIP
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('eventImages/:exhibitorId/download-all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadAllEventImages(
+    @Param('exhibitorId') exhibitorId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const archiver = require('archiver');
+      const exhibitor = await this.exhibitorService.getExhibitorEntityById(exhibitorId);
+      
+      if (!exhibitor.eventImages || exhibitor.eventImages.length === 0) {
+        throw new BadRequestException('No event images found to download');
+      }
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      response.attachment(`exhibitor-${exhibitorId}-event-images.zip`);
+      archive.pipe(response);
+
+      let addedFiles = 0;
+      for (const eventImage of exhibitor.eventImages) {
+        const filePath = path.join(__dirname, '..', '..', eventImage.eventImage);
+        if (fs.existsSync(filePath)) {
+          const fileName = eventImage.name || path.basename(eventImage.eventImage);
+          archive.file(filePath, { name: fileName });
+          addedFiles++;
+        }
+      }
+
+      if (addedFiles === 0) {
+        throw new BadRequestException('No valid event image files found to download');
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      this.errorHandler.logError(error, 'All event images download', req.user?.id);
       throw error;
     }
   }

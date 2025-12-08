@@ -2,12 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Row, Col, Card, Badge, Button, Tab, Nav, Alert, Container, Modal } from 'react-bootstrap';
-import { exhibitorById } from '../../store/actions/exhibitorsActions';
+import { 
+    exhibitorById, 
+    deleteExhibitorFlyer, 
+    deleteExhibitorDocument, 
+    deleteExhibitorEventImage,
+    downloadFlyer,
+    downloadAllFlyers,
+    downloadDocument,
+    downloadAllDocuments,
+    downloadEventImage,
+    downloadAllEventImages
+} from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import EventStaffComponent from '../../components/events/EventStaffComponent';
+import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
@@ -23,6 +35,18 @@ const ViewExhibitorPage = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [currentImageType, setCurrentImageType] = useState('');
     const [currentImages, setCurrentImages] = useState([]);
+
+    // Confirmation modal states
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [confirmMessage, setConfirmMessage] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    
+    // Store delete parameters
+    const [deleteParams, setDeleteParams] = useState({ type: null, id: null });
+    
+    // Track active tab to preserve it after deletion
+    const [activeTab, setActiveTab] = useState('flyers');
 
     useEffect(() => {
         if (id) {
@@ -171,6 +195,77 @@ const ViewExhibitorPage = () => {
 
     // Render flyers section
 
+    // Handle delete flyer
+    const handleDeleteFlyer = (flyerId, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isDeleting || showConfirmModal) return; // Prevent multiple clicks
+        
+        setConfirmMessage('Are you sure you want to delete this flyer?');
+        setDeleteParams({ type: 'flyer', id: flyerId });
+        setConfirmAction(null); // Clear any previous action
+        setShowConfirmModal(true);
+    };
+
+    // Handle delete document
+    const handleDeleteDocument = (documentId, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isDeleting || showConfirmModal) return; // Prevent multiple clicks
+        
+        setConfirmMessage('Are you sure you want to delete this document?');
+        setDeleteParams({ type: 'document', id: documentId });
+        setConfirmAction(null); // Clear any previous action
+        setShowConfirmModal(true);
+    };
+
+    // Handle delete event image
+    const handleDeleteEventImage = (eventImageId, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isDeleting || showConfirmModal) return; // Prevent multiple clicks
+        
+        setConfirmMessage('Are you sure you want to delete this event image?');
+        setDeleteParams({ type: 'eventImage', id: eventImageId });
+        setConfirmAction(null); // Clear any previous action
+        setShowConfirmModal(true);
+    };
+
+    // Handle confirmation - ONLY called when user clicks Delete button
+    const handleConfirm = async () => {
+        if (isDeleting || !deleteParams.type || !deleteParams.id) return;
+        
+        setIsDeleting(true);
+        try {
+            // Execute delete based on type - ONLY happens here
+            if (deleteParams.type === 'flyer') {
+                await dispatch(deleteExhibitorFlyer(id, deleteParams.id));
+            } else if (deleteParams.type === 'document') {
+                await dispatch(deleteExhibitorDocument(id, deleteParams.id));
+            } else if (deleteParams.type === 'eventImage') {
+                await dispatch(deleteExhibitorEventImage(id, deleteParams.id));
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+        } finally {
+            setIsDeleting(false);
+            setShowConfirmModal(false);
+            setConfirmAction(null);
+            setConfirmMessage('');
+            setDeleteParams({ type: null, id: null });
+        }
+    };
+
+    // Handle cancel
+    const handleCancel = () => {
+        if (!isDeleting) {
+            setShowConfirmModal(false);
+            setConfirmAction(null);
+            setConfirmMessage('');
+            setDeleteParams({ type: null, id: null });
+        }
+    };
+
     // Render flyers section
     const renderFlyers = () => {
         if (!exhibitor.flyers || exhibitor.flyers.length === 0) {
@@ -178,34 +273,90 @@ const ViewExhibitorPage = () => {
         }
 
         return (
-            <Row>
-                {exhibitor.flyers.map((flyer, index) => (
-                    <Col md={4} lg={3} key={index} className="mb-3">
-                        <Card style={{ cursor: 'pointer' }} onClick={() => handleFlyerImageClick(index)}>
-                            <Card.Img
-                                variant="top"
-                                src={`${API_URL}/${flyer.flyer || flyer}`}
-                                style={{ height: '200px', objectFit: 'cover' }}
-                                onError={(e) => {
-                                    e.target.src = '/assets/images/placeholder.jpg';
-                                }}
-                            />
-                            <Card.Body className="p-2">
-                                <div
-                                    style={{
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        color: '#495057',
-                                        textAlign: 'center'
-                                    }}
-                                >
-                                    {flyer.name || `Flyer ${index + 1}`}
+            <div>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 style={{ margin: 0 }}>Flyers ({exhibitor.flyers.length})</h6>
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => downloadAllFlyers(id)}
+                        style={{ fontSize: '12px' }}
+                    >
+                        <i className="fas fa-download me-1"></i>
+                        Download All (ZIP)
+                    </Button>
+                </div>
+                <Row>
+                    {exhibitor.flyers.map((flyer, index) => (
+                        <Col md={4} lg={3} key={flyer.id || index} className="mb-3">
+                            <Card>
+                                <div style={{ position: 'relative' }}>
+                                    <Card.Img
+                                        variant="top"
+                                        src={`${API_URL}/${flyer.flyer || flyer}`}
+                                        style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                                        onClick={() => handleFlyerImageClick(index)}
+                                        onError={(e) => {
+                                            e.target.src = '/assets/images/placeholder.jpg';
+                                        }}
+                                    />
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '8px',
+                                            right: '8px',
+                                            display: 'flex',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <Button
+                                            variant="light"
+                                            size="sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                downloadFlyer(id, flyer.id);
+                                            }}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px'
+                                            }}
+                                            title="Download"
+                                        >
+                                            <i className="fas fa-download"></i>
+                                        </Button>
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={(e) => handleDeleteFlyer(flyer.id, e)}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px'
+                                            }}
+                                            title="Delete"
+                                        >
+                                            <i className="fas fa-trash"></i>
+                                        </Button>
+                                    </div>
                                 </div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
+                                <Card.Body className="p-2">
+                                    <div
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            color: '#495057',
+                                            textAlign: 'center'
+                                        }}
+                                    >
+                                        {flyer.name || `Flyer ${index + 1}`}
+                                    </div>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
+            </div>
         );
     };
 
@@ -216,34 +367,90 @@ const ViewExhibitorPage = () => {
         }
 
         return (
-            <Row>
-                {exhibitor.eventImages.map((eventImage, index) => (
-                    <Col md={4} lg={3} key={index} className="mb-3">
-                        <Card style={{ cursor: 'pointer' }} onClick={() => handleEventImageClick(index)}>
-                            <Card.Img
-                                variant="top"
-                                src={`${API_URL}/${eventImage.eventImage || eventImage}`}
-                                style={{ height: '200px', objectFit: 'cover' }}
-                                onError={(e) => {
-                                    e.target.src = '/assets/images/placeholder.jpg';
-                                }}
-                            />
-                            <Card.Body className="p-2">
-                                <div
-                                    style={{
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        color: '#495057',
-                                        textAlign: 'center'
-                                    }}
-                                >
-                                    {eventImage.name || `Event Image ${index + 1}`}
+            <div>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 style={{ margin: 0 }}>Event Images ({exhibitor.eventImages.length})</h6>
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => downloadAllEventImages(id)}
+                        style={{ fontSize: '12px' }}
+                    >
+                        <i className="fas fa-download me-1"></i>
+                        Download All (ZIP)
+                    </Button>
+                </div>
+                <Row>
+                    {exhibitor.eventImages.map((eventImage, index) => (
+                        <Col md={4} lg={3} key={eventImage.id || index} className="mb-3">
+                            <Card>
+                                <div style={{ position: 'relative' }}>
+                                    <Card.Img
+                                        variant="top"
+                                        src={`${API_URL}/${eventImage.eventImage || eventImage}`}
+                                        style={{ height: '200px', objectFit: 'cover', cursor: 'pointer' }}
+                                        onClick={() => handleEventImageClick(index)}
+                                        onError={(e) => {
+                                            e.target.src = '/assets/images/placeholder.jpg';
+                                        }}
+                                    />
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '8px',
+                                            right: '8px',
+                                            display: 'flex',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <Button
+                                            variant="light"
+                                            size="sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                downloadEventImage(id, eventImage.id);
+                                            }}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px'
+                                            }}
+                                            title="Download"
+                                        >
+                                            <i className="fas fa-download"></i>
+                                        </Button>
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={(e) => handleDeleteEventImage(eventImage.id, e)}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px'
+                                            }}
+                                            title="Delete"
+                                        >
+                                            <i className="fas fa-trash"></i>
+                                        </Button>
+                                    </div>
                                 </div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
+                                <Card.Body className="p-2">
+                                    <div
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: 'bold',
+                                            color: '#495057',
+                                            textAlign: 'center'
+                                        }}
+                                    >
+                                        {eventImage.name || `Event Image ${index + 1}`}
+                                    </div>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
+            </div>
         );
     };
 
@@ -357,80 +564,123 @@ const ViewExhibitorPage = () => {
         }
 
         return (
-            <div className="documents-list">
-                {exhibitor.documents.map((doc, index) => (
-                    <div
-                        key={index}
-                        style={{
-                            backgroundColor: '#f8f9fa',
-                            border: '1px solid #e9ecef',
-                            borderRadius: '8px',
-                            padding: '12px 16px',
-                            marginBottom: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                        }}
+            <div>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 style={{ margin: 0 }}>Documents ({exhibitor.documents.length})</h6>
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => downloadAllDocuments(id)}
+                        style={{ fontSize: '12px' }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {/* PDF Icon */}
-                            <div
-                                style={{
-                                    backgroundColor: '#dc3545',
-                                    borderRadius: '4px',
-                                    padding: '8px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minWidth: '32px',
-                                    height: '32px'
-                                }}
-                            >
-                                <i className="fas fa-file-pdf" style={{ color: 'white', fontSize: '14px' }}></i>
-                            </div>
-
-                            {/* Document Name */}
-                            <div>
-                                <div
-                                    style={{
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        color: '#212529',
-                                        marginBottom: '2px'
-                                    }}
-                                >
-                                    {doc.name || `Document ${index + 1}`}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: '12px',
-                                        color: '#6c757d'
-                                    }}
-                                >
-                                    PDF Document
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* View Button */}
-                        <Button
-                            variant="outline-primary"
-                            size="sm"
-                            href={`${API_URL}/${doc.document || doc}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <i className="fas fa-download me-1"></i>
+                        Download All (ZIP)
+                    </Button>
+                </div>
+                <div className="documents-list">
+                    {exhibitor.documents.map((doc, index) => (
+                        <div
+                            key={doc.id || index}
                             style={{
-                                fontSize: '12px',
-                                padding: '6px 12px',
-                                borderRadius: '20px',
-                                fontWeight: '500'
+                                backgroundColor: '#f8f9fa',
+                                border: '1px solid #e9ecef',
+                                borderRadius: '8px',
+                                padding: '12px 16px',
+                                marginBottom: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
                             }}
                         >
-                            <i className="fas fa-eye" style={{ marginRight: '6px' }}></i>
-                            View
-                        </Button>
-                    </div>
-                ))}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {/* PDF Icon */}
+                                <div
+                                    style={{
+                                        backgroundColor: '#dc3545',
+                                        borderRadius: '4px',
+                                        padding: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        minWidth: '32px',
+                                        height: '32px'
+                                    }}
+                                >
+                                    <i className="fas fa-file-pdf" style={{ color: 'white', fontSize: '14px' }}></i>
+                                </div>
+
+                                {/* Document Name */}
+                                <div>
+                                    <div
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            color: '#212529',
+                                            marginBottom: '2px'
+                                        }}
+                                    >
+                                        {doc.name || `Document ${index + 1}`}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: '12px',
+                                            color: '#6c757d'
+                                        }}
+                                    >
+                                        PDF Document
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => downloadDocument(id, doc.id)}
+                                    style={{
+                                        fontSize: '12px',
+                                        padding: '6px 12px',
+                                        borderRadius: '20px',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
+                                    Download
+                                </Button>
+                                <Button
+                                    variant="outline-info"
+                                    size="sm"
+                                    href={`${API_URL}/${doc.document || doc}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        fontSize: '12px',
+                                        padding: '6px 12px',
+                                        borderRadius: '20px',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <i className="fas fa-eye" style={{ marginRight: '6px' }}></i>
+                                    View
+                                </Button>
+                                <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={(e) => handleDeleteDocument(doc.id, e)}
+                                    style={{
+                                        fontSize: '12px',
+                                        padding: '6px 12px',
+                                        borderRadius: '20px',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <i className="fas fa-trash"></i>
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     };
@@ -1081,7 +1331,7 @@ const ViewExhibitorPage = () => {
 
             {/* Additional Resources Section */}
             <InfoCard title="Additional Resources" icon="📁" borderColor="#e74c3c">
-                <Tab.Container defaultActiveKey="flyers">
+                <Tab.Container activeKey={activeTab} onSelect={setActiveTab}>
                     <Nav
                         variant="pills"
                         className="mb-4"
@@ -1246,6 +1496,16 @@ const ViewExhibitorPage = () => {
 
             {/* Image Zoom Modal */}
             {renderImageModal()}
+
+            {/* Confirmation Modal */}
+            <DeleteConfirmationModal
+                show={showConfirmModal}
+                onHide={handleCancel}
+                onConfirm={handleConfirm}
+                title="Confirm Delete"
+                message={confirmMessage}
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

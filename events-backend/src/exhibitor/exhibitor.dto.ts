@@ -1,6 +1,10 @@
 import { IsNotEmpty, IsString, IsOptional, IsArray, IsBoolean, IsEmail, IsObject } from 'class-validator';
 
 export class FlyerDto {
+  @IsOptional()
+  @IsString()
+  id?: string; // Unique ID for easy removal
+
   @IsNotEmpty()
   @IsString()
   name!: string;
@@ -11,6 +15,10 @@ export class FlyerDto {
 }
 
 export class DocumentDto {
+  @IsOptional()
+  @IsString()
+  id?: string; // Unique ID for easy removal (auto-generated)
+
   @IsNotEmpty()
   @IsString()
   name!: string;
@@ -21,6 +29,10 @@ export class DocumentDto {
 }
 
 export class EventImageDto {
+  @IsOptional()
+  @IsString()
+  id?: string; // Unique ID for easy removal (auto-generated)
+
   @IsNotEmpty()
   @IsString()
   name!: string;

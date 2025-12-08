@@ -124,11 +124,35 @@ export class UserService {
 
       // Apply search filter
       if (search) {
-        const searchTerm = `%${search.toLowerCase()}%`;
-        queryBuilder.andWhere(
-          '(LOWER(user.firstName) LIKE :searchTerm OR LOWER(user.lastName) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm OR LOWER(user.company) LIKE :searchTerm OR LOWER(user.designation) LIKE :searchTerm)',
-          { searchTerm },
-        );
+        const searchLower = search.toLowerCase().trim();
+        const searchWords = searchLower.split(/\s+/).filter(word => word.length > 0);
+        
+        // Remove duplicate words while preserving order
+        const uniqueWords = Array.from(new Set(searchWords));
+        
+        if (uniqueWords.length > 1) {
+          // Multiple words: each word must match in any field
+          const conditions: string[] = [];
+          const params: any = {};
+          
+          uniqueWords.forEach((word, index) => {
+            const wordParam = `searchWord${index}`;
+            params[wordParam] = `%${word}%`;
+            conditions.push(
+              `(LOWER(user.firstName) LIKE :${wordParam} OR LOWER(user.lastName) LIKE :${wordParam} OR LOWER(user.email) LIKE :${wordParam} OR LOWER(user.mobile) LIKE :${wordParam})`
+            );
+          });
+          
+          // All words must match (AND condition)
+          queryBuilder.andWhere(`(${conditions.join(' AND ')})`, params);
+        } else {
+          // Single word: search in all fields
+          const searchTerm = `%${uniqueWords[0]}%`;
+          queryBuilder.andWhere(
+            '(LOWER(user.firstName) LIKE :searchTerm OR LOWER(user.lastName) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm OR LOWER(user.mobile) LIKE :searchTerm)',
+            { searchTerm },
+          );
+        }
       }
 
       // Apply sorting

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Modal, Button } from 'react-bootstrap';
 
-const DeleteConfirmationModal = ({ show, onHide, onConfirm, title = 'Confirm Delete', isLoading = false }) => {
+const DeleteConfirmationModal = ({ show, onHide, onConfirm, title = 'Confirm Delete', message, isLoading = false }) => {
     if (!show) return null;
+
+    const defaultMessage = 'Are you sure you want to delete?';
 
     return (
         <div
@@ -25,21 +27,32 @@ const DeleteConfirmationModal = ({ show, onHide, onConfirm, title = 'Confirm Del
                 <Modal.Dialog>
                     <Modal.Header>
                         <Modal.Title>{title}</Modal.Title>
-                        <button type="button" onClick={onHide} class="close" aria-label="Close">
+                        <button type="button" onClick={onHide} className="close" aria-label="Close" disabled={isLoading}>
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </Modal.Header>
                     <Modal.Body>
-                        Are you sure you want to delete?
-                        <br />
-                        <span className="text-danger">This action cannot be undone.</span>
+                        {message || defaultMessage}
+                        {!message && (
+                            <>
+                                <br />
+                                <span className="text-danger">This action cannot be undone.</span>
+                            </>
+                        )}
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={onHide} disabled={isLoading}>
                             Cancel
                         </Button>
                         <Button variant="danger" onClick={onConfirm} disabled={isLoading}>
-                            {isLoading ? 'Deleting...' : 'Delete'}
+                            {isLoading ? (
+                                <>
+                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete'
+                            )}
                         </Button>
                     </Modal.Footer>
                 </Modal.Dialog>

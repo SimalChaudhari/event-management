@@ -74,17 +74,17 @@ export class Exhibitor {
   @Column({ type: 'text', nullable: true })
   promotionalOfferNote?: string;
 
-  // Updated flyers structure - array of objects with name and flyer
+  // Updated flyers structure - array of objects with id (required), name and flyer
   @Column({ type: 'text', nullable: true, transformer: fileArrayTransformer })
-  flyers?: Array<{ name: string; flyer: string }>;
+  flyers?: Array<{ id: string; name: string; flyer: string }>;
 
-  // Updated documents structure - array of objects with name and document
+  // Updated documents structure - array of objects with id (required), name and document
   @Column({ type: 'text', nullable: true, transformer: documentArrayTransformer })
-  documents?: Array<{ name: string; document: string }>;
+  documents?: Array<{ id: string; name: string; document: string }>;
 
-  // Updated event images structure - array of objects with name and eventImage
+  // Updated event images structure - array of objects with id (required), name and eventImage
   @Column({ type: 'text', nullable: true, transformer: eventImageArrayTransformer })
-  eventImages?: Array<{ name: string; eventImage: string }>;
+  eventImages?: Array<{ id: string; name: string; eventImage: string }>;
 
   // Event relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.exhibitor)

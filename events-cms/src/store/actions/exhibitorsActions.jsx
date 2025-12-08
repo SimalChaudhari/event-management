@@ -156,6 +156,228 @@ export const deleteExhibitor = (id) => async (dispatch) => {
     }
 };
 
+// Delete flyer by ID
+export const deleteExhibitorFlyer = (exhibitorId, flyerId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/exhibitors/flyers/${exhibitorId}`, {
+            data: { flyerId }
+        });
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success(response.data.message || 'Flyer deleted successfully!');
+            // Reload exhibitor data to get updated flyers
+            await dispatch(exhibitorById(exhibitorId));
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete flyer';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Delete document by ID
+export const deleteExhibitorDocument = (exhibitorId, documentId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/exhibitors/documents/${exhibitorId}`, {
+            data: { documentId }
+        });
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success(response.data.message || 'Document deleted successfully!');
+            // Reload exhibitor data to get updated documents
+            await dispatch(exhibitorById(exhibitorId));
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete document';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Delete event image by ID
+export const deleteExhibitorEventImage = (exhibitorId, eventImageId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/exhibitors/eventImages/${exhibitorId}`, {
+            data: { eventImageId }
+        });
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success(response.data.message || 'Event image deleted successfully!');
+            // Reload exhibitor data to get updated event images
+            await dispatch(exhibitorById(exhibitorId));
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete event image';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Download single flyer
+export const downloadFlyer = async (exhibitorId, flyerId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/flyers/${exhibitorId}/${flyerId}/download`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `flyer-${flyerId}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Flyer downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download flyer';
+        toast.error(errorMessage);
+    }
+};
+
+// Download all flyers as ZIP
+export const downloadAllFlyers = async (exhibitorId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/flyers/${exhibitorId}/download-all`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `exhibitor-${exhibitorId}-flyers.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Flyers downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download flyers';
+        toast.error(errorMessage);
+    }
+};
+
+// Download single document
+export const downloadDocument = async (exhibitorId, documentId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/documents/${exhibitorId}/${documentId}/download`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `document-${documentId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Document downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download document';
+        toast.error(errorMessage);
+    }
+};
+
+// Download all documents as ZIP
+export const downloadAllDocuments = async (exhibitorId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/documents/${exhibitorId}/download-all`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `exhibitor-${exhibitorId}-documents.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Documents downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download documents';
+        toast.error(errorMessage);
+    }
+};
+
+// Download single event image
+export const downloadEventImage = async (exhibitorId, eventImageId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/eventImages/${exhibitorId}/${eventImageId}/download`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `event-image-${eventImageId}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Event image downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download event image';
+        toast.error(errorMessage);
+    }
+};
+
+// Download all event images as ZIP
+export const downloadAllEventImages = async (exhibitorId) => {
+    try {
+        const response = await axiosInstance.get(
+            `/exhibitors/eventImages/${exhibitorId}/download-all`,
+            {
+                responseType: 'blob'
+            }
+        );
+        if (response.status === 200) {
+            const blob = new Blob([response.data]);
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `exhibitor-${exhibitorId}-event-images.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Event images downloaded successfully');
+        }
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to download event images';
+        toast.error(errorMessage);
+    }
+};
+
 // Fetch promotional offers
 
 

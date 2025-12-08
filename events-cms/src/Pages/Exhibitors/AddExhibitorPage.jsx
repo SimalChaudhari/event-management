@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Badge, Container, Modal } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createExhibitor, updateExhibitor, exhibitorById } from '../../store/actions/exhibitorsActions';
+import { 
+    createExhibitor, 
+    updateExhibitor, 
+    exhibitorById,
+    deleteExhibitorFlyer,
+    deleteExhibitorDocument,
+    deleteExhibitorEventImage
+} from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
@@ -226,6 +233,11 @@ function AddExhibitorPage() {
     const [eventImageNames, setEventImageNames] = useState([]);
     const [documentNames, setDocumentNames] = useState([]);
 
+    // Store existing files with IDs (for deletion when editing)
+    const [existingFlyers, setExistingFlyers] = useState([]);
+    const [existingDocuments, setExistingDocuments] = useState([]);
+    const [existingEventImages, setExistingEventImages] = useState([]);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -248,7 +260,9 @@ function AddExhibitorPage() {
                         if (editData.flyers) {
                             if (Array.isArray(editData.flyers)) {
                                 if (editData.flyers.length > 0 && editData.flyers[0].hasOwnProperty('name')) {
-                                    // New format: array of objects with name and flyer
+                                    // New format: array of objects with id, name and flyer
+                                    // Store existing flyers with IDs for deletion
+                                    setExistingFlyers(editData.flyers.filter(f => f.id));
                                     flyersData = editData.flyers.map((flyer) => flyer.flyer);
                                     flyerNamesData = editData.flyers.map((flyer) => flyer.name);
                                     flyerPreviewUrls = editData.flyers.map((flyer) => {
@@ -259,6 +273,7 @@ function AddExhibitorPage() {
                                     });
                                 } else {
                                     // Old format: array of flyer paths only
+                                    setExistingFlyers([]);
                                     flyersData = editData.flyers;
                                     flyerNamesData = editData.flyers.map((flyer, index) => `Flyer ${index + 1}`);
                                     flyerPreviewUrls = editData.flyers.map((flyer) => {
@@ -279,6 +294,8 @@ function AddExhibitorPage() {
                         if (editData.eventImages) {
                             if (Array.isArray(editData.eventImages)) {
                                 if (editData.eventImages.length > 0 && editData.eventImages[0].hasOwnProperty('name')) {
+                                    // Store existing event images with IDs for deletion
+                                    setExistingEventImages(editData.eventImages.filter(img => img.id));
                                     eventImagesData = editData.eventImages.map((eventImage) => eventImage.eventImage);
                                     eventImageNamesData = editData.eventImages.map((eventImage) => eventImage.name);
                                     eventImagePreviewUrls = editData.eventImages.map((eventImage) => {
@@ -288,6 +305,7 @@ function AddExhibitorPage() {
                                         return `${API_URL}/${eventImage.eventImage.replace(/\\/g, '/')}`;
                                     });
                                 } else {
+                                    setExistingEventImages([]);
                                     eventImagesData = editData.eventImages;
                                     eventImageNamesData = editData.eventImages.map((eventImage, index) => `Event Image ${index + 1}`);
                                     eventImagePreviewUrls = editData.eventImages.map((eventImage) => {
@@ -308,6 +326,8 @@ function AddExhibitorPage() {
                         if (editData.documents) {
                             if (Array.isArray(editData.documents)) {
                                 if (editData.documents.length > 0 && editData.documents[0].hasOwnProperty('name')) {
+                                    // Store existing documents with IDs for deletion
+                                    setExistingDocuments(editData.documents.filter(doc => doc.id));
                                     documentsData = editData.documents.map((doc) => doc.document);
                                     documentNamesData = editData.documents.map((doc) => doc.name);
                                     documentPreviewUrls = editData.documents.map((doc) => {
@@ -317,6 +337,7 @@ function AddExhibitorPage() {
                                         return `${API_URL}/${doc.document.replace(/\\/g, '/')}`;
                                     });
                                 } else {
+                                    setExistingDocuments([]);
                                     documentsData = editData.documents;
                                     documentNamesData = editData.documents.map((doc, index) => `Document ${index + 1}`);
                                     documentPreviewUrls = editData.documents.map((doc) => {
@@ -591,7 +612,23 @@ function AddExhibitorPage() {
     };
 
     // Remove functions 
-    const handleRemoveFlyer = (indexToRemove) => {
+    const handleRemoveFlyer = async (indexToRemove) => {
+        // Check if this is an existing file (has ID) - only in edit mode
+        if (id && existingFlyers.length > 0) {
+            const flyerPath = formData.flyers[indexToRemove];
+            const existingFlyer = existingFlyers.find(f => f.flyer === flyerPath);
+            
+            if (existingFlyer && existingFlyer.id) {
+                // Delete from database using API
+                const deleted = await dispatch(deleteExhibitorFlyer(id, existingFlyer.id));
+                if (deleted) {
+                    // Remove from existing flyers list
+                    setExistingFlyers(prev => prev.filter(f => f.id !== existingFlyer.id));
+                }
+            }
+        }
+
+        // Remove from local state
         setFormData((prev) => ({
             ...prev,
             flyers: prev.flyers.filter((_, index) => index !== indexToRemove)
@@ -607,7 +644,23 @@ function AddExhibitorPage() {
         }));
     };
 
-    const handleRemoveEventImage = (indexToRemove) => {
+    const handleRemoveEventImage = async (indexToRemove) => {
+        // Check if this is an existing file (has ID) - only in edit mode
+        if (id && existingEventImages.length > 0) {
+            const eventImagePath = formData.eventImages[indexToRemove];
+            const existingEventImage = existingEventImages.find(img => img.eventImage === eventImagePath);
+            
+            if (existingEventImage && existingEventImage.id) {
+                // Delete from database using API
+                const deleted = await dispatch(deleteExhibitorEventImage(id, existingEventImage.id));
+                if (deleted) {
+                    // Remove from existing event images list
+                    setExistingEventImages(prev => prev.filter(img => img.id !== existingEventImage.id));
+                }
+            }
+        }
+
+        // Remove from local state
         setFormData((prev) => ({
             ...prev,
             eventImages: prev.eventImages.filter((_, index) => index !== indexToRemove)
@@ -623,7 +676,23 @@ function AddExhibitorPage() {
         }));
     };
 
-    const handleRemoveDocument = (indexToRemove) => {
+    const handleRemoveDocument = async (indexToRemove) => {
+        // Check if this is an existing file (has ID) - only in edit mode
+        if (id && existingDocuments.length > 0) {
+            const documentPath = formData.documents[indexToRemove];
+            const existingDocument = existingDocuments.find(doc => doc.document === documentPath);
+            
+            if (existingDocument && existingDocument.id) {
+                // Delete from database using API
+                const deleted = await dispatch(deleteExhibitorDocument(id, existingDocument.id));
+                if (deleted) {
+                    // Remove from existing documents list
+                    setExistingDocuments(prev => prev.filter(doc => doc.id !== existingDocument.id));
+                }
+            }
+        }
+
+        // Remove from local state
         setFormData((prev) => ({
             ...prev,
             documents: prev.documents.filter((_, index) => index !== indexToRemove)

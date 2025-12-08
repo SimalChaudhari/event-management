@@ -40,6 +40,16 @@ export class ExhibitorService {
       const boothBannersToSave = exhibitorDto.boothBanner;
       delete exhibitorDto.boothBanner; // Remove from DTO to avoid saving to exhibitor table
 
+      // Ensure all flyers have unique IDs (required field)
+      if (exhibitorDto.flyers && exhibitorDto.flyers.length > 0) {
+        const { v4: uuidv4 } = require('uuid');
+        exhibitorDto.flyers = exhibitorDto.flyers.map((flyer: any) => ({
+          name: flyer.name,
+          flyer: flyer.flyer,
+          id: flyer.id || uuidv4(), // Always ensure ID exists
+        }));
+      }
+
       const exhibitor = this.exhibitorRepository.create(exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(exhibitor);
       
@@ -329,7 +339,7 @@ export class ExhibitorService {
 
   async updateExhibitorFlyers(
     id: string,
-    flyers: Array<{ name: string; flyer: string }>,
+    flyers: Array<{ id?: string; name: string; flyer: string }>,
   ): Promise<Partial<Exhibitor>> {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
@@ -337,7 +347,15 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
 
-      exhibitor.flyers = flyers;
+      // Always generate unique IDs for all flyers (required field)
+      const { v4: uuidv4 } = require('uuid');
+      const flyersWithIds: Array<{ id: string; name: string; flyer: string }> = flyers.map(flyer => ({
+        name: flyer.name,
+        flyer: flyer.flyer,
+        id: flyer.id || uuidv4(), // Always ensure ID exists (generate if not provided)
+      }));
+
+      exhibitor.flyers = flyersWithIds;
       return await this.exhibitorRepository.save(exhibitor);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -349,7 +367,7 @@ export class ExhibitorService {
 
   async updateExhibitorDocuments(
     id: string,
-    documents: Array<{ name: string; document: string }>,
+    documents: Array<{ id?: string; name: string; document: string }>,
   ): Promise<Partial<Exhibitor>> {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
@@ -357,7 +375,15 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
 
-      exhibitor.documents = documents;
+      // Always generate unique IDs for all documents (required field)
+      const { v4: uuidv4 } = require('uuid');
+      const documentsWithIds: Array<{ id: string; name: string; document: string }> = documents.map(doc => ({
+        name: doc.name,
+        document: doc.document,
+        id: doc.id || uuidv4(), // Always ensure ID exists (generate if not provided)
+      }));
+
+      exhibitor.documents = documentsWithIds;
       return await this.exhibitorRepository.save(exhibitor);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -525,7 +551,7 @@ export class ExhibitorService {
 
   async updateExhibitorEventImages(
     id: string,
-    eventImages: Array<{ name: string; eventImage: string }>,
+    eventImages: Array<{ id?: string; name: string; eventImage: string }>,
   ): Promise<Partial<Exhibitor>> {
     try {
       const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
@@ -533,7 +559,15 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
 
-      exhibitor.eventImages = eventImages;
+      // Always generate unique IDs for all event images (required field)
+      const { v4: uuidv4 } = require('uuid');
+      const eventImagesWithIds: Array<{ id: string; name: string; eventImage: string }> = eventImages.map(img => ({
+        name: img.name,
+        eventImage: img.eventImage,
+        id: img.id || uuidv4(), // Always ensure ID exists (generate if not provided)
+      }));
+
+      exhibitor.eventImages = eventImagesWithIds;
       return await this.exhibitorRepository.save(exhibitor);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
