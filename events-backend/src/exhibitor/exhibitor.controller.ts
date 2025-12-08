@@ -24,6 +24,7 @@ import path from 'path';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
+import { promisify } from 'util';
 import { ExhibitorService } from './exhibitor.service';
 import { ExhibitorDto } from './exhibitor.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
@@ -50,6 +51,70 @@ export class ExhibitorController {
     private readonly exhibitorService: ExhibitorService,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
+
+  /**
+   * Safely delete a file with retry logic for Windows file locking issues
+   * Ensures file is deleted from filesystem even if there are permission issues
+   */
+  private async deleteFileSafely(filePath: string, retries = 5, delay = 200): Promise<void> {
+    const unlinkAsync = promisify(fs.unlink);
+    const accessAsync = promisify(fs.access);
+    
+    // First check if file exists
+    try {
+      await accessAsync(filePath, fs.constants.F_OK);
+    } catch {
+      // File doesn't exist, consider it already deleted
+      return;
+    }
+    
+    for (let i = 0; i < retries; i++) {
+      try {
+        // Try to delete the file
+        await unlinkAsync(filePath);
+        
+        // Verify file is actually deleted
+        try {
+          await accessAsync(filePath, fs.constants.F_OK);
+          // File still exists, continue to retry
+          if (i < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+            continue;
+          }
+        } catch {
+          // File successfully deleted (access check failed = file doesn't exist)
+          return;
+        }
+      } catch (error: any) {
+        // If it's the last retry, try one more aggressive approach
+        if (i === retries - 1) {
+          // Last attempt: try with chmod to remove read-only flag (Windows)
+          try {
+            const chmodAsync = promisify(fs.chmod);
+            await chmodAsync(filePath, 0o666); // Make file writable
+            await unlinkAsync(filePath);
+            return;
+          } catch (finalError: any) {
+            // If still fails, throw the original error
+            throw error;
+          }
+        }
+        
+        // If it's a permission error (EPERM) or file in use (EBUSY), wait and retry
+        if (error.code === 'EPERM' || error.code === 'EBUSY' || error.code === 'EACCES' || error.code === 'ENOENT') {
+          // ENOENT means file doesn't exist (already deleted), which is fine
+          if (error.code === 'ENOENT') {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+          continue;
+        }
+        
+        // For other errors, throw immediately
+        throw error;
+      }
+    }
+  }
 
   /**
    * Create a new exhibitor
@@ -670,10 +735,23 @@ export class ExhibitorController {
         throw new ResourceNotFoundException('Flyer', flyerId);
       }
 
-      // Remove flyer from filesystem
+      // Remove flyer from filesystem with error handling
       const fullPath = path.join(__dirname, '..', '..', flyerToRemove.flyer);
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+      try {
+        // Use async unlink with retry for Windows file locking issues
+        // This will ensure file is deleted from folder
+        await this.deleteFileSafely(fullPath);
+      } catch (fileError: any) {
+        // If file still exists after all retries, log error but continue
+        const fileExists = fs.existsSync(fullPath);
+        if (fileExists) {
+          console.error(`Failed to delete file after retries: ${fullPath}`, fileError);
+          this.errorHandler.logError(
+            fileError,
+            `File deletion failed for flyer: ${flyerToRemove.flyer}. File may need manual deletion.`,
+            req.user?.id,
+          );
+        }
       }
 
       // Remove flyer from array by ID
@@ -731,10 +809,23 @@ export class ExhibitorController {
         throw new ResourceNotFoundException('Document', documentId);
       }
 
-      // Remove document from filesystem
+      // Remove document from filesystem with error handling
       const fullPath = path.join(__dirname, '..', '..', documentToRemove.document);
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+      try {
+        // Use async unlink with retry for Windows file locking issues
+        // This will ensure file is deleted from folder
+        await this.deleteFileSafely(fullPath);
+      } catch (fileError: any) {
+        // If file still exists after all retries, log error but continue
+        const fileExists = fs.existsSync(fullPath);
+        if (fileExists) {
+          console.error(`Failed to delete file after retries: ${fullPath}`, fileError);
+          this.errorHandler.logError(
+            fileError,
+            `File deletion failed for document: ${documentToRemove.document}. File may need manual deletion.`,
+            req.user?.id,
+          );
+        }
       }
 
       // Remove document from array by ID
@@ -792,10 +883,22 @@ export class ExhibitorController {
         throw new ResourceNotFoundException('Event image', eventImageId);
       }
 
-      // Remove event image from filesystem
+      // Remove event image from filesystem with error handling
       const fullPath = path.join(__dirname, '..', '..', eventImageToRemove.eventImage);
       if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+        try {
+          // Use async unlink with retry for Windows file locking issues
+          await this.deleteFileSafely(fullPath);
+        } catch (fileError) {
+          // Log the error but continue with database deletion
+          // File might be locked or permission issue, but we still remove from DB
+          console.warn(`Failed to delete file ${fullPath}:`, fileError);
+          this.errorHandler.logError(
+            fileError,
+            `File deletion warning for event image: ${eventImageToRemove.eventImage}`,
+            req.user?.id,
+          );
+        }
       }
 
       // Remove event image from array by ID

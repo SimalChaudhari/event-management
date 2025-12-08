@@ -164,8 +164,13 @@ export const deleteExhibitorFlyer = (exhibitorId, flyerId) => async (dispatch) =
         });
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Flyer deleted successfully!');
-            // Reload exhibitor data to get updated flyers
-            await dispatch(exhibitorById(exhibitorId));
+            // Update Redux store with the updated exhibitor data from response
+            if (response.data?.data) {
+                dispatch({
+                    type: EXHIBITOR_BY_ID,
+                    payload: { data: response.data.data }
+                });
+            }
             return true;
         }
         return false;
@@ -184,8 +189,13 @@ export const deleteExhibitorDocument = (exhibitorId, documentId) => async (dispa
         });
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Document deleted successfully!');
-            // Reload exhibitor data to get updated documents
-            await dispatch(exhibitorById(exhibitorId));
+            // Update Redux store with the updated exhibitor data from response
+            if (response.data?.data) {
+                dispatch({
+                    type: EXHIBITOR_BY_ID,
+                    payload: { data: response.data.data }
+                });
+            }
             return true;
         }
         return false;
@@ -204,8 +214,13 @@ export const deleteExhibitorEventImage = (exhibitorId, eventImageId) => async (d
         });
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Event image deleted successfully!');
-            // Reload exhibitor data to get updated event images
-            await dispatch(exhibitorById(exhibitorId));
+            // Update Redux store with the updated exhibitor data from response
+            if (response.data?.data) {
+                dispatch({
+                    type: EXHIBITOR_BY_ID,
+                    payload: { data: response.data.data }
+                });
+            }
             return true;
         }
         return false;
