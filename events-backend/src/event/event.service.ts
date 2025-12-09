@@ -1470,16 +1470,73 @@ export class EventService {
   }
 
 
-  // Get event booths by event ID
-  async getEventBooths(eventId: string): Promise<any[]> {
+  // Get event booths by event ID with search filter and pagination
+  async getEventBooths(
+    eventId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const eventBooths = await this.eventBoothRepository.find({
-        where: { eventId, isActive: true },
-        relations: ['exhibitor'],
-      });
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
+      // Build query builder
+      const queryBuilder = this.eventBoothRepository
+        .createQueryBuilder('eventBooth')
+        .leftJoinAndSelect('eventBooth.exhibitor', 'exhibitor')
+        .where('eventBooth.eventId = :eventId', { eventId })
+        .andWhere('eventBooth.isActive = :isActive', { isActive: true });
+
+      // Apply search filter - search in exhibitor company name, email, unique code
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(exhibitor.companyName) LIKE :searchTerm OR ' +
+          'LOWER(exhibitor.email) LIKE :searchTerm OR ' +
+          'LOWER(eventBooth.uniqueCode) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      if (sortBy === 'companyName') {
+        queryBuilder.orderBy('exhibitor.companyName', sortOrder);
+      } else if (sortBy === 'uniqueCode') {
+        queryBuilder.orderBy('eventBooth.uniqueCode', sortOrder);
+      } else if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        queryBuilder.orderBy(`eventBooth.${sortBy}`, sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('eventBooth.createdAt', sortOrder);
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const eventBooths = await queryBuilder.skip(skip).take(limit).getMany();
 
       // Format the response to include exhibitor details
-      return eventBooths.map((eventBooth) => ({
+      const formattedBooths = eventBooths.map((eventBooth) => ({
         id: eventBooth.id,
         eventId: eventBooth.eventId,
         exhibitorId: eventBooth.exhibitorId,
@@ -1493,6 +1550,23 @@ export class EventService {
             }
           : null,
       }));
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      return {
+        data: formattedBooths,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrev,
+        },
+      };
     } catch (error) {
       throw this.errorHandler.handleDatabaseError(error, 'Event booths retrieval');
     }

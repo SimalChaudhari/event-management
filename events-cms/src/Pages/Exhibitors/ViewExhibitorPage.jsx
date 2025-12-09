@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Row, Col, Card, Badge, Button, Tab, Nav, Alert, Container, Modal } from 'react-bootstrap';
 import { 
     exhibitorById, 
@@ -24,7 +24,43 @@ import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationMo
 const ViewExhibitorPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams();
+
+    // Get current exhibitor page from URL for preserving it
+    const [exhibitorPageFromUrl, setExhibitorPageFromUrl] = useState(null);
+    
+    useEffect(() => {
+        // Capture page parameter from URL when component mounts or URL changes
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageParam = urlParams.get('page');
+        if (pageParam) {
+            setExhibitorPageFromUrl(pageParam);
+        } else {
+            // Also check location.state as fallback
+            if (location.state?.page) {
+                setExhibitorPageFromUrl(location.state.page);
+            }
+        }
+    }, [location.search, location.state]);
+
+    // Custom handleBack that uses the captured page parameter
+    const handleBack = useCallback(() => {
+        // Priority: captured page from state > URL > location.state > null
+        const urlParams = new URLSearchParams(window.location.search || location.search);
+        const pageFromUrl = urlParams.get('page');
+        const currentPage = exhibitorPageFromUrl || pageFromUrl || location.state?.page;
+        
+        if (currentPage) {
+            navigate(`${EXHIBITOR_PATHS.LIST_EXHIBITORS}?page=${currentPage}`);
+        } else {
+            navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
+        }
+    }, [navigate, exhibitorPageFromUrl, location.search, location.state]);
+
+    const handleBackNavigation = useMemo(() => {
+        return handleBack;
+    }, [location.search, navigate, handleBack]);
 
     // Get exhibitor data from Redux store
     const { exhibitorById: exhibitorData, loading, error } = useSelector((state) => state.exhibitor);
@@ -62,9 +98,6 @@ const ViewExhibitorPage = () => {
         }
     };
 
-    const handleBack = () => {
-        navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
-    };
 
     // InfoCard component for consistent styling similar to EventBasicComponent
     const InfoCard = ({ title, icon, children, borderColor = '#4680ff', className = '' }) => (
@@ -188,7 +221,7 @@ const ViewExhibitorPage = () => {
                 size="medium"
                 showBackButton={true}
                 backButtonText="Back"
-                backButtonPath={`${EXHIBITOR_PATHS.LIST_EXHIBITORS}`}
+                backButtonPath={exhibitorPageFromUrl ? `${EXHIBITOR_PATHS.LIST_EXHIBITORS}?page=${exhibitorPageFromUrl}` : EXHIBITOR_PATHS.LIST_EXHIBITORS}
             />
         );
     }
@@ -899,7 +932,7 @@ const ViewExhibitorPage = () => {
                         </div>
                         <Button
                             variant="outline-secondary"
-                            onClick={handleBack}
+                            onClick={handleBackNavigation}
                             style={{
                                 borderRadius: '8px',
                                 padding: '8px 16px',

@@ -25,7 +25,9 @@ export interface ExhibitorFileUploadOptions {
 }
 
 export class ExhibitorFileUtils {
-  private static readonly DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private static readonly DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (for documents)
+  private static readonly MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50MB for images
+  private static readonly MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB for videos
   private static readonly ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
     'image/jpg',
@@ -106,16 +108,27 @@ export class ExhibitorFileUtils {
   }
 
   /**
-   * Create file filter for exhibitor uploads
+   * Create file filter for exhibitor uploads with size validation
    */
   static getExhibitorFileFilter() {
     return (req: any, file: Express.Multer.File, cb: any) => {
       const fieldName = file.fieldname;
       const mimeType = file.mimetype;
+      const fileSize = (req as any).file?.size || file.size || 0;
 
-      // Check image files
+      // Check image files (flyers, eventImages, logo)
       if (['flyers', 'eventImages', 'logo'].includes(fieldName)) {
         if (this.ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+          // Check file size for images (50MB max)
+          if (fileSize > this.MAX_IMAGE_SIZE) {
+            cb(
+              new Error(
+                `Image file size exceeds maximum allowed size of ${this.MAX_IMAGE_SIZE / (1024 * 1024)}MB`,
+              ),
+              false,
+            );
+            return;
+          }
           cb(null, true);
           return;
         }
@@ -130,7 +143,31 @@ export class ExhibitorFileUtils {
 
       // Check booth banner files (images and videos)
       if (fieldName === 'boothBanner') {
-        if (this.ALLOWED_IMAGE_TYPES.includes(mimeType) || this.ALLOWED_VIDEO_TYPES.includes(mimeType)) {
+        if (this.ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+          // Check file size for images (50MB max)
+          if (fileSize > this.MAX_IMAGE_SIZE) {
+            cb(
+              new Error(
+                `Banner image file size exceeds maximum allowed size of ${this.MAX_IMAGE_SIZE / (1024 * 1024)}MB`,
+              ),
+              false,
+            );
+            return;
+          }
+          cb(null, true);
+          return;
+        }
+        if (this.ALLOWED_VIDEO_TYPES.includes(mimeType)) {
+          // Check file size for videos (100MB max)
+          if (fileSize > this.MAX_VIDEO_SIZE) {
+            cb(
+              new Error(
+                `Banner video file size exceeds maximum allowed size of ${this.MAX_VIDEO_SIZE / (1024 * 1024)}MB`,
+              ),
+              false,
+            );
+            return;
+          }
           cb(null, true);
           return;
         }
@@ -165,10 +202,13 @@ export class ExhibitorFileUtils {
 
   /**
    * Create file size limits configuration
+   * Uses different limits based on file type (handled in fileFilter)
    */
   static getExhibitorFileSizeLimits(maxFileSize?: number) {
+    // Use the maximum of all limits to allow all file types
+    // Individual file type limits are enforced in fileFilter
     return {
-      fileSize: maxFileSize || this.DEFAULT_MAX_FILE_SIZE,
+      fileSize: maxFileSize || Math.max(this.MAX_IMAGE_SIZE, this.MAX_VIDEO_SIZE, this.DEFAULT_MAX_FILE_SIZE),
     };
   }
 

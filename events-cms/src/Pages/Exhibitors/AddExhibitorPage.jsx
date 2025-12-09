@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Row, Col, Card, Badge, Container, Modal } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
     createExhibitor, 
     updateExhibitor, 
     exhibitorById,
     deleteExhibitorFlyer,
     deleteExhibitorDocument,
-    deleteExhibitorEventImage
+    deleteExhibitorEventImage,
+    deleteExhibitorBoothBanner,
+    deleteAllExhibitorBoothBanners
 } from '../../store/actions/exhibitorsActions';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
+import useTableNavigation from '../../hooks/useTableNavigation';
 
-// DocumentNameInput component main component के बाहर define करें (Events जैसा ही)
+// DocumentNameInput component main component 
 const DocumentNameInput = ({ index, fileName, documentName, onNameChange, onValidationChange }) => {
     const [localError, setLocalError] = useState('');
 
@@ -237,6 +240,7 @@ function AddExhibitorPage() {
     const [existingFlyers, setExistingFlyers] = useState([]);
     const [existingDocuments, setExistingDocuments] = useState([]);
     const [existingEventImages, setExistingEventImages] = useState([]);
+    const [existingBoothBanners, setExistingBoothBanners] = useState([]);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -356,12 +360,26 @@ function AddExhibitorPage() {
                         let boothBannerLinksData = [];
 
                         if (editData.boothBanner && Array.isArray(editData.boothBanner)) {
-                            boothBannerData = editData.boothBanner.map((banner) => {
-                                if (typeof banner === 'object' && banner.value) {
-                                    return banner.value;
-                                }
-                                return typeof banner === 'string' ? banner : '';
-                            }).filter(Boolean);
+                            // Store existing booth banners with IDs for deletion
+                            if (editData.boothBanner.length > 0 && editData.boothBanner[0].hasOwnProperty('id')) {
+                                // New format: array of objects with id and value
+                                setExistingBoothBanners(editData.boothBanner.filter(b => b.id));
+                                boothBannerData = editData.boothBanner.map((banner) => {
+                                    if (typeof banner === 'object' && banner.value) {
+                                        return banner.value;
+                                    }
+                                    return typeof banner === 'string' ? banner : '';
+                                }).filter(Boolean);
+                            } else {
+                                // Old format or no IDs
+                                setExistingBoothBanners([]);
+                                boothBannerData = editData.boothBanner.map((banner) => {
+                                    if (typeof banner === 'object' && banner.value) {
+                                        return banner.value;
+                                    }
+                                    return typeof banner === 'string' ? banner : '';
+                                }).filter(Boolean);
+                            }
 
                             boothBannerData.forEach((banner) => {
                                 if (banner.startsWith('http://') || banner.startsWith('https://')) {
@@ -435,17 +453,27 @@ function AddExhibitorPage() {
                     }));
                 }
             } else if (name === 'flyers') {
-                const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+                // Validate file size (50MB max for images)
+                const maxImageSize = 50 * 1024 * 1024; // 50MB
+                const validFiles = newFiles.filter((file) => {
+                    if (file.size > maxImageSize) {
+                        alert(`Flyer file "${file.name}" exceeds maximum size of 50MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+                        return false;
+                    }
+                    return true;
+                });
+
+                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
                     ...prev,
-                    flyers: [...prev.flyers, ...newFiles]
+                    flyers: [...prev.flyers, ...validFiles]
                 }));
 
                 setFlyerPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
                 // Add default names for new flyers
-                const newFlyerNames = newFiles.map((file, index) => `Flyer ${formData.flyers.length + index + 1}`);
+                const newFlyerNames = validFiles.map((file, index) => `Flyer ${formData.flyers.length + index + 1}`);
                 setFlyerNames((prev) => [...prev, ...newFlyerNames]);
 
                 setFormData((prev) => ({
@@ -453,17 +481,27 @@ function AddExhibitorPage() {
                     flyerNames: [...prev.flyerNames, ...newFlyerNames]
                 }));
             } else if (name === 'eventImages') {
-                const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+                // Validate file size (50MB max for images)
+                const maxImageSize = 50 * 1024 * 1024; // 50MB
+                const validFiles = newFiles.filter((file) => {
+                    if (file.size > maxImageSize) {
+                        alert(`Event image file "${file.name}" exceeds maximum size of 50MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+                        return false;
+                    }
+                    return true;
+                });
+
+                const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
 
                 setFormData((prev) => ({
                     ...prev,
-                    eventImages: [...prev.eventImages, ...newFiles]
+                    eventImages: [...prev.eventImages, ...validFiles]
                 }));
 
                 setEventImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
 
                 // Add default names for new event images
-                const newEventImageNames = newFiles.map((file, index) => `Event Image ${formData.eventImages.length + index + 1}`);
+                const newEventImageNames = validFiles.map((file, index) => `Event Image ${formData.eventImages.length + index + 1}`);
                 setEventImageNames((prev) => [...prev, ...newEventImageNames]);
 
                 setFormData((prev) => ({
@@ -490,9 +528,30 @@ function AddExhibitorPage() {
                 }));
             } else if (name === 'boothBanner') {
                 // Support images and videos for booth banner
+                const maxImageSize = 50 * 1024 * 1024; // 50MB
+                const maxVideoSize = 100 * 1024 * 1024; // 100MB
                 const validFiles = newFiles.filter((file) => {
-                    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'video/mp4', 'video/mpeg', 'video/quicktime'];
-                    return allowedTypes.includes(file.type);
+                    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+                    
+                    // Check file type
+                    if (!allowedTypes.includes(file.type)) {
+                        return false;
+                    }
+                    
+                    // Check file size: 50MB for images, 100MB for videos
+                    if (file.type.startsWith('image/')) {
+                        if (file.size > maxImageSize) {
+                            alert(`Image file "${file.name}" exceeds maximum size of 50MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+                            return false;
+                        }
+                    } else if (file.type.startsWith('video/')) {
+                        if (file.size > maxVideoSize) {
+                            alert(`Video file "${file.name}" exceeds maximum size of 100MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+                            return false;
+                        }
+                    }
+                    
+                    return true;
                 });
 
                 const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
@@ -744,10 +803,27 @@ function AddExhibitorPage() {
         }
     };
 
-    const handleRemoveBoothBanner = (indexToRemove) => {
+    const handleRemoveBoothBanner = async (indexToRemove) => {
         const item = formData.boothBanner[indexToRemove];
         const isLink = typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'));
+        const isExisting = typeof item === 'string' && item.startsWith('uploads/');
 
+        // Check if this is an existing banner (has ID) - only in edit mode
+        if (id && existingBoothBanners.length > 0 && isExisting) {
+            // Find the existing banner by matching the path
+            const existingBanner = existingBoothBanners.find(b => b.value === item || b.banner === item);
+            
+            if (existingBanner && existingBanner.id) {
+                // Delete from database using API
+                const deleted = await dispatch(deleteExhibitorBoothBanner(id, existingBanner.id));
+                if (deleted) {
+                    // Remove from existing booth banners list
+                    setExistingBoothBanners(prev => prev.filter(b => b.id !== existingBanner.id));
+                }
+            }
+        }
+
+        // Remove from local state
         setFormData((prev) => ({
             ...prev,
             boothBanner: prev.boothBanner.filter((_, index) => index !== indexToRemove)
@@ -959,7 +1035,11 @@ function AddExhibitorPage() {
             const success = id ? await dispatch(updateExhibitor(id, formDataToSend)) : await dispatch(createExhibitor(formDataToSend));
 
             if (success) {
-                navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
+                // Preserve page number when navigating back
+                const urlParams = new URLSearchParams(window.location.search);
+                const pageParam = urlParams.get('page');
+                const backUrl = pageParam ? `${EXHIBITOR_PATHS.LIST_EXHIBITORS}?page=${pageParam}` : EXHIBITOR_PATHS.LIST_EXHIBITORS;
+                navigate(backUrl);
             }
         } catch (error) {
             setError('Failed to save exhibitor');
@@ -969,18 +1049,12 @@ function AddExhibitorPage() {
     };
 
     const handleNavigate = () => {
-        navigate(EXHIBITOR_PATHS.LIST_EXHIBITORS);
+        // Preserve page number when navigating back
+        const urlParams = new URLSearchParams(window.location.search);
+        const pageParam = urlParams.get('page');
+        const backUrl = pageParam ? `${EXHIBITOR_PATHS.LIST_EXHIBITORS}?page=${pageParam}` : EXHIBITOR_PATHS.LIST_EXHIBITORS;
+        navigate(backUrl);
     };
-
-    if (loading && id) {
-        return (
-            <div className="text-center p-5">
-                <div className="spinner-border" role="status">
-                    <span className="sr-only">Loading...</span>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <Container fluid>
@@ -999,6 +1073,14 @@ function AddExhibitorPage() {
                             </div>
                         </div>
                         <div className="card-body">
+                            {loading && id && (
+                                <div className="text-center p-3">
+                                    <div className="spinner-border spinner-border-sm" role="status">
+                                        <span className="sr-only">Loading...</span>
+                                    </div>
+                                    <p className="mt-2 text-muted">Loading exhibitor data...</p>
+                                </div>
+                            )}
                             {error && (
                                 <div className="alert alert-danger" role="alert">
                                     {error}
@@ -1080,11 +1162,13 @@ function AddExhibitorPage() {
                                                 <SettingsEditor
                                                     data={formData.companyDescription || ''}
                                                     onChange={(event, editor) => {
-                                                        const data = editor.getData();
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            companyDescription: data
-                                                        }));
+                                                        if (editor && editor.getData) {
+                                                            const data = editor.getData();
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                companyDescription: data
+                                                            }));
+                                                        }
                                                     }}
                                                     placeholder="Enter company description..."
                                                 />
@@ -1201,11 +1285,13 @@ function AddExhibitorPage() {
                                                 <SettingsEditor
                                                     data={formData.promotionalOfferNote || ''}
                                                     onChange={(event, editor) => {
-                                                        const data = editor.getData();
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            promotionalOfferNote: data
-                                                        }));
+                                                        if (editor && editor.getData) {
+                                                            const data = editor.getData();
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                promotionalOfferNote: data
+                                                            }));
+                                                        }
                                                     }}
                                                     placeholder="Enter promotional offer note..."
                                                 />
@@ -1342,7 +1428,7 @@ function AddExhibitorPage() {
                                                         wordWrap: 'break-word'
                                                     }}
                                                 >
-                                                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 10 images.
+                                                    Supported formats: JPG, PNG, GIF. Max size: 50MB per image. Max 10 images.
                                                 </p>
                                                 <input
                                                     type="file"
@@ -1524,7 +1610,7 @@ function AddExhibitorPage() {
                                                         wordWrap: 'break-word'
                                                     }}
                                                 >
-                                                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 10 images.
+                                                    Supported formats: JPG, PNG, GIF. Max size: 50MB per image. Max 10 images.
                                                 </p>
                                                 <input
                                                     type="file"
@@ -1917,14 +2003,14 @@ function AddExhibitorPage() {
                                                         wordWrap: 'break-word'
                                                     }}
                                                 >
-                                                    Supported: JPG, PNG, GIF, MP4. Max size: 10MB per file. Max 20 items.
+                                                    Supported: JPG, PNG, GIF (max 50MB), MP4, MPEG, MOV, AVI, WEBM (max 100MB). Max 20 items.
                                                 </p>
                                                 <input
                                                     type="file"
                                                     className="form-control"
                                                     name="boothBanner"
                                                     onChange={handleChange}
-                                                    accept="image/*,video/*"
+                                                    accept="image/jpeg,image/jpg,image/png,image/gif,video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
                                                     multiple
                                                     style={{ display: 'none' }}
                                                     id="boothBannerInput"
@@ -1983,6 +2069,14 @@ function AddExhibitorPage() {
                                                                 }
                                                             } else if (item instanceof File) {
                                                                 itemSrc = boothBannerPreviewUrls[index] || URL.createObjectURL(item);
+                                                            }
+
+                                                            // Find if this is an existing banner with ID
+                                                            const existingBanner = existingBoothBanners.find(b => 
+                                                                (b.value === item || b.banner === item) && b.id
+                                                            );
+                                                            if (existingBanner) {
+                                                                isExisting = true;
                                                             }
 
                                                             const isVideo = itemSrc && (itemSrc.includes('.mp4') || itemSrc.includes('.mpeg') || itemSrc.includes('.mov') || (item instanceof File && item.type.startsWith('video/')));

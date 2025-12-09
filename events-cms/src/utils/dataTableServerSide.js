@@ -28,9 +28,22 @@ export const initializeServerSideDataTable = ({
         $(tableSelector).DataTable().destroy();
     }
 
+    // Read page parameter from URL to set initial page before first API call
+    // This prevents the double API call (first page 1, then correct page)
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageParam = parseInt(urlParams.get('page'), 10);
+    let displayStart = 0; // Default to first page (0-indexed start position)
+    
+    if (!Number.isNaN(pageParam) && pageParam >= 1) {
+        // Calculate displayStart: (page - 1) * pageLength
+        // DataTables uses 0-indexed start position
+        displayStart = (pageParam - 1) * pageLength;
+    }
+
     const dataTableInstance = $(tableSelector).DataTable({
         processing: true,
         serverSide: true,
+        displayStart: displayStart, // Set initial page from URL to prevent double API call
         order: order || undefined, // Set default sort order if provided
         ajax: function (data, callback, settings) {
             // Show loading state if dispatch and loadingActionType are provided

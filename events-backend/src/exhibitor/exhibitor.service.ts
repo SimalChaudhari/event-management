@@ -61,9 +61,27 @@ export class ExhibitorService {
         });
         
         const newBanners = bannerValues.map(bannerValue => {
+          // Ensure we store only the string path, not a JSON object
+          let finalBannerValue: string;
+          if (typeof bannerValue === 'string') {
+            // Check if it's a JSON stringified object
+            try {
+              const parsed = JSON.parse(bannerValue);
+              if (parsed && typeof parsed === 'object' && parsed.value) {
+                finalBannerValue = parsed.value; // Extract value from parsed object
+              } else {
+                finalBannerValue = bannerValue; // It's already a string
+              }
+            } catch {
+              finalBannerValue = bannerValue; // Not JSON, use as is
+            }
+          } else {
+            finalBannerValue = String(bannerValue);
+          }
+          
           return this.boothBannerRepository.create({
             exhibitorId: savedExhibitor.id,
-            banner: bannerValue,
+            banner: finalBannerValue, // Store only the path string, not the object
           });
         });
         await this.boothBannerRepository.save(newBanners);
@@ -83,17 +101,42 @@ export class ExhibitorService {
     }
   }
 
-  async getAllExhibitors(eventId?: string): Promise<any[]> {
+  async getAllExhibitors(
+    eventId?: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
+      // Build query builder
+      const queryBuilder = this.exhibitorRepository
+        .createQueryBuilder('exhibitor')
+        .leftJoinAndSelect('exhibitor.boothBanners', 'boothBanners');
+
       // If eventId is provided, filter exhibitors by event
       if (eventId) {
-        const { EventExhibitor } = await import('../event/event.entity');
         const { Event } = await import('../event/event.entity');
-        const { EventStaff } = await import('../event/event-staff.entity');
-        
-        const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
         const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
-        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
 
         // Check if event exists
         const event = await eventRepository.findOne({
@@ -104,60 +147,56 @@ export class ExhibitorService {
           throw new ResourceNotFoundException('Event', eventId);
         }
 
-        // Get exhibitors associated with this event
-        const eventExhibitors = await eventExhibitorRepository.find({
-          where: { eventId },
-          relations: ['exhibitor', 'exhibitor.boothBanners'],
-        });
-
-        // Extract exhibitor data and format with promotional offers and event staff
-        const exhibitors = await Promise.all(
-          eventExhibitors
-            .map(ee => ee.exhibitor)
-            .filter(Boolean)
-            .map(async (exhibitor) => {
-              const basicInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
-              
-              // Get Event Staff for this exhibitor in this event
-              const eventStaffs = await eventStaffRepository.find({
-                where: {
-                  exhibitorId: exhibitor.id,
-                  eventId: eventId,
-                },
-                relations: ['user'],
-              });
-
-              // Format event staff data using utility
-              const formattedEventStaff = ExhibitorUtils.formatEventStaff(eventStaffs);
-
-              return {
-                ...basicInfo,
-              
-                eventStaff: formattedEventStaff,
-              };
-            })
-        );
-
-        return exhibitors;
+        // Join with EventExhibitor to filter by event
+        queryBuilder
+          .innerJoin('event_exhibitors', 'eventExhibitor', 'eventExhibitor.exhibitorId = exhibitor.id')
+          .where('eventExhibitor.eventId = :eventId', { eventId });
       }
 
-      // If no eventId, return all exhibitors
-      const exhibitors = await this.exhibitorRepository.find({
-        relations: ['boothBanners'],
-      });
-      
+      // Apply search filter - search in company name, email, mobile, UEN
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(exhibitor.companyName) LIKE :searchTerm OR ' +
+          'LOWER(exhibitor.email) LIKE :searchTerm OR ' +
+          'LOWER(exhibitor.mobile) LIKE :searchTerm OR ' +
+          'LOWER(exhibitor.uen) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      if (sortBy === 'companyName' || sortBy === 'email' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        queryBuilder.orderBy(`exhibitor.${sortBy}`, sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('exhibitor.createdAt', sortOrder);
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const exhibitors = await queryBuilder.skip(skip).take(limit).getMany();
+
       // Get Event Staff repository
       const { EventStaff } = await import('../event/event-staff.entity');
       const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
-      
-      // Format using utility and include promotional offers and event staff
+
+      // Format using utility and include event staff
       const formattedExhibitors = await Promise.all(
         exhibitors.map(async (exhibitor) => {
           const basicInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
-          
-          // Get all Event Staff for this exhibitor (across all events)
+
+          // Get Event Staff for this exhibitor
+          const whereCondition: any = { exhibitorId: exhibitor.id };
+          if (eventId) {
+            whereCondition.eventId = eventId;
+          }
+
           const eventStaffs = await eventStaffRepository.find({
-            where: { exhibitorId: exhibitor.id },
+            where: whereCondition,
             relations: ['user'],
           });
 
@@ -166,13 +205,27 @@ export class ExhibitorService {
 
           return {
             ...basicInfo,
-            
             eventStaff: formattedEventStaff,
           };
         })
       );
 
-      return formattedExhibitors;
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      return {
+        data: formattedExhibitors,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrev,
+        },
+      };
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -222,7 +275,10 @@ export class ExhibitorService {
 
   async getExhibitorEntityById(id: string): Promise<Exhibitor> {
     try {
-      const exhibitor = await this.exhibitorRepository.findOne({ where: { id } });
+      const exhibitor = await this.exhibitorRepository.findOne({ 
+        where: { id },
+        relations: ['boothBanners'], // Include boothBanners relation for update operations
+      });
       if (!exhibitor) {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
@@ -291,14 +347,55 @@ export class ExhibitorService {
       Object.assign(existingExhibitor, exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(existingExhibitor);
 
-      // Update booth banners if provided - this will REPLACE all existing banners
+      // Update booth banners if provided - adds new banners to existing ones
       if (boothBannersToSave !== undefined) {
-        // Normalize format: convert strings to {value: string} objects, then extract values
-        const normalizedBanners = boothBannersToSave.map(banner => {
-          const value = typeof banner === 'string' ? banner : (banner.value || String(banner));
-          return { value };
+        // Normalize format: extract values from objects or use strings directly
+        const normalizedBanners: Array<{ id?: string; value: string }> = boothBannersToSave.map((banner: any) => {
+          let extractedValue: string;
+          
+          // Extract the actual string value
+          if (typeof banner === 'string') {
+            // Check if it's a JSON stringified object
+            try {
+              const parsed = JSON.parse(banner);
+              if (parsed && typeof parsed === 'object' && parsed.value) {
+                extractedValue = parsed.value; // Extract value from parsed object
+              } else {
+                extractedValue = banner; // It's already a string
+              }
+            } catch {
+              extractedValue = banner; // Not JSON, use as is
+            }
+          } else if (banner && typeof banner === 'object' && 'value' in banner) {
+            // Extract value from object, handling nested JSON strings
+            if (typeof banner.value === 'string') {
+              try {
+                const parsed = JSON.parse(banner.value);
+                if (parsed && typeof parsed === 'object' && parsed.value) {
+                  extractedValue = parsed.value; // Extract value from parsed object
+                } else {
+                  extractedValue = banner.value; // It's already a string
+                }
+              } catch {
+                extractedValue = banner.value; // Not JSON, use as is
+              }
+            } else {
+              extractedValue = String(banner.value);
+            }
+            
+            // If it has an id, preserve it (existing banner)
+            if ('id' in banner && typeof banner.id === 'string' && banner.id) {
+              return { id: banner.id, value: extractedValue };
+            }
+            return { value: extractedValue };
+          } else {
+            // Fallback: try to extract value from object
+            extractedValue = String(banner);
+          }
+          
+          return { value: extractedValue };
         });
-        // This method will delete old files and replace with new ones
+        // This method will add new banners and keep existing ones
         await this.updateExhibitorBoothBanner(id, normalizedBanners);
       }
       
@@ -395,8 +492,8 @@ export class ExhibitorService {
 
   /**
    * Update booth banners for an exhibitor
-   * Replaces all existing banners with new ones
-   * Deletes old files that are no longer in the new list
+   * Adds new banners to existing ones (does not replace)
+   * Only deletes banners that are explicitly removed (not in the new list)
    */
   async updateExhibitorBoothBanner(
     id: string,
@@ -411,46 +508,84 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Exhibitor', id);
       }
 
-      // Get existing banner values for cleanup
-      const existingBannerValues = exhibitor.boothBanners 
-        ? exhibitor.boothBanners.map(bb => bb.banner)
-        : [];
+      // Get existing banners with their IDs
+      const existingBanners = exhibitor.boothBanners || [];
+      const existingBannerMap = new Map(
+        existingBanners.map(bb => [bb.id, bb.banner])
+      );
       
-      const newBannerValues = boothBanners.map(b => b.value);
-
-      // Delete old files that are no longer in the new list (only files, not URLs)
-      const fs = require('fs');
-      const path = require('path');
-      existingBannerValues.forEach((oldBanner: string) => {
-        // Only delete if it's a file path (starts with uploads/), not a URL
-        if (oldBanner && oldBanner.startsWith('uploads/') && !newBannerValues.includes(oldBanner)) {
-          const fullPath = path.join(__dirname, '..', '..', oldBanner);
-          if (fs.existsSync(fullPath)) {
-            try {
-              fs.unlinkSync(fullPath);
-            } catch (error) {
-              // Log but don't throw - file deletion is not critical
-              console.error(`Failed to delete old booth banner file: ${oldBanner}`, error);
-            }
-          }
+      // Separate existing banners (with IDs) from new banners (without IDs)
+      const bannersToKeep: Array<{ id: string; value: string }> = [];
+      const newBannersToAdd: Array<{ value: string }> = [];
+      
+      boothBanners.forEach(banner => {
+        if (banner.id && existingBannerMap.has(banner.id)) {
+          // This is an existing banner, keep it
+          bannersToKeep.push({ id: banner.id, value: banner.value });
+        } else {
+          // This is a new banner, add it
+          newBannersToAdd.push({ value: banner.value });
         }
       });
 
-      // Delete all existing booth banners from database
-      if (exhibitor.boothBanners && exhibitor.boothBanners.length > 0) {
-        await this.boothBannerRepository.remove(exhibitor.boothBanners);
+      // Get banners that should be deleted (existing banners not in the keep list)
+      const bannersToDelete = existingBanners.filter(bb => {
+        return !bannersToKeep.some(keep => keep.id === bb.id);
+      });
+
+      // Delete files for removed banners (only files, not URLs)
+      const fs = require('fs');
+      const path = require('path');
+      
+      for (const bannerToDelete of bannersToDelete) {
+        // Only delete if it's a file path (starts with uploads/), not a URL
+        if (bannerToDelete.banner && bannerToDelete.banner.startsWith('uploads/')) {
+          const fullPath = path.join(__dirname, '..', '..', bannerToDelete.banner);
+          try {
+            // Use safe deletion with retry logic
+            await this.deleteFileSafely(fullPath);
+          } catch (error: any) {
+            // Log but don't throw - file deletion is not critical
+            const fileExists = fs.existsSync(fullPath);
+            if (fileExists) {
+              console.error(`Failed to delete removed booth banner file after retries: ${bannerToDelete.banner}`, error);
+            }
+          }
+        }
       }
 
-      // Create new booth banners
-      if (boothBanners && boothBanners.length > 0) {
-        const newBanners = boothBanners.map(banner => {
-          const boothBanner = this.boothBannerRepository.create({
+      // Delete removed banners from database
+      if (bannersToDelete.length > 0) {
+        await this.boothBannerRepository.remove(bannersToDelete);
+      }
+
+      // Create new booth banners (only add new ones, existing ones are already in DB)
+      if (newBannersToAdd.length > 0) {
+        const bannersToCreate = newBannersToAdd.map(banner => {
+          // Extract the actual string value, handling cases where value might be nested or stringified
+          let bannerValue: string;
+          if (typeof banner.value === 'string') {
+            // Check if it's a JSON stringified object
+            try {
+              const parsed = JSON.parse(banner.value);
+              if (parsed && typeof parsed === 'object' && parsed.value) {
+                bannerValue = parsed.value; // Extract value from parsed object
+              } else {
+                bannerValue = banner.value; // It's already a string
+              }
+            } catch {
+              bannerValue = banner.value; // Not JSON, use as is
+            }
+          } else {
+            bannerValue = String(banner.value);
+          }
+          
+          return this.boothBannerRepository.create({
             exhibitorId: id,
-            banner: banner.value,
+            banner: bannerValue, // Store only the path string, not the object
           });
-          return boothBanner;
         });
-        await this.boothBannerRepository.save(newBanners);
+        await this.boothBannerRepository.save(bannersToCreate);
       }
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
@@ -493,8 +628,21 @@ export class ExhibitorService {
         const fs = require('fs');
         const path = require('path');
         const fullPath = path.join(__dirname, '..', '..', banner.banner);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
+        try {
+          // Use safe deletion with retry logic to ensure file is deleted from folder
+          await this.deleteFileSafely(fullPath);
+        } catch (fileError: any) {
+          // If file still exists after all retries, log error but continue
+          const fileExists = fs.existsSync(fullPath);
+          if (fileExists) {
+            console.error(`Failed to delete booth banner file after retries: ${banner.banner}`, fileError);
+            this.errorHandler.logError(
+              fileError,
+              `File deletion failed for booth banner: ${banner.banner}. File may need manual deletion.`,
+              undefined,
+            );
+          }
+          // Continue with database deletion even if file deletion fails
         }
       }
 
@@ -504,6 +652,128 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Delete booth banner');
+    }
+  }
+
+  /**
+   * Delete all booth banners for an exhibitor
+   */
+  async deleteAllBoothBanners(exhibitorId: string): Promise<void> {
+    try {
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+        relations: ['boothBanners'],
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      const banners = exhibitor.boothBanners || [];
+      
+      if (banners.length === 0) {
+        return; // No banners to delete
+      }
+
+      // Delete all files from filesystem (only files, not URLs)
+      const fs = require('fs');
+      const path = require('path');
+      
+      for (const banner of banners) {
+        // Only delete if it's a file path (starts with uploads/), not a URL
+        if (banner.banner && banner.banner.startsWith('uploads/')) {
+          const fullPath = path.join(__dirname, '..', '..', banner.banner);
+          try {
+            // Use safe deletion with retry logic to ensure file is deleted from folder
+            await this.deleteFileSafely(fullPath);
+          } catch (fileError: any) {
+            // Log but don't throw - file deletion is not critical
+            const fileExists = fs.existsSync(fullPath);
+            if (fileExists) {
+              console.error(`Failed to delete booth banner file after retries: ${banner.banner}`, fileError);
+              this.errorHandler.logError(
+                fileError,
+                `File deletion failed for booth banner: ${banner.banner}. File may need manual deletion.`,
+                undefined,
+              );
+            }
+          }
+        }
+      }
+
+      // Delete all banners from database
+      await this.boothBannerRepository.remove(banners);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Delete all booth banners');
+    }
+  }
+
+  /**
+   * Safely delete a file with retry logic for Windows file locking issues
+   * Ensures file is deleted from filesystem even if there are permission issues
+   */
+  private async deleteFileSafely(filePath: string, retries = 5, delay = 200): Promise<void> {
+    const fs = require('fs');
+    const { promisify } = require('util');
+    const unlinkAsync = promisify(fs.unlink);
+    const accessAsync = promisify(fs.access);
+    
+    // First check if file exists
+    try {
+      await accessAsync(filePath, fs.constants.F_OK);
+    } catch {
+      // File doesn't exist, consider it already deleted
+      return;
+    }
+    
+    for (let i = 0; i < retries; i++) {
+      try {
+        // Try to delete the file
+        await unlinkAsync(filePath);
+        
+        // Verify file is actually deleted
+        try {
+          await accessAsync(filePath, fs.constants.F_OK);
+          // File still exists, continue to retry
+          if (i < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+            continue;
+          }
+        } catch {
+          // File successfully deleted (access check failed = file doesn't exist)
+          return;
+        }
+      } catch (error: any) {
+        // If it's the last retry, try one more aggressive approach
+        if (i === retries - 1) {
+          // Last attempt: try with chmod to remove read-only flag (Windows)
+          try {
+            const chmodAsync = promisify(fs.chmod);
+            await chmodAsync(filePath, 0o666); // Make file writable
+            await unlinkAsync(filePath);
+            return;
+          } catch (finalError: any) {
+            // If still fails, throw the original error
+            throw error;
+          }
+        }
+        
+        // If it's a permission error (EPERM) or file in use (EBUSY), wait and retry
+        if (error.code === 'EPERM' || error.code === 'EBUSY' || error.code === 'EACCES' || error.code === 'ENOENT') {
+          // ENOENT means file doesn't exist (already deleted), which is fine
+          if (error.code === 'ENOENT') {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+          continue;
+        }
+        
+        // For other errors, throw immediately
+        throw error;
+      }
     }
   }
 

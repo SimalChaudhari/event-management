@@ -709,22 +709,39 @@ export class EventController {
 
 
 
-  // Get event booths
+  // Get event booths with search filter and pagination
   @Get(':id/booths')
   async getEventBooths(
     @Param('id') id: string,
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const eventBooths = await this.eventService.getEventBooths(id);
+      // Extract and process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.eventService.getEventBooths(id, processedFilters);
       
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Event booths retrieved successfully',
-        data: eventBooths,
+        data: result.data,
         metadata: {
-          total: eventBooths.length,
+          ...result.pagination,
           timestamp: new Date().toISOString(),
         },
       };
