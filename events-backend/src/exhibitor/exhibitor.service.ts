@@ -415,12 +415,8 @@ export class ExhibitorService {
         await this.updateExhibitorBoothBanner(id, normalizedBanners);
       }
       
-      const full = await this.exhibitorRepository.findOne({
-        where: { id: savedExhibitor.id },
-        relations: ['boothBanners']
-      });
-
-      return full || savedExhibitor;
+      // Return formatted response (same format as getExhibitorById)
+      return await this.getExhibitorById(id);
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
