@@ -112,7 +112,7 @@ export class ExhibitorService {
     },
   ): Promise<{
     data: any[];
-    pagination: {
+    pagination?: {
       page: number;
       limit: number;
       total: number;
@@ -122,6 +122,8 @@ export class ExhibitorService {
     };
   }> {
     try {
+      // If pagination is not provided, return all data
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const search = filters?.search;
@@ -149,7 +151,7 @@ export class ExhibitorService {
 
         // Join with EventExhibitor to filter by event
         queryBuilder
-          .innerJoin('event_exhibitors', 'eventExhibitor', 'eventExhibitor.exhibitorId = exhibitor.id')
+          .innerJoin('event_exhibitor', 'eventExhibitor', 'eventExhibitor.exhibitorId = exhibitor.id')
           .where('eventExhibitor.eventId = :eventId', { eventId });
       }
 
@@ -173,12 +175,18 @@ export class ExhibitorService {
         queryBuilder.orderBy('exhibitor.createdAt', sortOrder);
       }
 
-      // Get total count before pagination
+      // Get total count
       const total = await queryBuilder.getCount();
 
-      // Apply pagination
-      const skip = (page - 1) * limit;
-      const exhibitors = await queryBuilder.skip(skip).take(limit).getMany();
+      // Apply pagination only if pagination parameters are provided
+      let exhibitors;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        exhibitors = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        // No pagination - return all data
+        exhibitors = await queryBuilder.getMany();
+      }
 
       // Get Event Staff repository
       const { EventStaff } = await import('../event/event-staff.entity');
@@ -210,22 +218,30 @@ export class ExhibitorService {
         })
       );
 
-      // Calculate pagination metadata
-      const totalPages = Math.ceil(total / limit);
-      const hasNext = page < totalPages;
-      const hasPrev = page > 1;
+      // Return response with or without pagination
+      if (hasPagination) {
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
 
-      return {
-        data: formattedExhibitors,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNext,
-          hasPrev,
-        },
-      };
+        return {
+          data: formattedExhibitors,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+        };
+      } else {
+        // No pagination - return all data without pagination metadata
+        return {
+          data: formattedExhibitors,
+        };
+      }
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;

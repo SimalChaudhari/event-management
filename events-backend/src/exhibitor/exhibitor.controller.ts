@@ -312,7 +312,7 @@ export class ExhibitorController {
           : 'Exhibitors retrieved successfully',
         data: result.data,
         metadata: {
-          ...result.pagination,
+          ...(result.pagination || {}),
           timestamp: new Date().toISOString(),
         },
       };
