@@ -9,6 +9,7 @@ import {
     EXHIBITOR_LOADING,
     FETCH_PROMOTIONAL_OFFERS
 } from '../constants/actionTypes';
+import { buildUrlWithParams } from '../../utils/buildQueryParams';
 
 // Helper function to dispatch loading state
 const setLoading = (dispatch, loading) => {
@@ -18,22 +19,37 @@ const setLoading = (dispatch, loading) => {
     });
 };
 
-// Get all exhibitors
-export const exhibitorList = () => async (dispatch) => {
+// Get all exhibitors with pagination support
+export const exhibitorList = (filters = {}) => async (dispatch) => {
     try {
         setLoading(dispatch, true);
-
-        const response = await axiosInstance.get('/exhibitors');
+        
+        // Build URL with query parameters
+        const url = buildUrlWithParams('/exhibitors', filters);
+        
+        const response = await axiosInstance.get(url);
+        
         dispatch({
             type: EXHIBITOR_LIST,
-            payload: response.data
+            payload: {
+                data: response.data?.data || [],
+                pagination: response.data?.metadata || {}
+            }
         });
-        return true;
+        
+        return {
+            success: true,
+            data: response.data?.data || [],
+            pagination: response.data?.metadata || {}
+        };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch exhibitors';
-
         toast.error(errorMessage);
-        return false;
+        return {
+            success: false,
+            data: [],
+            pagination: {}
+        };
     } finally {
         setLoading(dispatch, false);
     }
@@ -390,6 +406,38 @@ export const downloadAllEventImages = async (exhibitorId) => {
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to download event images';
         toast.error(errorMessage);
+    }
+};
+
+// Delete booth banner by ID
+export const deleteExhibitorBoothBanner = (exhibitorId, bannerId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/exhibitors/boothBanner/${exhibitorId}/${bannerId}`);
+        if (response.status === 200 && response.data?.success) {
+            toast.success('Booth banner deleted successfully');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete booth banner';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Delete all booth banners
+export const deleteAllExhibitorBoothBanners = (exhibitorId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.delete(`/exhibitors/boothBanner/${exhibitorId}/all`);
+        if (response.status === 200 && response.data?.success) {
+            toast.success('All booth banners deleted successfully');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete all booth banners';
+        toast.error(errorMessage);
+        return false;
     }
 };
 

@@ -263,7 +263,7 @@ export class ExhibitorController {
   }
 
   /**
-   * Get all exhibitors
+   * Get all exhibitors with search filter and pagination
    * If eventId is provided, only returns exhibitors associated with that event
    * Access: Admin and Exhibitor users only
    */
@@ -272,6 +272,14 @@ export class ExhibitorController {
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   async getAllExhibitors(
     @Query('eventId') eventId: string | undefined,
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
     @Res() response: Response,
     @Request() req: any,
   ) {
@@ -286,16 +294,25 @@ export class ExhibitorController {
         });
       }
 
-      const exhibitors = await this.exhibitorService.getAllExhibitors(eventId);
+      // Extract and process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.exhibitorService.getAllExhibitors(eventId, processedFilters);
       
       const successResponse: SuccessResponse = {
         success: true,
         message: eventId 
           ? 'Exhibitors for event retrieved successfully' 
           : 'Exhibitors retrieved successfully',
-        data: exhibitors,
+        data: result.data,
         metadata: {
-          total: exhibitors.length,
+          ...result.pagination,
           timestamp: new Date().toISOString(),
         },
       };
@@ -596,39 +613,76 @@ export class ExhibitorController {
           exhibitorDto.logo = fileProcessing.processedFiles.logo;
         }
 
-        // Handle booth banner - REPLACES all existing banners with new array
-        // Old files not in the new array will be automatically deleted by updateExhibitorBoothBanner
+        // Handle booth banner - ADD new banners to existing ones (like flyers)
         if (fileProcessing.processedFiles.boothBanner) {
-          // Combine DTO array (existing banners to keep) with new uploaded files
-          // This array will REPLACE all existing banners - old files not in this array will be deleted
-          const allBoothBanner = exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner) 
-            ? [...exhibitorDto.boothBanner] 
-            : [];
+          const allBoothBanner = [];
+          
+          // Add existing booth banners from database (preserve all existing banners)
+          if (existingExhibitor.boothBanners && existingExhibitor.boothBanners.length > 0) {
+            const existingBanners = existingExhibitor.boothBanners.map(bb => ({
+              id: bb.id, // Preserve existing ID
+              value: bb.banner, // Use banner field as value
+            }));
+            allBoothBanner.push(...existingBanners);
+          }
           
           // Add new uploaded booth banner files (format: {value: "path"})
-          allBoothBanner.push(...fileProcessing.processedFiles.boothBanner);
+          // fileProcessing.processedFiles.boothBanner returns array of {value: string} objects
+          const newBanners = fileProcessing.processedFiles.boothBanner.map((banner: any) => {
+            // Extract value from object (it's already in {value: "path"} format)
+            return {
+              value: typeof banner === 'object' && banner.value ? banner.value : String(banner)
+            };
+          });
+          allBoothBanner.push(...newBanners);
           exhibitorDto.boothBanner = allBoothBanner;
         } else if (exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner)) {
-          // Normalize format: convert strings to {value: string} objects
-          // This array REPLACES all existing banners - old files not in this array will be deleted
-          exhibitorDto.boothBanner = exhibitorDto.boothBanner.map((item: any) => {
+          // If boothBanner is provided in DTO without new files, preserve existing and merge
+          const allBoothBanner = [];
+          
+          // Add existing booth banners from database
+          if (existingExhibitor.boothBanners && existingExhibitor.boothBanners.length > 0) {
+            const existingBanners = existingExhibitor.boothBanners.map(bb => ({
+              id: bb.id,
+              value: bb.banner,
+            }));
+            allBoothBanner.push(...existingBanners);
+          }
+          
+          // Normalize and add DTO banners (these are new links/URLs to add)
+          const normalizedBanners = exhibitorDto.boothBanner.map((item: any) => {
             if (typeof item === 'object' && item.value) {
-              return { value: item.value }; // Ignore id, DB will generate new one
+              return { value: item.value };
             }
             return { value: typeof item === 'string' ? item : item.value || item };
           });
+          allBoothBanner.push(...normalizedBanners);
+          exhibitorDto.boothBanner = allBoothBanner;
         }
         // If boothBanner is not provided in DTO and no new files, it will remain undefined
         // and won't overwrite existing values (preserves existing booth banner)
       } else if (exhibitorDto.boothBanner && Array.isArray(exhibitorDto.boothBanner)) {
-        // Normalize format: convert strings to {value: string} objects
-        // This array REPLACES all existing banners - old files not in this array will be deleted
-        exhibitorDto.boothBanner = exhibitorDto.boothBanner.map((item: any) => {
+        // If only DTO provided without file processing, combine with existing
+        const allBoothBanner = [];
+        
+        // Add existing booth banners from database
+        if (existingExhibitor.boothBanners && existingExhibitor.boothBanners.length > 0) {
+          const existingBanners = existingExhibitor.boothBanners.map(bb => ({
+            id: bb.id,
+            value: bb.banner,
+          }));
+          allBoothBanner.push(...existingBanners);
+        }
+        
+        // Normalize and add DTO banners
+        const normalizedBanners = exhibitorDto.boothBanner.map((item: any) => {
           if (typeof item === 'object' && item.value) {
             return { value: item.value };
           }
           return { value: typeof item === 'string' ? item : item.value || item };
         });
+        allBoothBanner.push(...normalizedBanners);
+        exhibitorDto.boothBanner = allBoothBanner;
       }
       // If boothBanner is not provided in DTO and no files uploaded, leave it undefined
       // This preserves existing booth banner in database
@@ -976,6 +1030,61 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Booth banner item removal', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all booth banners for an exhibitor
+   * Access: Admin and Exhibitor users only
+   */
+  @Delete('boothBanner/:id/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async removeAllBoothBanners(
+    @Param('id') id: string, // Exhibitor ID
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Get user info for permission check
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const userEmail = req.user?.email;
+
+      // Check permission: Only admin or the exhibitor owner can delete all booth banners
+      if (userRole === 'exhibitor' && userId) {
+        const userCanUpdate = await this.exhibitorService.canUserUpdateExhibitor(
+          id,
+          userId,
+          userEmail,
+        );
+
+        if (!userCanUpdate) {
+          throw new ForbiddenException(
+            'You do not have permission to delete booth banners from this exhibitor. You can only delete banners from your own exhibitor profile.',
+          );
+        }
+      }
+
+      // Delete all booth banners
+      await this.exhibitorService.deleteAllBoothBanners(id);
+
+      // Get updated exhibitor
+      const updatedExhibitor = await this.exhibitorService.getExhibitorById(id);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'All booth banners removed successfully',
+        data: updatedExhibitor,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'All booth banners removal', req.user?.id);
       throw error;
     }
   }

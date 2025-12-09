@@ -1,6 +1,7 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST, CREATE_EVENT, UPDATE_EVENT, ATTENDANCE_LOADING, ATTENDANCE_ERROR, REGISTERED_PARTICIPANTS_WITH_ATTENDANCE } from '../constants/actionTypes';
+import { EVENT_BY_ID, EVENT_LIST, EVENT_DELETE, EVENT_FILTER_LIST, EXHIBITOR_LIST, GALLERY_LIST, PARTICIPATED_EVENTS, UPCOMING_EVENT_LIST, UPDATE_EVENT_TAB_VISIBILITY, EVENT_LOADING, COUNTRY_LIST, SPEAKER_LIST, CATEGORY_LIST, CREATE_EVENT, UPDATE_EVENT, ATTENDANCE_LOADING, ATTENDANCE_ERROR, REGISTERED_PARTICIPANTS_WITH_ATTENDANCE, EVENT_BOOTH_LIST } from '../constants/actionTypes';
+import { buildUrlWithParams } from '../../utils/buildQueryParams';
 
 // Helper function to dispatch loading state
 const setEventLoading = (dispatch, loading) => {
@@ -682,6 +683,42 @@ export const getEventSpeakers = (eventId) => async (dispatch) => {
         console.error('Error fetching event speakers:', error);
         // Don't show toast error here, let caller handle it
         return { success: false, data: [] };
+    }
+};
+
+// Get event booths with search filter and pagination
+export const getEventBooths = (eventId, filters = {}) => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        
+        // Build URL with query parameters
+        const url = buildUrlWithParams(`/events/${eventId}/booths`, filters);
+        
+        const response = await axiosInstance.get(url);
+        
+        dispatch({
+            type: EVENT_BOOTH_LIST,
+            payload: {
+                data: response.data?.data || [],
+                pagination: response.data?.metadata || {}
+            }
+        });
+        
+        return {
+            success: true,
+            data: response.data?.data || [],
+            pagination: response.data?.metadata || {}
+        };
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch event booths';
+        toast.error(errorMessage);
+        return {
+            success: false,
+            data: [],
+            pagination: {}
+        };
+    } finally {
+        setEventLoading(dispatch, false);
     }
 };
 
