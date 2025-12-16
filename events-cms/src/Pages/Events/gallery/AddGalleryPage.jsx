@@ -286,8 +286,8 @@ const AddGalleryPage = () => {
     };
 
     const handleCancel = () => {
-        // Navigate back to gallery page
-        navigate(`${EVENT_PATHS.GALLERY}`);
+        // Navigate back to previous page in browser history
+        navigate(-1);
     };
 
     // Cleanup preview URLs

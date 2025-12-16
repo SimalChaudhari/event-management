@@ -94,7 +94,7 @@ const ViewExhibitorPage = () => {
         try {
             await dispatch(exhibitorById(id));
         } catch (error) {
-            console.error('Failed to load exhibitor data:', error);
+            // Failed to load exhibitor data
         }
     };
 
@@ -279,7 +279,7 @@ const ViewExhibitorPage = () => {
                 await dispatch(deleteExhibitorEventImage(id, deleteParams.id));
             }
         } catch (error) {
-            console.error('Delete error:', error);
+            // Delete error
         } finally {
             setIsDeleting(false);
             setShowConfirmModal(false);
@@ -321,7 +321,7 @@ const ViewExhibitorPage = () => {
                 </div>
                 <Row>
                     {exhibitor.flyers.map((flyer, index) => (
-                        <Col md={4} lg={3} key={flyer.id || index} className="mb-3">
+                        <Col md={4} lg={3} key={`flyer-${index}-${flyer.id || 'no-id'}`} className="mb-3">
                             <Card>
                                 <div style={{ position: 'relative' }}>
                                     <Card.Img
@@ -415,7 +415,7 @@ const ViewExhibitorPage = () => {
                 </div>
                 <Row>
                     {exhibitor.eventImages.map((eventImage, index) => (
-                        <Col md={4} lg={3} key={eventImage.id || index} className="mb-3">
+                        <Col md={4} lg={3} key={`eventImage-${index}-${eventImage.id || 'no-id'}`} className="mb-3">
                             <Card>
                                 <div style={{ position: 'relative' }}>
                                     <Card.Img
@@ -509,7 +509,7 @@ const ViewExhibitorPage = () => {
                     const bannerUrl = isLink ? bannerValue : `${API_URL}/${bannerValue.replace(/\\/g, '/')}`;
 
                     return (
-                        <Col md={4} lg={3} key={index} className="mb-3">
+                        <Col md={4} lg={3} key={`boothBanner-${index}-${banner.id || bannerValue || 'no-id'}`} className="mb-3">
                             <Card>
                                 {isLink ? (
                                     <Card.Body className="text-center p-4">
@@ -613,7 +613,7 @@ const ViewExhibitorPage = () => {
                 <div className="documents-list">
                     {exhibitor.documents.map((doc, index) => (
                         <div
-                            key={doc.id || index}
+                            key={`document-${index}-${doc.id || 'no-id'}`}
                             style={{
                                 backgroundColor: '#f8f9fa',
                                 border: '1px solid #e9ecef',
@@ -885,7 +885,6 @@ const ViewExhibitorPage = () => {
                                 borderRadius: '8px'
                             }}
                             onError={(e) => {
-                                console.error('Modal image failed to load:', imageSrc);
                                 e.target.style.display = 'none';
                             }}
                         />
@@ -1304,7 +1303,7 @@ const ViewExhibitorPage = () => {
 
                                             return (
                                                 <div
-                                                    key={index}
+                                                    key={`socialMedia-${index}-${item.platform || item.link || 'no-id'}`}
                                                     style={{
                                                         display: 'flex',
                                                         alignItems: 'center',

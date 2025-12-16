@@ -4,6 +4,8 @@ import { Button, Row, Col, Card, Container, Modal, Alert, Badge } from 'react-bo
 import { useDispatch } from 'react-redux';
 import { getGalleryById } from '../../../store/actions/galleryActions';
 import { MEDIA_MANAGER_PATHS, EVENT_PATHS } from '../../../utils/constants';
+import { DUMMY_PATH_GALLERY } from '../../../configs/env';
+import ImageWithFallback from '../../../components/common/ImageWithFallback';
 
 const ViewGalleryPage = () => {
     const { id } = useParams();
@@ -14,6 +16,17 @@ const ViewGalleryPage = () => {
     // For image modal
     const [showImageModal, setShowImageModal] = useState(false);
     const [currentImage, setCurrentImage] = useState('');
+    // For responsive design
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         const loadData = async () => {
@@ -66,28 +79,29 @@ const ViewGalleryPage = () => {
             style={{
                 backgroundColor: '#fff',
                 borderRadius: '8px',
-                padding: '20px',
+                padding: isMobile ? '15px' : '20px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 border: '1px solid #e9ecef',
                 borderLeft: `4px solid ${borderColor}`
             }}
         >
-            <div style={{ padding: '24px' }}>
+            <div style={{ padding: isMobile ? '12px' : '24px' }}>
                 <h5
                     style={{
-                        fontSize: '18px',
+                        fontSize: isMobile ? '16px' : '18px',
                         fontWeight: '600',
                         color: '#2c3e50',
-                        marginBottom: '20px',
+                        marginBottom: isMobile ? '15px' : '20px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
                         borderBottom: `2px solid ${borderColor}`,
-                        paddingBottom: '8px'
+                        paddingBottom: '8px',
+                        flexWrap: 'wrap'
                     }}
                 >
-                    <i className={iconClass} style={{ fontSize: '20px', color: getIconColor(iconClass) }}></i>
-                    {title}
+                    <i className={iconClass} style={{ fontSize: isMobile ? '16px' : '20px', color: getIconColor(iconClass) }}></i>
+                    <span>{title}</span>
                 </h5>
                 {children}
             </div>
@@ -100,15 +114,35 @@ const ViewGalleryPage = () => {
             style={{
                 borderBottom: '1px solid #f1f1f1',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: isMobile ? 'flex-start' : 'space-between',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                gap: isMobile ? '8px' : '0'
             }}
         >
-            <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', minWidth: '140px' }}>
+            <span 
+                className="field-label" 
+                style={{ 
+                    fontWeight: 'bold', 
+                    color: '#495057', 
+                    fontSize: isMobile ? '13px' : '14px',
+                    minWidth: isMobile ? 'auto' : '140px'
+                }}
+            >
                 {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
                 {label}:
             </span>
-            <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px', textAlign: 'right', flex: 1 }}>
+            <span 
+                className="field-value" 
+                style={{ 
+                    color: '#212529', 
+                    fontWeight: 'normal', 
+                    fontSize: isMobile ? '14px' : '15px', 
+                    textAlign: isMobile ? 'left' : 'right', 
+                    flex: 1,
+                    wordBreak: 'break-word'
+                }}
+            >
                 {value}
             </span>
         </div>
@@ -119,29 +153,56 @@ const ViewGalleryPage = () => {
             <Container fluid className="mt-4">
                 <div
                     className="mb-3"
-                    style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                    style={{ 
+                        backgroundColor: '#fff', 
+                        borderRadius: '8px', 
+                        padding: isMobile ? '15px' : '20px', 
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+                    }}
                 >
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View Gallery</h4>
-                        <div className="d-flex gap-2">
-                            <Button variant="primary" onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}>
-                                <i style={{ marginRight: '10px' }} className="fas fa-edit me-2"></i>
-                                Edit Gallery
+                    <div className={`d-flex ${isMobile ? 'flex-column' : 'justify-content-between'} align-items-${isMobile ? 'start' : 'center'} gap-3`}>
+                        <h4 
+                            className="card-title mb-0"
+                            style={{ 
+                                fontSize: isMobile ? '18px' : '24px',
+                                fontWeight: '600'
+                            }}
+                        >
+                            View Gallery
+                        </h4>
+                        <div 
+                            className='d-flex'
+                            style={{ gap: '5px', marginTop: isMobile ? '5PX' : '' }}
+                        >
+                            <Button 
+                                variant="primary" 
+                                onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}
+                                className={isMobile ? 'flex-fill' : ''}
+                                size={isMobile ? 'sm' : undefined}
+                                style={{ marginRight: isMobile ? '0' : '5px' }}
+                            >
+                                <i className="fas fa-edit me-2"></i>
+                                Edit
                             </Button>
-                            <Button variant="secondary" onClick={() => navigate(MEDIA_MANAGER_PATHS.GALLERY)}>
-                                <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => navigate(-1)}
+                                className={isMobile ? 'flex-fill' : ''}
+                                size={isMobile ? 'sm' : undefined}
+                            >
+                                <i className="fas fa-arrow-left me-2"></i>
                                 Back
                             </Button>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-2 bg-light">
+                <div className="p-2 bg-light" style={{ padding: isMobile ? '8px' : '16px' }}>
                     {/* Gallery Information Section */}
                     <InfoCard title="Gallery Information" iconClass="fas fa-image" borderColor="#3498db">
                         <Row>
-                            <Col lg={6} md={12}>
-                                <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                            <Col lg={6} md={12} className="mb-3 mb-md-0">
+                                <div style={{ fontSize: isMobile ? '14px' : '15px', lineHeight: '1.6' }}>
                                     <InfoField 
                                         label="Gallery Title" 
                                         value={galleryData.title} 
@@ -155,7 +216,7 @@ const ViewGalleryPage = () => {
                                     <InfoField 
                                         label="Total Images" 
                                         value={
-                                            <Badge bg="info" className="px-3 py-1">
+                                            <Badge bg="info" className="px-3 py-1" style={{ fontSize: isMobile ? '12px' : '14px' }}>
                                                 {galleryData.galleryImages?.length || 0} images
                                             </Badge>
                                         } 
@@ -164,7 +225,7 @@ const ViewGalleryPage = () => {
                                 </div>
                             </Col>
                             <Col lg={6} md={12}>
-                                <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                <div style={{ fontSize: isMobile ? '14px' : '15px', lineHeight: '1.6' }}>
                                     <InfoField 
                                         label="Location" 
                                         value={galleryData.event?.location || 'N/A'} 
@@ -192,16 +253,17 @@ const ViewGalleryPage = () => {
                     {/* Gallery Images Section */}
                     <InfoCard title="Gallery Images" iconClass="fas fa-images" borderColor="#28a745">
                         {galleryData.galleryImages && galleryData.galleryImages.length > 0 ? (
-                            <Row>
+                            <Row className="g-3">
                                 {galleryData.galleryImages.map((imagePath, index) => (
-                                    <Col lg={3} md={4} sm={6} xs={12} key={index} className="mb-3">
+                                    <Col lg={3} md={4} sm={6} xs={12} key={index}>
                                         <div style={{ position: 'relative' }}>
-                                            <img 
-                                                src={`${process.env.REACT_APP_API_URL}/${imagePath}`} 
-                                                alt="Gallery" 
+                                            <ImageWithFallback
+                                                src={`${process.env.REACT_APP_API_URL}/${imagePath}`}
+                                                alt={`Gallery Image ${index + 1}`}
+                                                onClick={() => handleImageClick(imagePath)}
                                                 style={{
                                                     width: '100%',
-                                                    height: '200px',
+                                                    height: isMobile ? '180px' : '200px',
                                                     objectFit: 'cover',
                                                     borderRadius: '8px',
                                                     border: '2px solid #28a745',
@@ -209,26 +271,17 @@ const ViewGalleryPage = () => {
                                                     transition: 'transform 0.2s',
                                                     boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
                                                 }}
-                                                onClick={() => handleImageClick(imagePath)}
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.transform = 'scale(1.05)';
-                                                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.transform = 'scale(1)';
-                                                    e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                                                }}
                                             />
                                             <div
                                                 style={{
                                                     position: 'absolute',
-                                                    top: '10px',
-                                                    right: '10px',
+                                                    top: isMobile ? '8px' : '10px',
+                                                    right: isMobile ? '8px' : '10px',
                                                     backgroundColor: 'rgba(0,0,0,0.7)',
                                                     color: 'white',
-                                                    padding: '8px 10px',
+                                                    padding: isMobile ? '6px 8px' : '8px 10px',
                                                     borderRadius: '50%',
-                                                    fontSize: '14px',
+                                                    fontSize: isMobile ? '12px' : '14px',
                                                     cursor: 'pointer',
                                                     transition: 'all 0.2s'
                                                 }}
@@ -241,11 +294,40 @@ const ViewGalleryPage = () => {
                                 ))}
                             </Row>
                         ) : (
-                            <Alert variant="info" className="text-center">
-                                <i className="fas fa-info-circle fa-2x mb-3"></i>
-                                <h5>No images in this gallery</h5>
-                                <p className="text-muted">This gallery doesn't have any images yet</p>
-                            </Alert>
+                            <Row>
+                                <Col xs={12} className="text-center">
+                                    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '400px', width: '100%' }}>
+                                        <ImageWithFallback
+                                            src={DUMMY_PATH_GALLERY}
+                                            alt="No Gallery Images"
+                                            style={{
+                                                width: '100%',
+                                                height: '300px',
+                                                objectFit: 'cover',
+                                                borderRadius: '8px',
+                                                border: '2px solid #e9ecef',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                            }}
+                                        />
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: '20px',
+                                                left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                                color: 'white',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                fontSize: '14px'
+                                            }}
+                                        >
+                                            <i className="fas fa-images me-2"></i>
+                                            No images in this gallery
+                                        </div>
+                                    </div>
+                                </Col>
+                            </Row>
                         )}
                     </InfoCard>
                 </div>
@@ -274,18 +356,21 @@ const ViewGalleryPage = () => {
                         onClick={() => setShowImageModal(false)}
                         style={{
                             position: 'fixed',
-                            top: '20px',
-                            right: '20px',
+                            top: isMobile ? '10px' : '20px',
+                            right: isMobile ? '10px' : '20px',
                             borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
+                            width: isMobile ? '35px' : '40px',
+                            height: isMobile ? '35px' : '40px',
                             zIndex: 1000,
                             backgroundColor: 'rgba(0,0,0,0.7)',
                             border: 'none',
-                            color: 'white'
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
                     >
-                        <i className="fas fa-times"></i>
+                        <i className="fas fa-times" style={{ fontSize: isMobile ? '14px' : '16px' }}></i>
                     </Button>
 
                     {/* Download Button */}
@@ -300,18 +385,21 @@ const ViewGalleryPage = () => {
                         }}
                         style={{
                             position: 'fixed',
-                            top: '20px',
-                            left: '20px',
+                            top: isMobile ? '10px' : '20px',
+                            left: isMobile ? '10px' : '20px',
                             borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
+                            width: isMobile ? '35px' : '40px',
+                            height: isMobile ? '35px' : '40px',
                             zIndex: 1000,
                             backgroundColor: 'rgba(0,0,0,0.7)',
                             border: 'none',
-                            color: 'white'
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
                     >
-                        <i className="fas fa-download"></i>
+                        <i className="fas fa-download" style={{ fontSize: isMobile ? '14px' : '16px' }}></i>
                     </Button>
 
                     {/* Image Container */}
@@ -320,11 +408,11 @@ const ViewGalleryPage = () => {
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
+                            minHeight: isMobile ? '70vh' : '90vh',
+                            padding: isMobile ? '40px 20px' : '60px 80px 80px 80px'
                         }}
                     >
-                        <img
+                        <ImageWithFallback
                             src={`${process.env.REACT_APP_API_URL}/${currentImage}`}
                             alt="Gallery"
                             style={{

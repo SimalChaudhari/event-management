@@ -258,7 +258,6 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
                     }
                 });
             }
-            console.log('Loaded', data.length, 'registered events. Total:', metadata?.total);
         },
         restoreTablePage: restoreTablePage,
         pageLength: 10,
@@ -473,7 +472,7 @@ const RegisteredEvents = () => {
                 }
             }
         } catch (error) {
-            console.error('Error deleting registration:', error);
+            // Error deleting registration
         } finally {
             setDeleteLoading(false);
         }
@@ -629,7 +628,7 @@ const RegisteredEvents = () => {
             await dispatch(exportRegisteredUsersByEvent(selectedEventId));
             setShowExportModal(false);
         } catch (error) {
-            console.error('Error exporting registered users:', error);
+            // Error exporting registered users
         } finally {
             setIsExporting(false);
         }
@@ -668,7 +667,7 @@ const RegisteredEvents = () => {
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
-            console.error('Error initializing registered events table:', error);
+            // Error initializing registered events table
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destroyTable, handleView, handleEdit, handleDelete, handleAddRegisterEvent]);

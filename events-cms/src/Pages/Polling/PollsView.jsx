@@ -226,7 +226,7 @@ const PollsView = () => {
                 await dispatch(eventList());
                 await dispatch(speakerList());
             } catch (error) {
-                console.error('Error fetching initial data:', error);
+                // Error fetching initial data
             }
         };
         fetchData();
@@ -234,8 +234,6 @@ const PollsView = () => {
 
     // Flatten and filter polls data for DataTable
     useEffect(() => {
-        console.log('Polls state:', polls);
-
         if (polls?.data && Array.isArray(polls.data)) {
             let processedPolls = [];
 
@@ -314,7 +312,7 @@ const PollsView = () => {
                 setSelectedPollName('');
                 dispatch(getAllPollsForAdmin());
             } catch (error) {
-                console.error('Error deleting poll:', error);
+                // Error deleting poll
             }
         }
     }, [dispatch, selectedPollId]);
@@ -325,7 +323,7 @@ const PollsView = () => {
                 await dispatch(togglePollLive(id));
                 dispatch(getAllPollsForAdmin());
             } catch (error) {
-                console.error('Error toggling poll status:', error);
+                // Error toggling poll status
             }
         },
         [dispatch]

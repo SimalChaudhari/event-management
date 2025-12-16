@@ -583,12 +583,12 @@ const logsRoutes = [
         name: 'System Logs',
         component: logsComponents.LogsPage
     },
-    {
-        path: LOGS_PATHS.LOG_DETAILS,
-        exact: true,
-        name: 'Log Details',
-        component: logsComponents.LogDetailsPage
-    }
+    // {
+    //     path: LOGS_PATHS.LOG_DETAILS,
+    //     exact: true,
+    //     name: 'Log Details',
+    //     component: logsComponents.LogDetailsPage
+    // }
 ];
 
 /**

@@ -180,7 +180,6 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
                     }
                 });
             }
-            console.log('Loaded', data.length, 'upcoming events. Total:', metadata?.total);
         },
         restoreTablePage: restoreTablePage,
         pageLength: 10,
@@ -301,7 +300,6 @@ const UpcomingEvents = () => {
                     
                     // Check if date is valid
                     if (isNaN(eventDate.getTime())) {
-                        console.warn('Invalid date for event:', event.id, event.startDate);
                         return true; // Include events with invalid dates (don't exclude)
                     }
                     
@@ -310,7 +308,6 @@ const UpcomingEvents = () => {
                     // Only include events where startDate is today or in the future
                     return eventDate >= today;
                 } catch (error) {
-                    console.warn('Error parsing date for event:', event.id, error);
                     return true; // Include events with date parsing errors (don't exclude)
                 }
             });
@@ -381,7 +378,6 @@ const UpcomingEvents = () => {
 
     const handleQA = useCallback((data) => {
         // Handle Q&A navigation if needed
-        console.log('Q&A for event:', data);
     }, []);
 
     const initializeTable = useCallback(() => {
@@ -407,7 +403,7 @@ const UpcomingEvents = () => {
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
-            console.error('Error initializing upcoming events table:', error);
+            // Error initializing upcoming events table
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleQA]);
@@ -460,7 +456,7 @@ const UpcomingEvents = () => {
             destroyTable();
             // Redux state is updated directly in the action, no need to refetch
         } catch (error) {
-            console.error('Delete failed:', error);
+            // Delete failed
         } finally {
             setIsDeleting(false);
         }

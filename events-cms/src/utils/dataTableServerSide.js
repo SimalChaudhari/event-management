@@ -54,8 +54,6 @@ export const initializeServerSideDataTable = ({
             // Get current ajaxParams (support both object and function)
             const currentAjaxParams = typeof ajaxParams === 'function' ? ajaxParams() : ajaxParams;
             
-            console.log('DataTable ajax: currentAjaxParams', currentAjaxParams);
-            
             // Determine default sortBy based on order or column index
             let defaultSortBy = 'updatedAt';
             if (order && order.length > 0) {
@@ -88,8 +86,6 @@ export const initializeServerSideDataTable = ({
                 filters.search = data.search.value.trim();
             }
             
-            console.log('DataTable ajax: filters before cleaning', filters);
-            
             // Clean filters - remove null/undefined/empty/'all' values
             const cleanedFilters = {};
             Object.keys(filters).forEach(key => {
@@ -119,9 +115,6 @@ export const initializeServerSideDataTable = ({
                     }
                 }
             });
-            
-            console.log('DataTable: Sending filters to backend', cleanedFilters);
-            console.log('DataTable: eventName in cleanedFilters', cleanedFilters.eventName, 'type:', typeof cleanedFilters.eventName, 'length:', cleanedFilters.eventName?.length);
             
             // Build query parameters using reusable utility
             const urlSearchParams = buildQueryParams(cleanedFilters);
@@ -167,7 +160,6 @@ export const initializeServerSideDataTable = ({
                         }
                     })
                     .catch(error => {
-                        console.error('DataTables AJAX error:', error);
                         callback({
                             draw: data.draw,
                             recordsTotal: 0,
@@ -209,7 +201,6 @@ export const initializeServerSideDataTable = ({
                         }
                     },
                     error: function (xhr, error, thrown) {
-                        console.error('DataTables AJAX error:', error);
                         callback({
                             draw: data.draw,
                             recordsTotal: 0,

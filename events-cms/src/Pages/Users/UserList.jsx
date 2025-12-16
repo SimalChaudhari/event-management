@@ -201,7 +201,6 @@ function userTable(
         loadingActionType: USER_LOADING, // Use USER_LOADING to show GlobalLoader
         onDataLoaded: (data, metadata) => {
             // Optional: Store data in Redux or handle it
-            console.log('Loaded', data.length, 'users. Total:', metadata?.total);
         },
         restoreTablePage: restoreTablePage,
         initCompleteCallback: function (settings, json, api) {
@@ -324,7 +323,7 @@ const UserList = () => {
                 setShowConfirmModal(false);
                 // deleteUserData already updates Redux directly, no need to fetch again
             } catch (error) {
-                console.error('Error deleting user:', error);
+                // Error deleting user
             }
         }
         setIsLoading(false);
@@ -363,9 +362,9 @@ const UserList = () => {
         setIsExporting(true);
         try {
             await exportUsersData();
-            setShowExportConfirmModal(false);
+                setShowExportConfirmModal(false);
         } catch (error) {
-            console.error('Error exporting users:', error);
+            // Error exporting users
         } finally {
             setIsExporting(false);
         }
@@ -409,7 +408,7 @@ const UserList = () => {
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
-            console.error('Error initializing user table:', error);
+            // Error initializing user table
         }
     };
 

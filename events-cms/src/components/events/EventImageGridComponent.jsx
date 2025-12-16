@@ -12,7 +12,7 @@ const EventImageGridComponent = ({ images, getImageSrc, handleEventImageClick })
     if (!images || images.length === 0) {
         return (
             <StandardComponentTemplate 
-                title={`Event Images ${images?.length || 0}`}  
+                title={`Images ${images?.length || 0}`}  
                 // icon="🖼️"
                 borderColor="purple"
             >
@@ -94,7 +94,7 @@ const EventImageGridComponent = ({ images, getImageSrc, handleEventImageClick })
 
     return (
         <StandardComponentTemplate 
-            title={`Event Images(${images?.length || 0})`} 
+            title={`Images(${images?.length || 0})`} 
             // icon="🖼️"
             borderColor="purple"
         >

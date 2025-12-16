@@ -202,7 +202,6 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
                     }
                 });
             }
-            console.log('Loaded', data.length, 'events. Total:', metadata?.total);
         },
         restoreTablePage: restoreTablePage,
         pageLength: 10,
@@ -393,7 +392,6 @@ const EventView = () => {
                     navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
                 }
             } catch (error) {
-                console.error('Error checking gallery:', error);
                 navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
             }
         },
@@ -429,7 +427,7 @@ const EventView = () => {
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
-            console.error('Error initializing event table:', error);
+            // Error initializing event table
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA]);
@@ -488,7 +486,7 @@ const EventView = () => {
                 tableRef.current.ajax.reload();
             }
         } catch (error) {
-            console.error('Delete failed:', error);
+            // Delete failed
         } finally {
             setIsDeleting(false);
         }

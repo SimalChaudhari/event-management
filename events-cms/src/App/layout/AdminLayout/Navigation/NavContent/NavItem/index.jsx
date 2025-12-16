@@ -29,7 +29,7 @@ const NavItem = (props) => {
             </a>);
     }
     else {
-        subContent = (<NavLink to={props.item.url} className="nav-link" exact={true} target={itemTarget}>
+        subContent = (<NavLink to={props.item.url} className="nav-link" end target={itemTarget}>
                 <NavIcon items={props.item}/>
                 {itemTitle}
                 <NavBadge layout={layout} items={props.item}/>

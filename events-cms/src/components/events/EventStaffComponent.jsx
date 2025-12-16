@@ -39,8 +39,7 @@ const EventStaffComponent = ({ eventStaff, showTitle = true }) => {
             : '?';
 
         return (
-            <Col key={staff.id} xs={12} sm={6} md={4} lg={3} className="mb-3">
-                <div className="card border-0 shadow-sm h-100" style={{
+            <div className="card border-0 shadow-sm h-100" style={{
                     borderRadius: '12px',
                     transition: 'all 0.3s ease',
                     overflow: 'hidden',
@@ -184,7 +183,6 @@ const EventStaffComponent = ({ eventStaff, showTitle = true }) => {
                         )}
                     </div>
                 </div>
-            </Col>
         );
     };
 
@@ -196,7 +194,11 @@ const EventStaffComponent = ({ eventStaff, showTitle = true }) => {
                 </p>
             )}
             <Row>
-                {eventStaff.map(renderStaffCard)}
+                {eventStaff.map((staff, index) => (
+                    <Col key={`eventStaff-${index}-${staff.id || 'no-id'}`} xs={12} sm={6} md={4} lg={3} className="mb-3">
+                        {renderStaffCard(staff)}
+                    </Col>
+                ))}
             </Row>
         </div>
     );
