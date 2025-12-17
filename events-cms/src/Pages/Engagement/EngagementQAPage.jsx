@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Card, Table, Row, Col, Badge, Button, Alert, Form, Modal, InputGroup } from 'react-bootstrap';
+import { Card, Table, Row, Col, Badge, Button, Alert, Form, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { getEngagementQAQuestions, answerEngagementQuestion, deleteEngagementQuestion } from '../../store/actions/engagementQnaActions';
@@ -12,42 +12,175 @@ import axiosInstance from '../../configs/axiosInstance';
 import * as $ from 'jquery';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../assets/css/event.css';
+import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import { ENGAGEMENT_QNA_LOADING } from '../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function engagementQaTable(data, engagementData, handleBack, handleAnswer, handleView, handleDelete) {
-    let tableZero = '#engagement-qa-data-table';
-    $.fn.dataTable.ext.errMode = 'throw';
+const EngagementQAPage = () => {
+    const { engagementId } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const dispatch = useDispatch();
 
-    // Preserve the current page
-    let currentPage = 0;
-    if ($.fn.DataTable.isDataTable(tableZero)) {
-        currentPage = $(tableZero).DataTable().page();
-        $(tableZero).DataTable().clear().destroy();
-    }
+    const { selectedEngagement } = useSelector((state) => state.engagement);
+    const { loading, pagination } = useSelector((state) => state.engagementQna);
 
-    $(tableZero).DataTable({
-        data: data || [],
-        order: [[4, 'desc']], // Sort by date descending
-        searching: true,
-        searchDelay: 500,
-        pageLength: 10,
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers',
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'back-button ml-2'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        columns: [
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sessionFilterId, setSessionFilterId] = useState(null);
+    const [statusFilterOptions, setStatusFilterOptions] = useState([
+        { value: 'all', label: 'All Questions' },
+        { value: 'not_answered', label: 'Not Answered' },
+        { value: 'answered', label: 'Answered' },
+    ]);
+    
+    // Reset filter options when context changes (engagementId or sessionId)
+    useEffect(() => {
+        // Reset to default options when context changes
+        setStatusFilterOptions([
+            { value: 'all', label: 'All Questions' },
+            { value: 'not_answered', label: 'Not Answered' },
+            { value: 'answered', label: 'Answered' },
+        ]);
+        setStatusFilter('all');
+        statusFilterRef.current = 'all';
+    }, [engagementId, sessionFilterId]);
+    
+    // Answer modal state
+    const [showAnswerModal, setShowAnswerModal] = useState(false);
+    const [selectedQuestion, setSelectedQuestion] = useState(null);
+    
+    // Delete modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    
+    const tableRef = useRef(null);
+    const statusFilterRef = useRef('all');
+    const sessionFilterIdRef = useRef(null);
+    const engagementIdRef = useRef(engagementId);
+    const isTableInitializedRef = useRef(false);
+    const { restoreTablePage } = usePersistedTablePage();
+
+    // Update refs when values change
+    useEffect(() => {
+        statusFilterRef.current = statusFilter;
+    }, [statusFilter]);
+
+    useEffect(() => {
+        sessionFilterIdRef.current = sessionFilterId;
+    }, [sessionFilterId]);
+
+    useEffect(() => {
+        engagementIdRef.current = engagementId;
+    }, [engagementId]);
+
+    // Read sessionId from query - initialize ref immediately
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const sId = params.get('sessionId');
+        const sessionIdValue = sId || null;
+        sessionFilterIdRef.current = sessionIdValue;
+        setSessionFilterId(sessionIdValue);
+    }, [location.search]);
+
+    // Load engagement (if valid)
+    useEffect(() => {
+        const hasValidEngagement = engagementId && engagementId !== 'unknown';
+        if (hasValidEngagement) {
+            dispatch(getEngagementById(engagementId));
+        }
+    }, [dispatch, engagementId]);
+
+    const handleBack = useCallback(() => {
+        navigate(-1);
+    }, [navigate]);
+
+    const handleAnswer = useCallback((question) => {
+        setSelectedQuestion(question);
+        setShowAnswerModal(true);
+    }, []);
+
+    const handleView = useCallback((question) => {
+        const currentEngagementId = engagementIdRef.current;
+        const currentSessionId = sessionFilterIdRef.current;
+        
+        // Get engagementId from question data if available
+        const questionEngagementId = question?.engagementId || question?.engagement?.id;
+        
+        // Use engagementId from question, then ref, then 'unknown' as fallback
+        const engagementIdToUse = questionEngagementId || (currentEngagementId && currentEngagementId !== 'unknown' ? currentEngagementId : 'unknown');
+        
+        // Navigate with engagementId (required by route)
+        navigate(`/engagement/qa/${engagementIdToUse}/view/${question.id}${currentSessionId ? `?sessionId=${currentSessionId}` : ''}`);
+    }, [navigate]);
+
+    const handleDelete = useCallback((question) => {
+        setSelectedQuestion(question);
+        setShowDeleteModal(true);
+    }, []);
+
+    const handleAnswerSubmit = useCallback(async () => {
+        // Reload table after answer
+        if (tableRef.current) {
+            tableRef.current.ajax.reload(null, false);
+        }
+    }, []);
+
+    const handleDeleteSubmit = useCallback(async () => {
+        // Reload table after delete
+        if (tableRef.current) {
+            tableRef.current.ajax.reload(null, false);
+        }
+    }, []);
+
+    const handleStatusFilterChange = useCallback((newStatus) => {
+        // Update ref immediately before state update
+        statusFilterRef.current = newStatus;
+        setStatusFilter(newStatus);
+        // Reload table with new filter immediately
+        if (tableRef.current) {
+            tableRef.current.ajax.reload(null, false);
+        }
+    }, []);
+
+    // Initialize server-side DataTable
+    useEffect(() => {
+        // Prevent multiple initializations
+        if (isTableInitializedRef.current && tableRef.current) {
+            return;
+        }
+        
+        const currentEngagementId = engagementIdRef.current;
+        const currentSessionId = sessionFilterIdRef.current;
+        
+        // At least one of engagementId or sessionId must be present
+        if (!currentEngagementId && !currentSessionId) {
+            return; // Wait for one of them to be set
+        }
+        
+        // Destroy existing table if any
+        if (tableRef.current) {
+            try {
+                tableRef.current.destroy();
+            } catch (e) {
+                // Ignore destroy errors
+            }
+            tableRef.current = null;
+        }
+        
+        isTableInitializedRef.current = true;
+
+        const columns = [
             {
                 data: 'question',
                 title: 'Question / Answer',
+                orderable: true,
                 render: function (data, type, row) {
-                    const questionText = row.question;
+                    if (type === 'sort' || type === 'type') {
+                        return (data || '') + ' ' + (row.answer || '');
+                    }
+                    const questionText = row.question || '';
                     const truncatedQuestion = questionText.length > 100 ? questionText.substring(0, 100) + '...' : questionText;
                     
                     const answerHtml = row.answer ? `
@@ -72,7 +205,11 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
             {
                 data: 'askedBy',
                 title: 'Asked By',
+                orderable: true,
                 render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.askedBy?.fullName || '';
+                    }
                     const userName = row.askedBy?.fullName || 'Unknown';
                     return `
                         <div class="d-inline-block align-middle">
@@ -84,7 +221,11 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
             {
                 data: 'likesCount',
                 title: 'Likes',
+                orderable: true,
                 render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.likesCount || 0;
+                    }
                     return `
                         <div class="text-start" style="margin-top: 10px;">
                             <span class="badge badge-light">
@@ -98,7 +239,11 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
             {
                 data: 'status',
                 title: 'Status',
+                orderable: true,
                 render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.status || (row.answer ? 'answered' : 'not_answered');
+                    }
                     const status = row.status || (row.answer ? 'answered' : 'not_answered');
                     let badgeClass = 'badge-secondary';
                     let statusText = status;
@@ -123,7 +268,11 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
             {
                 data: 'createdAt',
                 title: 'Date',
+                orderable: true,
                 render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.createdAt || '';
+                    }
                     return formatDateTimeForTable(row.createdAt);
                 }
             },
@@ -150,235 +299,231 @@ function engagementQaTable(data, engagementData, handleBack, handleAnswer, handl
                     `;
                 }
             }
-        ],
-        initComplete: function (settings, json) {
-            // Add back button
-            if (!$('#backBtn').length) {
-                $('.back-button').html(`
-                    <button class="btn btn-secondary d-flex align-items-center ml-2" id="backBtn">
-                        <i class="feather icon-arrow-left mr-1"></i>
-                        Back
-                    </button>
-                `);
+        ];
 
-                $('#backBtn').on('click', handleBack);
-            }
-        }
-    });
-
-    // Restore the page
-    $(tableZero).DataTable().page(currentPage).draw(false);
-
-    // Attach event listeners for actions
-    $(document).on('click', '.view-btn', function () {
-        const questionId = $(this).data('id');
-        const questionData = data.find((q) => q.id === questionId);
-        if (questionData) {
-            handleView(questionData);
-        }
-    });
-
-    $(document).on('click', '.answer-btn', function () {
-        const questionId = $(this).data('id');
-        const questionData = data.find((q) => q.id === questionId);
-        if (questionData) {
-            handleAnswer(questionData);
-        }
-    });
-
-    $(document).on('click', '.delete-btn', function () {
-        const questionId = $(this).data('id');
-        const questionData = data.find((q) => q.id === questionId);
-        if (questionData) {
-            handleDelete(questionData);
-        }
-    });
-}
-
-const EngagementQAPage = () => {
-    const { engagementId } = useParams();
-    const location = useLocation();
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
-
-    const { selectedEngagement } = useSelector((state) => state.engagement);
-    const { engagementQuestions, loading } = useSelector((state) => state.engagementQna);
-
-    const [filteredQaData, setFilteredQaData] = useState(null);
-    const [currentTable, setCurrentTable] = useState(null);
-    const [statusFilter, setStatusFilter] = useState('all');
-    
-    // Answer modal state
-    const [showAnswerModal, setShowAnswerModal] = useState(false);
-    const [selectedQuestion, setSelectedQuestion] = useState(null);
-    
-    // Delete modal state
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    
-
-    // Read sessionId from query
-    const [sessionFilterId, setSessionFilterId] = useState(null);
-    useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const sId = params.get('sessionId');
-        setSessionFilterId(sId || null);
-    }, [location.search]);
-
-    // Load engagement (if valid) and fetch questions (by sessionId if present)
-    useEffect(() => {
-        const hasValidEngagement = engagementId && engagementId !== 'unknown';
-        if (hasValidEngagement) {
-            dispatch(getEngagementById(engagementId));
-        }
-        if (sessionFilterId) {
-            dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
-        } else if (hasValidEngagement) {
-            dispatch(getEngagementQAQuestions(engagementId));
-        }
-    }, [dispatch, engagementId, sessionFilterId]);
-
-    // Filter questions based on status filter
-    useEffect(() => {
-        if (engagementQuestions) {
-            let filtered = engagementQuestions;
+        // Get ajaxParams function that includes sessionId filter (status is handled in fetchAction)
+        const getAjaxParams = () => {
+            const params = {};
+            const currentSessionId = sessionFilterIdRef.current;
             
-            if (statusFilter !== 'all') {
-                filtered = engagementQuestions.filter(question => {
-                    const status = question.status || (question.answer ? 'answered' : 'not_answered');
-                    return status === statusFilter;
+            if (currentSessionId) {
+                params.sessionId = currentSessionId;
+            }
+            
+            return params;
+        };
+
+        // Fetch action wrapper - always reads latest ref values
+        const fetchAction = (filters) => {
+            // Read latest values from refs (they're always up-to-date)
+            const currentEngagementId = engagementIdRef.current;
+            const currentSessionId = sessionFilterIdRef.current;
+            const currentStatus = statusFilterRef.current;
+            
+            // Start with filters from DataTables (page, limit, search, etc.)
+            const mergedFilters = {
+                ...filters,
+            };
+            
+            // Override with current filter values from refs
+            // Add status filter if not 'all' (don't send 'all' to backend)
+            if (currentStatus && currentStatus !== 'all') {
+                mergedFilters.status = currentStatus;
+            } else {
+                // Explicitly remove status if it's 'all' or not set
+                delete mergedFilters.status;
+            }
+            
+            // Add sessionId if present
+            if (currentSessionId) {
+                mergedFilters.sessionId = currentSessionId;
+            }
+            
+            // Add engagementId if valid
+            if (currentEngagementId && currentEngagementId !== 'unknown') {
+                mergedFilters.engagementId = currentEngagementId;
+            }
+            
+            return getEngagementQAQuestions(
+                mergedFilters.engagementId,
+                currentStatus !== 'all' ? currentStatus : 'all', // Pass status for action logic
+                'likes',
+                mergedFilters.sessionId,
+                mergedFilters
+            );
+        };
+
+        // Callback to update filter options from backend response
+        const onDataLoaded = (responseData, metadata, fullResponse) => {
+            // Update status filter options from backend metadata
+            if (metadata?.filterOptions?.status) {
+                setStatusFilterOptions(metadata.filterOptions.status);
+            }
+            return responseData;
+        };
+
+        // Initialize server-side DataTable
+        const tableInstance = initializeServerSideDataTable({
+            tableSelector: '#engagement-qa-data-table',
+            ajaxUrl: '/engagements/qna/questions',
+            ajaxMethod: 'GET',
+            columns: columns,
+            ajaxParams: getAjaxParams,
+            fetchAction: fetchAction,
+            onDataLoaded: onDataLoaded,
+            axiosInstance: axiosInstance,
+            dispatch: dispatch,
+            loadingActionType: ENGAGEMENT_QNA_LOADING,
+            dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'back-button ml-2'>>>" +
+                 "<'row'<'col-sm-12'tr>>" +
+                 "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            pageLength: 10,
+            lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            order: [[4, 'desc']], // Sort by date descending
+            restoreTablePage: restoreTablePage,
+            initCompleteCallback: function (settings, json, api) {
+                // Add back button
+                if (!$('#backBtn').length) {
+                    $('.back-button').html(`
+                        <button class="btn btn-secondary d-flex align-items-center ml-2" id="backBtn">
+                            <i class="feather icon-arrow-left mr-1"></i>
+                            Back
+                        </button>
+                    `);
+                    $('#backBtn').on('click', handleBack);
+                }
+
+                // Attach event listeners for actions
+                $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    const questionId = $(this).data('id');
+                    if (questionId && rowData) {
+                        handleView(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.answer-btn').on('click', '.answer-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    const questionId = $(this).data('id');
+                    if (questionId && rowData) {
+                        handleAnswer(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.delete-btn').on('click', '.delete-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    const questionId = $(this).data('id');
+                    if (questionId && rowData) {
+                        handleDelete(rowData);
+                    }
                 });
             }
-            
-            setFilteredQaData(filtered);
-        }
-    }, [engagementQuestions, statusFilter]);
+        });
 
-    const handleBack = useCallback(() => {
-        navigate(-1);
-    }, [navigate]);
+        tableRef.current = tableInstance;
 
-    const handleAnswer = useCallback((question) => {
-        setSelectedQuestion(question);
-        setShowAnswerModal(true);
-    }, []);
-
-    const handleView = useCallback((question) => {
-        navigate(`/engagement/qa/${engagementId}/view/${question.id}`);
-    }, [navigate, engagementId]);
-
-    const handleDelete = useCallback((question) => {
-        setSelectedQuestion(question);
-        setShowDeleteModal(true);
-    }, []);
-
-    const destroyTable = useCallback(() => {
-        if (currentTable) {
-            $('#engagement-qa-data-table').off('click', '.view-btn, .answer-btn, .delete-btn');
-            currentTable.destroy();
-            setCurrentTable(null);
-        }
-    }, [currentTable]);
-
-    const initializeTable = useCallback(() => {
-        destroyTable();
-        if (filteredQaData && filteredQaData.length >= 0) {
-            const table = engagementQaTable(filteredQaData, selectedEngagement, handleBack, handleAnswer, handleView, handleDelete);
-            setCurrentTable(table);
-        }
-    }, [filteredQaData, selectedEngagement, destroyTable, handleBack, handleAnswer, handleView, handleDelete]);
-
-    const handleAnswerSubmit = useCallback(async () => {
-        // Reload questions after answer
-        const hasValidEngagement = engagementId && engagementId !== 'unknown';
-        if (sessionFilterId) {
-            await dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
-        } else if (hasValidEngagement) {
-            await dispatch(getEngagementQAQuestions(hasValidEngagement ? engagementId : null));
-        }
-    }, [dispatch, engagementId, sessionFilterId]);
-
-    const handleDeleteSubmit = useCallback(async () => {
-        // Reload questions after delete
-        const hasValidEngagement = engagementId && engagementId !== 'unknown';
-        if (sessionFilterId) {
-            await dispatch(getEngagementQAQuestions(null, 'all', 'likes', sessionFilterId));
-        } else if (hasValidEngagement) {
-            await dispatch(getEngagementQAQuestions(hasValidEngagement ? engagementId : null));
-        }
-    }, [dispatch, engagementId, sessionFilterId]);
-
-
-    useEffect(() => {
-        if (filteredQaData) {
-            initializeTable();
-        }
-        return destroyTable;
-    }, [filteredQaData, initializeTable, destroyTable]);
-
-    // Don't block UI if engagement is unknown; table can render with questions only
+        return () => {
+            if (tableRef.current) {
+                tableRef.current.destroy();
+                tableRef.current = null;
+                isTableInitializedRef.current = false;
+            }
+        };
+    }, [sessionFilterId, engagementId]); // Re-initialize when sessionFilterId or engagementId changes
 
     return (
         <div className="engagement-qa-page">
             {/* Status Filter */}
-            <Row className="mb-3">
-                <Col sm={12}>
-                    <Card className="mb-4 shadow-sm border-0">
-                        <Card.Header className="bg-light border-0">
-                            <div className="d-flex align-items-center justify-content-between">
-                                <div className="d-flex align-items-center">
-                                    <i className="feather icon-filter mr-2" style={{ color: '#4680ff', fontSize: '18px' }}></i>
-                                    <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>
-                                        Filter Options
-                                    </h6>
-                                </div>
-                                <div className="d-flex align-items-center gap-2">
-                                    {statusFilter !== 'all' && (
-                                        <span className="badge badge-primary" style={{ backgroundColor: '#4680ff', fontSize: '11px', padding: '4px 8px' }}>
-                                            1 Active
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </Card.Header>
-                        <Card.Body>
-                            <Row className="align-items-end g-3">
-                                <Col xl={4} lg={4} md={6} sm={12} xs={12}>
-                                    <Form.Group className="mb-0">
-                                        <Form.Label style={{ fontSize: '14px', fontWeight: '600', color: '#495057', marginBottom: '8px' }}>
-                                            <i className="feather icon-check-circle mr-1"></i>
-                                            Filter by Status
-                                        </Form.Label>
-                                        <Form.Select
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                            className="border rounded"
-                                        >
-                                            <option value="all">All Questions</option>
-                                            <option value="not_answered">Not Answered</option>
-                                            <option value="answered">Answered</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
+            <Card className="mb-4 shadow-sm border-0" style={{ borderRadius: '8px' }}>
+                <Card.Header
+                    className="bg-light border-0"
+                    style={{
+                        padding: '16px 20px',
+                        borderRadius: '8px 8px 0 0'
+                    }}
+                >
+                    <div className="d-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center">
+                            <i className="feather icon-filter mr-2" style={{ color: '#4680ff', fontSize: '18px' }}></i>
+                            <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>
+                                Filter Options
+                            </h6>
+                        </div>
+                        {statusFilter !== 'all' && (
+                            <span
+                                className="badge badge-primary"
+                                style={{
+                                    backgroundColor: '#4680ff',
+                                    fontSize: '11px',
+                                    padding: '4px 8px'
+                                }}
+                            >
+                                1 Active
+                            </span>
+                        )}
+                    </div>
+                </Card.Header>
+                <Card.Body style={{ padding: '20px' }}>
+                    <Row className="align-items-end">
+                        <Col xl={4} lg={4} md={6} sm={12} xs={12} className="mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3">
+                            <Form.Group className="mb-0">
+                                <Form.Label
+                                    style={{
+                                        fontSize: '14px',
+                                        fontWeight: '600',
+                                        color: '#495057',
+                                        marginBottom: '8px'
+                                    }}
+                                >
+                                    <i className="feather icon-check-circle mr-1"></i>
+                                    Filter by Status
+                                </Form.Label>
+                                <Form.Select
+                                    value={statusFilter}
+                                    onChange={(e) => handleStatusFilterChange(e.target.value)}
+                                    style={{
+                                        borderRadius: '6px',
+                                        border: '1px solid #ced4da',
+                                        padding: '8px 12px',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                    }}
+                                >
+                                    {statusFilterOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label} {option.count !== undefined ? `(${option.count})` : ''}
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
 
-                                <Col xl={4} lg={4} md={6} sm={12} xs={12} className="mt-md-3 mt-sm-3 mt-3">
-                                    <div className="d-flex align-items-end justify-content-start flex-wrap" style={{ gap: '12px' }}>
-                                        {statusFilter !== 'all' && (
-                                            <Button
-                                                variant="outline-secondary"
-                                                onClick={() => setStatusFilter('all')}
-                                                className="border rounded"
-                                            >
-                                                <i className="feather icon-x mr-1"></i>
-                                                Clear
-                                            </Button>
-                                        )}
-                                    </div>
-                                </Col>
-                            </Row>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+                        <Col xl={4} lg={4} md={6} sm={12} xs={12} className="d-flex justify-content-xl-end justify-content-lg-end justify-content-md-start justify-content-sm-start justify-content-start align-items-center mt-xl-0 mt-lg-0 mt-md-4 mt-sm-4 mt-4">
+                            <div className="d-flex flex-wrap align-items-center" style={{ gap: '10px', width: '100%' }}>
+                                {statusFilter !== 'all' && (
+                                    <Button
+                                        variant="outline-secondary"
+                                        onClick={() => handleStatusFilterChange('all')}
+                                        style={{
+                                            borderRadius: '6px',
+                                            padding: '8px 14px',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            minWidth: '75px',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        <i className="feather icon-x mr-1"></i>
+                                        Clear
+                                    </Button>
+                                )}
+                            </div>
+                        </Col>
+                    </Row>
+                </Card.Body>
+            </Card>
 
             {/* Q&A Table */}
             <Row>
@@ -386,16 +531,8 @@ const EngagementQAPage = () => {
                     <Card className="event-list">
                         <Card.Body>
                             <Table striped hover responsive id="engagement-qa-data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Question / Answer</th>
-                                        <th>Asked By</th>
-                                        <th>Likes</th>
-                                        <th>Status</th>
-                                        <th>Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
+                                <thead></thead>
+                                <tbody></tbody>
                             </Table>
                         </Card.Body>
                     </Card>
@@ -417,10 +554,8 @@ const EngagementQAPage = () => {
                 question={selectedQuestion}
                 onSubmit={handleDeleteSubmit}
             />
-
         </div>
     );
 };
 
 export default EngagementQAPage;
-

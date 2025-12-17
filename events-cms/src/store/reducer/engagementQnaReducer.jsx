@@ -11,6 +11,7 @@ import {
 
 const initialState = {
     engagementQuestions: [],
+    pagination: {},
     selectedQuestion: null,
     loading: false,
     error: null,
@@ -32,9 +33,20 @@ const engagementQnaReducer = (state = initialState, action) => {
             };
             
         case ENGAGEMENT_QNA_LIST:
+            let questionsData = [];
+            let paginationData = {};
+            if (action.payload) {
+                if (Array.isArray(action.payload)) {
+                    questionsData = action.payload;
+                } else if (action.payload.data !== undefined && action.payload.data !== null) {
+                    questionsData = Array.isArray(action.payload.data) ? action.payload.data : [];
+                    paginationData = action.payload.pagination || {};
+                }
+            }
             return {
                 ...state,
-                engagementQuestions: action.payload,
+                engagementQuestions: questionsData,
+                pagination: paginationData,
                 loading: false,
                 error: null,
             };

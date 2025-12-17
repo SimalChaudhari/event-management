@@ -65,6 +65,25 @@ export class GetEngagementQuestionsDto {
   @IsOptional()
   @IsEnum(QuestionSortBy)
   sortBy?: QuestionSortBy = QuestionSortBy.LIKES;
+
+  // Pagination parameters
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+
+  // Search parameter
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  // Sort order
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 export class GenerateShareLinkDto {

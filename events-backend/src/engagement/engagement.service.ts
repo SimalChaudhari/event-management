@@ -622,8 +622,35 @@ export class EngagementService {
 
   /**
    * Get engagements by track ID with formatted data
+   * If filters with pagination are provided, returns sessions instead of engagements
    */
-  async getEngagementsByTrackId(trackId: string): Promise<any[]> {
+  async getEngagementsByTrackId(
+    trackId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<any[] | {
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    // If pagination filters are provided, return sessions instead of engagements
+    const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+    if (hasPagination) {
+      return this.getSessionsByTrackId(trackId, filters);
+    }
+
+    // Original behavior: return engagements with sessions
     const engagements = await this.engagementRepository.find({
       where: { trackId },
       relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
@@ -652,6 +679,149 @@ export class EngagementService {
     );
 
     return UserUtils.formatEngagements(engagementsWithStats, false); // Admin/Moderator can see all
+  }
+
+  /**
+   * Get sessions by track ID with pagination, search, and filters
+   */
+  async getSessionsByTrackId(
+    trackId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    try {
+      // Get engagement for this track to filter sessions by sessionIds
+      const engagement = await this.engagementRepository.findOne({
+        where: { trackId },
+        relations: ['track', 'track.event'],
+      });
+
+      if (!engagement) {
+        return {
+          data: [],
+          pagination: filters?.page !== undefined || filters?.limit !== undefined ? {
+            page: filters.page || 1,
+            limit: filters.limit || 10,
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          } : undefined,
+        };
+      }
+
+      // If pagination is not provided, return all data (backward compatibility)
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'sessionDate';
+      const sortOrder = filters?.sortOrder || 'ASC';
+
+      // Build query builder
+      const queryBuilder = this.programmeSessionRepository
+        .createQueryBuilder('session')
+        .leftJoinAndSelect('session.track', 'track')
+        .leftJoinAndSelect('track.event', 'event')
+        .leftJoinAndSelect('session.speakers', 'speakers')
+        .leftJoinAndSelect('speakers.speakerProfile', 'speakerProfile')
+        .where('session.trackId = :trackId', { trackId });
+
+      // Filter by engagement's sessionIds if available
+      if (engagement.sessionIds && engagement.sessionIds.length > 0) {
+        queryBuilder.andWhere('session.id IN (:...sessionIds)', { sessionIds: engagement.sessionIds });
+      }
+
+      // Apply search filter - search in title and description
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(session.title) LIKE :searchTerm OR LOWER(session.description) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      if (sortBy === 'title') {
+        queryBuilder.orderBy('session.title', sortOrder);
+      } else if (sortBy === 'sessionDate' || sortBy === 'startDate') {
+        queryBuilder.orderBy('session.sessionDate', sortOrder);
+        queryBuilder.addOrderBy('session.startTime', sortOrder);
+      } else if (sortBy === 'createdAt') {
+        queryBuilder.orderBy('session.createdAt', sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('session.sessionDate', 'ASC');
+        queryBuilder.addOrderBy('session.startTime', 'ASC');
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination only if pagination parameters are provided
+      let sessions;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        sessions = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        // No pagination - return all data
+        sessions = await queryBuilder.getMany();
+      }
+
+      // Format sessions with statistics
+      const sessionsWithStats = await Promise.all(
+        sessions.map(async (session) => {
+          const sessionStats = await this.getSessionStatistics(
+            engagement.id,
+            [session],
+            engagement.sessionIds || undefined,
+          );
+          return sessionStats[0] || session;
+        }),
+      );
+
+      // Return response with or without pagination
+      if (hasPagination) {
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+
+        return {
+          data: sessionsWithStats,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+        };
+      } else {
+        // No pagination - return all data without pagination metadata
+        return {
+          data: sessionsWithStats,
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**

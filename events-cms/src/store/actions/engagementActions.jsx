@@ -133,19 +133,44 @@ export const getEngagementById = (id) => async (dispatch) => {
     }
 };
 
-// Get engagements by track ID
-export const getEngagementsByTrack = (trackId) => async (dispatch) => {
+// Get engagements by track ID (with optional pagination for sessions)
+export const getEngagementsByTrack = (trackId, filters = {}) => async (dispatch) => {
     try {
         dispatch(setEngagementLoading(true));
         
-        const response = await axiosInstance.get(`/engagements/track/${trackId}`);
+        // Build URL with query parameters
+        const url = buildUrlWithParams(`/engagements/track/${trackId}`, filters);
         
-        dispatch({
-            type: ENGAGEMENT_BY_TRACK,
-            payload: { trackId, engagements: response.data.data }
-        });
+        const response = await axiosInstance.get(url);
         
-        return { success: true, data: response.data.data };
+        // Check if pagination is being used (sessions mode)
+        const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+        const responseData = response.data?.data || [];
+        
+        if (hasPagination && response.data?.metadata) {
+            // Pagination mode: return sessions with pagination
+            dispatch({
+                type: 'ENGAGEMENT_SESSIONS_LIST',
+                payload: {
+                    data: Array.isArray(responseData) ? responseData : [],
+                    pagination: response.data.metadata
+                }
+            });
+            
+            return { 
+                success: true, 
+                data: Array.isArray(responseData) ? responseData : [],
+                pagination: response.data.metadata
+            };
+        } else {
+            // No pagination: return engagements (backward compatibility)
+            dispatch({
+                type: ENGAGEMENT_BY_TRACK,
+                payload: { trackId, engagements: Array.isArray(responseData) ? responseData : [] }
+            });
+            
+            return { success: true, data: Array.isArray(responseData) ? responseData : [] };
+        }
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch engagements by track';
         dispatch(setEngagementError(errorMessage));
@@ -247,6 +272,7 @@ export const toggleEngagementStatus = (id) => async (dispatch) => {
         dispatch(setEngagementLoading(false));
     }
 };
+
 
 // Toggle engagement session status
 export const toggleEngagementSessionStatus = (sessionId) => async (dispatch) => {

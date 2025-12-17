@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, Row, Col, Badge, Button, Alert, Spinner } from 'react-bootstrap';
 import DateTimeFormatter from '../../components/dateTime/DateTimeFormatter';
@@ -12,11 +12,13 @@ const ViewEngagementQuestionPage = () => {
     const { engagementId, questionId } = useParams();
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const location = useLocation();
 
     const { selectedEngagement } = useSelector((state) => state.engagement);
     const { selectedQuestion, loading } = useSelector((state) => state.engagementQna);
 
     const [error, setError] = useState(null);
+    const hasFetchedDataRef = React.useRef(false);
 
     // Text truncation states
     const [showFullQuestion, setShowFullQuestion] = useState(false);
@@ -24,15 +26,31 @@ const ViewEngagementQuestionPage = () => {
 
     // Load data on mount
     useEffect(() => {
-        if (engagementId && questionId) {
-            dispatch(getEngagementById(engagementId));
+        // Prevent multiple API calls
+        if (hasFetchedDataRef.current) return;
+        
+        if (questionId) {
+            // Load question by ID (engagementId is optional)
             dispatch(getEngagementQAQuestionById(questionId));
+            
+            // Load engagement only if engagementId is provided
+            if (engagementId && engagementId !== 'unknown') {
+                dispatch(getEngagementById(engagementId));
+            }
+            
+            hasFetchedDataRef.current = true;
         }
     }, [dispatch, engagementId, questionId]);
 
     const handleBack = useCallback(() => {
-        navigate(`/engagement/qa/${engagementId}`);
-    }, [navigate, engagementId]);
+        // Check if we have sessionId in query params
+        const params = new URLSearchParams(location.search);
+        const sessionId = params.get('sessionId');
+        
+        if (sessionId) {
+            navigate(-1);
+        }
+    }, [navigate, engagementId, location.search]);
 
     const truncateText = (text, maxLength = 200) => {
         if (!text) return '';
@@ -88,7 +106,7 @@ const ViewEngagementQuestionPage = () => {
                         Track
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {selectedEngagement?.programmeTrack?.title || 'N/A'}
+                        {selectedQuestion?.engagement?.trackTitle || selectedEngagement?.programmeTrack?.title || 'N/A'}
                     </p>
                 </div>
             </Col>
@@ -143,9 +161,7 @@ const ViewEngagementQuestionPage = () => {
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
                             <h4 className="card-title mb-1">View Question</h4>
-                            <p className="text-muted mb-0">
-                                Engagement: {selectedEngagement?.programmeTrack?.title || 'Unknown'}
-                            </p>
+                           
                         </div>
                         <div className="d-flex gap-2">
                             <Button variant="secondary" onClick={handleBack}>

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -16,9 +16,11 @@ import { getEngagementsByTrack, toggleEngagementSessionStatus } from '../../stor
 import axiosInstance from '../../configs/axiosInstance';
 import { toast } from 'react-toastify';
 import { ENGAGEMENT_PATHS } from '../../utils/constants';
-import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import TrackQnAShareLinkModal from './components/TrackQnAShareLinkModal';
 import '../../assets/css/event.css';
+import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
+import usePersistedTablePage from '../../hooks/usePersistedTablePage';
+import { ENGAGEMENT_LOADING } from '../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -45,10 +47,7 @@ const EngagementSessionsPage = () => {
     const navigate = useNavigate();
 
     const { tracks } = useSelector((state) => state.programme);
-    const { trackEngagements } = useSelector((state) => state.engagement);
 
-    const [trackSessions, setTrackSessions] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [showPollingModal, setShowPollingModal] = useState(false);
     const [activeSession, setActiveSession] = useState(null);
     const [pollingTitle, setPollingTitle] = useState('');
@@ -62,100 +61,28 @@ const EngagementSessionsPage = () => {
     const [questionTitle, setQuestionTitle] = useState('');
     const [questionText, setQuestionText] = useState('');
     const [generatingQuestion, setGeneratingQuestion] = useState(false);
+    
+    const tableRef = useRef(null);
+    const trackIdRef = useRef(trackId);
+    const { restoreTablePage } = usePersistedTablePage();
+
+    // Update ref when trackId changes
+    useEffect(() => {
+        trackIdRef.current = trackId;
+    }, [trackId]);
 
     useEffect(() => {
         dispatch(getAllTracks());
-        if (trackId) {
-            // Use engagement API instead of programme API to get filtered sessions
-            dispatch(getEngagementsByTrack(trackId));
-        }
-    }, [dispatch, trackId]);
+    }, [dispatch]);
 
-    useEffect(() => {
-        if (trackId && trackEngagements && trackEngagements[trackId]) {
-            // Get engagements for this track from trackEngagements
-            const engagementsForTrack = trackEngagements[trackId];
-            
-            if (engagementsForTrack && engagementsForTrack.length > 0) {
-                // Get the first engagement (should only be one per track)
-                const engagementData = engagementsForTrack[0];
-                
-                // Extract sessions from programmeTracks
-                const programmeTracks = engagementData?.programmeTracks || [];
-                const trackData = programmeTracks.find(t => 
-                    t.trackId === trackId || t.id === trackId
-                );
-                
-                // Get filtered sessions (already filtered by backend based on sessionIds)
-                const sessions = trackData?.sessions || [];
-                
-                setTrackSessions(sessions);
-                setIsLoading(false);
-            } else {
-                // No engagement found for this track
-                setTrackSessions([]);
-                setIsLoading(false);
-            }
-        } else if (trackId) {
-            setIsLoading(true);
-        }
-    }, [trackEngagements, trackId]);
-
-    const handleToggleSessionStatus = React.useCallback(async (sessionId, session) => {
+    const handleToggleSessionStatus = React.useCallback(async (sessionId) => {
         try {
-            const currentIsActive = session.isActive !== undefined ? session.isActive : true;
-            const newIsActive = !currentIsActive;
-            
-            // Optimistic update - update local state and DataTable immediately
-            setTrackSessions(prevSessions => 
-                prevSessions.map(s => 
-                    s.id === sessionId ? { ...s, isActive: newIsActive } : s
-                )
-            );
-            
-            // Update DataTable directly
-            setTimeout(() => {
-                const dt = $('#engagement-sessions-table').DataTable();
-                if (dt) {
-                    dt.rows().every(function() {
-                        const rowData = this.data();
-                        if (rowData && rowData.id === sessionId) {
-                            const updatedData = { ...rowData, isActive: newIsActive };
-                            this.data(updatedData);
-                            return false; // Stop iteration
-                        }
-                        return true;
-                    });
-                    dt.draw(false);
-                }
-            }, 0);
-            
-            // Call engagement session toggle API - only one API call
             const result = await dispatch(toggleEngagementSessionStatus(sessionId));
             if (result && !result.error) {
-                // Success message already shown by action
-            } else {
-                // Revert on error
-                setTrackSessions(prevSessions => 
-                    prevSessions.map(s => 
-                        s.id === sessionId ? { ...s, isActive: currentIsActive } : s
-                    )
-                );
-                setTimeout(() => {
-                    const dt = $('#engagement-sessions-table').DataTable();
-                    if (dt) {
-                        dt.rows().every(function() {
-                            const rowData = this.data();
-                            if (rowData && rowData.id === sessionId) {
-                                this.data(session);
-                                return false;
-                            }
-                            return true;
-                        });
-                        dt.draw(false);
-                    }
-                }, 0);
-                toast.error('Failed to toggle session status');
+                // Reload table after toggle
+                if (tableRef.current) {
+                    tableRef.current.ajax.reload(null, false);
+                }
             }
         } catch (error) {
             console.error('Error toggling session status:', error);
@@ -164,194 +91,181 @@ const EngagementSessionsPage = () => {
     }, [dispatch]);
 
     useEffect(() => {
-        if (trackSessions.length >= 0 && !isLoading) {
-            setTimeout(() => {
-                if ($.fn.DataTable.isDataTable('#engagement-sessions-table')) {
-                    $('#engagement-sessions-table').DataTable().destroy();
-                }
+        if (!trackIdRef.current) return;
 
-                const dt = $('#engagement-sessions-table').DataTable({
-                    data: trackSessions || [],
-                    order: [[0, 'asc']],
-                    searching: true,
-                    searchDelay: 500,
-                    pageLength: 10,
-                    lengthMenu: [
-                        [5, 10, 25, 50, -1],
-                        [5, 10, 25, 50, 'All']
-                    ],
-                    pagingType: 'full_numbers',
-                    dom:
-                        "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f>>>'" +
-                        "<'row'<'col-sm-12'tr>>" +
-                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-                    columns: [
-                        {
-                            data: 'title',
-                            title: 'Session',
-                            render: function (data, type, row) {
-                                const speakers = row.speakers && row.speakers.length > 0
-                                    ? row.speakers.map(s => s.name).join(', ')
-                                    : 'TBA';
-                                return `
-                                    <div class="d-inline-block align-middle">
-                                        <div class="d-inline-block">
-                                            <h6 class="m-b-0">${data}</h6>
-                                            <div class="mt-2">
-                                                <span class="badge badge-light-primary">
-                                                    <i class="feather icon-mic mr-1"></i>
-                                                    ${speakers}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                        },
-                        {
-                            data: null,
-                            title: 'Date & Time',
-                            render: function (data, type, row) {
-                                // Use startDate for the date display
-                                const dateStr = row.startDate ? formatDate(row.startDate) : 'N/A';
-                                const timeStr = (row.startTime && row.endTime) 
-                                    ? `${formatTime(row.startTime)} - ${formatTime(row.endTime)}`
-                                    : 'N/A';
-                                return `
-                                    <div class="text-muted small">
-                                        <i class="feather icon-calendar mr-1"></i>${dateStr}<br>
-                                        <i class="feather icon-clock mr-1"></i>${timeStr}
-                                    </div>
-                                `;
-                            }
-                        },
-                        {
-                            data: null,
-                            title: 'Status',
-                            className: 'text-center',
-                            width: '15%',
-                            orderable: false,
-                            render: function (data, type, row) {
-                                // Check isActive from row data
-                                const isActive = (row.isActive !== undefined && row.isActive !== null) ? row.isActive : true;
-                                const badgeClass = isActive ? 'badge-light-success' : 'badge-light-secondary';
-                                const statusText = isActive ? 'Active' : 'Inactive';
-                                const iconClass = isActive ? 'icon-check-circle' : 'icon-x-circle';
-                                
-                                return `
-                                    <span class="badge ${badgeClass} toggle-session-status-badge" data-id="${row.id}" 
-                                          style="cursor: pointer; font-size: 13px; padding: 6px 16px; min-width: 90px;" 
-                                          title="Click to toggle status">
-                                        <i class="feather ${iconClass}" style="margin-right: 4px;"></i>${statusText}
+        const currentTrackId = trackIdRef.current;
+        const columns = [
+            {
+                data: 'title',
+                title: 'Session',
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return data || '';
+                    }
+                    const speakers = row.speakers && row.speakers.length > 0
+                        ? row.speakers.map(s => s.name).join(', ')
+                        : 'TBA';
+                    return `
+                        <div class="d-inline-block align-middle">
+                            <div class="d-inline-block">
+                                <h6 class="m-b-0">${data || 'N/A'}</h6>
+                                <div class="mt-2">
+                                    <span class="badge badge-light-primary">
+                                        <i class="feather icon-mic mr-1"></i>
+                                        ${speakers}
                                     </span>
-                                `;
-                            }
-                        },
-                        {
-                            data: null,
-                            title: 'Actions',
-                            orderable: false,
-                            render: function (data, type, row) {
-                                console.log(row);
-                                return `
-                                    <div class="d-flex">
-                                        <button type="button" class="btn btn-icon btn-success view-btn mr-2" data-id="${row.id}" title="View Session">
-                                            <i class="feather icon-eye"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-icon btn-info qa-btn mr-2" data-sessionid="${row.id}" title="Q&A">
-                                            <i class="feather icon-message-circle"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-icon btn-warning polling-btn" data-sessionid="${row.id}" title="Polling Link">
-                                            <i class="feather icon-link-2"></i>
-                                        </button>
-                                    </div>`;
-                            }
-                        }
-                    ],
-                });
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'sessionDate',
+                title: 'Date & Time',
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.sessionDate || '';
+                    }
+                    const dateStr = row.sessionDate ? formatDate(row.sessionDate) : 'N/A';
+                    const timeStr = (row.startTime && row.endTime) 
+                        ? `${formatTime(row.startTime)} - ${formatTime(row.endTime)}`
+                        : 'N/A';
+                    return `
+                        <div class="text-muted small">
+                            <i class="feather icon-calendar mr-1"></i>${dateStr}<br>
+                            <i class="feather icon-clock mr-1"></i>${timeStr}
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: null,
+                title: 'Status',
+                className: 'text-center',
+                width: '15%',
+                orderable: false,
+                render: function (data, type, row) {
+                    const isActive = (row.isActive !== undefined && row.isActive !== null) ? row.isActive : true;
+                    const badgeClass = isActive ? 'badge-light-success' : 'badge-light-secondary';
+                    const statusText = isActive ? 'Active' : 'Inactive';
+                    const iconClass = isActive ? 'icon-check-circle' : 'icon-x-circle';
+                    
+                    return `
+                        <span class="badge ${badgeClass} toggle-session-status-badge" data-id="${row.id}" 
+                              style="cursor: pointer; font-size: 13px; padding: 6px 16px; min-width: 90px;" 
+                              title="Click to toggle status">
+                            <i class="feather ${iconClass}" style="margin-right: 4px;"></i>${statusText}
+                        </span>
+                    `;
+                }
+            },
+            {
+                data: null,
+                title: 'Actions',
+                orderable: false,
+                render: function (data, type, row) {
+                    return `
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-icon btn-success view-btn mr-2" data-id="${row.id}" title="View Session">
+                                <i class="feather icon-eye"></i>
+                            </button>
+                            <button type="button" class="btn btn-icon btn-info qa-btn mr-2" data-sessionid="${row.id}" title="Q&A">
+                                <i class="feather icon-message-circle"></i>
+                            </button>
+                            <button type="button" class="btn btn-icon btn-warning polling-btn" data-sessionid="${row.id}" title="Polling Link">
+                                <i class="feather icon-link-2"></i>
+                            </button>
+                        </div>`;
+                }
+            }
+        ];
 
-                $(document).off('click', '.view-btn').on('click', '.view-btn', function () {
+        // Get ajaxParams function that includes trackId
+        const getAjaxParams = () => {
+            return {};
+        };
+
+        // Initialize server-side DataTable
+        const tableInstance = initializeServerSideDataTable({
+            tableSelector: '#engagement-sessions-table',
+            ajaxUrl: `/engagements/track/${currentTrackId}`,
+            ajaxMethod: 'GET',
+            columns: columns,
+            ajaxParams: getAjaxParams,
+            fetchAction: (filters) => getEngagementsByTrack(currentTrackId, filters), // Use existing Redux action
+            axiosInstance: axiosInstance,
+            dispatch: dispatch,
+            loadingActionType: ENGAGEMENT_LOADING,
+            dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f>>>" +
+                 "<'row'<'col-sm-12'tr>>" +
+                 "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            pageLength: 10,
+            lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            order: [[0, 'asc']],
+            restoreTablePage: restoreTablePage,
+            initCompleteCallback: function (settings, json, api) {
+                // Attach event listeners for actions
+                $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
                     const sessionId = $(this).data('id');
-                    console.log(sessionId);
-                    const session = trackSessions.find((s) => s.id === sessionId);
-                    if (session) {
-                        // Navigate to engagement session view page (dedicated page for engagement)
-                        const eventId = session.track && session.track.eventId ? session.track.eventId : (session.track && session.track.event && session.track.event.id);
+                    if (sessionId && rowData) {
+                        const eventId = rowData.track?.eventId || (rowData.track?.event?.id);
                         if (eventId) {
-                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${session.id}?eventId=${eventId}`);
+                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${sessionId}?eventId=${eventId}`);
                         } else {
-                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${session.id}`);
+                            navigate(`${ENGAGEMENT_PATHS.VIEW_SESSION}/${sessionId}`);
                         }
                     }
                 });
 
-                
-                $(document).off('click', '.qa-btn').on('click', '.qa-btn', function () {
-                    const dtLocal = $('#engagement-sessions-table').DataTable();
-                    const rowData = dtLocal.row($(this).closest('tr')).data() || {};
-                    const sessionId = rowData.sessionId || rowData.id;
-                    navigate(`${ENGAGEMENT_PATHS.QA}?sessionId=${sessionId}`);
-                });
-
-                $(document).off('click', '.polling-btn').on('click', '.polling-btn', async function () {
-                    const dtLocal = $('#engagement-sessions-table').DataTable();
-                    const rowData = dtLocal.row($(this).closest('tr')).data() || {};
-                    const sessionId = rowData.sessionId || rowData.id;
-                    setActiveSession(rowData);
-                    try {
-                        const res = await axiosInstance.get(`/engagements/sessions/${sessionId}/polling-link`);
-                        const link = res?.data?.data || null;
-                        setPollingLinkId(link?.id || null);
-                        setPollingTitle(link?.title || '');
-                        setPollingUrl(link?.url || '');
-                    } catch (e) {
-                        setPollingLinkId(null);
-                        setPollingTitle('');
-                        setPollingUrl('');
+                $(settings.nTable).off('click', '.qa-btn').on('click', '.qa-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    const sessionId = rowData?.id || $(this).data('sessionid');
+                    if (sessionId) {
+                        navigate(`${ENGAGEMENT_PATHS.QA}?sessionId=${sessionId}`);
                     }
-                    setShowPollingModal(true);
                 });
 
-                $(document).off('click', '.toggle-session-status-badge').on('click', '.toggle-session-status-badge', function () {
+                $(settings.nTable).off('click', '.polling-btn').on('click', '.polling-btn', async function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    const sessionId = rowData?.id || $(this).data('sessionid');
+                    if (sessionId && rowData) {
+                        setActiveSession(rowData);
+                        try {
+                            const res = await axiosInstance.get(`/engagements/sessions/${sessionId}/polling-link`);
+                            const link = res?.data?.data || null;
+                            setPollingLinkId(link?.id || null);
+                            setPollingTitle(link?.title || '');
+                            setPollingUrl(link?.url || '');
+                        } catch (e) {
+                            setPollingLinkId(null);
+                            setPollingTitle('');
+                            setPollingUrl('');
+                        }
+                        setShowPollingModal(true);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.toggle-session-status-badge').on('click', '.toggle-session-status-badge', function () {
                     const sessionId = $(this).data('id');
-                    const session = trackSessions.find((s) => s.id === sessionId);
-                    if (session) {
-                        handleToggleSessionStatus(sessionId, session);
+                    if (sessionId) {
+                        // Use the callback directly - it's stable
+                        handleToggleSessionStatus(sessionId);
                     }
                 });
+            }
+        });
 
-                $(document).off('click', '.track-link-btn').on('click', '.track-link-btn', async function () {
-                    if (!trackId) {
-                        toast.error('Track ID is required');
-                        return;
-                    }
-                    setGeneratingTrackLink(true);
-                    try {
-                        const res = await axiosInstance.post('/engagements/qna/generate-track-link', {
-                            trackId: trackId
-                        });
-                        if (res?.data?.success && res?.data?.data?.shareUrl) {
-                            setTrackShareUrl(res.data.data.shareUrl);
-                            setShowTrackLinkModal(true);
-                        } else {
-                            toast.error(res?.data?.message || 'Failed to generate track link');
-                        }
-                    } catch (e) {
-                        toast.error(e?.response?.data?.message || 'Failed to generate track link');
-                    } finally {
-                        setGeneratingTrackLink(false);
-                    }
-                });
-
-            }, 100);
-        }
+        tableRef.current = tableInstance;
 
         return () => {
-            if ($.fn.DataTable.isDataTable('#engagement-sessions-table')) {
-                $('#engagement-sessions-table').DataTable().destroy();
+            if (tableRef.current) {
+                tableRef.current.destroy();
+                tableRef.current = null;
             }
         };
-    }, [trackSessions, navigate, isLoading, handleToggleSessionStatus]);
+    }, []); // Only run once on mount - use refs for dynamic values
 
     const handleBack = () => {
         // Preserve page number when navigating back
@@ -377,6 +291,10 @@ const EngagementSessionsPage = () => {
             setPollingLinkId(res?.data?.data?.id || null);
             toast.success('Polling link saved');
             setShowPollingModal(false);
+            // Reload table after saving
+            if (tableRef.current) {
+                tableRef.current.ajax.reload(null, false);
+            }
         } catch (e) {
             toast.error(e?.response?.data?.message || 'Failed to save polling link');
         } finally {
@@ -399,6 +317,10 @@ const EngagementSessionsPage = () => {
             setPollingTitle('');
             setPollingUrl('');
             setShowPollingModal(false);
+            // Reload table after deleting
+            if (tableRef.current) {
+                tableRef.current.ajax.reload(null, false);
+            }
         } catch (e) {
             toast.error(e?.response?.data?.message || 'Failed to delete polling link');
         } finally {
@@ -468,25 +390,10 @@ const EngagementSessionsPage = () => {
                             </div>
                         </Card.Header>
                         <Card.Body>
-                            {isLoading ? (
-                                <div className="text-center py-5">
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="sr-only">Loading sessions...</span>
-                                    </div>
-                                    <p className="mt-2">Loading sessions...</p>
-                                </div>
-                            ) : (
-                                <Table striped hover responsive id="engagement-sessions-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Session</th>
-                                            <th>Date & Time</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                </Table>
-                            )}
+                            <Table striped hover responsive id="engagement-sessions-table">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </Table>
                         </Card.Body>
                     </Card>
                 </Col>
@@ -664,8 +571,4 @@ const EngagementSessionsPage = () => {
     );
 };
 
-// Modal JSX appended within the component above return - ensure it's inside the component
-
 export default EngagementSessionsPage;
-
-

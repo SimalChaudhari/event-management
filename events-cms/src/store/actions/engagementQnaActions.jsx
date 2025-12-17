@@ -108,29 +108,64 @@ export const toggleEngagementQuestionLike = (questionId) => async (dispatch) => 
     }
 };
 
-// 4. Get All Questions for Engagement
-export const getEngagementQAQuestions = (engagementId, status = 'all', sortBy = 'likes', sessionId = null) => async (dispatch) => {
+// 4. Get All Questions for Engagement (with pagination support)
+export const getEngagementQAQuestions = (engagementId, status = 'all', sortBy = 'likes', sessionId = null, filters = {}) => async (dispatch) => {
     try {
         dispatch(setLoading(true));
 
-        let params;
+        // Build params object
+        let params = { ...filters };
+        
         if (sessionId) {
-            // Only pass sessionId as requested
-            params = { sessionId };
-        } else {
-            params = { status, sortBy };
-            if (engagementId) params.engagementId = engagementId;
+            params.sessionId = sessionId;
+        } else if (engagementId) {
+            params.engagementId = engagementId;
+        }
+        
+        // Add status and sortBy if not in filters
+        // Priority: use status from filters object first, then from status parameter
+        // Only add status if it's not 'all' (backend doesn't need 'all' status)
+        if (params.status === 'all') {
+            // Remove 'all' status from params
+            delete params.status;
+        } else if (!params.status && status && status !== 'all') {
+            params.status = status;
+        }
+        if (!params.sortBy && sortBy) {
+            params.sortBy = sortBy;
         }
 
         const response = await axiosInstance.get('/engagements/qna/questions', { params });
 
         if (response && response.status >= 200 && response.status < 300) {
-            dispatch({
-                type: ENGAGEMENT_QNA_LIST,
-                payload: response.data.data.questions || []
-            });
+            const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+            const questionsData = hasPagination 
+                ? (Array.isArray(response.data.data) ? response.data.data : [])
+                : (response.data.data?.questions || []);
+            const paginationData = response.data.metadata || {};
+
+            if (hasPagination) {
+                dispatch({
+                    type: ENGAGEMENT_QNA_LIST,
+                    payload: {
+                        data: questionsData,
+                        pagination: paginationData
+                    }
+                });
+            } else {
+                dispatch({
+                    type: ENGAGEMENT_QNA_LIST,
+                    payload: questionsData
+                });
+            }
             
-            return { success: true, data: response.data.data };
+            return { 
+                success: true, 
+                data: questionsData,
+                pagination: paginationData,
+                metadata: paginationData,
+                filterOptions: response.data.metadata?.filterOptions // Include filter options from backend
+            };
         }
         return { success: false };
     } catch (error) {

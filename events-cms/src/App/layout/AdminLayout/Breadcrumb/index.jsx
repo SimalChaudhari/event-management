@@ -98,6 +98,9 @@ const breadcrumbNavigation = {
                         { id: 'add-engagement', title: 'Add Engagement', type: 'item', url: '/engagements/add' },
                         { id: 'edit-engagement', title: 'Edit Engagement', type: 'item', url: '/engagements/edit/:id' },
                         { id: 'view-engagement', title: 'View Engagement', type: 'item', url: '/engagements/view/:id' },
+                        { id: 'engagement-qa', title: 'Engagement Q&A', type: 'item', url: '/engagement/qa/:engagementId' },
+                        { id: 'engagement-qa-session', title: 'Engagement Q&A (Session)', type: 'item', url: '/engagement/qa' },
+                        { id: 'view-engagement-question', title: 'View Engagement Question', type: 'item', url: '/engagement/qa/:engagementId/view/:questionId' },
                         { id: 'engagement-sessions', title: 'Engagement Sessions', type: 'item', url: '/engagements/sessions/:trackId' },
                         { id: 'view-engagement-session', title: 'View Engagement Session', type: 'item', url: '/engagements/view-session/:id' }
                     ]

@@ -121,12 +121,31 @@ export class EngagementQnaController {
         });
       }
 
-      const result = await this.engagementQnaService.getQuestions(query, userId);
+      // Process query parameters
+      const processedQuery = {
+        engagementId: query.engagementId,
+        sessionId: query.sessionId,
+        status: query.status,
+        sortBy: query.sortBy,
+        page: query.page ? Number(query.page) : undefined,
+        limit: query.limit ? Number(query.limit) : undefined,
+        search: query.search?.trim() || undefined,
+        sortOrder: query.sortOrder || undefined,
+      };
+
+      const result = await this.engagementQnaService.getQuestions(processedQuery, userId);
+
+      const hasPagination = processedQuery.page !== undefined || processedQuery.limit !== undefined;
+
+      // Extract questions array from data
+      const questionsData = hasPagination 
+        ? (result.data?.questions || [])
+        : (result.data?.questions || []);
 
       const successResponse: SuccessResponse = {
         success: result.success,
         message: result.message,
-        data: result.data,
+        data: questionsData, // Return questions array directly
         metadata: {
           ...result.metadata,
           userId,

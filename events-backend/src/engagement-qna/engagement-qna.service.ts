@@ -220,31 +220,93 @@ export class EngagementQnaService {
         throw new ValidationException('Engagement ID or Session ID is required to retrieve Q&A questions');
       }
 
-      const whereConditions: any = { isActive: true };
+      // Check if pagination is requested
+      const hasPagination = getDto.page !== undefined || getDto.limit !== undefined;
+      const page = getDto.page || 1;
+      const limit = getDto.limit || 10;
+      const search = getDto.search;
+      const sortBy = getDto.sortBy || QuestionSortBy.LIKES;
+      const sortOrder = getDto.sortOrder || 'DESC';
 
+      // Build query using QueryBuilder for pagination and search
+      const queryBuilder = this.engagementQnaQuestionRepository
+        .createQueryBuilder('question')
+        .leftJoinAndSelect('question.askedBy', 'askedBy')
+        .leftJoinAndSelect('question.engagement', 'engagement')
+        .leftJoinAndSelect('engagement.track', 'track')
+        .leftJoinAndSelect('track.event', 'event')
+        .leftJoinAndSelect('question.answeredByUser', 'answeredByUser')
+        .leftJoinAndSelect('question.likes', 'likes')
+        .where('question.isActive = :isActive', { isActive: true });
+
+      // Apply engagementId filter
       if (getDto.engagementId) {
-        whereConditions.engagementId = getDto.engagementId;
+        queryBuilder.andWhere('question.engagementId = :engagementId', { engagementId: getDto.engagementId });
       }
 
-      // Add sessionId filter if provided
+      // Apply sessionId filter
       if (getDto.sessionId) {
-        whereConditions.sessionId = getDto.sessionId;
+        queryBuilder.andWhere('question.sessionId = :sessionId', { sessionId: getDto.sessionId });
       }
 
-      // Handle status filter
-      if (getDto.status === QuestionStatus.ANSWERED) {
-        whereConditions.status = 'answered';
-      } else if (getDto.status === QuestionStatus.NOT_ANSWERED) {
-        whereConditions.status = 'not_answered';
-      } else if (getDto.status === QuestionStatus.APPROVED) {
-        whereConditions.status = 'approved';
+      // Handle status filter - support both enum values and string values
+      const statusValue = getDto.status as any;
+      if (statusValue === QuestionStatus.ANSWERED || statusValue === 'answered') {
+        queryBuilder.andWhere('question.status = :status', { status: 'answered' });
+      } else if (statusValue === QuestionStatus.NOT_ANSWERED || statusValue === 'not_answered') {
+        queryBuilder.andWhere('(question.status = :status OR question.status IS NULL)', { status: 'not_answered' });
+      } else if (statusValue === QuestionStatus.APPROVED || statusValue === 'approved') {
+        queryBuilder.andWhere('question.status = :status', { status: 'approved' });
       }
 
-      const questions = await this.engagementQnaQuestionRepository.find({
-        where: whereConditions,
-        relations: ['askedBy', 'engagement', 'engagement.track', 'engagement.track.event', 'answeredByUser', 'likes'],
-        order: this.getSortOrder(getDto.sortBy),
-      });
+      // Apply search filter - search in question, answer, and askedBy name
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(question.question) LIKE :searchTerm OR LOWER(question.answer) LIKE :searchTerm OR LOWER(askedBy.firstName) LIKE :searchTerm OR LOWER(askedBy.lastName) LIKE :searchTerm OR LOWER(CONCAT(askedBy.firstName, \' \', askedBy.lastName)) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting - support multiple sortBy values
+      const sortByValue = sortBy as any; // Allow string values from frontend
+      if (sortByValue === QuestionSortBy.CREATED_AT || sortByValue === 'createdAt' || sortByValue === 'date') {
+        queryBuilder.orderBy('question.createdAt', sortOrder);
+      } else if (sortByValue === QuestionSortBy.ANSWERED_AT || sortByValue === 'answeredAt') {
+        queryBuilder.orderBy('question.answeredAt', sortOrder);
+      } else if (sortByValue === 'likesCount' || sortByValue === 'likes' || sortByValue === QuestionSortBy.LIKES) {
+        // Sort by likes, then by pinned, then by createdAt
+        queryBuilder.orderBy('question.isPinned', 'DESC');
+        queryBuilder.addOrderBy('question.likesCount', sortOrder);
+        queryBuilder.addOrderBy('question.createdAt', 'DESC');
+      } else if (sortByValue === 'status') {
+        queryBuilder.orderBy('question.status', sortOrder);
+        queryBuilder.addOrderBy('question.createdAt', 'DESC');
+      } else if (sortByValue === 'question') {
+        queryBuilder.orderBy('question.question', sortOrder);
+        queryBuilder.addOrderBy('question.createdAt', 'DESC');
+      } else if (sortByValue === 'askedBy') {
+        queryBuilder.orderBy('askedBy.firstName', sortOrder);
+        queryBuilder.addOrderBy('askedBy.lastName', sortOrder);
+        queryBuilder.addOrderBy('question.createdAt', 'DESC');
+      } else {
+        // Default: sort by likes, then by pinned, then by createdAt
+        queryBuilder.orderBy('question.isPinned', 'DESC');
+        queryBuilder.addOrderBy('question.likesCount', sortOrder);
+        queryBuilder.addOrderBy('question.createdAt', 'DESC');
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination if requested
+      let questions;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        questions = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        questions = await queryBuilder.getMany();
+      }
 
       // Get user's likes for these questions
       let userLikes: EngagementQnaLike[] = [];
@@ -339,29 +401,80 @@ export class EngagementQnaService {
             questions: sortedQuestions,
           };
 
-      // Calculate summary statistics
-      const totalQuestions = questions.length;
-      const answeredQuestions = questions.filter((q) => q.status === 'answered').length;
-      const unansweredQuestions = questions.filter((q) => q.status === 'not_answered' || q.status === null).length;
-      const approvedQuestions = questions.filter((q) => q.status === 'approved').length;
-      const pinnedQuestions = questions.filter((q) => q.isPinned).length;
+      // Calculate summary statistics from total count (before pagination)
+      // We need to get counts from all matching questions, not just the paginated ones
+      const countQueryBuilder = this.engagementQnaQuestionRepository
+        .createQueryBuilder('question')
+        .where('question.isActive = :isActive', { isActive: true });
+
+      if (getDto.engagementId) {
+        countQueryBuilder.andWhere('question.engagementId = :engagementId', { engagementId: getDto.engagementId });
+      }
+      if (getDto.sessionId) {
+        countQueryBuilder.andWhere('question.sessionId = :sessionId', { sessionId: getDto.sessionId });
+      }
+      const statusValueForCount = getDto.status as any;
+      if (statusValueForCount === QuestionStatus.ANSWERED || statusValueForCount === 'answered') {
+        countQueryBuilder.andWhere('question.status = :status', { status: 'answered' });
+      } else if (statusValueForCount === QuestionStatus.NOT_ANSWERED || statusValueForCount === 'not_answered') {
+        countQueryBuilder.andWhere('(question.status = :status OR question.status IS NULL)', { status: 'not_answered' });
+      } else if (statusValueForCount === QuestionStatus.APPROVED || statusValueForCount === 'approved') {
+        countQueryBuilder.andWhere('question.status = :status', { status: 'approved' });
+      }
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        countQueryBuilder.andWhere(
+          '(LOWER(question.question) LIKE :searchTerm OR LOWER(question.answer) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      const allMatchingQuestions = await countQueryBuilder.getMany();
+      const totalQuestions = allMatchingQuestions.length;
+      const answeredQuestions = allMatchingQuestions.filter((q) => q.status === 'answered').length;
+      const unansweredQuestions = allMatchingQuestions.filter((q) => q.status === 'not_answered' || q.status === null).length;
+      const approvedQuestions = allMatchingQuestions.filter((q) => q.status === 'approved').length;
+      const pinnedQuestions = allMatchingQuestions.filter((q) => q.isPinned).length;
+
+      // Build metadata with pagination if requested
+      const metadata: any = {
+        total: totalQuestions,
+        answered: answeredQuestions,
+        unanswered: unansweredQuestions,
+        approved: approvedQuestions,
+        pinned: pinnedQuestions,
+        engagementId: getDto.engagementId,
+        sessionId: getDto.sessionId,
+        status: getDto.status,
+        sortBy: getDto.sortBy,
+        timestamp: new Date().toISOString(),
+        // Add filter options for frontend
+        filterOptions: {
+          status: [
+            { value: 'all', label: 'All Questions', count: totalQuestions },
+            { value: 'not_answered', label: 'Not Answered', count: unansweredQuestions },
+            { value: 'answered', label: 'Answered', count: answeredQuestions },
+            { value: 'approved', label: 'Approved', count: approvedQuestions },
+          ],
+        },
+      };
+
+      if (hasPagination) {
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+        metadata.page = page;
+        metadata.limit = limit;
+        metadata.totalPages = totalPages;
+        metadata.hasNext = hasNext;
+        metadata.hasPrev = hasPrev;
+      }
 
       return {
         success: true,
         message: 'Questions retrieved successfully',
         data: data,
-        metadata: {
-          total: totalQuestions,
-          answered: answeredQuestions,
-          unanswered: unansweredQuestions,
-          approved: approvedQuestions,
-          pinned: pinnedQuestions,
-          engagementId: getDto.engagementId,
-          sessionId: getDto.sessionId,
-          status: getDto.status,
-          sortBy: getDto.sortBy,
-          timestamp: new Date().toISOString(),
-        },
+        metadata: metadata,
       };
     } catch (error: any) {
       if (error instanceof ValidationException || error instanceof ResourceNotFoundException) {

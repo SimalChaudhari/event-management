@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button, Row, Col, Badge, Alert, Tab, Nav, Modal } from 'react-bootstrap';
@@ -19,6 +19,7 @@ const ViewEngagementSessionPage = () => {
     const { tracks, sessions, loading } = useSelector((state) => state.programme);
     const [session, setSession] = useState(null);
     const [track, setTrack] = useState(null);
+    const hasFetchedDataRef = useRef(false);
     
     // Speaker image modal state
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
@@ -26,10 +27,14 @@ const ViewEngagementSessionPage = () => {
     const [showFullDescription, setShowFullDescription] = useState(false);
 
     useEffect(() => {
+        // Prevent multiple API calls
+        if (hasFetchedDataRef.current) return;
+        
         if (eventIdFromUrl) {
             // If we have eventId, fetch only sessions and tracks for that event
             dispatch(getSessionsByEvent(eventIdFromUrl));
             dispatch(getTracksByEvent(eventIdFromUrl));
+            hasFetchedDataRef.current = true;
         } else {
             // Only fetch all data if not already available
             if (!sessions || sessions.length === 0) {
@@ -38,8 +43,9 @@ const ViewEngagementSessionPage = () => {
             if (!tracks || tracks.length === 0) {
                 dispatch(getAllTracks());
             }
+            hasFetchedDataRef.current = true;
         }
-    }, [dispatch, eventIdFromUrl, sessions, tracks]);
+    }, [dispatch, eventIdFromUrl]); // Removed sessions and tracks from dependencies
 
     useEffect(() => {
         if (sessions && sessions.length > 0) {

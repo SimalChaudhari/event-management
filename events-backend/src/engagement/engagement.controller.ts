@@ -288,20 +288,57 @@ export class EngagementController {
 
   /**
    * Get engagements by track ID
+   * If pagination filters are provided, returns sessions with pagination
+   * Otherwise returns engagements with sessions (backward compatibility)
    */
   @Get('track/:trackId')
   @Roles(UserRole.Admin, UserRole.Moderator)
   async getEngagementsByTrackId(
     @Param('trackId') trackId: string,
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
     @Res() response: Response,
   ) {
     try {
-      const engagements = await this.engagementService.getEngagementsByTrackId(trackId);
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        data: engagements,
-        total: engagements.length,
-      });
+      // Process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.engagementService.getEngagementsByTrackId(trackId, processedFilters);
+
+      // Check if result is sessions (with pagination) or engagements (array)
+      const hasPagination = processedFilters.page !== undefined || processedFilters.limit !== undefined;
+      
+      if (hasPagination && result && typeof result === 'object' && 'data' in result && 'pagination' in result) {
+        // Return sessions with pagination
+        return response.status(HttpStatus.OK).json({
+          success: true,
+          data: result.data,
+          metadata: {
+            ...(result.pagination || {}),
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } else {
+        // Return engagements (backward compatibility)
+        const engagements = Array.isArray(result) ? result : [];
+        return response.status(HttpStatus.OK).json({
+          success: true,
+          data: engagements,
+          total: engagements.length,
+        });
+      }
     } catch (error: any) {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
