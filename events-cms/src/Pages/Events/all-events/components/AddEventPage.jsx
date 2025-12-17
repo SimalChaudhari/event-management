@@ -31,6 +31,8 @@ import useTableNavigation from '../../../../hooks/useTableNavigation';
 import EventProgrammeManagement from '../../../../components/events/EventProgrammeManagement';
 import { createTrack, createSession } from '../../../../store/actions/programmeActions';
 import SettingsEditor from '../../../../App/components/CkEditor/SettingsEditor';
+import DeleteConfirmationModal from '../../../../components/modal/DeleteConfirmationModal';
+import { components } from 'react-select';
 
 // Main component
 function AddEventPage() {
@@ -125,6 +127,10 @@ function AddEventPage() {
 
     // Add loading state for speaker modal
     const [isSpeakerLoading, setIsSpeakerLoading] = useState(false);
+
+    // Confirmation modal for speaker removal
+    const [showSpeakerDeleteModal, setShowSpeakerDeleteModal] = useState(false);
+    const [speakerToRemove, setSpeakerToRemove] = useState(null);
 
     // Add loading states for dropdowns
     const [isLoadingSpeakers, setIsLoadingSpeakers] = useState(false);
@@ -491,17 +497,6 @@ function AddEventPage() {
 
                     setFloorPlanPreview(floorPlanPreviewUrl);
                     setBackgroundImagePreview(backgroundImagePreviewUrl);
-                    
-                    // Store event speakers in localStorage for programme session creation
-                    if (speakerIds && speakerIds.length > 0 && id) {
-                        const eventSpeakersKey = `event_${id}_speakers`;
-                        const speakersData = editData.speakers || editData.speakersData || [];
-                        localStorage.setItem(eventSpeakersKey, JSON.stringify({
-                            speakerIds: speakerIds,
-                            speakers: speakersData,
-                            timestamp: new Date().toISOString()
-                        }));
-                    }
                 }
             } catch (error) {
                 console.error('Error loading event data:', error);
@@ -756,20 +751,43 @@ function AddEventPage() {
     // Handle speaker and category selection
     const handleSpeakerSelect = (selectedOptions) => {
         const selectedIds = selectedOptions.map((option) => option.value);
-        
-        // Store selected speakers in localStorage for programme session creation
-        const selectedSpeakers = speakerList.filter(speaker => selectedIds.includes(speaker.id));
-        const eventSpeakersKey = id ? `event_${id}_speakers` : 'event_temp_speakers';
-        localStorage.setItem(eventSpeakersKey, JSON.stringify({
-            speakerIds: selectedIds,
-            speakers: selectedSpeakers,
-            timestamp: new Date().toISOString()
-        }));
 
         setFormData((prev) => ({
             ...prev,
             speakerIds: selectedIds
         }));
+    };
+
+    // Custom MultiValueRemove to show confirmation modal
+    const CustomMultiValueRemove = (props) => {
+        const { data, innerProps } = props;
+        const speaker = speakerList.find(s => s.id === data.value);
+        const speakerName = speaker ? `${speaker.firstName} ${speaker.lastName}` : data.label;
+        
+        return (
+            <components.MultiValueRemove
+                {...props}
+                innerProps={{
+                    ...innerProps,
+                    onClick: (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSpeakerToRemove({ id: data.value, name: speakerName });
+                        setShowSpeakerDeleteModal(true);
+                    }
+                }}
+            />
+        );
+    };
+
+    // Handle confirm remove speaker
+    const handleConfirmRemoveSpeaker = () => {
+        if (speakerToRemove) {
+            const newValue = selectedSpeakerOptions.filter(opt => opt.value !== speakerToRemove.id);
+            handleSpeakerSelect(newValue);
+        }
+        setShowSpeakerDeleteModal(false);
+        setSpeakerToRemove(null);
     };
 
     const handleCategorySelect = (selectedOptions) => {
@@ -994,15 +1012,6 @@ function AddEventPage() {
             const result = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
             if (result && result.success) {
                 const newEventId = result.data?.id || result.id || id;
-                
-                // If creating new event, move temp speakers to event-specific key
-                if (!id && newEventId) {
-                    const tempSpeakers = localStorage.getItem('event_temp_speakers');
-                    if (tempSpeakers) {
-                        localStorage.setItem(`event_${newEventId}_speakers`, tempSpeakers);
-                        localStorage.removeItem('event_temp_speakers');
-                    }
-                }
                 
                 // If creating new event and we have programme data, save it
                 if (!id && programmeDataRef.current) {
@@ -1790,6 +1799,9 @@ function AddEventPage() {
                                                     isLoading={isLoadingSpeakers}
                                                     onMenuOpen={handleSpeakerDropdownOpen}
                                                     onMenuClose={() => setSpeakerDropdownOpen(false)}
+                                                    components={{
+                                                        MultiValueRemove: CustomMultiValueRemove
+                                                    }}
                                                     styles={{
                                                         control: (base) => ({
                                                             ...base,
@@ -2941,6 +2953,7 @@ function AddEventPage() {
                                         <EventProgrammeManagement 
                                             eventId={id} 
                                             isEditMode={!!id}
+                                            eventSpeakers={speakerList.filter(speaker => formData.speakerIds && formData.speakerIds.includes(speaker.id))}
                                             onProgrammeDataChange={(data) => {
                                                 if (!id) {
                                                     // Store programme data for later saving after event creation
@@ -2976,6 +2989,26 @@ function AddEventPage() {
                 onHide={() => setShowMapModal(false)}
                 formData={formData}
                 onLocationSave={handleLocationSave}
+            />
+
+            <DeleteConfirmationModal
+                show={showSpeakerDeleteModal}
+                onHide={() => {
+                    setShowSpeakerDeleteModal(false);
+                    setSpeakerToRemove(null);
+                }}
+                onConfirm={handleConfirmRemoveSpeaker}
+                title="Remove Speaker"
+                message={
+                    <>
+                        Are you sure you want to delete?
+                        <br />
+                        <br />
+                        <span className="text-muted" style={{ fontSize: '0.9em' }}>
+                            <strong>Note:</strong> This speaker will be removed from all programme sessions and engagements. The sessions and engagements will remain, but without this speaker.
+                        </span>
+                    </>
+                }
             />
         </Container>
     );

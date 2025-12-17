@@ -8,6 +8,7 @@ import { ProgrammeController } from './programme.controller';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { EventSpeaker } from '../event/event-speaker.entity';
+import { Engagement } from '../engagement/engagement.entity';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
       UserEntity,
       Event,
       EventSpeaker,
+      Engagement,
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,

@@ -44,12 +44,92 @@ export class CategoryService {
     }
   }
 
-  async getAllCategories() {
+  async getAllCategories(
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const categories = await this.categoryRepository.find({
-        order: { createdAt: 'DESC' },
-      });
-      return categories;
+      // If pagination is not provided, return all data
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
+      // Build query builder
+      const queryBuilder = this.categoryRepository.createQueryBuilder('category');
+
+      // Apply search filter - search in name and description
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(category.name) LIKE :searchTerm OR ' +
+          'LOWER(category.description) LIKE :searchTerm)',
+          { searchTerm },
+        );
+      }
+
+      // Apply sorting
+      if (sortBy === 'name' || sortBy === 'description' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        queryBuilder.orderBy(`category.${sortBy}`, sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('category.createdAt', sortOrder);
+      }
+
+      // Get total count
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination only if pagination parameters are provided
+      let categories;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        categories = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        // No pagination - return all data
+        categories = await queryBuilder.getMany();
+      }
+
+      // Return response with or without pagination
+      if (hasPagination) {
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+
+        return {
+          data: categories,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+        };
+      } else {
+        // No pagination - return all data without pagination metadata
+        return {
+          data: categories,
+        };
+      }
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Category retrieval');
     }

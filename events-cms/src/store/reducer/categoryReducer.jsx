@@ -2,6 +2,7 @@ import { CATEGORY_LIST, CREATE_CATEGORY, UPDATE_CATEGORY, DELETE_CATEGORY, CATEG
 
 const initialState = {
     categories: [],
+    pagination: {},
     loading: false,
     error: null
 };
@@ -14,9 +15,11 @@ const categoryReducer = (state = initialState, { type, payload } = {}) => {
                 loading: payload
             };
         case CATEGORY_LIST:
+            // Handle payload as an object with data and pagination
             return {
                 ...state,
-                categories: payload,
+                categories: payload.data || payload, // Support both old format (array) and new format (object)
+                pagination: payload.pagination || {},
                 loading: false,
                 error: null
             };

@@ -16,6 +16,7 @@ const initialState = {
     selectedEngagement: null,
     trackEngagements: {}, // Store engagements by trackId: { trackId1: [engagements], trackId2: [engagements] }
     events: [], // Events that have engagements (for filter dropdown)
+    pagination: {}, // Pagination metadata
     loading: false,
     error: null,
 };
@@ -42,9 +43,22 @@ const engagementReducer = (state = initialState, action) => {
             };
             
         case ENGAGEMENT_LIST:
+            // Handle both old format (array directly) and new format (object with data and pagination)
+            let engagementsData = [];
+            if (action.payload) {
+                if (Array.isArray(action.payload)) {
+                    // Old format: payload is directly an array
+                    engagementsData = action.payload;
+                } else if (action.payload.data !== undefined && action.payload.data !== null) {
+                    // New format: payload has data property
+                    engagementsData = Array.isArray(action.payload.data) ? action.payload.data : [];
+                }
+            }
+            
             return {
                 ...state,
-                engagements: action.payload,
+                engagements: engagementsData,
+                pagination: action.payload?.pagination || {},
                 loading: false,
                 error: null,
             };

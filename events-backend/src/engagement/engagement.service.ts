@@ -271,44 +271,163 @@ export class EngagementService {
   /**
    * Get all engagements with formatted data
    */
-  async getAllEngagements(eventId?: string): Promise<any[]> {
-    const whereCondition: any = {};
-    
-    // Filter by eventId if provided
-    if (eventId) {
-      whereCondition.track = {
-        event: { id: eventId }
-      };
-    }
+  async getAllEngagements(
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      eventId?: string;
+    },
+  ): Promise<{
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    events: any[]; // For filter dropdown
+  }> {
+    try {
+      // If pagination is not provided, return all data (backward compatibility)
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const search = filters?.search;
+      const sortBy = filters?.sortBy || 'displayOrder';
+      const sortOrder = filters?.sortOrder || 'ASC';
+      const eventId = filters?.eventId;
 
-    const engagements = await this.engagementRepository.find({
-      where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
-      relations: ['track', 'track.event', 'track.sessions', 'track.sessions.speakers', 'track.sessions.speakers.speakerProfile'],
-      order: { displayOrder: 'ASC', createdAt: 'ASC' },
-    });
+      // Build query builder
+      const queryBuilder = this.engagementRepository
+        .createQueryBuilder('engagement')
+        .leftJoinAndSelect('engagement.track', 'track')
+        .leftJoinAndSelect('track.event', 'event')
+        .leftJoinAndSelect('track.sessions', 'sessions')
+        .leftJoinAndSelect('sessions.speakers', 'speakers')
+        .leftJoinAndSelect('speakers.speakerProfile', 'speakerProfile');
 
-    // Get statistics for each engagement
-    const engagementsWithStats = await Promise.all(
-      engagements.map(async (engagement) => {
-        const statistics = await this.getEngagementStatistics(engagement.id);
-        const sessionsWithStats = await this.getSessionStatistics(
-          engagement.id, 
-          engagement.track?.sessions || [],
-          engagement.sessionIds || undefined
+      // Filter by eventId if provided
+      if (eventId) {
+        queryBuilder.andWhere('event.id = :eventId', { eventId });
+      }
+
+      // Apply search filter - search in track title and event name
+      if (search && search.trim() !== '') {
+        const searchTerm = `%${search.toLowerCase().trim()}%`;
+        queryBuilder.andWhere(
+          '(LOWER(track.title) LIKE :searchTerm OR LOWER(event.name) LIKE :searchTerm)',
+          { searchTerm },
         );
-        
-        return {
-          ...engagement,
-          statistics,
-          track: {
-            ...engagement.track,
-            sessions: sessionsWithStats
-          }
-        };
-      })
-    );
+      }
 
-    return UserUtils.formatEngagements(engagementsWithStats, false); // Admin can see all
+      // Apply sorting
+      if (sortBy === 'displayOrder') {
+        queryBuilder.orderBy('engagement.displayOrder', sortOrder);
+        queryBuilder.addOrderBy('engagement.createdAt', 'ASC');
+      } else if (sortBy === 'createdAt') {
+        queryBuilder.orderBy('engagement.createdAt', sortOrder);
+      } else if (sortBy === 'trackTitle') {
+        queryBuilder.orderBy('track.title', sortOrder);
+      } else if (sortBy === 'eventName') {
+        queryBuilder.orderBy('event.name', sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('engagement.displayOrder', 'ASC');
+        queryBuilder.addOrderBy('engagement.createdAt', 'ASC');
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination only if pagination parameters are provided
+      let engagements;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        engagements = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        // No pagination - return all data
+        engagements = await queryBuilder.getMany();
+      }
+
+      // Get statistics for each engagement
+      const engagementsWithStats = await Promise.all(
+        engagements.map(async (engagement) => {
+          const statistics = await this.getEngagementStatistics(engagement.id);
+          const sessionsWithStats = await this.getSessionStatistics(
+            engagement.id,
+            engagement.track?.sessions || [],
+            engagement.sessionIds || undefined,
+          );
+
+          return {
+            ...engagement,
+            statistics,
+            track: {
+              ...engagement.track,
+              sessions: sessionsWithStats,
+            },
+          };
+        }),
+      );
+
+      // Format engagements into grouped structure
+      const formattedData = UserUtils.formatEngagements(engagementsWithStats, false); // Admin can see all
+
+      // Get all events for filter dropdown (fetch all engagements to get all events)
+      const allEngagementsQuery = this.engagementRepository
+        .createQueryBuilder('engagement')
+        .leftJoinAndSelect('engagement.track', 'track')
+        .leftJoinAndSelect('track.event', 'event');
+      const allEngagements = await allEngagementsQuery.getMany();
+      const eventsMap = new Map();
+      allEngagements.forEach((engagement) => {
+        if (engagement.track?.event?.id) {
+          const eventIdStr = String(engagement.track.event.id);
+          if (!eventsMap.has(eventIdStr)) {
+            eventsMap.set(eventIdStr, {
+              id: engagement.track.event.id,
+              name: engagement.track.event.name || '',
+              location: engagement.track.event.location || '',
+            });
+          }
+        }
+      });
+      const events = Array.from(eventsMap.values());
+
+      // Return response with or without pagination
+      if (hasPagination) {
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+
+        return {
+          data: formattedData,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+          events,
+        };
+      } else {
+        // No pagination - return all data without pagination metadata
+        return {
+          data: formattedData,
+          events,
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**

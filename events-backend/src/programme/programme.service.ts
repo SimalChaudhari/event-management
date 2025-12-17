@@ -6,6 +6,7 @@ import { ProgrammeSession } from './programme-session.entity';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { EventSpeaker } from '../event/event-speaker.entity';
+import { Engagement } from '../engagement/engagement.entity';
 import {
   CreateProgrammeTrackDto,
   UpdateProgrammeTrackDto,
@@ -17,6 +18,7 @@ import {
 } from './programme.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserUtils } from '../utils/user.utils';
+import { ForeignKeyConstraintException } from '../utils/exceptions/custom-exceptions';
 
 @Injectable()
 export class ProgrammeService {
@@ -31,6 +33,8 @@ export class ProgrammeService {
     private eventRepository: Repository<Event>,
     @InjectRepository(EventSpeaker)
     private eventSpeakerRepository: Repository<EventSpeaker>,
+    @InjectRepository(Engagement)
+    private engagementRepository: Repository<Engagement>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
@@ -90,6 +94,20 @@ export class ProgrammeService {
         throw new NotFoundException('Programme track not found');
       }
 
+      // Check if track has engagements before deleting
+      const engagements = await this.engagementRepository.find({
+        where: { trackId },
+      });
+
+      if (engagements.length > 0) {
+        throw new ForeignKeyConstraintException(
+          'Programme Track',
+          'Engagements',
+          engagements.length,
+          'delete',
+        );
+      }
+
       // Delete all sessions first (cascade should handle this, but being explicit)
       if (track.sessions && track.sessions.length > 0) {
         await this.programmeSessionRepository.delete(
@@ -98,7 +116,35 @@ export class ProgrammeService {
       }
 
       await this.programmeTrackRepository.delete(trackId);
-    } catch (error) {
+    } catch (error: any) {
+      // Check if it's a foreign key constraint error
+      if (
+        error?.code === '23503' ||
+        error?.message?.includes('foreign key constraint') ||
+        error?.message?.includes('FK_35e9c23cece2cfabc9335c670d2') ||
+        error instanceof ForeignKeyConstraintException
+      ) {
+        // If we already threw ForeignKeyConstraintException, re-throw it
+        if (error instanceof ForeignKeyConstraintException) {
+          throw error;
+        }
+        // Otherwise, create a proper error message
+        const engagements = await this.engagementRepository.find({
+          where: { trackId },
+        });
+        throw new ForeignKeyConstraintException(
+          'Programme Track',
+          'Engagements',
+          engagements.length,
+          'delete',
+        );
+      }
+      
+      // Re-throw NotFoundException
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      
       this.errorHandler.logError(error, 'Delete Programme Track', trackId);
       throw error;
     }

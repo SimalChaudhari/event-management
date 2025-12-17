@@ -136,49 +136,58 @@ export class EngagementController {
   }
 
   /**
-   * Get all engagements
+   * Get all engagements with search, filter, and pagination
    */
   @Get()
   @Roles(UserRole.Admin, UserRole.Moderator)
   async getAllEngagements(
     @Query('eventId') eventId: string,
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
     @Res() response: Response,
   ) {
     try {
-      // Get filtered engagements (if eventId provided) or all engagements
-      const engagements = await this.engagementService.getAllEngagements(eventId);
+      // Process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+        eventId: eventId || undefined,
+      };
+
+      const result = await this.engagementService.getAllEngagements(processedFilters);
+
+      // If pagination is not provided, return the previous format (backward compatibility)
+      const hasPagination = processedFilters.page !== undefined || processedFilters.limit !== undefined;
       
-      // Extract unique events from engagements for filter dropdown
-      // If eventId filter is applied, we need to fetch all engagements to get all events
-      // Otherwise, we can use the current engagements data
-      let allEngagementsForEvents = engagements;
-      if (eventId) {
-        // If filtering by event, fetch all engagements to get complete events list for dropdown
-        allEngagementsForEvents = await this.engagementService.getAllEngagements();
+      if (!hasPagination) {
+        // Return previous format: { success: true, data: ..., events: ..., total: ... }
+        return response.status(HttpStatus.OK).json({
+          success: true,
+          data: result.data,
+          events: result.events,
+          total: result.data.length,
+        });
+      } else {
+        // Return new format with pagination metadata
+        return response.status(HttpStatus.OK).json({
+          success: true,
+          data: result.data,
+          events: result.events,
+          metadata: {
+            ...(result.pagination || {}),
+            timestamp: new Date().toISOString(),
+          },
+        });
       }
-      
-      // Extract unique events from engagements for filter dropdown
-      const eventsMap = new Map();
-      allEngagementsForEvents.forEach((engagementGroup: any) => {
-        if (engagementGroup.event && engagementGroup.event.id) {
-          const eventIdStr = String(engagementGroup.event.id);
-          if (!eventsMap.has(eventIdStr)) {
-            eventsMap.set(eventIdStr, {
-              id: engagementGroup.event.id,
-              name: engagementGroup.event.name || engagementGroup.event.eventName || '',
-              location: engagementGroup.event.location || ''
-            });
-          }
-        }
-      });
-      const events = Array.from(eventsMap.values());
-      
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        data: engagements, // Filtered engagements (or all if no filter)
-        events: events, // All events that have engagements (for filter dropdown)
-        total: engagements.length,
-      });
     } catch (error: any) {
       return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,

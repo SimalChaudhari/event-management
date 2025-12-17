@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -7,44 +7,76 @@ import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { useSelector, useDispatch } from 'react-redux';
 import * as $ from 'jquery';
-import { categoryList, deleteCategory } from '../../../store/actions/categoryActions';
+import { deleteCategory } from '../../../store/actions/categoryActions';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
+import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
+import axiosInstance from '../../../configs/axiosInstance';
+import { CATEGORY_LOADING } from '../../../store/constants/actionTypes';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
+const Categories = () => {
+    const dispatch = useDispatch();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const tableRef = useRef(null);
 
-function atable(data, handleAddCategory, handleEdit, handleDelete, handleView, restoreTablePage) {
-    const tableZero = '#data-table-zero';
-    $.fn.dataTable.ext.errMode = 'throw';
+    // Use pagination persistence hook
+    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
 
-    if ($.fn.DataTable.isDataTable(tableZero)) {
-        $(tableZero).DataTable().clear().destroy();
-    }
+    // Use reusable table navigation hook for page preservation
+    const { handleView, handleEdit, handleAdd } = useTableNavigation({
+        tableRef,
+        listPath: EVENT_PATHS.CATEGORIES,
+        viewPath: EVENT_PATHS.VIEW_CATEGORY,
+        editPath: EVENT_PATHS.EDIT_CATEGORY,
+        addPath: EVENT_PATHS.ADD_CATEGORY
+    });
 
-    const validData = Array.isArray(data) ? data.filter((item) => item && item.id) : [];
+    const handleDelete = React.useCallback((categoryId) => {
+        setItemToDelete({ id: categoryId });
+        setShowDeleteModal(true);
+    }, []);
 
-    const dataTableInstance = $(tableZero).DataTable({
-        data: validData,
-        rowId: 'id',
-        order: [[0, 'asc']],
-        searching: true,
-        searchDelay: 500,
-        pageLength: 5,
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers',
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-category-button ml-2'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        columns: [
+    const handleConfirmDelete = async () => {
+        if (!itemToDelete) return;
+
+        setIsDeleting(true);
+        try {
+            const result = await dispatch(deleteCategory(itemToDelete.id));
+            if (result === true) {
+                setShowDeleteModal(false);
+                setItemToDelete(null);
+                // Reload DataTable after deletion
+                if (tableRef.current) {
+                    tableRef.current.ajax.reload(null, false);
+                }
+            } else {
+                setShowDeleteModal(false);
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            setShowDeleteModal(false);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleClose = () => {
+        if (!isDeleting) {
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        }
+    };
+
+    useEffect(() => {
+        const columns = [
             {
                 data: 'name',
                 title: 'Category Name',
@@ -58,10 +90,14 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView, r
                         description = description.substring(0, maxLength) + '...';
                     }
                     
+                    if (type === 'sort' || type === 'type') {
+                        return row.name || '';
+                    }
+                    
                     return `
                         <div class="d-inline-block align-middle">
                             <div class="d-inline-block">
-                                <h6 class="m-b-0">${row.name}</h6>
+                                <h6 class="m-b-0">${row.name || 'N/A'}</h6>
                                 <p class="text-muted m-b-0">${description}</p>
                             </div>
                         </div>   
@@ -72,26 +108,32 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView, r
                 data: 'createdAt',
                 title: 'Created Date',
                 render: function (data, type, row) {
-                    const date = new Date(row.createdAt);
-                    const formattedDate = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    return `<span class="badge badge-light">${formattedDate}</span>`;
+                    if (data) {
+                        const date = new Date(data);
+                        const formattedDate = date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                        return `<span class="badge badge-light">${formattedDate}</span>`;
+                    }
+                    return 'N/A';
                 }
             },
             {
                 data: 'updatedAt',
                 title: 'Last Updated',
                 render: function (data, type, row) {
-                    const date = new Date(row.updatedAt);
-                    const formattedDate = date.toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    return `<span class="badge badge-light">${formattedDate}</span>`;
+                    if (data) {
+                        const date = new Date(data);
+                        const formattedDate = date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                        return `<span class="badge badge-light">${formattedDate}</span>`;
+                    }
+                    return 'N/A';
                 }
             },
             {
@@ -117,163 +159,79 @@ function atable(data, handleAddCategory, handleEdit, handleDelete, handleView, r
                     `;
                 }
             }
-        ],
-        initComplete: function () {
-            if (typeof restoreTablePage === 'function') {
-                const api = this.api();
-                restoreTablePage(api);
+        ];
+
+        // Initialize server-side DataTable
+        tableRef.current = initializeServerSideDataTable({
+            tableSelector: '#data-table-zero',
+            ajaxUrl: '/categories/get',
+            ajaxMethod: 'GET',
+            columns: columns,
+            ajaxParams: {},
+            axiosInstance: axiosInstance,
+            dispatch: dispatch, // Pass dispatch for loading state
+            loadingActionType: CATEGORY_LOADING, // Use CATEGORY_LOADING to show GlobalLoader
+            dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-category-button ml-2'>>>" +
+                 "<'row'<'col-sm-12'tr>>" +
+                 "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            pageLength: 10,
+            lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            onDataLoaded: (data, metadata) => {
+                // Optional: Handle data if needed
+            },
+            restoreTablePage: restoreTablePage,
+            initCompleteCallback: function (settings, json, api) {
+                // Add button initialization
+                if (!$('#addCategoryBtn').length) {
+                    $('.add-category-button').html(`
+                        <button class="btn btn-primary d-flex align-items-center ml-2" id="addCategoryBtn">
+                            <i class="feather icon-plus mr-1"></i>
+                            Add
+                        </button>
+                    `);
+                    $('#addCategoryBtn').on('click', handleAdd);
+                }
+
+                // Attach event listeners for actions
+                $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleView(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.edit-btn').on('click', '.edit-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleEdit(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.delete-btn').on('click', '.delete-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleDelete(rowData.id);
+                    }
+                });
             }
+        });
 
-            if (!$('#addCategoryBtn').length) {
-                $('.add-category-button').html(`
-                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addCategoryBtn">
-                        <i class="feather icon-plus mr-1"></i>
-                        Add
-                    </button>
-                `);
-
-                $('#addCategoryBtn').on('click', handleAddCategory);
+        return () => {
+            if (tableRef.current) {
+                tableRef.current.destroy();
+                tableRef.current = null;
             }
-        },
-        responsive: true
-    });
-
-    const tableSelector = `${tableZero} tbody`;
-    $(tableSelector).off('click', '.view-btn').on('click', '.view-btn', function () {
-        const table = $(tableZero).DataTable();
-        const rowData = table.row($(this).closest('tr')).data();
-        if (rowData && rowData.id) {
-            handleView(rowData);
-        }
-    });
-
-    $(tableSelector).off('click', '.edit-btn').on('click', '.edit-btn', function () {
-        const table = $(tableZero).DataTable();
-        const rowData = table.row($(this).closest('tr')).data();
-        if (rowData && rowData.id) {
-            handleEdit(rowData);
-        }
-    });
-
-    $(tableSelector).off('click', '.delete-btn').on('click', '.delete-btn', function () {
-        const categoryId = $(this).data('id');
-        if (categoryId) {
-            handleDelete(categoryId);
-        }
-    });
-
-    return dataTableInstance;
-}
-
-const Categories = () => {
-    const dispatch = useDispatch();
-    const categories = useSelector((state) => state.category?.categories);
-    const [currentTable, setCurrentTable] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const tableRef = React.useRef(null);
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
-
-    const { handleView, handleEdit, handleAdd } = useTableNavigation({
-        tableRef,
-        listPath: EVENT_PATHS.CATEGORIES,
-        viewPath: EVENT_PATHS.VIEW_CATEGORY,
-        editPath: EVENT_PATHS.EDIT_CATEGORY,
-        addPath: EVENT_PATHS.ADD_CATEGORY
-    });
-
-    const destroyTable = () => {
-        if (currentTable) {
-            currentTable.off('page.dt');
-            const tableSelector = '#data-table-zero tbody';
-            $(tableSelector).off('click', '.view-btn');
-            $(tableSelector).off('click', '.edit-btn');
-            $(tableSelector).off('click', '.delete-btn');
-            currentTable.destroy();
-            setCurrentTable(null);
-            tableRef.current = null;
-        }
-    };
-
-    const initializeTable = () => {
-        destroyTable();
-        if (Array.isArray(categories)) {
-            const table = atable(
-                categories,
-                handleAddCategory,
-                handleEditCategory,
-                handleDeleteCategory,
-                handleViewCategory,
-                restoreTablePage
-            );
-            setCurrentTable(table);
-            tableRef.current = table;
-            if (table && typeof checkAndAdjustPage === 'function') {
-                checkAndAdjustPage(table);
-            }
-        }
-    };
-
-    useEffect(() => {
-        // Only fetch if categories are not already loaded in Redux
-        // This prevents unnecessary API calls when navigating back after create/update/delete
-        // Since create/update/delete already update Redux, we don't need to fetch again
-        if (!categories || categories.length === 0) {
-            dispatch(categoryList());
-        }
-        return () => destroyTable();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        initializeTable();
-        return () => destroyTable();
-    }, [categories]);
-
-    const handleAddCategory = () => {
-        handleAdd();
-    };
-
-    const handleEditCategory = (data) => {
-        handleEdit(data);
-    };
-
-    const handleViewCategory = (data) => {
-        handleView(data);
-    };
-
-    const handleDeleteCategory = (categoryId) => {
-        setItemToDelete({ id: categoryId });
-        setShowDeleteModal(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!itemToDelete) return;
-
-        setIsDeleting(true);
-        try {
-            await dispatch(deleteCategory(itemToDelete.id));
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-        } catch (error) {
-            console.error('Delete failed:', error);
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const handleClose = () => {
-        if (!isDeleting) {
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-        }
-    };
+        };
+    }, []); // Only run once on mount
 
     return (
         <>
-          
-            <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
+            <DeleteConfirmationModal 
+                show={showDeleteModal} 
+                onHide={handleClose} 
+                onConfirm={handleConfirmDelete} 
+                isLoading={isDeleting} 
+            />
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">

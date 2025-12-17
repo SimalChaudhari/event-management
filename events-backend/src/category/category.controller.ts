@@ -6,9 +6,11 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
   UseGuards,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { CategoryService } from './category.service';
@@ -53,24 +55,48 @@ export class CategoryController {
     }
   }
 
+  /**
+   * Get all categories with search filter and pagination
+   * Access: All authenticated users
+   */
   @Get('get')
-  async getAllCategories(@Res() response: Response) {
+  async getAllCategories(
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
     try {
-      const categories = await this.categoryService.getAllCategories();
+      // Extract and process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.categoryService.getAllCategories(processedFilters);
       
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Categories retrieved successfully',
-        data: categories,
+        data: result.data,
         metadata: {
-          total: categories.length,
+          ...(result.pagination || {}),
           timestamp: new Date().toISOString(),
         },
       };
       
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
-      this.errorHandler.logError(error, 'Category retrieval');
+      this.errorHandler.logError(error, 'Category retrieval', req.user?.id);
       throw error;
     }
   }

@@ -1,6 +1,7 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
 import { CATEGORY_LIST, CREATE_CATEGORY, UPDATE_CATEGORY, DELETE_CATEGORY, CATEGORY_LOADING } from "../constants/actionTypes";
+import { buildUrlWithParams } from "../../utils/buildQueryParams";
 
 // Helper function to dispatch loading state
 const setCategoryLoading = (dispatch, loading) => {
@@ -10,24 +11,40 @@ const setCategoryLoading = (dispatch, loading) => {
     });
 };
 
-// Get all categories
-export const categoryList = () => async (dispatch) => {
+// Get all categories with pagination support
+export const categoryList = (filters = {}) => async (dispatch) => {
     try {
         setCategoryLoading(dispatch, true);
-        const response = await axiosInstance.get('/categories/get');
+        
+        // Build URL with query parameters
+        const url = buildUrlWithParams('/categories/get', filters);
+        
+        const response = await axiosInstance.get(url);
+        
         dispatch({
             type: CATEGORY_LIST,
-            payload: response.data.data,
+            payload: {
+                data: response.data?.data || [],
+                pagination: response.data?.metadata || {}
+            }
         });
-        return true;
-    } catch (error) {
         
+        return {
+            success: true,
+            data: response.data?.data || [],
+            pagination: response.data?.metadata || {}
+        };
+    } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch categories';
         toast.error(errorMessage);
+        return {
+            success: false,
+            data: [],
+            pagination: {}
+        };
     } finally {
         setCategoryLoading(dispatch, false);
     }
-    return false;
 };
 
 export const categoryById = (id) => async (dispatch) => {

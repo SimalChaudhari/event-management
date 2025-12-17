@@ -114,7 +114,7 @@ const AddEngagementPage = () => {
     // Track if events have been loaded to prevent duplicate calls
     const eventsLoadedRef = React.useRef(false);
 
-    // Load events and filter to only show events with tracks
+    // Load events and filter to show only future/upcoming events (all future events)
     useEffect(() => {
         // Only load events once on mount, not on every render
         if (eventsLoadedRef.current) {
@@ -126,49 +126,49 @@ const AddEngagementPage = () => {
             try {
                 // Load all events
                 const eventsData = await dispatch(getAllEventsForFilter());
-                setEvents(eventsData || []);
+                console.log("eventsData", eventsData);
                 
-                // Load all tracks to check which events have tracks
-                const tracksResult = await dispatch(getAllTracks());
-                const allTracks = tracksResult?.data || [];
+                // Ensure eventsData is an array
+                const eventsArray = Array.isArray(eventsData) ? eventsData : [];
                 
-                // Get unique event IDs that have tracks
-                const eventIdsWithTracks = new Set(
-                    allTracks.map(track => track.eventId || track.event?.id).filter(Boolean)
-                );
+                // Log first event structure to understand the data format
+                if (eventsArray.length > 0) {
+                    console.log("First event structure:", eventsArray[0]);
+                    console.log("First event keys:", Object.keys(eventsArray[0]));
+                }
                 
-                // Filter events to only include those with tracks and exclude past events
+                setEvents(eventsArray);
+                
+                // Filter events to show only future/upcoming events (all future events, not just those with tracks)
                 const today = new Date();
                 today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
                 
-                const filteredEvents = (eventsData || []).filter(event => {
-                    // First check if event has tracks
-                    if (!eventIdsWithTracks.has(event.id)) {
-                        return false;
-                    }
+                const filteredEvents = eventsArray.filter(event => {
+                    // Check for startDate in different possible field names
+                    const eventStartDate = event.startDate || event.eventStartDate || event.start_date;
                     
-                    // Filter out past events - only show upcoming/future events
-                    if (!event.startDate) {
-                        // If no startDate, include it (might be a data issue, but don't exclude)
-                        return true;
+                    if (!eventStartDate) {
+                        // If no startDate found, include it (might be a data issue, but don't exclude all)
+                        console.log('Event has no startDate field:', event.id, event.name || event.eventName);
+                        return true; // Include events without date to avoid filtering everything out
                     }
                     
                     try {
                         // Parse the event start date - handle different date formats
                         let eventDate;
-                        if (typeof event.startDate === 'string') {
+                        if (typeof eventStartDate === 'string') {
                             // Handle ISO string format (e.g., "2024-12-25" or "2024-12-25T00:00:00.000Z")
-                            eventDate = new Date(event.startDate.split('T')[0]); // Get date part only
-                        } else if (event.startDate instanceof Date) {
-                            eventDate = new Date(event.startDate);
+                            eventDate = new Date(eventStartDate.split('T')[0]); // Get date part only
+                        } else if (eventStartDate instanceof Date) {
+                            eventDate = new Date(eventStartDate);
                         } else {
                             // Try to parse as date
-                            eventDate = new Date(event.startDate);
+                            eventDate = new Date(eventStartDate);
                         }
                         
                         // Check if date is valid
                         if (isNaN(eventDate.getTime())) {
-                            console.warn('Invalid date for event:', event.id, event.startDate);
+                            console.warn('Invalid date for event:', event.id, event.name || event.eventName, eventStartDate);
                             return true; // Include events with invalid dates (don't exclude)
                         }
                         
@@ -177,11 +177,13 @@ const AddEngagementPage = () => {
                         // Only include events where startDate is today or in the future
                         return eventDate >= today;
                     } catch (error) {
-                        console.warn('Error parsing date for event:', event.id, error);
+                        console.warn('Error parsing date for event:', event.id, event.name || event.eventName, error);
                         return true; // Include events with date parsing errors (don't exclude)
                     }
                 });
                 
+                console.log("filteredEvents", filteredEvents);
+                console.log("filteredEvents length", filteredEvents.length);
                 setEventsWithTracks(filteredEvents);
                 eventsLoadedRef.current = true;
             } catch (error) {
@@ -505,7 +507,8 @@ const AddEngagementPage = () => {
     // Find selected track option
     const selectedTrackOption = trackOptions.find(option => option.value === selectedTrackId);
 
-    // Create event options for select dropdown (only events with tracks)
+    // Create event options for select dropdown (all future events)
+    console.log("eventsWithTracks", eventsWithTracks);
     const eventOptions = eventsWithTracks
         .map(event => ({
             value: event.id,
@@ -517,6 +520,7 @@ const AddEngagementPage = () => {
             const labelB = b.label || '';
             return labelA.localeCompare(labelB);
         });
+    console.log("eventOptions", eventOptions);
 
     const selectedEventOption = eventOptions.find(option => option.value === selectedEventId);
 

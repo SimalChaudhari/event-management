@@ -12,6 +12,7 @@ import {
     TOGGLE_ENGAGEMENT_STATUS,
     CLEAR_ENGAGEMENT_ERROR
 } from '../constants/actionTypes';
+import { buildUrlWithParams } from '../../utils/buildQueryParams';
 
 // Set Loading State
 export const setEngagementLoading = (loading) => ({
@@ -30,35 +31,52 @@ export const clearEngagementError = () => ({
     type: CLEAR_ENGAGEMENT_ERROR
 });
 
-// Get all engagements
+// Get all engagements with pagination support
 export const getAllEngagements = (filters = {}) => async (dispatch) => {
     try {
         dispatch(setEngagementLoading(true));
         
-        const queryParams = new URLSearchParams();
-        if (filters.eventId) {
-            queryParams.append('eventId', filters.eventId);
+        // Build URL with query parameters
+        const url = buildUrlWithParams('/engagements', filters);
+          const response = await axiosInstance.get(url);
+
+        
+        // Check if pagination is being used
+        const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+        const engagementData = response.data?.data || [];
+          // Dispatch payload in the same format as before (array directly) when no pagination
+        // Or with data/pagination structure when pagination is used
+        if (hasPagination && response.data?.metadata) {
+            // New format with pagination
+            dispatch({
+                type: ENGAGEMENT_LIST,
+                payload: {
+                    data: Array.isArray(engagementData) ? engagementData : [],
+                    pagination: response.data.metadata
+                }
+            });
+        } else {
+            // Previous format: dispatch array directly (backward compatibility)
+            dispatch({
+                type: ENGAGEMENT_LIST,
+                payload: Array.isArray(engagementData) ? engagementData : []
+            });
         }
         
-        const queryString = queryParams.toString();
-        const url = queryString ? `/engagements?${queryString}` : '/engagements';
-        
-        const response = await axiosInstance.get(url);
-        
-        dispatch({
-            type: ENGAGEMENT_LIST,
-            payload: response.data.data
-        });
-        
         // Store events from response for filter dropdown
-        if (response.data.events) {
+        if (response.data?.events) {
             dispatch({
                 type: 'ENGAGEMENT_EVENTS_LIST',
                 payload: response.data.events
             });
         }
         
-        return { success: true, data: response.data.data, events: response.data.events || [] };
+        return { 
+            success: true, 
+            data: Array.isArray(engagementData) ? engagementData : [], 
+            events: response.data?.events || [],
+            pagination: response.data?.metadata || {}
+        };
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch engagements';
         dispatch(setEngagementError(errorMessage));

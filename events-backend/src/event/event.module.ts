@@ -31,6 +31,8 @@ import { NotificationUtil } from '../utils/notification.util';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { PushNotification, UserPermissions, PermissionTemplate } from '../settings/setting.entity';
 import { ProgrammeModule } from '../programme/programme.module';
+import { ProgrammeSession } from '../programme/programme-session.entity';
+import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { FilterModule } from '../service/filter.module';
 
@@ -62,6 +64,8 @@ import { FilterModule } from '../service/filter.module';
         OrderItemEntity,
         EventAttendance,
         Feedback,
+        ProgrammeSession,
+        ProgrammeTrack,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({

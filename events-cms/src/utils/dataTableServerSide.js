@@ -19,7 +19,9 @@ export const initializeServerSideDataTable = ({
     lengthMenu = [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
     order = null, // Default sort order
     dispatch = null, // Redux dispatch for loading state
-    loadingActionType = null // Action type to dispatch for loading (e.g., 'EVENT_LOADING')
+    loadingActionType = null, // Action type to dispatch for loading (e.g., 'EVENT_LOADING')
+    rowReorder = null, // RowReorder configuration object
+    fetchAction = null // Redux action function to fetch data (e.g., getAllEngagements)
 }) => {
     const $ = window.$ || require('jquery');
     
@@ -40,12 +42,49 @@ export const initializeServerSideDataTable = ({
         displayStart = (pageParam - 1) * pageLength;
     }
 
-    const dataTableInstance = $(tableSelector).DataTable({
-        processing: true,
-        serverSide: true,
-        displayStart: displayStart, // Set initial page from URL to prevent double API call
-        order: order || undefined, // Set default sort order if provided
-        ajax: function (data, callback, settings) {
+    // Debounce timer for search - store it per table instance
+    let searchDebounceTimer = null;
+    let lastSearchValue = '';
+    let pendingCallback = null;
+    let pendingData = null;
+    let pendingSettings = null;
+
+    // Debounce function for search
+    const debounceSearch = (data, callback, settings) => {
+        const currentSearchValue = data.search?.value || '';
+        const isSearchChange = currentSearchValue !== lastSearchValue;
+        
+        // Check if this is a search-only change (same page, same sort, only search changed)
+        const isSearchOnlyChange = isSearchChange && 
+            data.start === (pendingData?.start || 0) && 
+            JSON.stringify(data.order) === JSON.stringify(pendingData?.order || []);
+        
+        // Clear existing timer
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
+        }
+        
+        // Store current values
+        pendingCallback = callback;
+        pendingData = data;
+        pendingSettings = settings;
+        
+        // If it's a search-only change, debounce it
+        if (isSearchOnlyChange && currentSearchValue !== '') {
+            searchDebounceTimer = setTimeout(() => {
+                lastSearchValue = currentSearchValue;
+                executeAjaxCall(pendingData, pendingCallback, pendingSettings);
+                searchDebounceTimer = null;
+            }, 1000); // 500ms delay
+        } else {
+            // For non-search changes (pagination, sorting) or empty search, execute immediately
+            lastSearchValue = currentSearchValue;
+            executeAjaxCall(data, callback, settings);
+        }
+    };
+
+    // Actual AJAX call function
+    const executeAjaxCall = function (data, callback, settings) {
             // Show loading state if dispatch and loadingActionType are provided
             if (dispatch && loadingActionType) {
                 dispatch({ type: loadingActionType, payload: true });
@@ -125,8 +164,68 @@ export const initializeServerSideDataTable = ({
                 paramsObject[key] = value;
             });
             
-            // Use axios if provided, otherwise use jQuery ajax
-            if (axiosInstance) {
+            // Use Redux action if provided, otherwise use direct API call
+            if (fetchAction && dispatch) {
+                // Use Redux action to fetch data
+                dispatch(fetchAction(cleanedFilters))
+                    .then(result => {
+                        if (result && !result.error) {
+                            const responseData = result.data || [];
+                            const metadata = result.pagination || {};
+                            
+                            // Call custom callback if provided - pass full response to access filter data
+                            if (onDataLoaded) {
+                                const processedData = onDataLoaded(responseData, metadata, { 
+                                    data: responseData, 
+                                    events: result.events,
+                                    metadata: metadata 
+                                });
+                                // Use processed data if callback returns something
+                                const finalData = processedData !== undefined ? processedData : responseData;
+                                
+                                callback({
+                                    draw: data.draw,
+                                    recordsTotal: metadata.total || finalData.length,
+                                    recordsFiltered: metadata.total || finalData.length,
+                                    data: finalData,
+                                    metadata: metadata
+                                });
+                            } else {
+                                callback({
+                                    draw: data.draw,
+                                    recordsTotal: metadata.total || responseData.length,
+                                    recordsFiltered: metadata.total || responseData.length,
+                                    data: responseData,
+                                    metadata: metadata
+                                });
+                            }
+                        } else {
+                            callback({
+                                draw: data.draw,
+                                recordsTotal: 0,
+                                recordsFiltered: 0,
+                                data: []
+                            });
+                        }
+                        // Hide loading state after response
+                        if (dispatch && loadingActionType) {
+                            dispatch({ type: loadingActionType, payload: false });
+                        }
+                    })
+                    .catch(error => {
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: 0,
+                            recordsFiltered: 0,
+                            data: []
+                        });
+                        // Hide loading state on error
+                        if (dispatch && loadingActionType) {
+                            dispatch({ type: loadingActionType, payload: false });
+                        }
+                    });
+            } else if (axiosInstance) {
+                // Use direct axios call if no action provided
                 axiosInstance.get(ajaxUrl, { params: paramsObject })
                     .then(response => {
                         const json = response.data;
@@ -210,7 +309,15 @@ export const initializeServerSideDataTable = ({
                     }
                 });
             }
-        },
+    };
+
+    const dataTableConfig = {
+        processing: true,
+        serverSide: true,
+        displayStart: displayStart, // Set initial page from URL to prevent double API call
+        order: order || undefined, // Set default sort order if provided
+        searchDelay: 500, // Additional delay for UI feedback
+        ajax: debounceSearch, // Use debounced search function
         columns: columns,
         pageLength: pageLength,
         lengthMenu: lengthMenu,
@@ -252,7 +359,14 @@ export const initializeServerSideDataTable = ({
                 }
             }
         }
-    });
+    };
+
+    // Add rowReorder configuration if provided
+    if (rowReorder) {
+        dataTableConfig.rowReorder = rowReorder;
+    }
+
+    const dataTableInstance = $(tableSelector).DataTable(dataTableConfig);
 
     return dataTableInstance;
 };

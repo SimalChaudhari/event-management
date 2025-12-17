@@ -172,7 +172,15 @@ export class EventSpeakerUtils {
           return 0;
         });
 
+    // Get list of speaker IDs that are directly assigned to the event (not just from programme sessions)
+    const eventSpeakerIds = new Set(
+      event.eventSpeakers?.map((es: any) => es?.speaker?.id).filter(Boolean) || []
+    );
+
+    // Filter to only include speakers that are directly assigned to the event
+    // Programme session speakers will still appear in their respective sessions, but not in the main speakers list
     return Array.from(speakerMap.values())
+      .filter(({ info }) => eventSpeakerIds.has(info.id)) // Only show speakers from EventSpeaker table
       .sort((a, b) => a.order - b.order)
       .map(({ info, slots }) => {
         const sortedSlots = sortSlots(slots);

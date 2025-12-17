@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Row, Col, Badge, Table } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
@@ -19,7 +19,7 @@ import { speakerList as fetchSpeakerList } from '../../store/actions/speakerActi
 import { getEventSpeakers } from '../../store/actions/eventActions';
 import DeleteConfirmationModal from '../modal/DeleteConfirmationModal';
 
-const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeDataChange = null, initialProgrammeData = null }) => {
+const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeDataChange = null, initialProgrammeData = null, eventSpeakers = null }) => {
     const dispatch = useDispatch();
     const { tracks, sessions, loading } = useSelector((state) => state.programme || { tracks: [], sessions: [], loading: false });
     const reduxSpeakers = useSelector((state) => state.speaker?.speakers || []);
@@ -44,6 +44,10 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
     const [expandedTracks, setExpandedTracks] = useState({});
     const [speakerList, setSpeakerList] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Refs to prevent duplicate API calls
+    const fetchingEventSpeakersRef = useRef(false);
+    const eventSpeakersLoadedRef = useRef(false);
 
     // Track form state
     const [trackForm, setTrackForm] = useState({
@@ -71,7 +75,7 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
     useEffect(() => {
         if (eventId && isEditMode && !isPreviewMode) {
             loadProgrammeData();
-            fetchEventSpeakers();
+            // Don't call fetchEventSpeakers here - let the localStorage useEffect handle it
         }
     }, [eventId, isEditMode, isPreviewMode]);
 
@@ -118,13 +122,20 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
         }
     };
 
-    const fetchEventSpeakers = async () => {
+    const fetchEventSpeakers = React.useCallback(async () => {
+        // Check refs to prevent duplicate calls
+        if (fetchingEventSpeakersRef.current) return;
+        if (eventSpeakersLoadedRef.current) return;
+
+        // Set ref synchronously to prevent race conditions
+        fetchingEventSpeakersRef.current = true;
         try {
             if (eventId && isEditMode) {
                 // Fetch speakers assigned to this event using action
                 const result = await dispatch(getEventSpeakers(eventId));
                 if (result?.success && result.data && result.data.length > 0) {
                     setSpeakerList(result.data);
+                    eventSpeakersLoadedRef.current = true;
                     return;
                 }
             }
@@ -132,11 +143,15 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
             // Fallback: fetch all speakers using fetchSpeakerList action
             await dispatch(fetchSpeakerList());
             // fetchSpeakerList action updates Redux store, we'll use useEffect to sync
+            eventSpeakersLoadedRef.current = true;
         } catch (error) {
             console.error('Error fetching speakers:', error);
-            // toast.error('Failed to load speakers. Please try again.');
+            // Even on error, set loaded to true to prevent infinite retries
+            eventSpeakersLoadedRef.current = true;
+        } finally {
+            fetchingEventSpeakersRef.current = false;
         }
-    };
+    }, [dispatch, eventId, isEditMode]);
 
     // Sync reduxSpeakers to local state when they change
     useEffect(() => {
@@ -145,55 +160,41 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
         }
     }, [reduxSpeakers, speakerList.length]);
 
-    // Fetch speakers from localStorage first, then API if needed
+    // Use speakers from props, or fetch from API if not provided
     useEffect(() => {
-        // Check localStorage for event speakers first
-        const eventSpeakersKey = eventId && isEditMode ? `event_${eventId}_speakers` : 'event_temp_speakers';
-        const storedSpeakers = localStorage.getItem(eventSpeakersKey);
-
-        if (storedSpeakers) {
-            try {
-                const speakersData = JSON.parse(storedSpeakers);
-                if (speakersData.speakers && Array.isArray(speakersData.speakers) && speakersData.speakers.length > 0) {
-                    setSpeakerList(speakersData.speakers);
-                    return; // Don't fetch from API if we have stored speakers
-                }
-            } catch (error) {
-                console.error('Error parsing stored speakers:', error);
-            }
+        // Reset loaded ref when eventId changes
+        if (eventId) {
+            eventSpeakersLoadedRef.current = false;
         }
 
-        // If no stored speakers, fetch from API
-        if (speakerList.length === 0) {
+        // Priority 1: Use speakers from props if provided
+        if (eventSpeakers && Array.isArray(eventSpeakers) && eventSpeakers.length > 0) {
+            setSpeakerList(eventSpeakers);
+            eventSpeakersLoadedRef.current = true;
+            return;
+        }
+
+        // Priority 2: If no props and not already loaded, fetch from API
+        if (speakerList.length === 0 && !eventSpeakersLoadedRef.current) {
             fetchEventSpeakers();
         }
-    }, [eventId, isEditMode]);
+    }, [eventId, isEditMode, eventSpeakers, fetchEventSpeakers]);
 
     // Fetch speakers when session modal opens (if not already loaded)
     useEffect(() => {
         if (showSessionModal) {
-            // Always check localStorage first when modal opens
-            const eventSpeakersKey = eventId && isEditMode ? `event_${eventId}_speakers` : 'event_temp_speakers';
-            const storedSpeakers = localStorage.getItem(eventSpeakersKey);
-
-            if (storedSpeakers) {
-                try {
-                    const speakersData = JSON.parse(storedSpeakers);
-                    if (speakersData.speakers && Array.isArray(speakersData.speakers) && speakersData.speakers.length > 0) {
-                        setSpeakerList(speakersData.speakers);
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error parsing stored speakers:', error);
-                }
+            // Priority 1: Use speakers from props if provided
+            if (eventSpeakers && Array.isArray(eventSpeakers) && eventSpeakers.length > 0) {
+                setSpeakerList(eventSpeakers);
+                return;
             }
 
-            // If no stored speakers and list is empty, fetch from API
-            if (speakerList.length === 0) {
+            // Priority 2: If no props and list is empty and not already loaded, fetch from API
+            if (speakerList.length === 0 && !eventSpeakersLoadedRef.current) {
                 fetchEventSpeakers();
             }
         }
-    }, [showSessionModal]);
+    }, [showSessionModal, speakerList.length, fetchEventSpeakers, eventId, isEditMode, eventSpeakers]);
 
     const handleAddTrack = () => {
         setCurrentTrack(null);
@@ -434,11 +435,6 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
             setShowSessionModal(false);
             // toast.success(currentSession ? 'Session updated' : 'Session added');
 
-            // Remove used speakers from localStorage after session is created
-            if (!currentSession && sessionForm.speakerIds.length > 0) {
-                removeUsedSpeakersFromStorage(sessionForm.speakerIds);
-            }
-
             return;
         }
 
@@ -456,11 +452,6 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                 await loadSessionsForTrack(sessionForm.trackId);
                 setShowSessionModal(false);
                 // toast.success(currentSession ? 'Session updated successfully' : 'Session created successfully');
-
-                // Remove used speakers from localStorage after session is created
-                if (!currentSession && sessionForm.speakerIds.length > 0) {
-                    removeUsedSpeakersFromStorage(sessionForm.speakerIds);
-                }
             }
         } catch (error) {
             console.error('Error saving session:', error);
@@ -524,45 +515,6 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
         return `${hour12}:${minutes} ${ampm}`;
     };
 
-    // Remove used speakers from localStorage after they're used in sessions
-    const removeUsedSpeakersFromStorage = (usedSpeakerIds) => {
-        try {
-            const eventSpeakersKey = eventId && isEditMode ? `event_${eventId}_speakers` : 'event_temp_speakers';
-            const storedSpeakers = localStorage.getItem(eventSpeakersKey);
-
-            if (storedSpeakers && usedSpeakerIds && usedSpeakerIds.length > 0) {
-                const speakersData = JSON.parse(storedSpeakers);
-
-                // Normalize IDs for comparison (handle string/number mismatches)
-                const normalizeId = (id) => String(id);
-                const normalizedUsedIds = new Set(usedSpeakerIds.map(normalizeId));
-
-                // Remove used speaker IDs
-                const remainingSpeakerIds = speakersData.speakerIds.filter((id) => !normalizedUsedIds.has(normalizeId(id)));
-
-                const remainingSpeakers = speakersData.speakers.filter((speaker) => !normalizedUsedIds.has(normalizeId(speaker.id)));
-
-                // Update localStorage with remaining speakers
-                if (remainingSpeakerIds.length > 0 && remainingSpeakers.length > 0) {
-                    localStorage.setItem(
-                        eventSpeakersKey,
-                        JSON.stringify({
-                            speakerIds: remainingSpeakerIds,
-                            speakers: remainingSpeakers,
-                            timestamp: speakersData.timestamp
-                        })
-                    );
-                    // Update speaker list to reflect removed speakers
-                    setSpeakerList(remainingSpeakers);
-                } else {
-                    // Remove key if no speakers left
-                    localStorage.removeItem(eventSpeakersKey);
-                }
-            }
-        } catch (error) {
-            console.error('Error removing used speakers from storage:', error);
-        }
-    };
 
     // Component is always available, just in different modes
 

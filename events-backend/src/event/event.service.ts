@@ -20,6 +20,9 @@ import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { Survey } from '../survey/survey.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { Gallery } from '../gallery/gallery.entity';
+import { ProgrammeSession } from '../programme/programme-session.entity';
+import { ProgrammeTrack } from '../programme/programme-track.entity';
+import { removeSpeakersFromAssociations } from '../utils/speaker-with-associate-link.utils';
 import { Cart } from '../cart/cart.entity';
 import { OrderItemEntity } from '../order/event.item.entity';
 import { EventAttendance } from '../attendance/attendance.entity';
@@ -78,6 +81,10 @@ export class EventService {
     private engagementRepository: Repository<Engagement>,
     @InjectRepository(Gallery)
     private galleryRepository: Repository<Gallery>,
+    @InjectRepository(ProgrammeSession)
+    private programmeSessionRepository: Repository<ProgrammeSession>,
+    @InjectRepository(ProgrammeTrack)
+    private programmeTrackRepository: Repository<ProgrammeTrack>,
     @InjectRepository(Cart)
     private cartRepository: Repository<Cart>,
     @InjectRepository(OrderItemEntity)
@@ -1225,6 +1232,39 @@ export class EventService {
 
     // Update speaker associations if provided
     if (eventDto.speakerIds !== undefined) {
+      // Get existing speakers before deletion
+      const existingSpeakers = await this.eventSpeakerRepository.find({
+        where: { eventId },
+        select: ['speakerId'],
+      });
+      const existingSpeakerIds = new Set(
+        existingSpeakers
+          .map((es) => es.speakerId)
+          .filter((id): id is string => Boolean(id)),
+      );
+
+      // Get new speaker IDs
+      const newSpeakerIds = eventDto.speakerIds
+        ? new Set(eventDto.speakerIds.split(',').map((id) => id.trim()))
+        : new Set<string>();
+
+      // Find removed speakers
+      const removedSpeakerIds = Array.from(existingSpeakerIds).filter(
+        (id) => !newSpeakerIds.has(id),
+      );
+
+      // If speakers were removed, remove them from programme tracks, sessions and engagement tracks (not delete sessions)
+      if (removedSpeakerIds.length > 0) {
+        await removeSpeakersFromAssociations(
+          this.programmeSessionRepository,
+          this.programmeTrackRepository,
+          this.engagementRepository,
+          eventId,
+          removedSpeakerIds,
+        );
+      }
+
+      // Now update event speakers
       await this.eventSpeakerRepository.delete({ eventId });
       if (eventDto.speakerIds) {
         const speakerIdsArray = eventDto.speakerIds.split(',');
@@ -1234,7 +1274,7 @@ export class EventService {
             const eventSpeaker = new EventSpeaker();
             eventSpeaker.eventId = eventId;
             eventSpeaker.speakerId = speakerId.trim();
-            
+
             await this.eventSpeakerRepository.save(eventSpeaker);
           }),
         );
