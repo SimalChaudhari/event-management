@@ -25,6 +25,7 @@ import {
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserEntity } from 'user/users.entity';
 import { SurveyUtils } from '../utils/survey-utils';
+import { FilterService } from '../service/filter.service';
 
 @Injectable()
 export class SurveyService {
@@ -41,12 +42,23 @@ export class SurveyService {
     private userRepository: Repository<UserEntity>,
     private errorHandler: ErrorHandlerService,
     private surveyUtils: SurveyUtils,
+    private filterService: FilterService,
   ) {}
 
   // Helper function to validate time format
   private validateTimeFormat(time: string): boolean {
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/;
     return timeRegex.test(time);
+  }
+
+  // Helper function to convert 24-hour time to 12-hour format for error messages
+  private formatTime12Hour(time: string): string {
+    if (!time) return '';
+    const [hours, minutes, seconds] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   }
 
   // Calculate event duration in days
@@ -257,7 +269,7 @@ export class SurveyService {
       // 4. Validate time formats with suggestions
       if (!this.validateTimeFormat(surveyData.startTime)) {
         throw new ValidationException(
-          `Invalid start time format.Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
+          `Invalid start time format.Use startTime: "${this.formatTime12Hour(event.startTime)}" or time in HH:MM:SS format.`,
           [
             {
               field: 'startTime',
@@ -276,7 +288,7 @@ export class SurveyService {
 
       if (!this.validateTimeFormat(surveyData.endTime)) {
         throw new ValidationException(
-          `Invalid end time format.Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
+          `Invalid end time format.Use endTime: "${this.formatTime12Hour(event.endTime)}" or time in HH:MM:SS format.`,
           [
             {
               field: 'endTime',
@@ -301,7 +313,7 @@ export class SurveyService {
 
       if (surveyEndTimeMinutes <= surveyStartTimeMinutes) {
         throw new ValidationException(
-          `Use startTime: "${event.startTime}" and endTime: "${event.endTime}".`,
+          `Use startTime: "${this.formatTime12Hour(event.startTime)}" and endTime: "${this.formatTime12Hour(event.endTime)}".`,
           [
             {
               field: 'timeRange',
@@ -326,7 +338,7 @@ export class SurveyService {
       ) {
         if (surveyStartTimeMinutes < eventStartTimeMinutes) {
           throw new ValidationException(
-            `Use startTime: "${event.startTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            `Use startTime: "${this.formatTime12Hour(event.startTime)}" or any time between ${this.formatTime12Hour(event.startTime)} and ${this.formatTime12Hour(event.endTime)}.`,
             [
               {
                 field: 'startTime',
@@ -346,7 +358,7 @@ export class SurveyService {
 
         if (surveyEndTimeMinutes > eventEndTimeMinutes) {
           throw new ValidationException(
-            `Use endTime: "${event.endTime}" or any time between ${event.startTime} and ${event.endTime}.`,
+            `Use endTime: "${this.formatTime12Hour(event.endTime)}" or any time between ${this.formatTime12Hour(event.startTime)} and ${this.formatTime12Hour(event.endTime)}.`,
             [
               {
                 field: 'endTime',
@@ -457,7 +469,7 @@ export class SurveyService {
         // 2. Session time format validation with suggestions
         if (!this.validateTimeFormat(session.startTime)) {
           throw new ValidationException(
-            `start time format is invalid. Use time in HH:MM:SS format, e.g., "${event.startTime}".`,
+            `start time format is invalid. Use time in HH:MM:SS format, e.g., "${this.formatTime12Hour(event.startTime)}".`,
             [
               {
                 field: `sessions[${i}].startTime`,
@@ -477,7 +489,7 @@ export class SurveyService {
 
         if (!this.validateTimeFormat(session.endTime)) {
           throw new ValidationException(
-            `End time format is invalid. Use time in HH:MM:SS format, e.g., "${event.endTime}".`,
+            `End time format is invalid. Use time in HH:MM:SS format, e.g., "${this.formatTime12Hour(event.endTime)}".`,
             [
               {
                 field: `sessions[${i}].endTime`,
@@ -548,7 +560,7 @@ export class SurveyService {
         if (sessionDate.getTime() === eventEndDate.getTime()) {
           if (sessionEndMinutes > eventEndTimeMinutes) {
             throw new ValidationException(
-              `Use endTime: "${event.endTime}" or earlier.`,
+              `Use endTime: "${this.formatTime12Hour(event.endTime)}" or earlier.`,
               [
                 {
                   field: `sessions[${i}].endTime`,
@@ -916,31 +928,100 @@ export class SurveyService {
   }
 
   // READ - Get all surveys with sessions (Admin only)
-  async getAllSurveysWithSessions() {
+  async getAllSurveysWithSessions(filters?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }) {
     try {
-      const surveys = await this.surveyRepository.find({
-        order: { createdAt: 'DESC' },
-      });
+      // Extract pagination parameters
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
 
-      const surveysWithSessions = [];
+      // Build query with filters
+      const queryBuilder = this.surveyRepository.createQueryBuilder('survey');
 
-      for (const survey of surveys) {
-        const sessions = await this.surveySessionRepository.find({
-          where: { surveyId: survey.id, isActive: true },
-          order: { date: 'ASC', startTime: 'ASC' },
+      // Join with Event table for event name search
+      // If sorting by eventInfo, use leftJoinAndSelect so event.name is available for ORDER BY
+      if (sortBy === 'eventInfo') {
+        queryBuilder.leftJoinAndSelect('survey.event', 'event');
+      } else {
+        queryBuilder.leftJoin('survey.event', 'event');
+      }
+
+      // Apply search filter - search by survey title and event name
+      if (filters?.search && filters.search.trim() !== '') {
+        const searchTerm = filters.search.toLowerCase().trim();
+        queryBuilder.where(
+          '(LOWER(survey.title) LIKE :searchTerm OR LOWER(event.name) LIKE :searchTerm)',
+          { searchTerm: `%${searchTerm}%` },
+        );
+      }
+
+      // Filter by date range - filter by survey startDate
+      if (filters?.startDate) {
+        queryBuilder.andWhere('DATE(survey.startDate) >= :startDate', {
+          startDate: filters.startDate,
         });
-
-        // Get event information using utility function
-        const eventInfo = await this.surveyUtils.getEventInfoByEventId(survey.eventId);
-
-        surveysWithSessions.push({
-          ...survey,
-          sessions,
-          eventInfo,
+      }
+      if (filters?.endDate) {
+        queryBuilder.andWhere('DATE(survey.startDate) <= :endDate', {
+          endDate: filters.endDate,
         });
       }
 
-      return surveysWithSessions;
+      // Apply sorting
+      // Map eventInfo to event.name for sorting since eventInfo is a nested object
+      if (sortBy === 'eventInfo') {
+        queryBuilder.orderBy('event.name', sortOrder);
+      } else {
+        queryBuilder.orderBy(`survey.${sortBy}`, sortOrder);
+      }
+
+      // Get total count before pagination
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const surveys = await queryBuilder.skip(skip).take(limit).getMany();
+
+      // Calculate pagination metadata
+      const pagination = this.filterService.calculatePaginationMetadata(
+        total,
+        page,
+        limit,
+      );
+
+      // Get sessions and event info for each survey
+      const surveysWithSessions = await Promise.all(
+        surveys.map(async (survey) => {
+          const sessions = await this.surveySessionRepository.find({
+            where: { surveyId: survey.id, isActive: true },
+            order: { date: 'ASC', startTime: 'ASC' },
+          });
+
+          // Get event information using utility function
+          const eventInfo =
+            await this.surveyUtils.getEventInfoByEventId(survey.eventId);
+
+          return {
+            ...survey,
+            sessions,
+            eventInfo,
+          };
+        }),
+      );
+
+      return {
+        surveys: surveysWithSessions,
+        pagination: pagination,
+      };
     } catch (error: any) {
       this.errorHandler.logError(error, 'Get all surveys with sessions');
       this.errorHandler.handleDatabaseError(error, 'All surveys retrieval');
@@ -1847,7 +1928,7 @@ export class SurveyService {
         if (sessionDate.getTime() === eventEndDate.getTime()) {
           if (sessionEndMinutes > eventEndTimeMinutes) {
             throw new ValidationException(
-              `Update session end time to ${event.endTime} or earlier, or delete the session.`,
+              `Update session end time to ${this.formatTime12Hour(event.endTime)} or earlier, or delete the session.`,
               [
                 {
                   field: 'existingSession.endTime',
@@ -2115,7 +2196,7 @@ export class SurveyService {
       if (!this.validateTimeFormat(sessionData.startTime)) {
         throw new ValidationException(
           `start time format is invalid.
-           Use startTime: "${event.startTime}" or time in HH:MM:SS format.`,
+           Use startTime: "${this.formatTime12Hour(event.startTime)}" or time in HH:MM:SS format.`,
           [
             {
               field: 'startTime',
@@ -2135,7 +2216,7 @@ export class SurveyService {
 
       if (!this.validateTimeFormat(sessionData.endTime)) {
         throw new ValidationException(
-          `End time format is invalid. Use endTime: "${event.endTime}" or time in HH:MM:SS format.`,
+          `End time format is invalid. Use endTime: "${this.formatTime12Hour(event.endTime)}" or time in HH:MM:SS format.`,
           [
             {
               field: 'endTime',
@@ -2212,7 +2293,7 @@ export class SurveyService {
       if (sessionDate.getTime() === eventEndDate.getTime()) {
         if (sessionEndMinutes > eventEndTimeMinutes) {
           throw new ValidationException(
-            `Use endTime: "${event.endTime}" or earlier.`,
+            `Use endTime: "${this.formatTime12Hour(event.endTime)}" or earlier.`,
             [
               {
                 field: 'endTime',

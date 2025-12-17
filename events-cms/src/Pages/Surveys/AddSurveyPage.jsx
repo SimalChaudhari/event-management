@@ -4,8 +4,18 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button, Row, Col, Card, Badge, Container, Alert } from 'react-bootstrap';
 import Select from 'react-select';
 import { surveyCreate, surveyUpdate, surveyDetail, getEventSuggestions } from '../../store/actions/surveyActions';
-import { eventList } from '../../store/actions/eventActions';
+import { getAllEventsForFilter } from '../../store/actions/eventActions';
 import { SURVEY_PATHS } from '../../utils/constants';
+
+// Helper function to format time from 24-hour to 12-hour format
+const formatTime12Hour = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+};
 
 const AddSurveyPage = () => {
     const navigate = useNavigate();
@@ -13,7 +23,19 @@ const AddSurveyPage = () => {
     const { id } = useParams();
     const isEditing = Boolean(id);
 
-    const events = useSelector((state) => state.event?.event?.events);
+    let events = useSelector((state) => state.event?.eventFilterList || []);
+
+    // Filter out past events (events where endDate < today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    events = events.filter((event) => {
+        if (!event.endDate) return true; // Include events without endDate
+        const eventEndDate = new Date(event.endDate);
+        eventEndDate.setHours(0, 0, 0, 0);
+        // Only include events where endDate >= today (exclude past events)
+        return eventEndDate >= today;
+    });
 
     const { selectedSurvey, createLoading, updateLoading } = useSelector((state) => state.survey);
 
@@ -29,9 +51,7 @@ const AddSurveyPage = () => {
         sessions: []
     });
 
-    const [surveyUrlsList, setSurveyUrlsList] = useState([
-        { title: '', url: '' }
-    ]);
+    const [surveyUrlsList, setSurveyUrlsList] = useState([{ title: '', url: '' }]);
 
     const [errors, setErrors] = useState({});
     const [suggestions, setSuggestions] = useState(null);
@@ -48,8 +68,8 @@ const AddSurveyPage = () => {
     ]);
 
     useEffect(() => {
-        dispatch(eventList());
-        
+        dispatch(getAllEventsForFilter());
+
         if (isEditing) {
             dispatch(surveyDetail(id));
         }
@@ -71,16 +91,18 @@ const AddSurveyPage = () => {
 
             // Load surveyUrls into surveyUrlsList
             if (selectedSurvey.surveyUrls && Array.isArray(selectedSurvey.surveyUrls) && selectedSurvey.surveyUrls.length > 0) {
-                setSurveyUrlsList(selectedSurvey.surveyUrls.map((url, index) => ({
-                    id: index,
-                    title: url.title || '',
-                    url: url.url || ''
-                })));
+                setSurveyUrlsList(
+                    selectedSurvey.surveyUrls.map((url, index) => ({
+                        id: index,
+                        title: url.title || '',
+                        url: url.url || ''
+                    }))
+                );
             }
 
             // Load sessions into sessionsList
             if (selectedSurvey.sessions && Array.isArray(selectedSurvey.sessions)) {
-                const formattedSessions = selectedSurvey.sessions.map(session => ({
+                const formattedSessions = selectedSurvey.sessions.map((session) => ({
                     id: session.id || Date.now() + Math.random(),
                     name: session.name || '',
                     date: session.date ? new Date(session.date).toISOString().split('T')[0] : '',
@@ -96,14 +118,14 @@ const AddSurveyPage = () => {
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
-        
+
         // Clear error when user starts typing
         if (errors[name]) {
-            setErrors(prev => ({
+            setErrors((prev) => ({
                 ...prev,
                 [name]: ''
             }));
@@ -111,7 +133,7 @@ const AddSurveyPage = () => {
     };
 
     const handleEventChange = async (eventId) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             eventId,
             startDate: '',
@@ -137,7 +159,7 @@ const AddSurveyPage = () => {
     const useSuggestions = () => {
         if (suggestions?.eventInfo) {
             const eventInfo = suggestions.eventInfo;
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 startDate: eventInfo.startDate,
                 endDate: eventInfo.endDate,
@@ -168,7 +190,7 @@ const AddSurveyPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!validateForm()) {
             return;
         }
@@ -185,20 +207,22 @@ const AddSurveyPage = () => {
                 startTime: formatTime(formData.startTime),
                 endTime: formatTime(formData.endTime),
                 surveyUrls: surveyUrlsList
-                    .filter(url => url.title && url.url) // Only include valid URLs
-                    .map(url => ({
+                    .filter((url) => url.title && url.url) // Only include valid URLs
+                    .map((url) => ({
                         title: url.title,
                         url: url.url
                     })),
-                sessions: sessionsList.map(session => ({
-                    ...(session.id && { id: session.id }), // Include ID if it exists (for updates)
-                    name: session.name,
-                    date: session.date,
-                    startTime: formatTime(session.startTime),
-                    endTime: formatTime(session.endTime),
-                    description: session.description,
-                    isActive: session.isActive
-                })).filter(session => session.name && session.date) // Only include sessions with name and date
+                sessions: sessionsList
+                    .map((session) => ({
+                        ...(session.id && { id: session.id }), // Include ID if it exists (for updates)
+                        name: session.name,
+                        date: session.date,
+                        startTime: formatTime(session.startTime),
+                        endTime: formatTime(session.endTime),
+                        description: session.description,
+                        isActive: session.isActive
+                    }))
+                    .filter((session) => session.name && session.date) // Only include sessions with name and date
             };
 
             let response;
@@ -239,13 +263,11 @@ const AddSurveyPage = () => {
     };
 
     const removeSession = (sessionId) => {
-        setSessionsList(sessionsList.filter(session => session.id !== sessionId));
+        setSessionsList(sessionsList.filter((session) => session.id !== sessionId));
     };
 
     const updateSession = (sessionId, field, value) => {
-        setSessionsList(sessionsList.map(session => 
-            session.id === sessionId ? { ...session, [field]: value } : session
-        ));
+        setSessionsList(sessionsList.map((session) => (session.id === sessionId ? { ...session, [field]: value } : session)));
     };
 
     const addSurveyUrl = () => {
@@ -258,13 +280,11 @@ const AddSurveyPage = () => {
     };
 
     const removeSurveyUrl = (urlId) => {
-        setSurveyUrlsList(surveyUrlsList.filter(url => url.id !== urlId));
+        setSurveyUrlsList(surveyUrlsList.filter((url) => url.id !== urlId));
     };
 
     const updateSurveyUrl = (urlId, field, value) => {
-        setSurveyUrlsList(surveyUrlsList.map(url => 
-            url.id === urlId ? { ...url, [field]: value } : url
-        ));
+        setSurveyUrlsList(surveyUrlsList.map((url) => (url.id === urlId ? { ...url, [field]: value } : url)));
     };
 
     const isLoading = createLoading || updateLoading;
@@ -290,333 +310,331 @@ const AddSurveyPage = () => {
                 }
             `}</style>
             <Container fluid>
-            <div className="row">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header">
-                            <div className="d-flex justify-content-between align-items-center">
-                                <h4 className="card-title">{isEditing ? 'Edit Survey' : 'Add New Survey'}</h4>
-                                <Button variant="secondary" onClick={handleNavigate}>
-                                    <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
-                                    Back
-                                </Button>
+                <div className="row">
+                    <div className="col-12">
+                        <div className="card">
+                            <div className="card-header">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <h4 className="card-title">{isEditing ? 'Edit Survey' : 'Add Survey'}</h4>
+                                    <Button variant="secondary" onClick={handleNavigate}>
+                                        <i style={{ marginRight: '10px' }} className="fas fa-arrow-left me-2"></i>
+                                        Back
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="card-body">
-                            <form onSubmit={handleSubmit}>
-                                <Row>
-                                    <Col sm={12}>
-                                        <div className="form-group fill" >
-                                            <label className="floating-label" style={{ marginTop: '-8px' }} htmlFor="eventId">
-                                                Event *
-                                            </label>
-                                            <Select
-                                                value={events?.find(event => event.id === formData.eventId) ? 
-                                                    { value: formData.eventId, label: `${events.find(event => event.id === formData.eventId)?.name} - ${events.find(event => event.id === formData.eventId)?.location}` } : null}
-                                                onChange={(selectedOption) => handleEventChange(selectedOption?.value || '')}
-                                                options={events?.map((event) => ({
-                                                    value: event.id,
-                                                    label: `${event.name} - ${event.location}`
-                                                }))}
-                                                placeholder="Select an event"
-                                                isClearable
-                                                isSearchable
-                                                menuPortalTarget={document.body}
-                                                menuPosition="fixed"
-                                                styles={{
-                                                    control: (base) => ({
-                                                        ...base,
-                                                        minHeight: '45px',
-                                                        border: errors.eventId ? '1px solid #dc3545' : '1px solid #ced4da',
-                                                        fontSize: '14px'
-                                                    }),
-                                                    menu: (base) => ({
-                                                        ...base,
-                                                        zIndex: 9999,
-                                                        fontSize: '14px'
-                                                    }),
-                                                    menuPortal: (base) => ({
-                                                        ...base,
-                                                        zIndex: 9999
-                                                    }),
-                                                    option: (base) => ({
-                                                        ...base,
-                                                        fontSize: '14px',
-                                                        padding: '8px 12px',
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis'
-                                                    }),
-                                                    singleValue: (base) => ({
-                                                        ...base,
-                                                        fontSize: '14px',
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        maxWidth: '100%'
-                                                    })
-                                                }}
-                                            />
-                                            {errors.eventId && (
-                                                <div className="invalid-feedback d-block">
-                                                    {errors.eventId}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-                                </Row>
-
-                                <Row>
-                                    <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="title">
-                                                Survey Title *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className={`form-control ${errors.title ? 'is-invalid' : ''}`}
-                                                name="title"
-                                                value={formData.title}
-                                                onChange={handleInputChange}
-                                                placeholder="Enter survey title"
-                                                required
-                                            />
-                                            {errors.title && (
-                                                <div className="invalid-feedback">
-                                                    {errors.title}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-
-                                </Row>
-
-                                {showSuggestions && suggestions && (
+                            <div className="card-body">
+                                <form onSubmit={handleSubmit}>
                                     <Row>
                                         <Col sm={12}>
-                                            <Alert variant="info" className="mb-3">
-                                                <Alert.Heading className="h6">
-                                                    <i className="feather icon-info mr-2"></i>
-                                                    Event Information Suggestions
-                                                </Alert.Heading>
-                                                <div className="row">
-                                                    <div className="col-md-6">
-                                                        <p className="mb-1"><strong>Event:</strong> {suggestions.eventInfo.name}</p>
-                                                        <p className="mb-1"><strong>Location:</strong> {suggestions.eventInfo.location}</p>
-                                                    </div>
-                                                    <div className="col-md-6">
-                                                        <p className="mb-1"><strong>Date:</strong> {suggestions.eventInfo.startDate} to {suggestions.eventInfo.endDate}</p>
-                                                        <p className="mb-1"><strong>Time:</strong> {suggestions.eventInfo.startTime} to {suggestions.eventInfo.endTime}</p>
-                                                    </div>
-                                                </div>
-                                                <Button variant="outline-info" size="sm" onClick={useSuggestions} className="mt-2">
-                                                    <i className="feather icon-download mr-1"></i>
-                                                    Use Event Information
-                                                </Button>
-                                            </Alert>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" style={{ marginTop: '-8px' }} htmlFor="eventId">
+                                                    Event *
+                                                </label>
+                                                <Select
+                                                    value={
+                                                        events?.find((event) => event.id === formData.eventId)
+                                                            ? {
+                                                                  value: formData.eventId,
+                                                                  label:
+                                                                      events.find((event) => event.id === formData.eventId)?.eventName || ''
+                                                              }
+                                                            : null
+                                                    }
+                                                    onChange={(selectedOption) => handleEventChange(selectedOption?.value || '')}
+                                                    options={events?.map((event) => ({
+                                                        value: event.id,
+                                                        label: event.eventName || ''
+                                                    }))}
+                                                    placeholder="Select an event"
+                                                    isClearable
+                                                    isSearchable
+                                                    menuPortalTarget={document.body}
+                                                    menuPosition="fixed"
+                                                    styles={{
+                                                        control: (base) => ({
+                                                            ...base,
+                                                            minHeight: '45px',
+                                                            border: errors.eventId ? '1px solid #dc3545' : '1px solid #ced4da',
+                                                            fontSize: '14px'
+                                                        }),
+                                                        menu: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999,
+                                                            fontSize: '14px'
+                                                        }),
+                                                        menuPortal: (base) => ({
+                                                            ...base,
+                                                            zIndex: 9999
+                                                        }),
+                                                        option: (base) => ({
+                                                            ...base,
+                                                            fontSize: '14px',
+                                                            padding: '8px 12px',
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }),
+                                                        singleValue: (base) => ({
+                                                            ...base,
+                                                            fontSize: '14px',
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            maxWidth: '100%'
+                                                        })
+                                                    }}
+                                                />
+                                                {errors.eventId && <div className="invalid-feedback d-block">{errors.eventId}</div>}
+                                            </div>
                                         </Col>
                                     </Row>
-                                )}
 
-                                <Row>
-                                    <Col sm={3}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="startDate">
-                                                Start Date *
-                                            </label>
-                                            <input
-                                                type="date"
-                                                className={`form-control ${errors.startDate ? 'is-invalid' : ''}`}
-                                                name="startDate"
-                                                value={formData.startDate}
-                                                onChange={handleInputChange}
-                                                required
-                                            />
-                                            {errors.startDate && (
-                                                <div className="invalid-feedback">
-                                                    {errors.startDate}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-                                    <Col sm={3}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="startTime">
-                                                Start Time *
-                                            </label>
-                                            <input
-                                                type="time"
-                                                className={`form-control ${errors.startTime ? 'is-invalid' : ''}`}
-                                                name="startTime"
-                                                value={formData.startTime}
-                                                onChange={handleInputChange}
-                                                required
-                                            />
-                                            {errors.startTime && (
-                                                <div className="invalid-feedback">
-                                                    {errors.startTime}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-                                    <Col sm={3}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="endDate">
-                                                End Date *
-                                            </label>
-                                            <input
-                                                type="date"
-                                                className={`form-control ${errors.endDate ? 'is-invalid' : ''}`}
-                                                name="endDate"
-                                                value={formData.endDate}
-                                                onChange={handleInputChange}
-                                                required
-                                            />
-                                            {errors.endDate && (
-                                                <div className="invalid-feedback">
-                                                    {errors.endDate}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-                                    <Col sm={3}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="endTime">
-                                                End Time *
-                                            </label>
-                                            <input
-                                                type="time"
-                                                className={`form-control ${errors.endTime ? 'is-invalid' : ''}`}
-                                                name="endTime"
-                                                value={formData.endTime}
-                                                onChange={handleInputChange}
-                                                required
-                                            />
-                                            {errors.endTime && (
-                                                <div className="invalid-feedback">
-                                                    {errors.endTime}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Col>
-                                </Row>
-
-                                <Row>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <div className="form-check" style={{ marginTop: '25px' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    className="form-check-input"
-                                                    name="isActive"
-                                                    checked={formData.isActive}
-                                                    onChange={handleInputChange}
-                                                    id="isActive"
-                                                />
-                                                <label className="form-check-label" htmlFor="isActive">
-                                                    Survey is active
+                                    <Row>
+                                        <Col sm={12}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" htmlFor="title">
+                                                    Survey Title *
                                                 </label>
+                                                <input
+                                                    type="text"
+                                                    className={`form-control ${errors.title ? 'is-invalid' : ''}`}
+                                                    name="title"
+                                                    value={formData.title}
+                                                    onChange={handleInputChange}
+                                                    placeholder="Enter survey title"
+                                                    required
+                                                />
+                                                {errors.title && <div className="invalid-feedback">{errors.title}</div>}
                                             </div>
-                                        </div>
-                                    </Col>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <Badge bg="info" className="mb-2">
-                                                <span>Sessions </span> {sessionsList.length}/20
-                                            </Badge>
-                                            <small className="text-muted">
-                                                Add survey sessions (optional)
-                                            </small>
-                                        </div>
-                                    </Col>
-                                </Row>
+                                        </Col>
+                                    </Row>
 
-                                {/* Survey URLs Management */}
-                                <Row>
-                                    <Col sm={12}>
-                                        <Card className="mb-3">
-                                            <Card.Header className="d-flex justify-content-between align-items-center">
-                                                <h6 className="mb-0">
-                                                    <i className="fas fa-link mr-2"></i>
-                                                    Survey URLs ({surveyUrlsList.length})
-                                                </h6>
-                                                <Button
-                                                    variant="outline-primary"
-                                                    size="sm"
-                                                    onClick={addSurveyUrl}
-                                                >
-                                                    <i className="feather icon-plus mr-1"></i>
-                                                    Add URL
-                                                </Button>
-                                            </Card.Header>
-                                            <Card.Body>
-                                                {surveyUrlsList.map((urlItem, index) => (
-                                                    <div key={urlItem.id} className="border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
-                                                        <div className="d-flex justify-content-between align-items-center mb-2">
-                                                            <h6 className="mb-0">Survey URL {index + 1}</h6>
-                                                            <Button
-                                                                variant="danger"
-                                                                size="sm"
-                                                                onClick={() => removeSurveyUrl(urlItem.id)}
-                                                            >
-                                                                <i className="feather icon-trash-2"></i>
-                                                            </Button>
+                                    {showSuggestions && suggestions && (
+                                        <Row>
+                                            <Col sm={12}>
+                                                <Alert variant="info" className="mb-3">
+                                                    <Alert.Heading className="h6">
+                                                        <i className="feather icon-info mr-2"></i>
+                                                        Event Information Suggestions
+                                                    </Alert.Heading>
+                                                    <div className="row">
+                                                        <div className="col-md-6">
+                                                            <p className="mb-1">
+                                                                <strong>Event:</strong> {suggestions.eventInfo.name}
+                                                            </p>
+                                                            <p className="mb-1">
+                                                                <strong>Location:</strong> {suggestions.eventInfo.location}
+                                                            </p>
                                                         </div>
-                                                        <Row>
-                                                            <Col sm={4}>
-                                                                <div className="form-group fill">
-                                                                    <label className="floating-label">Title</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        className="form-control"
-                                                                        value={urlItem.title}
-                                                                        onChange={(e) => updateSurveyUrl(urlItem.id, 'title', e.target.value)}
-                                                                        placeholder="e.g., Pre-event Survey"
-                                                                    />
-                                                                </div>
-                                                            </Col>
-                                                            <Col sm={8}>
-                                                                <div className="form-group fill">
-                                                                    <label className="floating-label">URL</label>
-                                                                    <input
-                                                                        type="url"
-                                                                        className="form-control"
-                                                                        value={urlItem.url}
-                                                                        onChange={(e) => updateSurveyUrl(urlItem.id, 'url', e.target.value)}
-                                                                        placeholder="https://example.com/survey"
-                                                                    />
-                                                                </div>
-                                                            </Col>
-                                                        </Row>
+                                                        <div className="col-md-6">
+                                                            <p className="mb-1">
+                                                                <strong>Date:</strong> {suggestions.eventInfo.startDate} to{' '}
+                                                                {suggestions.eventInfo.endDate}
+                                                            </p>
+                                                            <p className="mb-1">
+                                                                <strong>Time:</strong> {formatTime12Hour(suggestions.eventInfo.startTime)} to{' '}
+                                                                {formatTime12Hour(suggestions.eventInfo.endTime)}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                ))}
-                                            </Card.Body>
-                                        </Card>
-                                    </Col>
-                                </Row>
+                                                    <Button variant="outline-info" size="sm" onClick={useSuggestions} className="mt-2">
+                                                        <i className="feather icon-download mr-1"></i>
+                                                        Use Event Information
+                                                    </Button>
+                                                </Alert>
+                                            </Col>
+                                        </Row>
+                                    )}
 
-                                {/* Sessions Management */}
-                                <Row>
-                                    <Col sm={12}>
-                                        <Card className="mb-3">
-                                            <Card.Header className="d-flex justify-content-between align-items-center">
-                                                <h6 className="mb-0">
-                                                    <i className="feather icon-list mr-2"></i>
-                                                    Survey Sessions ({sessionsList.length})
-                                                </h6>
-                                                <Button
-                                                    variant="outline-primary"
-                                                    size="sm"
-                                                    onClick={addSession}
-                                                    disabled={sessionsList.length >= 20}
-                                                >
-                                                    <i className="feather icon-plus mr-1"></i>
-                                                    Add Session
-                                                </Button>
-                                            </Card.Header>
-                                            <Card.Body>
+                                    <Row>
+                                        <Col sm={3}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" htmlFor="startDate">
+                                                    Start Date *
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    className={`form-control ${errors.startDate ? 'is-invalid' : ''}`}
+                                                    name="startDate"
+                                                    value={formData.startDate}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                />
+                                                {errors.startDate && <div className="invalid-feedback">{errors.startDate}</div>}
+                                            </div>
+                                        </Col>
+                                        <Col sm={3}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" htmlFor="startTime">
+                                                    Start Time *
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    className={`form-control ${errors.startTime ? 'is-invalid' : ''}`}
+                                                    name="startTime"
+                                                    value={formData.startTime}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                />
+                                                {errors.startTime && <div className="invalid-feedback">{errors.startTime}</div>}
+                                            </div>
+                                        </Col>
+                                        <Col sm={3}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" htmlFor="endDate">
+                                                    End Date *
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    className={`form-control ${errors.endDate ? 'is-invalid' : ''}`}
+                                                    name="endDate"
+                                                    value={formData.endDate}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                />
+                                                {errors.endDate && <div className="invalid-feedback">{errors.endDate}</div>}
+                                            </div>
+                                        </Col>
+                                        <Col sm={3}>
+                                            <div className="form-group fill">
+                                                <label className="floating-label" htmlFor="endTime">
+                                                    End Time *
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    className={`form-control ${errors.endTime ? 'is-invalid' : ''}`}
+                                                    name="endTime"
+                                                    value={formData.endTime}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                />
+                                                {errors.endTime && <div className="invalid-feedback">{errors.endTime}</div>}
+                                            </div>
+                                        </Col>
+                                    </Row>
+
+                                    <Row>
+                                        <Col sm={6}>
+                                            <div className="form-group fill">
+                                                <div className="form-check" style={{ marginTop: '25px' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="form-check-input"
+                                                        name="isActive"
+                                                        checked={formData.isActive}
+                                                        onChange={handleInputChange}
+                                                        id="isActive"
+                                                    />
+                                                    <label className="form-check-label" htmlFor="isActive">
+                                                        Survey is active
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </Col>
+                                        <Col sm={6}>
+                                            <div className="form-group fill">
+                                                <Badge bg="info" className="mb-2">
+                                                    <span>Sessions </span> {sessionsList.length}/20
+                                                </Badge>
+                                                <small className="text-muted">Add survey sessions (optional)</small>
+                                            </div>
+                                        </Col>
+                                    </Row>
+
+                                    {/* Survey URLs Management */}
+                                    <Row>
+                                        <Col sm={12}>
+                                            <Card className="mb-3">
+                                                <Card.Header className="d-flex justify-content-between align-items-center">
+                                                    <h6 className="mb-0">
+                                                        <i className="fas fa-link mr-2"></i>
+                                                        Survey URLs ({surveyUrlsList.length})
+                                                    </h6>
+                                                    <Button variant="outline-primary" size="sm" onClick={addSurveyUrl}>
+                                                        <i className="feather icon-plus mr-1"></i>
+                                                        Add URL
+                                                    </Button>
+                                                </Card.Header>
+                                                <Card.Body>
+                                                    {surveyUrlsList.map((urlItem, index) => (
+                                                        <div
+                                                            key={urlItem.id}
+                                                            className="border rounded p-3 mb-3"
+                                                            style={{ backgroundColor: '#f8f9fa' }}
+                                                        >
+                                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                <h6 className="mb-0">Survey URL {index + 1}</h6>
+                                                                <Button
+                                                                    variant="danger"
+                                                                    size="sm"
+                                                                    onClick={() => removeSurveyUrl(urlItem.id)}
+                                                                >
+                                                                    <i className="feather icon-trash-2"></i>
+                                                                </Button>
+                                                            </div>
+                                                            <Row>
+                                                                <Col sm={4}>
+                                                                    <div className="form-group fill">
+                                                                        <label className="floating-label">Title</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="form-control"
+                                                                            value={urlItem.title}
+                                                                            onChange={(e) =>
+                                                                                updateSurveyUrl(urlItem.id, 'title', e.target.value)
+                                                                            }
+                                                                            placeholder="e.g., Pre-event Survey"
+                                                                        />
+                                                                    </div>
+                                                                </Col>
+                                                                <Col sm={8}>
+                                                                    <div className="form-group fill">
+                                                                        <label className="floating-label">URL</label>
+                                                                        <input
+                                                                            type="url"
+                                                                            className="form-control"
+                                                                            value={urlItem.url}
+                                                                            onChange={(e) =>
+                                                                                updateSurveyUrl(urlItem.id, 'url', e.target.value)
+                                                                            }
+                                                                            placeholder="https://example.com/survey"
+                                                                        />
+                                                                    </div>
+                                                                </Col>
+                                                            </Row>
+                                                        </div>
+                                                    ))}
+                                                </Card.Body>
+                                            </Card>
+                                        </Col>
+                                    </Row>
+
+                                    {/* Sessions Management */}
+                                    <Row>
+                                        <Col sm={12}>
+                                            <Card className="mb-3">
+                                                <Card.Header className="d-flex justify-content-between align-items-center">
+                                                    <h6 className="mb-0">
+                                                        <i className="feather icon-list mr-2"></i>
+                                                        Survey Sessions ({sessionsList.length})
+                                                    </h6>
+                                                    <Button
+                                                        variant="outline-primary"
+                                                        size="sm"
+                                                        onClick={addSession}
+                                                        disabled={sessionsList.length >= 20}
+                                                    >
+                                                        <i className="feather icon-plus mr-1"></i>
+                                                        Add Session
+                                                    </Button>
+                                                </Card.Header>
+                                                <Card.Body>
                                                     {sessionsList.map((session, index) => (
-                                                        <div key={session.id} className="border rounded p-3 mb-3" style={{ backgroundColor: '#f8f9fa' }}>
+                                                        <div
+                                                            key={session.id}
+                                                            className="border rounded p-3 mb-3"
+                                                            style={{ backgroundColor: '#f8f9fa' }}
+                                                        >
                                                             <div className="d-flex justify-content-between align-items-center mb-2">
                                                                 <h6 className="mb-0">Session {index + 1}</h6>
                                                                 <Button
@@ -635,7 +653,9 @@ const AddSurveyPage = () => {
                                                                             type="text"
                                                                             className="form-control"
                                                                             value={session.name}
-                                                                            onChange={(e) => updateSession(session.id, 'name', e.target.value)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'name', e.target.value)
+                                                                            }
                                                                             placeholder="Enter session name"
                                                                         />
                                                                     </div>
@@ -647,7 +667,9 @@ const AddSurveyPage = () => {
                                                                             type="date"
                                                                             className="form-control"
                                                                             value={session.date}
-                                                                            onChange={(e) => updateSession(session.id, 'date', e.target.value)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'date', e.target.value)
+                                                                            }
                                                                         />
                                                                     </div>
                                                                 </Col>
@@ -657,10 +679,15 @@ const AddSurveyPage = () => {
                                                                             type="checkbox"
                                                                             className="form-check-input"
                                                                             checked={session.isActive}
-                                                                            onChange={(e) => updateSession(session.id, 'isActive', e.target.checked)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'isActive', e.target.checked)
+                                                                            }
                                                                             id={`session-active-${session.id}`}
                                                                         />
-                                                                        <label className="form-check-label" htmlFor={`session-active-${session.id}`}>
+                                                                        <label
+                                                                            className="form-check-label"
+                                                                            htmlFor={`session-active-${session.id}`}
+                                                                        >
                                                                             Active
                                                                         </label>
                                                                     </div>
@@ -672,7 +699,9 @@ const AddSurveyPage = () => {
                                                                             type="time"
                                                                             className="form-control"
                                                                             value={session.startTime}
-                                                                            onChange={(e) => updateSession(session.id, 'startTime', e.target.value)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'startTime', e.target.value)
+                                                                            }
                                                                         />
                                                                     </div>
                                                                 </Col>
@@ -683,7 +712,9 @@ const AddSurveyPage = () => {
                                                                             type="time"
                                                                             className="form-control"
                                                                             value={session.endTime}
-                                                                            onChange={(e) => updateSession(session.id, 'endTime', e.target.value)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'endTime', e.target.value)
+                                                                            }
                                                                         />
                                                                     </div>
                                                                 </Col>
@@ -693,7 +724,9 @@ const AddSurveyPage = () => {
                                                                         <textarea
                                                                             className="form-control"
                                                                             value={session.description}
-                                                                            onChange={(e) => updateSession(session.id, 'description', e.target.value)}
+                                                                            onChange={(e) =>
+                                                                                updateSession(session.id, 'description', e.target.value)
+                                                                            }
                                                                             placeholder="Enter session description"
                                                                             rows={2}
                                                                         />
@@ -702,29 +735,29 @@ const AddSurveyPage = () => {
                                                             </Row>
                                                         </div>
                                                     ))}
-                                            </Card.Body>
-                                        </Card>
-                                    </Col>
-                                </Row>
+                                                </Card.Body>
+                                            </Card>
+                                        </Col>
+                                    </Row>
 
-                                {/* Form Actions */}
-                                <div className="row mt-4">
-                                    <div className="col-12">
-                                        <div className="d-flex justify-content-between gap-2">
-                                            <Button variant="danger" onClick={handleNavigate} disabled={isLoading}>
-                                                Cancel
-                                            </Button>
-                                            <Button variant="primary" type="submit" disabled={isLoading}>
-                                                {isLoading ? 'Saving...' : (isEditing ? 'Update Survey' : 'Create Survey')}
-                                            </Button>
+                                    {/* Form Actions */}
+                                    <div className="row mt-4">
+                                        <div className="col-12">
+                                            <div className="d-flex justify-content-between gap-2">
+                                                <Button variant="danger" onClick={handleNavigate} disabled={isLoading}>
+                                                    Cancel
+                                                </Button>
+                                                <Button variant="primary" type="submit" disabled={isLoading}>
+                                                    {isLoading ? 'Saving...' : isEditing ? 'Update Survey' : 'Create Survey'}
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             </Container>
         </>
     );

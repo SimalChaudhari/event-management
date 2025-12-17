@@ -24,6 +24,7 @@ import { EventBooth } from 'event/event-booth.entity';
 import { EmailService } from 'service/email.service';
 import { EventAgenda } from 'agenda/agenda.entity';
 import { CouponModule } from 'coupon/coupon.module';
+import { FilterModule } from '../service/filter.module';
 
 
 @Module({
@@ -43,6 +44,7 @@ import { CouponModule } from 'coupon/coupon.module';
     forwardRef(() => EventModule), // Add EventModule here
     CheckoutModule, // Add CheckoutModule for checkout integration
     CouponModule, // Add CouponModule for coupon integration
+    FilterModule, // Import FilterModule for SurveyService dependency
   ],
     providers: [CartService,SurveyService,ErrorHandlerService,EmailService],
     controllers: [CartController],

@@ -107,20 +107,42 @@ export class SurveyController {
   // READ - Get all surveys with sessions (Admin only)
   @Get('current')
   async getAllSurveysWithSessions(
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
     @Res() response: Response,
     @Request() req: any,
   ) {
     try {
-      const surveys = await this.surveyService.getAllSurveysWithSessions();
+      const result = await this.surveyService.getAllSurveysWithSessions(filters);
+
+      // Build metadata with pagination from service
+      const metadata: any = {
+        total: result.pagination?.total || result.surveys?.length || 0,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Add pagination fields from service
+      if (result.pagination) {
+        metadata.page = result.pagination.page;
+        metadata.limit = result.pagination.limit;
+        metadata.totalPages = result.pagination.totalPages;
+        metadata.hasNext = result.pagination.hasNext;
+        metadata.hasPrev = result.pagination.hasPrev;
+      }
 
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Surveys with sessions retrieved successfully',
-        data: surveys,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          totalCount: surveys.length,
-        },
+        data: result.surveys,
+        metadata: metadata,
       };
 
       return response.status(HttpStatus.OK).json(successResponse);

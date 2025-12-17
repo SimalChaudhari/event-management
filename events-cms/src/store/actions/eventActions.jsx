@@ -539,12 +539,8 @@ export const getAllEventsForFilter = () => async (dispatch, getState) => {
         setEventLoading(dispatch, true);
         // CRITICAL: Request ALL events for filter dropdown (not paginated)
         // Use a very high limit to get all events, or fetch from filter response if available
-        const response = await axiosInstance.get('/events', {
-            params: {
-                limit: 10000, // High limit to get all events
-                page: 1
-            }
-        });
+        const response = await axiosInstance.get('/events');
+        console.log(response.data);
         
         // Try to get events from filter.events first (contains all events for dropdown)
         // Otherwise use events array (might be paginated)

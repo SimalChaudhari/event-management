@@ -627,6 +627,8 @@ export class EventService {
           const formattedEvents = completeEvents.map(event => ({
             id: event.id,
             eventName: event.name,
+            startDate: event.startDate,
+            endDate: event.endDate,
           }));
           filterData = {
             events: formattedEvents,
@@ -665,6 +667,8 @@ export class EventService {
         const formattedEvents = filteredEvents.map(event => ({
           id: event.id,
           eventName: event.name,
+          startDate: event.startDate,
+          endDate: event.endDate,
         }));
         filterData = {
           events: formattedEvents,

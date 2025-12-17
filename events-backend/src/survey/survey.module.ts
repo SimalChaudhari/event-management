@@ -11,6 +11,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { SurveyUtils } from '../utils/survey-utils';
 import { QAModule } from './qa.module';
+import { FilterModule } from '../service/filter.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { QAModule } from './qa.module';
       signOptions: { }, // Set your token expiration
     }),
     QAModule,
+    FilterModule, // Import FilterModule for pagination
   ],
   providers: [SurveyService, ErrorHandlerService, SurveyUtils],
   controllers: [SurveyController],

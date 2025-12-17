@@ -17,9 +17,14 @@ export const setupDateFilter = (table) => {
                 return true;
             }
 
-            // Get the event date from rowData
-            const eventDate = new Date(rowData.event?.startDate || rowData.startDate);
-            eventDate.setHours(0, 0, 0, 0);
+            // Get the date from rowData - supports both surveys (rowData.startDate) and events (rowData.event?.startDate)
+            const dateToFilter = rowData.startDate || rowData.event?.startDate;
+            if (!dateToFilter) {
+                return true; // If no date available, include the row
+            }
+            
+            const filterDate = new Date(dateToFilter);
+            filterDate.setHours(0, 0, 0, 0);
 
             const startDate = startDateStr ? new Date(startDateStr) : null;
             const endDate = new Date(endDateStr);
@@ -28,9 +33,9 @@ export const setupDateFilter = (table) => {
             endDate.setHours(23, 59, 59, 999);
 
             if (startDate) {
-                return eventDate >= startDate && eventDate <= endDate;
+                return filterDate >= startDate && filterDate <= endDate;
             } else {
-                return eventDate <= endDate;
+                return filterDate <= endDate;
             }
         }
     );
