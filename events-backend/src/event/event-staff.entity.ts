@@ -18,6 +18,9 @@ export class EventStaff {
   @Column()
   userId!: string; // User ID who switched to exhibitor role
 
+  @Column({ type: 'boolean', default: false })
+  isCurrent!: boolean; // Marks the current/active association for this user
+
   @ManyToOne(() => Event, (event) => event.eventStaffs, {
     onDelete: 'CASCADE',
   })

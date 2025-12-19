@@ -22,6 +22,7 @@ export const userList = (filters = {}) => async (dispatch) => {
         });
 
         const response = await axiosInstance.get(url);
+        console.log(response.data);
         
         // Store both data and pagination metadata
         dispatch({

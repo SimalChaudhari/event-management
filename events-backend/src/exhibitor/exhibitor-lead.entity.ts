@@ -46,25 +46,6 @@ export class ExhibitorLead {
   @JoinColumn({ name: 'scannedBy' })
   scanner!: UserEntity;
 
-  // Contact details stored for reference
-  @Column({ type: 'varchar', length: 100 })
-  firstName!: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  lastName!: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  email!: string;
-
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  mobile?: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  company?: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  designation?: string;
-
   @Column({ type: 'text', nullable: true })
   notes?: string; // Optional notes about the lead
 

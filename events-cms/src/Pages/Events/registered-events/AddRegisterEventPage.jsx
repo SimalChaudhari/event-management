@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Row, Col, Container } from 'react-bootstrap';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { createRegisterEvent, eventList, adminUpdateRegisterEvent, registerEventById } from '../../../store/actions/eventActions';
-import { userList } from '../../../store/actions/userActions';
+import { createRegisterEvent, adminUpdateRegisterEvent, registerEventById } from '../../../store/actions/eventActions';
+import { filterUserList, filterEventList } from '../../../store/actions/filterActions';
 import { EVENT_PATHS } from '../../../utils/constants';
 import useTableNavigation from '../../../hooks/useTableNavigation';
+import SearchableDropdown from '../../../components/common/SearchableDropdown';
 
 const AddRegisterEventPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams(); // For edit mode
-    const events = useSelector((state) => state.event?.event?.events || []);
-    const users = useSelector((state) => state.user?.user || []);
     const previousPageRef = useRef(null);
 
     // Use reusable table navigation hook for back navigation
@@ -36,11 +35,20 @@ const AddRegisterEventPage = () => {
     const [submitting, setSubmitting] = useState(false); // For form submission
     const [currentUser, setCurrentUser] = useState(null);
     const [currentEvent, setCurrentEvent] = useState(null);
-
-    useEffect(() => {
-        dispatch(eventList({}));
-        dispatch(userList());
-    }, [dispatch]);
+    const [users, setUsers] = useState([]); // Local state for users from filter API
+    const [events, setEvents] = useState([]); // Local state for events from filter API
+    
+    // Pagination and search states for users
+    const [userSearch, setUserSearch] = useState('');
+    const [userPage, setUserPage] = useState(1);
+    const [userPagination, setUserPagination] = useState({ total: 0, totalPages: 0 });
+    const [userLoading, setUserLoading] = useState(false);
+    
+    // Pagination and search states for events
+    const [eventSearch, setEventSearch] = useState('');
+    const [eventPage, setEventPage] = useState(1);
+    const [eventPagination, setEventPagination] = useState({ total: 0, totalPages: 0 });
+    const [eventLoading, setEventLoading] = useState(false);
 
     // Load data for edit mode
     useEffect(() => {
@@ -85,13 +93,99 @@ const AddRegisterEventPage = () => {
         }
     }, [id, dispatch, location.search]);
 
-    const handleInputChange = (e) => {
+    const handleInputChange = async (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
             [name]: value
         }));
     };
+
+    // Load users with search and pagination
+    const loadUsers = useCallback(async (search = '', page = 1, append = false) => {
+        setUserLoading(true);
+        try {
+            const result = await filterUserList({ search, page, limit: 20 });
+            if (result?.success) {
+                if (append) {
+                    setUsers(prev => [...prev, ...result.data]);
+                } else {
+                    setUsers(result.data);
+                }
+                setUserPagination(result.pagination || {});
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+        } finally {
+            setUserLoading(false);
+        }
+    }, []);
+
+    // Load events with search and pagination
+    const loadEvents = useCallback(async (search = '', page = 1, append = false) => {
+        setEventLoading(true);
+        try {
+            const result = await filterEventList({ search, page, limit: 20 });
+            if (result?.success) {
+                if (append) {
+                    setEvents(prev => [...prev, ...result.data]);
+                } else {
+                    setEvents(result.data);
+                }
+                setEventPagination(result.pagination || {});
+            }
+        } catch (error) {
+            console.error('Error loading events:', error);
+        } finally {
+            setEventLoading(false);
+        }
+    }, []);
+
+    // Handle user dropdown open - load initial data
+    const handleUserDropdownOpen = useCallback(() => {
+        if (users.length === 0) {
+            loadUsers('', 1, false);
+        }
+    }, [users.length, loadUsers]);
+
+    // Handle event dropdown open - load initial data
+    const handleEventDropdownOpen = useCallback(() => {
+        if (events.length === 0) {
+            loadEvents('', 1, false);
+        }
+    }, [events.length, loadEvents]);
+
+    // Handle load more users (infinite scroll)
+    const handleLoadMoreUsers = useCallback(async () => {
+        if (!userLoading && userPage < userPagination.totalPages) {
+            const nextPage = userPage + 1;
+            setUserPage(nextPage);
+            await loadUsers(userSearch, nextPage, true);
+        }
+    }, [userLoading, userPage, userPagination.totalPages, userSearch, loadUsers]);
+
+    // Handle load more events (infinite scroll)
+    const handleLoadMoreEvents = useCallback(async () => {
+        if (!eventLoading && eventPage < eventPagination.totalPages) {
+            const nextPage = eventPage + 1;
+            setEventPage(nextPage);
+            await loadEvents(eventSearch, nextPage, true);
+        }
+    }, [eventLoading, eventPage, eventPagination.totalPages, eventSearch, loadEvents]);
+
+    // Handle user search
+    const handleUserSearch = useCallback((searchTerm) => {
+        setUserSearch(searchTerm);
+        setUserPage(1);
+        loadUsers(searchTerm, 1, false);
+    }, [loadUsers]);
+
+    // Handle event search
+    const handleEventSearch = useCallback((searchTerm) => {
+        setEventSearch(searchTerm);
+        setEventPage(1);
+        loadEvents(searchTerm, 1, false);
+    }, [loadEvents]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -163,58 +257,60 @@ const AddRegisterEventPage = () => {
                             <form onSubmit={handleSubmit}>
                                     <Row>
                                         <Col sm={12}>
-                                            <div className="form-group fill">
-                                                <label className="floating-label" htmlFor="userId">
-                                                    Select User
-                                                </label>
-                                                <select
-                                                    className="form-control"
-                                                    name="userId"
-                                                    value={formData.userId}
-                                                    onChange={handleInputChange}
-                                                    required
-                                                >
-                                                    <option value="">Select a user</option>
-                                                    {users.map((user) => (
-                                                        <option key={user.id} value={user.id}>
-                                                            {user.firstName} {user.lastName}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {id && currentUser && (
-                                                    <small className="text-info">
-                                                        Current: {currentUser.firstName} {currentUser.lastName} ({currentUser.email})
-                                                    </small>
-                                                )}
-                                            </div>
+                                            <SearchableDropdown
+                                                label="Select User"
+                                                name="userId"
+                                                value={formData.userId}
+                                                onChange={handleInputChange}
+                                                options={users.map(user => ({
+                                                    id: user.id,
+                                                    name: `${user.firstName} ${user.lastName}${user.email ? ` (${user.email})` : ''}`
+                                                }))}
+                                                onLoadMore={handleLoadMoreUsers}
+                                                hasMore={userPage < userPagination.totalPages}
+                                                loading={userLoading}
+                                                placeholder="Select a user"
+                                                displayKey="name"
+                                                valueKey="id"
+                                                searchPlaceholder="Search users by name or email..."
+                                                required
+                                                onOpen={handleUserDropdownOpen}
+                                                onSearch={handleUserSearch}
+                                            />
+                                            {id && currentUser && (
+                                                <small className="text-info">
+                                                    Current: {currentUser.firstName} {currentUser.lastName} ({currentUser.email})
+                                                </small>
+                                            )}
                                         </Col>
 
                                         <Col sm={12}>
-                                            <div className="form-group fill">
-                                                <label className="floating-label" htmlFor="eventId">
-                                                    Select Event
-                                                </label>
-                                                <select
-                                                    className="form-control"
-                                                    name="eventId"
-                                                    value={formData.eventId}
-                                                    onChange={handleInputChange}
-                                                    required
-                                                >
-                                                    <option value="">Select an event</option>
-                                                    {events.map((event) => (
-                                                        <option key={event.id} value={event.id}>
-                                                            {event.name} - {new Date(event.startDate).toLocaleDateString()}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {id && currentEvent && (
-                                                    <small className="text-info">
-                                                        Current: {currentEvent.name} (
-                                                        {new Date(currentEvent.startDate).toLocaleDateString()})
-                                                    </small>
-                                                )}
-                                            </div>
+                                            <SearchableDropdown
+                                                label="Select Event"
+                                                name="eventId"
+                                                value={formData.eventId}
+                                                onChange={handleInputChange}
+                                                options={events.map(event => ({
+                                                    id: event.id,
+                                                    name: `${event.name} - ${new Date(event.startDate).toLocaleDateString()}`
+                                                }))}
+                                                onLoadMore={handleLoadMoreEvents}
+                                                hasMore={eventPage < eventPagination.totalPages}
+                                                loading={eventLoading}
+                                                placeholder="Select an event"
+                                                displayKey="name"
+                                                valueKey="id"
+                                                searchPlaceholder="Search events..."
+                                                required
+                                                onOpen={handleEventDropdownOpen}
+                                                onSearch={handleEventSearch}
+                                            />
+                                            {id && currentEvent && (
+                                                <small className="text-info">
+                                                    Current: {currentEvent.name} (
+                                                    {new Date(currentEvent.startDate).toLocaleDateString()})
+                                                </small>
+                                            )}
                                         </Col>
 
                                         <Col sm={12}>

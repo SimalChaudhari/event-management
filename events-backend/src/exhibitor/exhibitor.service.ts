@@ -12,7 +12,7 @@ import {
   DuplicateResourceException,
 } from '../utils/exceptions/custom-exceptions';
 import { EventService } from '../event/event.service';
-import { UserEntity } from '../user/users.entity';
+import { UserEntity, UserRole } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
 
@@ -1492,6 +1492,11 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Attendee', userId);
       }
 
+      // Check if the user being scanned is an exhibitor - exhibitors cannot be scanned as leads
+      if (attendee.role === UserRole.Exhibitor) {
+        throw new BadRequestException('Exhibitors cannot be scanned as leads. Only attendees can be scanned.');
+      }
+
       // Verify event exists
       const event = await this.eventRepository.findOne({
         where: { id: eventId },
@@ -1625,12 +1630,6 @@ export class ExhibitorService {
         attendeeId: userId,
         eventId: eventId,
         scannedBy: scannedBy,
-        firstName: attendee.firstName,
-        lastName: attendee.lastName,
-        email: attendee.email,
-        mobile: attendee.mobile || undefined,
-        company: attendee.company || undefined,
-        designation: attendee.designation || undefined,
         notes: notes || undefined,
       });
 
@@ -1675,6 +1674,510 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Attendee QR code scanning for lead collection');
+    }
+  }
+
+  /**
+   * Get current event ID for a user from their current association
+   * @param userId User ID
+   * @returns Event ID or null if no current association
+   */
+  async getCurrentEventIdForUser(userId: string): Promise<string | null> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      
+      const currentEventStaff = await eventStaffRepository.findOne({
+        where: {
+          userId: userId,
+          isCurrent: true,
+        },
+      });
+
+      return currentEventStaff ? currentEventStaff.eventId : null;
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get current event ID for user', userId);
+      return null;
+    }
+  }
+
+  /**
+   * Manually create a lead entry for an attendee by user ID
+   * Allows exhibitor to manually enter attendee by user ID as a lead
+   * Exhibitor ID is automatically determined from the logged-in user's current association
+   * @param eventId Event ID where the lead is being collected
+   * @param attendeeId User ID of the attendee
+   * @param scannedBy User ID of the exhibitor staff member who is creating the lead
+   * @param notes Optional notes about the lead
+   * @returns Lead information
+   */
+  async createManualLead(
+    eventId: string,
+    attendeeId: string,
+    scannedBy: string,
+    notes?: string,
+  ): Promise<any> {
+    try {
+      // Get the exhibitor from the logged-in user's EventStaff association for this event
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      
+      const currentEventStaff = await eventStaffRepository.findOne({
+        where: {
+          userId: scannedBy,
+          eventId: eventId,
+        },
+      });
+
+      if (!currentEventStaff) {
+        throw new ForbiddenException('You are not associated with this event as an exhibitor staff member');
+      }
+
+      const exhibitorId = currentEventStaff.exhibitorId;
+      const isCurrent = currentEventStaff.isCurrent;
+
+      // Get booth details ONLY if isCurrent is true
+      // When isCurrent is true, always include exhibitorBooth field in response (default data)
+      let exhibitorBooth: any = undefined; // Use undefined so field is not included when false
+      if (isCurrent) {
+        const { EventBooth } = await import('../event/event-booth.entity');
+        const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
+        
+        const eventBooth = await eventBoothRepository.findOne({
+          where: {
+            eventId: eventId,
+            exhibitorId: exhibitorId,
+          },
+        });
+
+        // Always set exhibitorBooth when isCurrent is true (default data)
+        // If booth exists, include details; if not, set to null but field will still be included
+        exhibitorBooth = eventBooth ? {
+          id: eventBooth.id,
+          uniqueCode: eventBooth.uniqueCode,
+          isActive: eventBooth.isActive,
+        } : null;
+      }
+
+      // Get attendee (user) data
+      const attendee = await this.userRepository.findOne({
+        where: { id: attendeeId },
+      });
+
+      if (!attendee) {
+        throw new ResourceNotFoundException('Attendee', attendeeId);
+      }
+
+      // Check if the user being scanned is an exhibitor - exhibitors cannot be scanned as leads
+      if (attendee.role === UserRole.Exhibitor) {
+        throw new BadRequestException('Exhibitors cannot be scanned as leads. Only attendees can be scanned.');
+      }
+
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Check if attendee is registered for this event
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      
+      const registration = await registerEventRepository.findOne({
+        where: {
+          userId: attendeeId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
+        throw new BadRequestException('Attendee is not registered for this event');
+      }
+
+      // Verify exhibitor exists
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      // We already verified the exhibitor is associated with this event through EventStaff
+      // No need to check again
+
+      // Verify scanner (exhibitor staff) exists
+      const scanner = await this.userRepository.findOne({
+        where: { id: scannedBy },
+      });
+
+      if (!scanner) {
+        throw new ResourceNotFoundException('Scanner', scannedBy);
+      }
+
+      // We already verified the scanner is staff member through currentEventStaff check above
+      // No need to check again
+
+      // Check if lead already exists for this exhibitor-attendee-event combination
+      const existingLead = await this.exhibitorLeadRepository.findOne({
+        where: {
+          exhibitorId: exhibitorId,
+          attendeeId: attendeeId,
+          eventId: eventId,
+        },
+      });
+
+      if (existingLead) {
+        // Throw error if lead already exists
+        throw new ConflictException('Lead already collected for this attendee');
+      }
+
+      // Create new manual lead
+      const lead = this.exhibitorLeadRepository.create({
+        exhibitorId: exhibitorId,
+        attendeeId: attendeeId,
+        eventId: eventId,
+        scannedBy: scannedBy,
+        notes: notes || undefined,
+      });
+
+      const savedLead = await this.exhibitorLeadRepository.save(lead);
+
+      // Build response matching GET response structure
+      return {
+        success: true,
+        message: 'Manual lead created successfully',
+        data: {
+          id: savedLead.id,
+          attendee: {
+            id: attendee.id,
+            firstName: attendee.firstName,
+            lastName: attendee.lastName,
+            email: attendee.email,
+            mobile: attendee.mobile,
+            company: attendee.company,
+            designation: attendee.designation,
+            profilePicture: attendee.profilePicture,
+          },
+          event: {
+            id: event.id,
+            name: event.name,
+          },
+          exhibitor: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+          },
+          scanner: {
+            id: scanner.id,
+            firstName: scanner.firstName,
+            lastName: scanner.lastName,
+            email: scanner.email,
+          },
+          notes: savedLead.notes || null,
+          collectedAt: savedLead.createdAt,
+          updatedAt: savedLead.updatedAt,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Manual lead creation');
+    }
+  }
+
+  /**
+   * Get all leads
+   * - For Exhibitor role: Automatically shows all leads for their company (no exhibitorId needed)
+   * - For Admin role: Shows all leads, or filter by exhibitorId if provided
+   * Can filter by eventId, and supports pagination
+   * @param exhibitorId Optional exhibitor ID (only for admin, exhibitor role doesn't need it)
+   * @param eventId Optional event ID to filter leads
+   * @param userId User ID making the request (for permission check)
+   * @param userRole User role (for permission check)
+   * @param filters Pagination and search filters
+   * @returns List of leads with pagination
+   */
+  async getExhibitorLeads(
+    exhibitorId: string | undefined,
+    eventId: string | undefined,
+    userId: string,
+    userRole: string,
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    } = {},
+  ): Promise<any> {
+    try {
+      let exhibitorIds: string[] = [];
+
+      // Permission check: Exhibitor users can only access their own company's leads
+      if (userRole === 'exhibitor') {
+        // Get all exhibitor IDs where this user is a staff member
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+        const staffRecords = eventId
+          ? await eventStaffRepository.find({
+              where: {
+                userId: userId,
+                eventId: eventId,
+              },
+              select: ['exhibitorId'],
+            })
+          : await eventStaffRepository.find({
+              where: {
+                userId: userId,
+              },
+              select: ['exhibitorId'],
+            });
+
+        if (!staffRecords || staffRecords.length === 0) {
+          // Return empty result if user is not a staff member for any exhibitor
+          return {
+            data: [],
+            pagination: {
+              total: 0,
+              page: filters.page || 1,
+              limit: filters.limit || 10,
+              totalPages: 0,
+            },
+          };
+        }
+
+        // Extract unique exhibitor IDs
+        exhibitorIds = [...new Set(staffRecords.map(record => record.exhibitorId))];
+      } else if (userRole === 'admin') {
+        // Admin can see all leads, or filter by specific exhibitorId if provided
+        if (exhibitorId) {
+          // Verify exhibitor exists
+          const exhibitor = await this.exhibitorRepository.findOne({
+            where: { id: exhibitorId },
+          });
+
+          if (!exhibitor) {
+            throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+          }
+          exhibitorIds = [exhibitorId];
+        }
+        // If no exhibitorId provided, exhibitorIds remains empty array (will show all leads)
+      }
+
+      // Build query
+      const queryBuilder = this.exhibitorLeadRepository
+        .createQueryBuilder('lead')
+        .leftJoinAndSelect('lead.attendee', 'attendee')
+        .leftJoinAndSelect('lead.event', 'event')
+        .leftJoinAndSelect('lead.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('lead.scanner', 'scanner')
+        .where('lead.isActive = :isActive', { isActive: true });
+
+      // Filter by exhibitor(s)
+      if (userRole === 'exhibitor') {
+        // Exhibitor users: only their company's leads
+        if (exhibitorIds.length > 0) {
+          queryBuilder.andWhere('lead.exhibitorId IN (:...exhibitorIds)', { exhibitorIds });
+        } else {
+          // No exhibitor IDs found, return empty result
+          return {
+            data: [],
+            pagination: {
+              total: 0,
+              page: filters.page || 1,
+              limit: filters.limit || 10,
+              totalPages: 0,
+            },
+          };
+        }
+      } else if (userRole === 'admin' && exhibitorId) {
+        // Admin with specific exhibitorId: filter by that exhibitor
+        queryBuilder.andWhere('lead.exhibitorId = :exhibitorId', { exhibitorId });
+      }
+      // Admin without exhibitorId: show all leads (no additional filter)
+
+      // Filter by event if provided
+      if (eventId) {
+        queryBuilder.andWhere('lead.eventId = :eventId', { eventId });
+      }
+
+      // Search filter - search in attendee fields
+      if (filters.search) {
+        const searchTerm = `%${filters.search}%`;
+        queryBuilder.andWhere(
+          '(attendee.firstName LIKE :search OR attendee.lastName LIKE :search OR attendee.email LIKE :search OR attendee.mobile LIKE :search OR attendee.company LIKE :search)',
+          { search: searchTerm },
+        );
+      }
+
+      // Sorting
+      const sortBy = filters.sortBy || 'createdAt';
+      const sortOrder = filters.sortOrder || 'DESC';
+      
+      // Map attendee fields to the correct relation path
+      const attendeeSortFields = ['firstName', 'lastName', 'email', 'mobile', 'company', 'designation'];
+      if (attendeeSortFields.includes(sortBy)) {
+        queryBuilder.orderBy(`attendee.${sortBy}`, sortOrder);
+      } else {
+        queryBuilder.orderBy(`lead.${sortBy}`, sortOrder);
+      }
+
+      // Pagination
+      const page = filters.page || 1;
+      const limit = filters.limit || 10;
+      const skip = (page - 1) * limit;
+
+      queryBuilder.skip(skip).take(limit);
+
+      // Execute query
+      const [leads, total] = await queryBuilder.getManyAndCount();
+
+      // Format response
+      const formattedLeads = leads.map((lead) => ({
+        id: lead.id,
+        attendee: {
+          id: lead.attendeeId,
+          firstName: lead.attendee?.firstName,
+          lastName: lead.attendee?.lastName,
+          email: lead.attendee?.email,
+          mobile: lead.attendee?.mobile,
+          company: lead.attendee?.company,
+          designation: lead.attendee?.designation,
+          profilePicture: lead.attendee?.profilePicture,
+        },
+        event: {
+          id: lead.eventId,
+          name: lead.event?.name,
+        },
+        exhibitor: {
+          id: lead.exhibitorId,
+          companyName: lead.exhibitor?.companyName,
+        },
+        scanner: {
+          id: lead.scannedBy,
+          firstName: lead.scanner?.firstName,
+          lastName: lead.scanner?.lastName,
+          email: lead.scanner?.email,
+        },
+        notes: lead.notes,
+        collectedAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+      }));
+
+      return {
+        data: formattedLeads,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor leads retrieval');
+    }
+  }
+
+  /**
+   * Get lead by ID
+   * Exhibitor users can only view leads from their own company
+   * Admin users can view any lead
+   * @param leadId Lead ID
+   * @param userId User ID making the request (for permission check)
+   * @param userRole User role (for permission check)
+   * @returns Lead information
+   */
+  async getLeadById(
+    leadId: string,
+    userId: string,
+    userRole: string,
+  ): Promise<any> {
+    try {
+      // Get lead with relations
+      const lead = await this.exhibitorLeadRepository.findOne({
+        where: { id: leadId, isActive: true },
+        relations: ['attendee', 'event', 'exhibitor', 'scanner'],
+      });
+
+      if (!lead) {
+        throw new ResourceNotFoundException('Lead', leadId);
+      }
+
+      // Permission check: Exhibitor users can only access their own company's leads
+      if (userRole === 'exhibitor') {
+        // Check if user is staff member for this exhibitor
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+        const staffRecord = await eventStaffRepository.findOne({
+          where: {
+            userId: userId,
+            exhibitorId: lead.exhibitorId,
+          },
+        });
+
+        if (!staffRecord) {
+          throw new ForbiddenException('You do not have permission to view this lead');
+        }
+      }
+      // Admin users can view any lead (no additional check needed)
+
+      // Format response
+      return {
+        id: lead.id,
+        attendee: {
+          id: lead.attendeeId,
+          firstName: lead.attendee?.firstName,
+          lastName: lead.attendee?.lastName,
+          email: lead.attendee?.email,
+          mobile: lead.attendee?.mobile,
+          company: lead.attendee?.company,
+          designation: lead.attendee?.designation,
+          profilePicture: lead.attendee?.profilePicture,
+        },
+        event: {
+          id: lead.eventId,
+          name: lead.event?.name,
+        },
+        exhibitor: {
+          id: lead.exhibitorId,
+          companyName: lead.exhibitor?.companyName,
+        },
+        scanner: {
+          id: lead.scannedBy,
+          firstName: lead.scanner?.firstName,
+          lastName: lead.scanner?.lastName,
+          email: lead.scanner?.email,
+        },
+        notes: lead.notes,
+        collectedAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Lead retrieval by ID');
     }
   }
 }

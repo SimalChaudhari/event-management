@@ -157,9 +157,20 @@ export class UserController {
   }
 
   @Get('get/:id')
+  @UseGuards(JwtAuthGuard)
   async getUserById(@Param('id') id: string, @Res() response: Response, @Request() req: any) {
     try {
-      const user = await this.userService.getById(id);
+      const requestingUserId = req.user?.id;
+      const requestingUserRole = req.user?.role;
+      
+      if (!requestingUserId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+      
+      const user = await this.userService.getById(id, requestingUserId, requestingUserRole);
       
       const successResponse: SuccessResponse = {
         success: true,
@@ -705,19 +716,30 @@ export class UserController {
       // Generate new tokens with updated role using AuthService
       const { accessToken, refreshToken } = this.authService.generateTokensForUser(fullUserEntity);
       
-      // Get sanitized user data for response
-      const updatedUser = await this.userService.getById(userId);
+      // Get sanitized user data for response (with associations if user is exhibitor)
+      const updatedUser = await this.userService.getById(userId, userId, fullUserEntity.role);
 
       // Format user data to match expected response format
       const { password, ...userData } = updatedUser;
-      const formattedUser = {
+      const userDataWithAssociations = userData as any; // Type assertion for association fields
+      
+      const formattedUser: any = {
         id: userData.id,
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
         mobile: userData.mobile,
         isVerify: userData.isVerify,
+        role: userData.role,
       };
+
+      // Include exhibitor associations if available
+      if (userDataWithAssociations.currentLoginAssociation) {
+        formattedUser.currentLoginAssociation = userDataWithAssociations.currentLoginAssociation;
+      }
+      if (userDataWithAssociations.relatedAllAssociations) {
+        formattedUser.relatedAllAssociations = userDataWithAssociations.relatedAllAssociations;
+      }
       
       const successResponse = {
         user: formattedUser,

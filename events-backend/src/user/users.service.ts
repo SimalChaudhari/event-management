@@ -64,6 +64,86 @@ export class UserService {
  
   }
 
+  /**
+   * Get exhibitor associations for a user (company and event information)
+   * @param userId User ID
+   * @returns Array of exhibitor associations with company and event details, including booth code
+   */
+  private async getExhibitorAssociations(userId: string): Promise<any[]> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+
+      const { EventBooth } = await import('../event/event-booth.entity');
+      
+      const eventStaffRepository = this.userRepository.manager.getRepository(EventStaff);
+      const eventBoothRepository = this.userRepository.manager.getRepository(EventBooth);
+
+      // Get all EventStaff entries for this user with relations
+      // First get the current one, then get others ordered by most recent first
+      const currentEventStaff = await eventStaffRepository.findOne({
+        where: { userId, isCurrent: true },
+        relations: ['exhibitor', 'event'],
+      });
+
+      const otherEventStaffs = await eventStaffRepository.find({
+        where: { userId, isCurrent: false },
+        relations: ['exhibitor', 'event'],
+        order: { createdAt: 'DESC' }, // Most recent first
+      });
+
+      // Combine: current first, then others
+      const eventStaffs = currentEventStaff 
+        ? [currentEventStaff, ...otherEventStaffs]
+        : otherEventStaffs;
+
+      if (!eventStaffs || eventStaffs.length === 0) {
+        return [];
+      }
+
+      // Format the associations with company and event information, including booth code
+      const associations = await Promise.all(
+        eventStaffs.map(async (eventStaff) => {
+          // Use loaded relations if available, otherwise use IDs
+          const exhibitor = eventStaff.exhibitor;
+          const event = eventStaff.event;
+
+          // Get the booth code (uniqueCode) for this exhibitor and event
+          const eventBooth = await eventBoothRepository.findOne({
+            where: {
+              eventId: eventStaff.eventId,
+              exhibitorId: eventStaff.exhibitorId,
+            },
+            select: ['uniqueCode'],
+          });
+
+          return {
+            eventStaffId: eventStaff.id,
+            companyCode: eventBooth?.uniqueCode || null, // Booth code used when switching role
+            company: {
+              id: exhibitor?.id || eventStaff.exhibitorId,
+              companyName: exhibitor?.companyName || 'Unknown Company',
+              email: exhibitor?.email || '',
+              mobile: exhibitor?.mobile || '',
+            },
+            event: {
+              id: event?.id || eventStaff.eventId,
+              name: event?.name || 'Unknown Event',
+              location: event?.location || '',
+              venue: event?.venue || '',
+            },
+            associatedAt: eventStaff.createdAt,
+          };
+        })
+      );
+
+      // Already sorted by most recent first (from query order)
+      return associations;
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitor associations retrieval', userId);
+      return [];
+    }
+  }
+
 
   async getAll(
     roles?: UserRole[],
@@ -186,7 +266,11 @@ export class UserService {
       this.errorHandler.handleDatabaseError(error, 'Users retrieval');
     }
   }
-  async getById(id: string): Promise<Partial<UserEntity>> {
+  async getById(
+    id: string,
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
+  ): Promise<Partial<UserEntity>> {
     try {
       const user = await this.userRepository.findOne({
         where: { id },
@@ -196,7 +280,41 @@ export class UserService {
         throw new ResourceNotFoundException('User', id);
       }
 
-      return UserUtils.sanitizeUserData(user);
+      const sanitizedUser = UserUtils.sanitizeUserData(user);
+
+      // Only show exhibitor associations if:
+      // 1. User is an exhibitor
+      // 2. Requesting user is the same user (exhibitor viewing own profile) OR requesting user is admin
+      const isRequestingOwnProfile = requestingUserId && requestingUserId === id;
+      const isAdmin = requestingUserRole === UserRole.Admin;
+      const isExhibitor = user.role === UserRole.Exhibitor;
+      
+      const canViewAssociations = isExhibitor && (isRequestingOwnProfile || isAdmin);
+
+      if (canViewAssociations) {
+        // Get all associations (first one will be the current one marked with isCurrent = true)
+        const exhibitorAssociations = await this.getExhibitorAssociations(id);
+        
+        // The current login association is the first one (marked with isCurrent = true in database)
+        const currentLoginAssociation = exhibitorAssociations.length > 0 ? exhibitorAssociations[0] : null;
+        
+        // Remove current association from relatedAllAssociations to avoid duplication
+        const relatedAllAssociations = currentLoginAssociation 
+          ? exhibitorAssociations.filter(
+              (assoc) => assoc.eventStaffId !== currentLoginAssociation.eventStaffId
+            )
+          : exhibitorAssociations;
+        
+        // Add exhibitor associations to user profile
+        return {
+          ...sanitizedUser,
+          currentLoginAssociation: currentLoginAssociation,
+          relatedAllAssociations: relatedAllAssociations,
+        };
+      }
+
+      // If user is not exhibitor or requesting user doesn't have permission, return without associations
+      return sanitizedUser;
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -711,8 +829,14 @@ export class UserService {
           );
         }
 
+        // First, set all existing EventStaff entries for this user to isCurrent = false
+        await eventStaffRepository.update(
+          { userId: userId },
+          { isCurrent: false }
+        );
+
         // Check if EventStaff entry already exists for this specific exhibitor and event
-        const existingEventStaff = await eventStaffRepository.findOne({
+        let currentEventStaff = await eventStaffRepository.findOne({
           where: {
             eventId: eventBooth.eventId,
             exhibitorId: eventBooth.exhibitorId,
@@ -720,14 +844,19 @@ export class UserService {
           },
         });
 
-        if (!existingEventStaff) {
-          // Create new EventStaff entry with exhibitorId
-          const eventStaff = eventStaffRepository.create({
+        if (!currentEventStaff) {
+          // Create new EventStaff entry with exhibitorId and mark as current
+          currentEventStaff = eventStaffRepository.create({
             eventId: eventBooth.eventId,
             exhibitorId: eventBooth.exhibitorId,
             userId: userId,
+            isCurrent: true,
           });
-          await eventStaffRepository.save(eventStaff);
+          await eventStaffRepository.save(currentEventStaff);
+        } else {
+          // Update existing EventStaff entry to mark as current
+          currentEventStaff.isCurrent = true;
+          await eventStaffRepository.save(currentEventStaff);
         }
 
         // Auto-register user for the event if not already registered
@@ -776,15 +905,40 @@ export class UserService {
       // Get the updated user to return
       const updatedUser = await this.userRepository.findOne({
         where: { id: userId },
+        relations: ['addresses'],
       });
 
       if (!updatedUser) {
         throw new ResourceNotFoundException('User', userId);
       }
 
-      // Remove sensitive fields from response
-      const { password, ...result } = updatedUser;
-      return result;
+      // Sanitize user data
+      const sanitizedUser = UserUtils.sanitizeUserData(updatedUser);
+
+      // Only show exhibitor associations if user is now an exhibitor
+      if (updatedUser.role === UserRole.Exhibitor) {
+        // Get all associations (first one will be the current one marked with isCurrent = true)
+        const exhibitorAssociations = await this.getExhibitorAssociations(userId);
+        
+        // The current login association is the first one (marked with isCurrent = true in database)
+        const currentLoginAssociation = exhibitorAssociations.length > 0 ? exhibitorAssociations[0] : null;
+        
+        // Remove current association from relatedAllAssociations to avoid duplication
+        const relatedAllAssociations = currentLoginAssociation 
+          ? exhibitorAssociations.filter(
+              (assoc) => assoc.eventStaffId !== currentLoginAssociation.eventStaffId
+            )
+          : exhibitorAssociations;
+        
+        return {
+          ...sanitizedUser,
+          currentLoginAssociation: currentLoginAssociation,
+          relatedAllAssociations: relatedAllAssociations,
+        };
+      }
+
+      // If user is not exhibitor, return without associations
+      return sanitizedUser;
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||

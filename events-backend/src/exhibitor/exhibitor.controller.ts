@@ -17,6 +17,7 @@ import {
     UseGuards,
     BadRequestException,
     ForbiddenException,
+    ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -449,8 +450,126 @@ export class ExhibitorController {
   }
 
   /**
+   * Get all leads
+   * - For Exhibitor role: Automatically shows all leads for their company (no exhibitorId needed)
+   * - For Admin role: Shows all leads, or filter by exhibitorId if provided
+   * Can filter by eventId and supports pagination
+   * Access: Admin and Exhibitor users only
+   * NOTE: This route must come BEFORE @Get(':id') to avoid route conflicts
+   */
+  @Get('leads')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getExhibitorLeads(
+    @Query('exhibitorId') exhibitorId: string | undefined,
+    @Query('eventId') eventId: string | undefined,
+    @Query()
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      // Extract and process filter parameters
+      const processedFilters = {
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        search: filters.search?.trim() || undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.exhibitorService.getExhibitorLeads(
+        exhibitorId,
+        eventId,
+        userId,
+        userRole,
+        processedFilters,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: exhibitorId
+          ? 'Exhibitor leads retrieved successfully'
+          : eventId
+          ? 'Leads for event retrieved successfully'
+          : 'Leads retrieved successfully',
+        data: result.data,
+        metadata: {
+          ...(result.pagination || {}),
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitor leads retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get lead by ID
+   * Access: Admin and Exhibitor users only
+   * Exhibitor users can only view leads from their own company
+   * NOTE: This route must come BEFORE @Get(':id') to avoid route conflicts
+   */
+  @Get('lead/:leadId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async getLeadById(
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const lead = await this.exhibitorService.getLeadById(leadId, userId, userRole);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Lead retrieved successfully',
+        data: lead,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Lead retrieval by ID', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Get exhibitor by ID
    * Access: All users (no authentication required)
+   * NOTE: This route must come AFTER specific routes like 'leads' to avoid route conflicts
    */
   @Get(':id')
   async getExhibitorById(
@@ -1477,6 +1596,129 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Attendee QR code scanning for lead collection', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Manually create a lead entry (POST with body)
+   * Allows exhibitor to manually enter attendee by user ID as a lead
+   * Access: Admin and Exhibitor users only
+   * Exhibitor ID is automatically determined from the logged-in user's current association
+   */
+  @Post('collect-lead')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async createManualLead(
+    @Body() body: {
+      eventId: string;
+      attendeeId: string; // User ID of the attendee
+      notes?: string;
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const { eventId, attendeeId, notes } = body;
+      const scannedBy = req.user?.id;
+
+      if (!scannedBy) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!eventId || !attendeeId) {
+        throw new BadRequestException('Missing required fields: eventId, attendeeId');
+      }
+
+      const result = await this.exhibitorService.createManualLead(
+        eventId,
+        attendeeId,
+        scannedBy,
+        notes,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Manual lead creation', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Scan QR code and automatically create lead (GET - Parameters in URL)
+   * When exhibitor scans attendee QR code, automatically creates a lead
+   * URL format: /api/exhibitors/qr-code/scan/:attendeeId?eventId=xxx&notes=xxx
+   * If eventId not provided, uses current association event
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('qr-code/scan/:attendeeId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async scanQRCodeForLead(
+    @Param('attendeeId', ParseUUIDPipe) attendeeId: string,
+    @Query('eventId') eventId: string | undefined,
+    @Query('notes') notes: string | undefined,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const scannedBy = req.user?.id;
+
+      if (!scannedBy) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!attendeeId) {
+        throw new BadRequestException('Missing required field: attendeeId');
+      }
+
+      // If eventId is not provided, try to get it from user's current association
+      let finalEventId: string = eventId || '';
+      if (!finalEventId) {
+        const currentEventId = await this.exhibitorService.getCurrentEventIdForUser(scannedBy);
+        
+        if (!currentEventId) {
+          throw new BadRequestException('eventId is required. Please provide eventId as query parameter or ensure you have a current event association.');
+        }
+        
+        finalEventId = currentEventId;
+      }
+
+      // Automatically create lead
+      const result = await this.exhibitorService.createManualLead(
+        finalEventId,
+        attendeeId,
+        scannedBy,
+        notes,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'QR code scan for lead creation', req.user?.id);
       throw error;
     }
   }
