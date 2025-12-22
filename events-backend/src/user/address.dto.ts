@@ -10,30 +10,30 @@ import {
 import { AddressType } from './address.entity';
 
 export class CreateAddressDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(255)
-  street!: string;
+  street?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(100)
-  city!: string;
+  city?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(100)
-  state!: string;
+  state?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  postalCode!: string;
+  postalCode?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(100)
-  country!: string;
+  country?: string;
 
   @IsOptional()
   @IsEnum(AddressType)

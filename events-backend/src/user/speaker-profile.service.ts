@@ -172,9 +172,18 @@ export class SpeakerProfileService {
       }
 
       // Apply sorting
-      const orderBy = sortBy === 'firstName' || sortBy === 'lastName' 
-        ? `user.${sortBy}` 
-        : `user.${sortBy}`;
+      // Handle fields that are in speakerProfile vs user table
+      let orderBy: string;
+      if (sortBy === 'position' || sortBy === 'companyName') {
+        // These fields are in speakerProfile table
+        orderBy = `speakerProfile.${sortBy}`;
+      } else if (sortBy === 'firstName' || sortBy === 'lastName' || sortBy === 'email' || sortBy === 'mobile' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        // These fields are in user table
+        orderBy = `user.${sortBy}`;
+      } else {
+        // Default to user table
+        orderBy = `user.${sortBy}`;
+      }
       queryBuilder.orderBy(orderBy, sortOrder);
 
       // Get total count before pagination

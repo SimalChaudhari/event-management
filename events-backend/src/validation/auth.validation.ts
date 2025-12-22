@@ -121,8 +121,10 @@ export class RegisterDto {
   @IsValidEmail()
   email!: string;
 
+  @IsOptional()
+  @ValidateIf((o) => o.password !== undefined && o.password !== null && o.password !== '')
   @IsValidPassword()
-  password!: string;
+  password?: string;
 
   @IsValidMobile()
   mobile!: string;

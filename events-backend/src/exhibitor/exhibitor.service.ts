@@ -2142,6 +2142,7 @@ export class ExhibitorService {
       // Format response
       return {
         id: lead.id,
+        eventId: lead.eventId, // Add eventId at top level for easy identification
         attendee: {
           id: lead.attendeeId,
           firstName: lead.attendee?.firstName,
@@ -2178,6 +2179,101 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Lead retrieval by ID');
+    }
+  }
+
+  /**
+   * Update lead notes
+   * Exhibitor users can only update leads from their own company
+   * Admin users can update any lead
+   * @param leadId Lead ID
+   * @param notes Notes to update (can be null/empty to clear notes)
+   * @param userId User ID making the request (for permission check)
+   * @param userRole User role (for permission check)
+   * @returns Updated lead information
+   */
+  async updateLeadNotes(
+    leadId: string,
+    notes: string | undefined,
+    userId: string,
+    userRole: string,
+  ): Promise<any> {
+    try {
+      // Get lead with relations
+      const lead = await this.exhibitorLeadRepository.findOne({
+        where: { id: leadId, isActive: true },
+        relations: ['attendee', 'event', 'exhibitor', 'scanner'],
+      });
+
+      if (!lead) {
+        throw new ResourceNotFoundException('Lead', leadId);
+      }
+
+      // Permission check: Exhibitor users can only update their own company's leads
+      if (userRole === 'exhibitor') {
+        // Check if user is staff member for this exhibitor
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+        const staffRecord = await eventStaffRepository.findOne({
+          where: {
+            userId: userId,
+            exhibitorId: lead.exhibitorId,
+          },
+        });
+
+        if (!staffRecord) {
+          throw new ForbiddenException('You do not have permission to update this lead');
+        }
+      }
+      // Admin users can update any lead (no additional check needed)
+
+      // Update notes (allow null/empty string to clear notes)
+      if (notes !== undefined) {
+        lead.notes = notes.trim() || (null as any); // Allow null to clear notes
+      }
+      const updatedLead = await this.exhibitorLeadRepository.save(lead);
+
+      // Format response
+      return {
+        id: updatedLead.id,
+        eventId: updatedLead.eventId,
+        attendee: {
+          id: updatedLead.attendeeId,
+          firstName: lead.attendee?.firstName,
+          lastName: lead.attendee?.lastName,
+          email: lead.attendee?.email,
+          mobile: lead.attendee?.mobile,
+          company: lead.attendee?.company,
+          designation: lead.attendee?.designation,
+          profilePicture: lead.attendee?.profilePicture,
+        },
+        event: {
+          id: updatedLead.eventId,
+          name: lead.event?.name,
+        },
+        exhibitor: {
+          id: updatedLead.exhibitorId,
+          companyName: lead.exhibitor?.companyName,
+        },
+        scanner: {
+          id: updatedLead.scannedBy,
+          firstName: lead.scanner?.firstName,
+          lastName: lead.scanner?.lastName,
+          email: lead.scanner?.email,
+        },
+        notes: updatedLead.notes,
+        collectedAt: updatedLead.createdAt,
+        updatedAt: updatedLead.updatedAt,
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Lead notes update');
     }
   }
 }

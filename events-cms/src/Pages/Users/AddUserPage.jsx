@@ -21,7 +21,6 @@ const AddUserPage = () => {
         lastName: '',
         email: '',
         mobile: '',
-        role: 'user',
         salutation: '',
         company: '',
         industry: '',
@@ -31,7 +30,6 @@ const AddUserPage = () => {
         state: '',
         postalCode: '',
         country: '',
-        addressType: 'home',
         isDefaultAddress: true,
         apartment: '',
         landmark: '',
@@ -106,7 +104,6 @@ const AddUserPage = () => {
                 email: editData.email || '',
 
                 mobile: editData.mobile || '',
-                role: editData.role || 'user',
                 salutation: editData.salutation || '',
                 company: editData.company || '',
                 industry: editData.industry || '',
@@ -116,7 +113,6 @@ const AddUserPage = () => {
                 state: defaultAddress.state || '',
                 postalCode: defaultAddress.postalCode || '',
                 country: defaultAddress.country || '',
-                addressType: defaultAddress.type || 'home',
                 isDefaultAddress: defaultAddress.isDefault || true,
                 apartment: defaultAddress.apartment || '',
                 landmark: defaultAddress.landmark || '',
@@ -255,7 +251,6 @@ const AddUserPage = () => {
                         lastName: '',
                         email: '',
                         mobile: '',
-                        role: 'user',
                         salutation: '',
                         company: '',
                         industry: '',
@@ -265,7 +260,6 @@ const AddUserPage = () => {
                         state: '',
                         postalCode: '',
                         country: '',
-                        addressType: 'home',
                         isDefaultAddress: true,
                         apartment: '',
                         landmark: '',
@@ -394,25 +388,6 @@ const AddUserPage = () => {
                                     </Col>
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="role">
-                                                Role<span className="text-danger">*</span>
-                                            </label>
-                                            <select
-                                                className="form-control"
-                                                name="role"
-                                                value={formData.role}
-                                                onChange={handleChange}
-                                                required
-                                            >
-                                                <option value="user">User</option>
-                                                <option value="admin">Admin</option>
-                                                <option value="speaker">Speaker</option>
-                                                <option value="exhibitor">Exhibitor</option>
-                                            </select>
-                                        </div>
-                                    </Col>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
                                             <label className="floating-label" htmlFor="salutation">
                                                 Salutation
                                             </label>
@@ -507,25 +482,6 @@ const AddUserPage = () => {
                                                 <option value="Sport & Recreation">Sport & Recreation</option>
                                                 <option value="Trades & Services">Trades & Services</option>
                                                 <option value="Others">Others</option>
-                                            </select>
-                                        </div>
-                                    </Col>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="addressType">
-                                                Address Type
-                                            </label>
-                                            <select
-                                                className="form-control"
-                                                name="addressType"
-                                                value={formData.addressType}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="home">Home</option>
-                                                <option value="work">Work</option>
-                                                <option value="billing">Billing</option>
-                                                <option value="shipping">Shipping</option>
-                                                <option value="other">Other</option>
                                             </select>
                                         </div>
                                     </Col>
@@ -716,56 +672,6 @@ const AddUserPage = () => {
                                             )}
                                         </div>
                                     </Col>
-                                    {/* Speaker Profile Fields - Show only when role is speaker */}
-                                    {formData.role === 'speaker' && (
-                                        <>
-                                            <Col sm={6}>
-                                                <div className="form-group fill">
-                                                    <label className="floating-label" htmlFor="companyName">
-                                                        Company Name
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-control"
-                                                        name="companyName"
-                                                        value={formData.companyName}
-                                                        onChange={handleChange}
-                                                        placeholder="Company/Organization"
-                                                    />
-                                                </div>
-                                            </Col>
-                                            <Col sm={6}>
-                                                <div className="form-group fill">
-                                                    <label className="floating-label" htmlFor="position">
-                                                        Position/Title
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-control"
-                                                        name="position"
-                                                        value={formData.position}
-                                                        onChange={handleChange}
-                                                        placeholder="Job Title/Position"
-                                                    />
-                                                </div>
-                                            </Col>
-                                            <Col sm={12}>
-                                                <div className="form-group fill">
-                                                    <label className="floating-label" htmlFor="description">
-                                                        Bio/Description
-                                                    </label>
-                                                    <textarea
-                                                        className="form-control"
-                                                        name="description"
-                                                        value={formData.description}
-                                                        onChange={handleChange}
-                                                        placeholder="Speaker biography and description"
-                                                        rows={4}
-                                                    />
-                                                </div>
-                                            </Col>
-                                        </>
-                                    )}
 
                                     <Col sm={6}>
                                         <div className="form-group">

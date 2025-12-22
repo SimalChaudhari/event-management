@@ -168,6 +168,8 @@ export class UserService {
     };
   }> {
     try {
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const search = filters?.search;
@@ -202,7 +204,7 @@ export class UserService {
         queryBuilder.andWhere('user.isActive = :isActive', { isActive });
       }
 
-      // Apply search filter
+      // Apply search filter - search in: email, firstName, lastName, mobile, company, designation
       if (search) {
         const searchLower = search.toLowerCase().trim();
         const searchWords = searchLower.split(/\s+/).filter(word => word.length > 0);
@@ -219,7 +221,7 @@ export class UserService {
             const wordParam = `searchWord${index}`;
             params[wordParam] = `%${word}%`;
             conditions.push(
-              `(LOWER(user.firstName) LIKE :${wordParam} OR LOWER(user.lastName) LIKE :${wordParam} OR LOWER(user.email) LIKE :${wordParam} OR LOWER(user.mobile) LIKE :${wordParam})`
+              `(LOWER(user.firstName) LIKE :${wordParam} OR LOWER(user.lastName) LIKE :${wordParam} OR LOWER(user.email) LIKE :${wordParam} OR LOWER(user.mobile) LIKE :${wordParam} OR LOWER(user.company) LIKE :${wordParam} OR LOWER(user.designation) LIKE :${wordParam})`
             );
           });
           
@@ -229,37 +231,45 @@ export class UserService {
           // Single word: search in all fields
           const searchTerm = `%${uniqueWords[0]}%`;
           queryBuilder.andWhere(
-            '(LOWER(user.firstName) LIKE :searchTerm OR LOWER(user.lastName) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm OR LOWER(user.mobile) LIKE :searchTerm)',
+            '(LOWER(user.firstName) LIKE :searchTerm OR LOWER(user.lastName) LIKE :searchTerm OR LOWER(user.email) LIKE :searchTerm OR LOWER(user.mobile) LIKE :searchTerm OR LOWER(user.company) LIKE :searchTerm OR LOWER(user.designation) LIKE :searchTerm)',
             { searchTerm },
           );
         }
       }
 
       // Apply sorting
+      // Note: For updatedAt, sorting by timestamp will still sort chronologically by date
+      // Time component acts as tiebreaker for same dates, which is acceptable
       queryBuilder.orderBy(`user.${sortBy}`, sortOrder);
 
-      // Get total count before pagination
+      // Get total count
       const total = await queryBuilder.getCount();
 
-      // Apply pagination
-      const skip = (page - 1) * limit;
-      const users = await queryBuilder.skip(skip).take(limit).getMany();
+      // Apply pagination only if pagination parameters are provided
+      let users;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        users = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        // Return all records if no pagination parameters
+        users = await queryBuilder.getMany();
+      }
 
       // Sanitize user data
       const sanitizedUsers = users.map((user) => UserUtils.sanitizeUserData(user));
 
       // Calculate pagination metadata
-      const totalPages = Math.ceil(total / limit);
+      const totalPages = hasPagination ? Math.ceil(total / limit) : 1;
 
       return {
         data: sanitizedUsers,
         pagination: {
-          page,
-          limit,
+          page: hasPagination ? page : 1,
+          limit: hasPagination ? limit : total,
           total,
           totalPages,
-          hasNext: page < totalPages,
-          hasPrev: page > 1,
+          hasNext: hasPagination ? page < totalPages : false,
+          hasPrev: hasPagination ? page > 1 : false,
         },
       };
     } catch (error) {

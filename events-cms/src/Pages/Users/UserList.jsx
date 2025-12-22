@@ -32,7 +32,9 @@ function userTable(
     handleDeleteUser,
     handleViewUser,
     handleExportUsers,
-    restoreTablePage, dispatch = null
+    restoreTablePage, 
+    dispatch = null,
+    getRoleFilter = null // Function to get current roleFilter dynamically
 ) {
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -41,12 +43,12 @@ function userTable(
         $(tableZero).DataTable().destroy();
     }
 
-    // Define columns
+    // Define columns - All sorting is done on backend via serverSide: true
     const columns = [
             {
                 data: 'firstName',
                 title: 'User Details',
-                type: 'string',
+                orderable: true, // Backend sorting enabled
                 render: function (data, type, row) {
                     const imageUrl = row.profilePicture 
                         ? `${API_URL}/${row.profilePicture}` 
@@ -55,19 +57,28 @@ function userTable(
                     let badgeClass = 'badge-light-success';
                     let statusText = 'Active';
                     
-                    // You can add user status logic here if needed
-                    // if (!row.isActive) {
-                    //     badgeClass = 'badge-light-danger';
-                    //     statusText = 'Inactive';
-                    // }
-
-                    // For sorting, return combined firstName + lastName
-                    if (type === 'sort' || type === 'type') {
-                        const firstName = (row.firstName || '').trim().toLowerCase();
-                        const lastName = (row.lastName || '').trim().toLowerCase();
-                        return `${firstName} ${lastName}`;
+                    // Role badge styling
+                    const role = row.role || 'user';
+                    let roleBadgeClass = 'badge-light-primary';
+                    let roleText = role.charAt(0).toUpperCase() + role.slice(1);
+                    let roleIconClass = 'feather icon-user';
+                    
+                    // Set different colors and icons based on role
+                    if (role === 'exhibitor') {
+                        roleBadgeClass = 'badge-light-warning';
+                        roleIconClass = 'feather icon-briefcase';
+                    } else if (role === 'speaker') {
+                        roleBadgeClass = 'badge-light-info';
+                        roleIconClass = 'feather icon-mic';
+                    } else if (role === 'admin') {
+                        roleBadgeClass = 'badge-light-danger';
+                        roleIconClass = 'feather icon-shield';
+                    } else if (role === 'moderator') {
+                        roleBadgeClass = 'badge-light-success';
+                        roleIconClass = 'feather icon-users';
                     }
-
+                    
+                    // For display only - sorting is handled by backend
                     return `
                         <div class="d-inline-block align-middle">
                             <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15" 
@@ -76,51 +87,24 @@ function userTable(
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.firstName || ''} ${row.lastName || ''}</h6>
                                 <p class="m-b-5 text-muted">${row.email || 'N/A'}</p>
-                                <span class="badge ${badgeClass}">
-                                    ${statusText}
-                                </span>
+                                <div class="d-flex align-items-center" style="gap: 8px;">
+                                    <span class="badge ${badgeClass}">
+                                        ${statusText}
+                                    </span>
+                                    <span class="badge ${roleBadgeClass}">
+                                        <i class="${roleIconClass} mr-1"></i>
+                                        ${roleText}
+                                    </span>
+                                </div>
                             </div>
                         </div>   
                     `;
                 }
             },
             {
-                data: 'role',
-                title: 'Role',
-                render: function (data, type, row) {
-                    const role = row.role || 'user';
-                    let badgeClass = 'badge-light-primary';
-                    let roleText = role.charAt(0).toUpperCase() + role.slice(1);
-                    let iconClass = 'feather icon-user';
-                    
-                    // Set different colors and icons based on role
-                    if (role === 'exhibitor') {
-                        badgeClass = 'badge-light-warning';
-                        iconClass = 'feather icon-briefcase';
-                    } else if (role === 'speaker') {
-                        badgeClass = 'badge-light-info';
-                        iconClass = 'feather icon-mic';
-                    } else if (role === 'admin') {
-                        badgeClass = 'badge-light-danger';
-                        iconClass = 'feather icon-shield';
-                    } else if (role === 'moderator') {
-                        badgeClass = 'badge-light-success';
-                        iconClass = 'feather icon-users';
-                    }
-                    
-                    return `
-                        <div class="d-inline-block align-middle">
-                            <span class="badge ${badgeClass}">
-                                <i class="${iconClass} mr-1"></i>
-                                ${roleText}
-                            </span>
-                        </div>
-                    `;
-                }
-            },
-            {
                 data: 'mobile',
                 title: 'Mobile',
+                orderable: true, // Backend sorting enabled
                 render: function (data, type, row) {
                     const formattedPhone = row.mobile ? formatPhoneDisplay(row.mobile) : 'N/A';
                     return `
@@ -136,17 +120,35 @@ function userTable(
                 }
             },
             {
-                data: 'address',
-                title: 'Address',
+                data: 'company',
+                title: 'Company',
+                orderable: true, // Backend sorting enabled
                 render: function (data, type, row) {
+                    const companyName = row.company || 'N/A';
+                    // Display only - sorting handled by backend
                     return `
-                        <div class="d-inline-block align-middle">
-                            <p class="m-b-0">
-                                <span class="badge badge-light-primary">
-                                    <i class="feather icon-map-pin mr-1"></i>
-                                    ${row.formattedAddress || 'Not specified'}
-                                </span>
-                            </p>
+                        <div class="d-inline-block align-middle" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <span title="${companyName}">
+                                <i class="feather icon-briefcase mr-1" style="color: #4680ff;"></i>
+                                ${companyName}
+                            </span>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'designation',
+                title: 'Designation',
+                orderable: true, // Backend sorting enabled
+                render: function (data, type, row) {
+                    const designation = row.designation || 'N/A';
+                    // Display only - sorting handled by backend
+                    return `
+                        <div class="d-inline-block align-middle" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <span title="${designation}">
+                                <i class="feather icon-award mr-1" style="color: #4680ff;"></i>
+                                ${designation}
+                            </span>
                         </div>
                     `;
                 }
@@ -154,6 +156,7 @@ function userTable(
             {
                 data: 'updatedAt',
                 title: 'Last Updated',
+                orderable: true, // Backend sorting enabled
                 render: function (data, type, row) {
                     if (data) {
                         const date = new Date(data);
@@ -188,13 +191,18 @@ function userTable(
     ];
 
     // Initialize server-side DataTable
+    // Use function for ajaxParams to get current roleFilter dynamically
     const dataTableInstance = initializeServerSideDataTable({
         tableSelector: tableZero,
         ajaxUrl: '/users',
         ajaxMethod: 'GET',
         columns: columns,
-        ajaxParams: {
-            role: roleFilter && roleFilter !== 'all' ? roleFilter : undefined
+        ajaxParams: () => {
+            // Get current roleFilter dynamically from function (which accesses ref for immediate value)
+            const currentRoleFilter = getRoleFilter ? getRoleFilter() : roleFilter;
+            return {
+                role: currentRoleFilter && currentRoleFilter !== 'all' ? currentRoleFilter : undefined
+            };
         },
         axiosInstance: axiosInstance,
         dispatch: dispatch, // Pass dispatch for loading state
@@ -258,6 +266,7 @@ const UserList = () => {
  
     const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
     const { user } = useSelector((state) => state.user);
+    const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
@@ -268,6 +277,7 @@ const UserList = () => {
     const [isExporting, setIsExporting] = React.useState(false);
     const [currentTable, setCurrentTable] = useState(null);
     const [roleFilter, setRoleFilter] = useState('all');
+    const roleFilterRef = React.useRef('all'); // Ref to store current filter for immediate access
     const tableRef = React.useRef(null);
 
     const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
@@ -330,12 +340,18 @@ const UserList = () => {
     };
 
     const handleRoleFilterChange = async (newFilter) => {
-        // Update state first
+        // Update both state and ref immediately
         setRoleFilter(newFilter);
+        roleFilterRef.current = newFilter;
         
-        // Immediately reinitialize table with new filter value (don't wait for state)
-        // This ensures the filter is applied right away
-        initializeTable(newFilter);
+        // Reload DataTable with new filter - ajaxParams function will get the updated value from ref
+        if (tableRef.current && $.fn.DataTable.isDataTable('#user-data-table')) {
+            // Simply reload - the ajaxParams function will get the current roleFilter from ref
+            tableRef.current.ajax.reload(null, false); // false = keep current page
+        } else {
+            // If table doesn't exist yet, initialize it
+            initializeTable(newFilter);
+        }
     };
 
     const handleClearFilters = async () => {
@@ -371,9 +387,10 @@ const UserList = () => {
     };
 
     // Define filter options for the reusable component
+    // Only two roles: user and exhibitor
     const roleFilterOptions = [
-        { value: 'user', label: 'Users Only' },
-        { value: 'exhibitor', label: 'Exhibitors Only' }
+        { value: 'user', label: 'Users' },
+        { value: 'exhibitor', label: 'Exhibitors' }
     ];
 
     const destroyTable = () => {
@@ -396,6 +413,7 @@ const UserList = () => {
         
         destroyTable();
         try {
+            // Pass a function to get current roleFilter dynamically
             const table = userTable(
                 currentFilter,
                 handleAddUser,
@@ -404,6 +422,8 @@ const UserList = () => {
                 handleViewUser,
                 handleExportUsers,
                 restoreTablePage,
+                dispatch,
+                () => roleFilterRef.current // Function to get current roleFilter from ref (immediate access)
             );
             tableRef.current = table;
             setCurrentTable(table);
@@ -489,9 +509,9 @@ const UserList = () => {
                                 <thead>
                                     <tr>
                                         <th>User Details</th>
-                                        <th>Role</th>
                                         <th>Contact & Location</th>
-                                        <th>Address</th>
+                                        <th>Company</th>
+                                        <th>Designation</th>
                                         <th>Last Updated</th>
                                         <th>Actions</th>
                                     </tr>

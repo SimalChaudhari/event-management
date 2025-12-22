@@ -35,6 +35,7 @@ import { UserUtils } from '../utils/user.utils';
 import { RoleSwitchDto, CreateSpeakerDto } from './users.dto';
 import { AuthService } from '../auth/auth.service';
 import { UserFilterDto, BaseFilterDto } from '../service/filter.dto';
+import { FilterService } from '../service/filter.service';
 
 @Controller('api/users')
 export class UserController {
@@ -42,6 +43,7 @@ export class UserController {
     private readonly userService: UserService,
     private readonly errorHandler: ErrorHandlerService,
     private readonly authService: AuthService,
+    private readonly filterService: FilterService,
   ) {}
 
   @Get('')
@@ -55,12 +57,19 @@ export class UserController {
     try {
       const { role: roleFilter, ...filters } = filterDto;
       
-      // Pass roleFilter and filters to service method
+      // Use common filter service to process pagination
+      // This removes page/limit if they weren't in the raw query
+      const processedFilters = this.filterService.processFiltersWithPagination(
+        filters,
+        req.query
+      );
+      
+      // Pass roleFilter and processedFilters to service method
       // If no roleFilter, default behavior shows both users and exhibitors
       const result = await this.userService.getAll(
         [UserRole.User, UserRole.Exhibitor],
         roleFilter,
-        filters,
+        processedFilters,
       );
       
       let message = 'User details retrieved successfully';

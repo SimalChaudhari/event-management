@@ -109,15 +109,27 @@ const Speakers = () => {
             {
                 data: 'position',
                 title: 'Position',
+                orderable: true,
                 render: function (data, type, row) {
-                    return `<div class="text-wrap">${row.position || 'N/A'}</div>`;
+                    const position = row.position || 'N/A';
+                    // For sorting, return the actual position value
+                    if (type === 'sort' || type === 'type') {
+                        return position;
+                    }
+                    return `<div class="text-wrap">${position}</div>`;
                 }
             },
             {
                 data: 'companyName',
                 title: 'Company',
+                orderable: true,
                 render: function (data, type, row) {
-                    return `<div class="text-wrap">${row.companyName || 'N/A'}</div>`;
+                    const companyName = row.companyName || 'N/A';
+                    // For sorting, return the actual companyName value
+                    if (type === 'sort' || type === 'type') {
+                        return companyName;
+                    }
+                    return `<div class="text-wrap">${companyName}</div>`;
                 }
             },
             {

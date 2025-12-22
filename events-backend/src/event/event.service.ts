@@ -266,7 +266,8 @@ export class EventService {
     userRole?: string,
   ) {
     try {
-      // Extract pagination parameters
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const sortBy = filters?.sortBy || 'startDate';
@@ -405,11 +406,27 @@ export class EventService {
         return dateB.getTime() - dateA.getTime();
       });
 
-      // Apply pagination to filtered events
+      // Apply pagination to filtered events only if pagination parameters are provided
       const total = filteredEvents.length;
-      const pagination = this.filterService.calculatePaginationMetadata(total, page, limit);
-      const skip = (page - 1) * limit;
-      const paginatedEvents = filteredEvents.slice(skip, skip + limit);
+      let paginatedEvents;
+      let pagination;
+      
+      if (hasPagination) {
+        pagination = this.filterService.calculatePaginationMetadata(total, page, limit);
+        const skip = (page - 1) * limit;
+        paginatedEvents = filteredEvents.slice(skip, skip + limit);
+      } else {
+        // Return all events if no pagination parameters
+        paginatedEvents = filteredEvents;
+        pagination = {
+          page: 1,
+          limit: total,
+          total: total,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        };
+      }
 
       const eventsWithAttendance = await Promise.all(
         paginatedEvents.map(async (event) => {

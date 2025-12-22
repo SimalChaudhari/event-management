@@ -567,6 +567,54 @@ export class ExhibitorController {
   }
 
   /**
+   * Update lead notes
+   * Access: Admin and Exhibitor users only
+   * Exhibitor users can only update leads from their own company
+   */
+  @Put('lead/:leadId/notes')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async updateLeadNotes(
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+    @Body() body: { notes?: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      const updatedLead = await this.exhibitorService.updateLeadNotes(
+        leadId,
+        body.notes,
+        userId,
+        userRole,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Lead notes updated successfully',
+        data: updatedLead,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Lead notes update', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Get exhibitor by ID
    * Access: All users (no authentication required)
    * NOTE: This route must come AFTER specific routes like 'leads' to avoid route conflicts

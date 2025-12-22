@@ -40,8 +40,21 @@ export class AddressService {
         await this.unsetDefaultAddresses(createAddressDto.userId);
       }
 
-      // Create new address
-      const address = this.addressRepository.create(createAddressDto);
+      // Create new address with default values for required fields if not provided
+      const address = this.addressRepository.create({
+        street: createAddressDto.street || '',
+        city: createAddressDto.city || '',
+        state: createAddressDto.state || '',
+        postalCode: createAddressDto.postalCode || '',
+        country: createAddressDto.country || 'Singapore',
+        type: createAddressDto.type || AddressType.HOME,
+        isDefault: createAddressDto.isDefault !== undefined ? createAddressDto.isDefault : false,
+        apartment: createAddressDto.apartment,
+        landmark: createAddressDto.landmark,
+        label: createAddressDto.label,
+        instructions: createAddressDto.instructions,
+        userId: createAddressDto.userId
+      });
       return await this.addressRepository.save(address);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {

@@ -44,66 +44,92 @@ const ViewUserPage = () => {
         }
     };
 
-    const InfoCard = ({ title, icon, children, className = "" }) => (
-        <Card className={`mb-4 ${className}`} style={{ 
-            backgroundColor: '#fff', 
-            borderRadius: '8px', 
-            padding: '20px', 
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            border: '1px solid #e9ecef',
-            borderLeft: '4px solid #4680ff'
-        }}>
-            <Card.Body style={{ padding: '24px' }}>
-                <Card.Title style={{ 
-                    fontSize: '18px', 
-                    fontWeight: '600', 
-                    color: '#2c3e50',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                }}>
-                    <i className={icon} style={{ color: '#4680ff' }}></i>
-                    {title}
-                </Card.Title>
-                <hr style={{ margin: '0 0 20px 0', borderTop: '2px solid #4680ff', opacity: '0.8' }} />
-                {children}
-            </Card.Body>
-        </Card>
-    );
-
-    const InfoField = ({ label, value, icon = null }) => (
-        <div className="mb-3" style={{ 
-            padding: '12px 16px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
-            border: '1px solid #e9ecef'
-        }}>
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
             <div style={{ 
-                fontSize: '13px', 
-                fontWeight: '600', 
-                color: '#6c757d',
-                marginBottom: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
             }}>
-                {icon && <i className={icon} style={{ fontSize: '12px' }}></i>}
-                {label}
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none mb-2">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#000000',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        {icon && (
+                            <i 
+                                className={icon} 
+                                style={{ 
+                                    fontSize: '14px', 
+                                    flexShrink: 0,
+                                    width: '16px',
+                                    textAlign: 'center',
+                                    color: '#4680ff'
+                                }}
+                            ></i>
+                        )}
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        paddingLeft: icon ? '24px' : '0',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#000000',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        {icon && <i className={icon} style={{ fontSize: '12px', color: '#4680ff' }}></i>}
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
             </div>
-            <div style={{ 
-                fontSize: '15px', 
-                color: '#2c3e50',
-                fontWeight: '500'
-            }}>
-                {value || 'N/A'}
-            </div>
-        </div>
+        </Col>
     );
 
     return (
         <>
-            <Container fluid className="mt-4">
+            <Container fluid className="mt-4" style={{ overflowX: 'hidden', width: '100%', maxWidth: '100%' }}>
                 {/* Header */}
                 <div style={{ 
                     backgroundColor: '#fff', 
@@ -117,7 +143,7 @@ const ViewUserPage = () => {
                         <div>
                             <h4 style={{ 
                                 margin: 0, 
-                                color: '#2c3e50',
+                                color: '#000000',
                                 fontWeight: '600'
                             }}>
                                 <i className="feather icon-user mr-2" style={{ color: '#4680ff' }}></i>
@@ -125,7 +151,7 @@ const ViewUserPage = () => {
                             </h4>
                             <p style={{ 
                                 margin: '8px 0 0 0', 
-                                color: '#6c757d',
+                                color: '#000000',
                                 fontSize: '14px'
                             }}>
                                 View detailed information about this user
@@ -147,22 +173,29 @@ const ViewUserPage = () => {
                     </div>
                 </div>
 
-                <Row>
-                    {/* Left Column - Profile Image and Basic Info */}
-                    <Col lg={4} md={12} className="mb-4">
-                        <InfoCard title="Profile Information" icon="feather icon-user">
-                            <div className="text-center mb-4">
+                {/* Main Content Card */}
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        <Row style={{ margin: 0, width: '100%', maxWidth: '100%' }}>
+                            {/* Profile Image */}
+                            <Col xs={12} className="text-center mb-4">
                                 {userData.profilePicture ? (
                                     <div style={{ position: 'relative', display: 'inline-block' }}>
                                         <img
                                             src={`${API_URL}/${userData.profilePicture.replace(/\\/g, '/')}`}
                                             alt="Profile"
                                             style={{
-                                                width: '180px',
-                                                height: '180px',
+                                                width: '120px',
+                                                height: '120px',
                                                 objectFit: 'cover',
                                                 borderRadius: '50%',
-                                                border: '4px solid #4680ff',
+                                                border: '3px solid #4680ff',
                                                 cursor: 'pointer',
                                                 transition: 'transform 0.2s, box-shadow 0.2s',
                                                 boxShadow: '0 4px 12px rgba(70, 128, 255, 0.2)'
@@ -180,13 +213,13 @@ const ViewUserPage = () => {
                                         <div
                                             style={{
                                                 position: 'absolute',
-                                                bottom: '10px',
-                                                right: '10px',
+                                                bottom: '5px',
+                                                right: '5px',
                                                 backgroundColor: '#4680ff',
                                                 color: 'white',
-                                                padding: '6px',
+                                                padding: '4px',
                                                 borderRadius: '50%',
-                                                fontSize: '12px',
+                                                fontSize: '10px',
                                                 cursor: 'pointer',
                                                 boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                                             }}
@@ -198,11 +231,11 @@ const ViewUserPage = () => {
                                 ) : (
                                     <div
                                         style={{
-                                            width: '180px',
-                                            height: '180px',
+                                            width: '120px',
+                                            height: '120px',
                                             backgroundColor: '#f8f9fa',
                                             borderRadius: '50%',
-                                            border: '4px solid #4680ff',
+                                            border: '3px solid #4680ff',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
@@ -210,259 +243,307 @@ const ViewUserPage = () => {
                                             boxShadow: '0 4px 12px rgba(70, 128, 255, 0.2)'
                                         }}
                                     >
-                                        <i className="feather icon-user" style={{ fontSize: '60px', color: '#6c757d' }}></i>
+                                        <i className="feather icon-user" style={{ fontSize: '50px', color: '#000000' }}></i>
                                     </div>
                                 )}
-                            </div>
+                            </Col>
 
-                            <InfoField 
-                                label="Full Name" 
-                                value={`${userData.salutation ? userData.salutation + ' ' : ''}${userData.firstName} ${userData.lastName}`}
-                                icon="feather icon-user"
-                            />
+                            {/* Personal Information */}
+                            <Col xs={12} style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-user mr-2" style={{ color: '#4680ff' }}></i>
+                                    Personal Information
+                                </h5>
+                                <Row>
+                                    <InfoField 
+                                        label="Full Name" 
+                                        value={`${userData.salutation ? userData.salutation + ' ' : ''}${userData.firstName} ${userData.lastName}`}
+                                        icon="feather icon-user"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Email Address" 
+                                        value={userData.email}
+                                        icon="feather icon-mail"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Mobile Number" 
+                                        value={formatPhoneDisplay(userData.mobile)}
+                                        icon="feather icon-phone"
+                                        colSize={6}
+                                    />
+                                    {userData.salutation && (
+                                        <InfoField 
+                                            label="Salutation" 
+                                            value={userData.salutation}
+                                            icon="feather icon-user"
+                                            colSize={6}
+                                        />
+                                    )}
+                                    {userData.company && (
+                                        <InfoField 
+                                            label="Company" 
+                                            value={userData.company}
+                                            icon="feather icon-briefcase"
+                                            colSize={6}
+                                        />
+                                    )}
+                                    {userData.designation && (
+                                        <InfoField 
+                                            label="Designation" 
+                                            value={userData.designation}
+                                            icon="feather icon-award"
+                                            colSize={6}
+                                        />
+                                    )}
+                                    {userData.industry && (
+                                        <InfoField 
+                                            label="Industry" 
+                                            value={userData.industry}
+                                            icon="feather icon-trending-up"
+                                            colSize={6}
+                                        />
+                                    )}
+                                </Row>
+                            </Col>
 
-                            
-                            <InfoField 
-                                label="Email Address" 
-                                value={userData.email}
-                                icon="feather icon-mail"
-                            />
-                            <InfoField 
-                                label="Mobile Number" 
-                                value={formatPhoneDisplay(userData.mobile)}
-                                icon="feather icon-phone"
-                            />
-                            {userData.salutation && (
-                                <InfoField 
-                                    label="Salutation" 
-                                    value={userData.salutation}
-                                    icon="feather icon-user"
-                                />
-                            )}
-                            {userData.company && (
-                                <InfoField 
-                                    label="Company" 
-                                    value={userData.company}
-                                    icon="feather icon-briefcase"
-                                />
-                            )}
-                            {userData.designation && (
-                                <InfoField 
-                                    label="Designation" 
-                                    value={userData.designation}
-                                    icon="feather icon-award"
-                                />
-                            )}
-                            {userData.industry && (
-                                <InfoField 
-                                    label="Industry" 
-                                    value={userData.industry}
-                                    icon="feather icon-trending-up"
-                                />
-                            )}
-                        </InfoCard>
-                    </Col>
-
-                    {/* Right Column - Detailed Information */}
-                    <Col lg={8} md={12}>
-                        {/* Account Details */}
-                        <InfoCard title="Account Details" icon="feather icon-settings">
-                            <Row>
-                                <Col xs={12} md={6}>
+                            {/* Account Details */}
+                            <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-settings mr-2" style={{ color: '#4680ff' }}></i>
+                                    Account Details
+                                </h5>
+                                <Row>
                                     <InfoField 
                                         label="User Role" 
                                         value={userData.role}
                                         icon="feather icon-shield"
+                                        colSize={6}
                                     />
-                                </Col>
-                                <Col xs={12} md={6}>
                                     <InfoField 
                                         label="Account Verified" 
                                         value={userData.isVerify ? 'Yes' : 'No'}
                                         icon="feather icon-check-circle"
+                                        colSize={6}
                                     />
-                                </Col>
-                                <Col xs={12} md={6}>
                                     <InfoField 
                                         label="Terms Accepted" 
                                         value={userData.acceptTerms ? 'Yes' : 'No'}
                                         icon="feather icon-file-text"
+                                        colSize={6}
                                     />
-                                </Col>
-                                <Col xs={12} md={6}>
                                     <InfoField 
                                         label="Authentication Provider" 
                                         value={userData.authProvider}
                                         icon="feather icon-lock"
+                                        colSize={6}
                                     />
-                                </Col>
-                                {userData.socialId && (
-                                    <Col xs={12} md={6}>
+                                    {userData.socialId && (
                                         <InfoField 
                                             label="Social ID" 
                                             value={userData.socialId}
                                             icon="feather icon-link"
+                                            colSize={6}
                                         />
-                                    </Col>
-                                )}
-                                {userData.linkedinProfile && (
-                                    <Col xs={12} md={6}>
+                                    )}
+                                    {userData.linkedinProfile && (
                                         <InfoField 
                                             label="LinkedIn Profile" 
                                             value={userData.linkedinProfile}
                                             icon="fab fa-linkedin"
+                                            colSize={6}
                                         />
-                                    </Col>
-                                )}
-                                {userData.countryCurrency && (
-                                    <Col xs={12} md={6}>
+                                    )}
+                                    {userData.countryCurrency && (
                                         <InfoField 
                                             label="Country Currency" 
                                             value={userData.countryCurrency}
                                             icon="feather icon-dollar-sign"
+                                            colSize={6}
                                         />
-                                    </Col>
-                                )}
-                            </Row>
-                        </InfoCard>
-
-                        {/* Account History Card */}
-                        <InfoCard title="Account History" icon="feather icon-clock">
-                            <Row>
-                                <Col xs={12} md={6}>
+                                    )}
                                     <InfoField 
                                         label="Account Created" 
                                         value={new Date(userData.createdAt).toLocaleString()}
                                         icon="feather icon-user-plus"
+                                        colSize={6}
                                     />
-                                </Col>
-                                <Col xs={12} md={6}>
                                     <InfoField 
                                         label="Last Updated" 
                                         value={new Date(userData.updatedAt).toLocaleString()}
                                         icon="feather icon-edit"
+                                        colSize={6}
                                     />
-                                </Col>
-                              
-                            </Row>
-                        </InfoCard>
-                    </Col>
+                                </Row>
+                            </Col>
 
-                    <Col xs={12}>
-                        {/* Address Details - Show all addresses */}
-                        {userData.addresses && Array.isArray(userData.addresses) && userData.addresses.length > 0 && (
-                            <InfoCard title="Address Information" icon="feather icon-map-pin">
-                                {userData.addresses.map((address, index) => (
-                                    <div key={address.id} className="mb-4">
-                                        {userData.addresses.length > 1 && (
-                                            <div style={{
-                                                backgroundColor: '#e9ecef',
-                                                padding: '8px 12px',
-                                                borderRadius: '6px',
-                                                marginBottom: '12px',
-                                                fontSize: '14px',
-                                                fontWeight: '600',
-                                                color: '#495057',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                borderLeft: '3px solid #4680ff'
-                                            }}>
-                                                <span>Address {index + 1}</span>
-                                                <div>
-                                                    {address.isDefault && (
-                                                        <Badge bg="primary" style={{ fontSize: '10px', marginRight: '6px' }}>
-                                                            Default
-                                                        </Badge>
-                                                    )}
-                                                    <Badge bg="secondary" style={{ fontSize: '10px' }}>
-                                                        {address.type}
-                                                    </Badge>
+                            {/* Address Information */}
+                            {userData.addresses && Array.isArray(userData.addresses) && userData.addresses.length > 0 && (
+                                <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                    <h5 style={{ 
+                                        fontSize: '16px', 
+                                        fontWeight: '600', 
+                                        color: '#000000',
+                                        marginBottom: '16px',
+                                        paddingBottom: '8px',
+                                        borderBottom: '2px solid #4680ff'
+                                    }}>
+                                        <i className="feather icon-map-pin mr-2" style={{ color: '#4680ff' }}></i>
+                                        Address Information
+                                    </h5>
+                                    {userData.addresses.map((address, index) => (
+                                        <div key={address.id} className={index > 0 ? "mt-4" : ""}>
+                                            {/* Address Header - Only show if multiple addresses */}
+                                            {userData.addresses.length > 1 && (
+                                                <div style={{
+                                                    marginBottom: '16px',
+                                                    paddingBottom: '12px',
+                                                    borderBottom: '1px solid #dee2e6',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    flexWrap: 'wrap',
+                                                    gap: '8px'
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: '15px',
+                                                        fontWeight: '600',
+                                                        color: '#000000',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px'
+                                                    }}>
+                                                        <i className="feather icon-map-pin" style={{ color: '#4680ff', fontSize: '16px' }}></i>
+                                                        <span>Address {index + 1}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                        {address.isDefault && (
+                                                            <Badge bg="primary" style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                                                Default
+                                                            </Badge>
+                                                        )}
+                                                        {address.type && (
+                                                            <Badge bg="secondary" style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                                                {address.type}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        <Row>
-                                            <Col xs={12} md={4}>
-                                                <InfoField 
-                                                    label="Street Address" 
-                                                    value={address.street}
-                                                    icon="feather icon-map-pin"
-                                                />
-                                            </Col>
-                                            {address.apartment && (
-                                                <Col xs={12} md={4}>
+                                            )}
+                                            
+                                            <Row>
+                                                {/* Street Address - Full Width */}
+                                                {address.street && (
+                                                    <InfoField 
+                                                        label="Street Address" 
+                                                        value={address.street}
+                                                        icon="feather icon-map-pin"
+                                                        colSize={12}
+                                                    />
+                                                )}
+                                                
+                                                {/* City - Two Column Grid */}
+                                                {address.city && (
+                                                    <InfoField 
+                                                        label="City" 
+                                                        value={address.city}
+                                                        icon="feather icon-map-pin"
+                                                        colSize={6}
+                                                    />
+                                                )}
+                                                
+                                                {/* State - Two Column Grid */}
+                                                {address.state && (
+                                                    <InfoField 
+                                                        label="State" 
+                                                        value={address.state}
+                                                        icon="feather icon-map-pin"
+                                                        colSize={6}
+                                                    />
+                                                )}
+                                                
+                                                {/* Country - Two Column Grid */}
+                                                {address.country && (
+                                                    <InfoField 
+                                                        label="Country" 
+                                                        value={address.country}
+                                                        icon="feather icon-globe"
+                                                        colSize={6}
+                                                    />
+                                                )}
+                                                
+                                                {/* Postal Code - Two Column Grid */}
+                                                {address.postalCode && (
+                                                    <InfoField 
+                                                        label="Postal Code" 
+                                                        value={address.postalCode}
+                                                        icon="feather icon-map-pin"
+                                                        colSize={6}
+                                                    />
+                                                )}
+                                                
+                                                {/* Apartment/Unit - Two Column Grid */}
+                                                {address.apartment && (
                                                     <InfoField 
                                                         label="Apartment/Unit" 
                                                         value={address.apartment}
                                                         icon="feather icon-home"
+                                                        colSize={6}
                                                     />
-                                                </Col>
-                                            )}
-                                            {address.landmark && (
-                                                <Col xs={12} md={4}>
+                                                )}
+                                                
+                                                {/* Landmark - Two Column Grid */}
+                                                {address.landmark && (
                                                     <InfoField 
                                                         label="Landmark" 
                                                         value={address.landmark}
                                                         icon="feather icon-navigation"
+                                                        colSize={6}
                                                     />
-                                                </Col>
-                                            )}
-                                            <Col xs={12} md={4}>
-                                                <InfoField 
-                                                    label="City" 
-                                                    value={address.city}
-                                                    icon="feather icon-map-pin"
-                                                />
-                                            </Col>
-                                            <Col xs={12} md={4}>
-                                                <InfoField 
-                                                    label="State" 
-                                                    value={address.state}
-                                                    icon="feather icon-map-pin"
-                                                />
-                                            </Col>
-                                            <Col xs={12} md={4}>
-                                                <InfoField 
-                                                    label="Postal Code" 
-                                                    value={address.postalCode}
-                                                    icon="feather icon-map-pin"
-                                                />
-                                            </Col>
-                                            <Col xs={12} md={4}>
-                                                <InfoField 
-                                                    label="Country" 
-                                                    value={address.country}
-                                                    icon="feather icon-globe"
-                                                />
-                                            </Col>
-                                            {address.label && (
-                                                <Col xs={12} md={4}>
+                                                )}
+                                                
+                                                {/* Address Label - Two Column Grid */}
+                                                {address.label && (
                                                     <InfoField 
                                                         label="Address Label" 
                                                         value={address.label}
                                                         icon="feather icon-tag"
+                                                        colSize={6}
                                                     />
-                                                </Col>
-                                            )}
-                                            {address.instructions && (
-                                                <Col xs={12}>
+                                                )}
+                                                
+                                                {/* Delivery Instructions - Full Width */}
+                                                {address.instructions && (
                                                     <InfoField 
                                                         label="Delivery Instructions" 
                                                         value={address.instructions}
                                                         icon="feather icon-message-square"
+                                                        colSize={12}
                                                     />
-                                                </Col>
-                                            )}
-                                        </Row>
-                                        {index < userData.addresses.length - 1 && (
-                                            <hr style={{ margin: '20px 0', opacity: '0.3' }} />
-                                        )}
-                                    </div>
-                                ))}
-                            </InfoCard>
-                        )}
-                    </Col>
-                </Row>
+                                                )}
+                                            </Row>
+                                        </div>
+                                    ))}
+                                </Col>
+                            )}
+                        </Row>
+                    </Card.Body>
+                </Card>
             </Container>
 
             {/* Profile Image Modal */}

@@ -35,6 +35,7 @@ import { FileUploadUtils, FileUploadConfig } from '../utils/filesUploadFormat/fi
 import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 import { EventNotificationService } from '../utils/event-notification.service';
 import { ProgrammeService } from '../programme/programme.service';
+import { FilterService } from '../service/filter.service';
 import {
   CreateProgrammeTrackDto,
   UpdateProgrammeTrackDto,
@@ -51,6 +52,7 @@ export class EventController {
     private readonly errorHandler: ErrorHandlerService,
     private readonly eventNotificationService: EventNotificationService,
     private readonly programmeService: ProgrammeService,
+    private readonly filterService: FilterService,
   ) {}
 
   @Post('create')
@@ -160,6 +162,13 @@ export class EventController {
       // Extract pagination parameters
       const { page, limit, sortBy, sortOrder, ...eventFilters } = filters;
 
+      // Use common filter service to process pagination
+      // This removes page/limit if they weren't in the raw query
+      const paginationFilters = this.filterService.processFiltersWithPagination(
+        { page, limit, sortBy, sortOrder },
+        req.query
+      );
+
       // Convert string query parameters to appropriate types
       const processedFilters = {
         ...eventFilters,
@@ -167,11 +176,11 @@ export class EventController {
         globalSearch: typeof eventFilters.globalSearch === 'string' ? eventFilters.globalSearch : undefined,
         // eventName should be a string for event name filtering
         eventName: typeof eventFilters.eventName === 'string' ? eventFilters.eventName : undefined,
-        // Add pagination parameters
-        page: page ? Number(page) : undefined,
-        limit: limit ? Number(limit) : undefined,
-        sortBy: sortBy || undefined,
-        sortOrder: sortOrder || undefined,
+        // Add pagination parameters (will be undefined if not in raw query)
+        page: paginationFilters.page,
+        limit: paginationFilters.limit,
+        sortBy: paginationFilters.sortBy || undefined,
+        sortOrder: paginationFilters.sortOrder || undefined,
       };
 
       const result = await this.eventService.getAllEvents(processedFilters, userId, userRole);

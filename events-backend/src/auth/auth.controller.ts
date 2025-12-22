@@ -56,7 +56,7 @@ export class AuthController {
     @Res() response: Response,
     @Body() userDto: RegisterDto, // Use RegisterDto instead of UserDto
   ) {
-    const result = await this.authService.register(userDto);
+    const result = await this.authService.register(userDto, false); // false = self-registration
     return response.status(HttpStatus.OK).json({
       message: result.message,
     });
@@ -101,7 +101,7 @@ export class AuthController {
     if (file) {
       userDto.profilePicture = `uploads/images/${file.filename}`;
     }
-    const result = await this.authService.register(userDto);
+    const result = await this.authService.register(userDto, true); // true = admin registration
     return response.status(HttpStatus.OK).json({
       message: result.message,
     });
