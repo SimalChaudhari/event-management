@@ -197,6 +197,7 @@ function userTable(
         ajaxUrl: '/users',
         ajaxMethod: 'GET',
         columns: columns,
+        order: [[4, 'desc']], // Default sort by updatedAt (column index 4) in descending order
         ajaxParams: () => {
             // Get current roleFilter dynamically from function (which accesses ref for immediate value)
             const currentRoleFilter = getRoleFilter ? getRoleFilter() : roleFilter;

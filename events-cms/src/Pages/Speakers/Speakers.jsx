@@ -150,8 +150,8 @@ const Speakers = () => {
                 }
             },
             {
-                data: 'createdAt',
-                title: 'Created Date',
+                data: 'updatedAt',
+                title: 'Last Updated',
                 render: function (data, type, row) {
                     if (data) {
                         const date = new Date(data);
@@ -196,6 +196,7 @@ const Speakers = () => {
             ajaxUrl: '/users/speakers/get',
             ajaxMethod: 'GET',
             columns: columns,
+            order: [[4, 'desc']],
             ajaxParams: {},
             axiosInstance: axiosInstance,
             dispatch: dispatch, // Pass dispatch for loading state

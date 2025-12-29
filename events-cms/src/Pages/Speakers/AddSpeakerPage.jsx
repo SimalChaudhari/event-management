@@ -7,7 +7,6 @@ import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { SPEAKER_PATHS } from '../../utils/constants';
 import useTableNavigation from '../../hooks/useTableNavigation';
-import useCalculateTargetPage from '../../hooks/useCalculateTargetPage';
 import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
 
 const AddSpeakerPage = () => {
@@ -18,19 +17,6 @@ const AddSpeakerPage = () => {
 
     // Store the page number from where we came from (for edit mode)
     const previousPageRef = React.useRef(null);
-    
-    // Store original firstName and lastName for edit mode to detect changes
-    const originalSpeakerNameRef = React.useRef({ firstName: '', lastName: '' });
-    
-    // Use reusable hook for calculating target page
-    const { calculateTargetPage } = useCalculateTargetPage({
-        listAction: speakerList,
-        reduxSelector: 'speaker.speakers',
-        pageLength: 5,
-        sortType: 'string',
-        sortDirection: 'asc',
-        sortFields: ['firstName', 'lastName']
-    });
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -80,14 +66,7 @@ const AddSpeakerPage = () => {
                             description: editData.description || '',
                             profilePicture: null
                         });
-                        
-                        // Store original name for comparison on update
-                        originalSpeakerNameRef.current = {
-                            firstName: editData.firstName || '',
-                            lastName: editData.lastName || ''
-                        };
 
-                       
                         if (editData.profilePicture) {
                             setImagePreview(`${API_URL}/${editData.profilePicture}`);
                         } else {
@@ -161,50 +140,21 @@ const AddSpeakerPage = () => {
             });
 
             if (id) {
-                // For edit mode, check if firstName or lastName changed
-                const originalFirstName = originalSpeakerNameRef.current.firstName;
-                const originalLastName = originalSpeakerNameRef.current.lastName;
-                const newFirstName = formData.firstName.trim();
-                const newLastName = formData.lastName.trim();
-                
                 const response = await dispatch(updateSpeaker(id, submitData));
                 if (response) {
-                    // If firstName or lastName changed, calculate which page the updated speaker will appear on
-                    // No need to refresh - Redux already has the updated speaker from updateSpeaker action
-                    if (originalFirstName !== newFirstName || originalLastName !== newLastName) {
-                        // Convert id to string for consistent comparison (matching reducer and hook logic)
-                        const pageNumber = await calculateTargetPage({
-                            newItemData: { firstName: newFirstName, lastName: newLastName },
-                            entityId: String(id), // Ensure string format for ID comparison
-                            shouldRefreshList: false // Redux already updated, no need to fetch again
-                        });
-                        navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${pageNumber}`);
+                    // Redux is already updated with UPDATE_SPEAKER action, no need to fetch again
+                    // Just navigate back - DataTable will use updated Redux state or reload if needed
+                    const targetPage = previousPageRef.current;
+                    if (targetPage) {
+                        navigate(SPEAKER_PATHS.LIST_SPEAKERS);
                     } else {
-                        // Name didn't change, preserve the page number if we were editing from a specific page
-                        if (previousPageRef.current) {
-                            navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${previousPageRef.current}`);
-                        } else {
-                            navigate(SPEAKER_PATHS.LIST_SPEAKERS);
-                        }
+                        navigate(SPEAKER_PATHS.LIST_SPEAKERS);
                     }
                 }
             } else {
-                // For create mode, calculate which page the new speaker will appear on
-                const newFirstName = formData.firstName.trim();
-                const newLastName = formData.lastName.trim();
-                
                 const response = await dispatch(createSpeaker(submitData));
                 if (response) {
-                    // After creation, calculate the page
-                    // createSpeaker already adds the new speaker to Redux, no need to fetch again
-                    // We sort the existing Redux data in the hook before calculating
-                    // Convert id to string for consistent comparison (matching reducer and hook logic)
-                    const pageNumber = await calculateTargetPage({
-                        newItemData: { firstName: newFirstName, lastName: newLastName },
-                        entityId: response.id ? String(response.id) : null, // Ensure string format for ID comparison
-                        shouldRefreshList: false // Redux already updated, no need to fetch again
-                    });
-                    
+                    // Redux is already updated with CREATE_SPEAKER action, no need to fetch again
                     setFormData({
                         firstName: '',
                         lastName: '',
@@ -217,9 +167,8 @@ const AddSpeakerPage = () => {
                         profilePicture: null
                     });
                     setImagePreview(null);
-
-                    // Navigate to the page where the new speaker appears
-                    navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${pageNumber}`);
+                    // Redux is already updated, just navigate back - no need to fetch again
+                    navigate(SPEAKER_PATHS.LIST_SPEAKERS);
                 }
             }
         } catch (error) {

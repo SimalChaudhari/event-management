@@ -7,7 +7,6 @@ import { API_URL } from '../../configs/env';
 import { USER_PATHS } from '../../utils/constants';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import useTableNavigation from '../../hooks/useTableNavigation';
-import useCalculateTargetPage from '../../hooks/useCalculateTargetPage';
 
 const AddUserPage = () => {
     const dispatch = useDispatch();
@@ -44,7 +43,6 @@ const AddUserPage = () => {
     });
     const [imagePreview, setImagePreview] = useState(null);
     const previousPageRef = React.useRef(null);
-    const originalUserNameRef = React.useRef({ firstName: '', lastName: '' });
 
     const { handleBack: handleBackNavigation } = useTableNavigation({
         tableRef: null,
@@ -52,15 +50,6 @@ const AddUserPage = () => {
         viewPath: USER_PATHS.VIEW_USER,
         editPath: USER_PATHS.EDIT_USER,
         addPath: USER_PATHS.ADD_USER
-    });
-
-    const { calculateTargetPage } = useCalculateTargetPage({
-        listAction: userList,
-        reduxSelector: 'user.user',
-        pageLength: 5,
-        sortType: 'string',
-        sortDirection: 'asc',
-        sortFields: ['firstName', 'lastName']
     });
 
     useEffect(() => {
@@ -125,11 +114,6 @@ const AddUserPage = () => {
                 linkedinProfile: editData.linkedinProfile || '',
                 profilePicture: null
             });
-
-            originalUserNameRef.current = {
-                firstName: editData.firstName || '',
-                lastName: editData.lastName || ''
-            };
 
             if (editData.profilePicture) {
                 setImagePreview(`${API_URL}/${editData.profilePicture.replace(/\\/g, '/')}`);
@@ -205,47 +189,22 @@ const AddUserPage = () => {
                 formDataToSend.append(key, value);
             });
 
-            const getReturnPage = () => {
-                const urlParams = new URLSearchParams(location.search || window.location.search);
-                return urlParams.get('page') || location.state?.page || previousPageRef.current;
-            };
-
             if (id) {
-                const originalFirstName = originalUserNameRef.current.firstName?.trim() || '';
-                const originalLastName = originalUserNameRef.current.lastName?.trim() || '';
-                const newFirstName = formData.firstName.trim();
-                const newLastName = formData.lastName.trim();
-
                 const response = await dispatch(editUser(id, formDataToSend));
                 if (response) {
-                    if (originalFirstName !== newFirstName || originalLastName !== newLastName) {
-                        const pageNumber = await calculateTargetPage({
-                            newItemData: { firstName: newFirstName, lastName: newLastName },
-                            entityId:  String(id),
-                            shouldRefreshList: false
-                        });
-                        navigate(`${USER_PATHS.LIST_USERS}?page=${pageNumber}`);
+                    // Redux is already updated with UPDATE_USER action, no need to fetch again
+                    // Just navigate back - DataTable will use updated Redux state or reload if needed
+                    const targetPage = previousPageRef.current;
+                    if (targetPage) {
+                        navigate(USER_PATHS.LIST_USERS)
                     } else {
-                        const targetPage = previousPageRef.current;
-                        if (targetPage) {
-                            navigate(`${USER_PATHS.LIST_USERS}?page=${targetPage}`);
-                        } else {
-                            navigate(USER_PATHS.LIST_USERS);
-                        }
+                        navigate(USER_PATHS.LIST_USERS);
                     }
                 }
             } else {
-                const newFirstName = formData.firstName.trim();
-                const newLastName = formData.lastName.trim();
                 const response = await dispatch(createUser(formDataToSend));
                 if (response) {
-                
-
-                    const pageNumber = await calculateTargetPage({
-                        newItemData: { firstName: newFirstName, lastName: newLastName },
-                        entityId: response?.id ? String(response.id) : null,
-                        shouldRefreshList: true
-                    });
+                    // Redux is already updated with CREATE_USER action, no need to fetch again
                     setFormData({
                         firstName: '',
                         lastName: '',
@@ -273,7 +232,8 @@ const AddUserPage = () => {
                         profilePicture: null
                     });
                     setImagePreview(null);
-                    navigate(`${USER_PATHS.LIST_USERS}?page=${pageNumber}`);
+                    // Redux is already updated, just navigate back - no need to fetch again
+                    navigate(USER_PATHS.LIST_USERS);
                 }
             }
         } catch (error) {
