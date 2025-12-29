@@ -2,19 +2,14 @@ import React, { useEffect, useMemo } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Button from 'react-bootstrap/Button';
-import Badge from 'react-bootstrap/Badge';
-import Alert from 'react-bootstrap/Alert';
-import Spinner from 'react-bootstrap/Spinner';
+import { Button, Row, Col, Card, Container, Badge, Alert, Spinner } from 'react-bootstrap';
 import {
     fetchPushNotificationDetail,
     clearPushNotificationDetail
 } from '../../store/actions/pushNotificationActions.jsx';
 import { PUSH_NOTIFICATION_PATHS } from '../../utils/constants.js';
 import useTableNavigation from '../../hooks/useTableNavigation';
+import NoDataFound from '../../components/NoDataFound';
 import '../../assets/css/event.css';
 
 const badgeVariantMap = {
@@ -74,36 +69,33 @@ const ViewPushNotificationPage = () => {
 
     if (loading && !selectedNotification) {
         return (
-            <Row>
-                <Col sm={12} className="btn-page">
-                    <Card className="event-list">
-                        <Card.Body className="text-center py-5">
-                            <Spinner animation="border" variant="primary" role="status" />
-                            <p className="mt-3 mb-0 text-muted">Loading push notification details…</p>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+            <Container fluid className="mt-4">
+                <Row>
+                    <Col sm={12} className="btn-page">
+                        <Card className="event-list">
+                            <Card.Body className="text-center py-5">
+                                <Spinner animation="border" variant="primary" role="status" />
+                                <p className="mt-3 mb-0 text-muted">Loading push notification details…</p>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+            </Container>
         );
     }
 
     if (!selectedNotification) {
         return (
-            <Row>
-                <Col sm={12} className="btn-page">
-                    <Card className="event-list">
-                        <Card.Body>
-                            <Alert variant="warning" className="mb-3">
-                                Push notification not found or you might not have access to view it.
-                            </Alert>
-                            <Button variant="outline-secondary" onClick={() => handleBack()}>
-                                <i className="feather icon-arrow-left me-2" />
-                                Back to List
-                            </Button>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+            <NoDataFound
+                title="Push Notification Not Found"
+                message="The push notification you're looking for doesn't exist or has been removed."
+                icon="feather icon-bell-off"
+                variant="warning"
+                size="medium"
+                showBackButton={true}
+                backButtonText="Back"
+                backButtonPath={PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS}
+            />
         );
     }
 
@@ -112,8 +104,6 @@ const ViewPushNotificationPage = () => {
         sendToAllUsers,
         event,
         eventId,
-        tracks,
-        trackIds,
         redirectType,
         redirectUrl,
         appPageRoute,
@@ -128,188 +118,427 @@ const ViewPushNotificationPage = () => {
     } = selectedNotification;
 
     const formatDateTime = (value) =>
-        value ? new Date(value).toLocaleString() : '—';
+        value ? new Date(value).toLocaleString() : 'N/A';
 
-    const deliveryMetrics = [
-        {
-            label: 'Status',
-            value: (
-                <Badge bg={badgeVariantMap[status] || 'secondary'} className="px-3 py-2 text-uppercase">
-                    {status || 'scheduled'}
-                </Badge>
-            )
-        },
-        {
-            label: 'Scheduled at',
-            value: formatDateTime(scheduledAt)
-        },
-        {
-            label: 'Last sent',
-            value: formatDateTime(sentAt)
-        },
-        {
-            label: 'Recipients (success / failed)',
-            value: (
-                <>
-                    <strong>{sentCount ?? 0}</strong> /{' '}
-                    <span className="text-danger">{failedCount ?? 0}</span>
-                </>
-            )
-        }
-    ];
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+            }}>
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none mb-2">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#000000',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        {icon && (
+                            <i 
+                                className={icon} 
+                                style={{ 
+                                    fontSize: '14px', 
+                                    flexShrink: 0,
+                                    width: '16px',
+                                    textAlign: 'center',
+                                    color: '#4680ff'
+                                }}
+                            ></i>
+                        )}
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        paddingLeft: icon ? '24px' : '0',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#000000',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        {icon && <i className={icon} style={{ fontSize: '12px', color: '#4680ff' }}></i>}
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+            </div>
+        </Col>
+    );
 
     return (
         <>
-            <Row>
-                <Col sm={12} className="btn-page">
-                    <Card className="event-list border-0 shadow-sm">
-                        <div
-                            className="px-4 py-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between"
-                            style={{
-                                background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-                                color: '#fff'
+            <Container fluid className="mt-4" style={{ overflowX: 'hidden', width: '100%', maxWidth: '100%' }}>
+                {/* Header */}
+                <div style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    padding: '20px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    marginBottom: '24px',
+                    borderTop: '4px solid #4680ff'
+                }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 style={{ 
+                                margin: 0, 
+                                color: '#000000',
+                                fontWeight: '600'
+                            }}>
+                                <i className="feather icon-bell mr-2" style={{ color: '#4680ff' }}></i>
+                                Push Notification Details
+                            </h4>
+                            <p style={{ 
+                                margin: '8px 0 0 0', 
+                                color: '#000000',
+                                fontSize: '14px'
+                            }}>
+                                View detailed information about this push notification
+                            </p>
+                        </div>
+                        <Button 
+                            variant="outline-secondary" 
+                            onClick={() => handleBack()}
+                            style={{ 
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                border: '1px solid #dee2e6',
+                                fontWeight: '500'
                             }}
                         >
-                            <div className="mb-3 mb-md-0">
-                                <Button
-                                    variant="link"
-                                    className="text-decoration-none text-white px-0 d-inline-flex align-items-center mb-2"
-                                    onClick={() => handleBack()}
-                                    style={{ opacity: 0.85 }}
-                                >
-                                    <i className="feather icon-arrow-left me-2" />
-                                    Back to notifications
-                                </Button>
-                                <h4 className="mb-1 text-white">Push Notification Overview</h4>
-                                <span className="text-white-50">
-                                    Review content, audience targeting, scheduling, and delivery results.
-                                </span>
-                            </div>
-                            <div
-                                className="text-end"
-                                style={{
-                                    fontSize: '0.85rem',
-                                    opacity: 0.85
-                                }}
-                            >
-                                <div>Created: {formatDateTime(createdAt)}</div>
-                                <div>Updated: {formatDateTime(updatedAt)}</div>
-                            </div>
-                        </div>
-                        <Card.Body className="p-4 p-lg-5">
-                            {errorMessage && (
-                                <Alert variant="danger" className="mb-4">
-                                    <i className="feather icon-alert-triangle me-2" />
-                                    {errorMessage}
-                                </Alert>
-                            )}
+                            <i className="fas fa-arrow-left me-2" style={{marginRight: '10px'}}></i>
+                            Back
+                        </Button>
+                    </div>
+                </div>
 
-                            <Row className="g-3 mb-4">
-                                {deliveryMetrics.map((metric, index) => (
-                                    <Col key={index} xs={12} sm={6} xl={3}>
-                                        <Card className="border-0 shadow-sm h-100" style={{ background: '#f6f9ff' }}>
-                                            <Card.Body className="py-3">
-                                                <span className="d-block text-muted text-uppercase small mb-2">
-                                                    {metric.label}
-                                                </span>
-                                                <div className="fw-semibold" style={{ fontSize: '0.95rem' }}>
-                                                    {metric.value}
-                                                </div>
-                                            </Card.Body>
-                                        </Card>
-                                    </Col>
-                                ))}
-                            </Row>
+                {/* Main Content Card */}
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {errorMessage && (
+                            <Alert variant="danger" className="mb-4">
+                                <i className="feather icon-alert-triangle me-2" />
+                                <strong>Error:</strong> {errorMessage}
+                            </Alert>
+                        )}
 
-                            <Card className="border-0 shadow-sm mb-4">
-                                <Card.Body>
-                                    <h6 className="text-uppercase text-muted mb-3">Audience</h6>
-                                    <p className="mb-3">
-                                        <strong>Delivery scope:</strong>
-                                        <br />
-                                        {audienceDescription}
-                                    </p>
+                        <Row style={{ margin: 0, width: '100%', maxWidth: '100%' }}>
+                            {/* Delivery Status & Metrics */}
+                            <Col xs={12} style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-activity mr-2" style={{ color: '#4680ff' }}></i>
+                                    Delivery Status & Metrics
+                                </h5>
+                                <Row>
+                                    <InfoField 
+                                        label="Status" 
+                                        value={
+                                            <Badge bg={badgeVariantMap[status] || 'secondary'} className="px-3 py-2 text-uppercase">
+                                                {status || 'scheduled'}
+                                            </Badge>
+                                        }
+                                        icon="feather icon-activity"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Scheduled At" 
+                                        value={formatDateTime(scheduledAt)}
+                                        icon="feather icon-clock"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Last Sent" 
+                                        value={formatDateTime(sentAt)}
+                                        icon="feather icon-send"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Recipients" 
+                                        value={
+                                            <>
+                                                <strong style={{ color: '#28a745' }}>{sentCount ?? 0}</strong> successful /{' '}
+                                                <strong style={{ color: '#dc3545' }}>{failedCount ?? 0}</strong> failed
+                                            </>
+                                        }
+                                        icon="feather icon-users"
+                                        colSize={6}
+                                    />
+                                </Row>
+                            </Col>
+
+                            {/* Audience Information */}
+                            <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-users mr-2" style={{ color: '#4680ff' }}></i>
+                                    Audience Information
+                                </h5>
+                                <Row>
+                                    <InfoField 
+                                        label="Delivery Scope" 
+                                        value={audienceDescription}
+                                        icon="feather icon-target"
+                                        colSize={12}
+                                    />
                                     {!sendToAllUsers && event?.name && (
-                                        <p className="mb-3">
-                                            <strong>Event:</strong>
-                                            <br />
-                                            {event.name}
-                                            {eventId && (
-                                                <span className="text-muted d-block small mt-1">
-                                                    Event ID: {eventId}
-                                                </span>
-                                            )}
-                                        </p>
+                                        <InfoField 
+                                            label="Event Name" 
+                                            value={event.name}
+                                            icon="feather icon-calendar"
+                                            colSize={6}
+                                        />
                                     )}
-                                    {resolvedTracks.length > 0 ? (
-                                        <>
-                                            <h6 className="text-muted text-uppercase small mb-2">Tracks</h6>
-                                            <div className="d-flex flex-wrap gap-2">
-                                                {resolvedTracks.map((track) => (
-                                                    <Badge
-                                                        key={track.id || track.title || track}
-                                                        bg="light"
-                                                        text="dark"
-                                                        className="px-3 py-2"
-                                                    >
-                                                        {track.title || track.name || track.id || track}
-                                                    </Badge>
-                                                ))}
+                                    {!sendToAllUsers && eventId && (
+                                        <InfoField 
+                                            label="Event ID" 
+                                            value={eventId}
+                                            icon="feather icon-hash"
+                                            colSize={6}
+                                        />
+                                    )}
+                                    {resolvedTracks.length > 0 && (
+                                        <Col xs={12} className="mb-2" style={{ padding: '8px 12px' }}>
+                                            <div className="d-block d-md-none mb-2">
+                                                <div style={{ 
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#000000',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    <i className="feather icon-list" style={{ fontSize: '14px', color: '#4680ff' }}></i>
+                                                    <span>Tracks:</span>
+                                                </div>
+                                                <div className="d-flex flex-wrap gap-2">
+                                                    {resolvedTracks.map((track) => (
+                                                        <Badge
+                                                            key={track.id || track.title || track}
+                                                            bg="light"
+                                                            text="dark"
+                                                            className="px-3 py-2"
+                                                        >
+                                                            {track.title || track.name || track.id || track}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </>
-                                    ) : (
-                                        <p className="text-muted mb-0">
-                                            No track filter applied; notification targets all registrants for the selected event.
-                                        </p>
+                                            <div className="d-none d-md-flex align-items-start">
+                                                <div style={{ 
+                                                    minWidth: '140px',
+                                                    maxWidth: '140px',
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#000000',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    marginRight: '12px',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <i className="feather icon-list" style={{ fontSize: '12px', color: '#4680ff' }}></i>
+                                                    <span>Tracks:</span>
+                                                </div>
+                                                <div className="d-flex flex-wrap gap-2" style={{ flex: 1 }}>
+                                                    {resolvedTracks.map((track) => (
+                                                        <Badge
+                                                            key={track.id || track.title || track}
+                                                            bg="light"
+                                                            text="dark"
+                                                            className="px-3 py-2"
+                                                        >
+                                                            {track.title || track.name || track.id || track}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </Col>
                                     )}
-                                </Card.Body>
-                            </Card>
+                                    {resolvedTracks.length === 0 && !sendToAllUsers && (
+                                        <InfoField 
+                                            label="Track Filter" 
+                                            value="No track filter applied; notification targets all registrants for the selected event."
+                                            icon="feather icon-list"
+                                            colSize={12}
+                                        />
+                                    )}
+                                </Row>
+                            </Col>
 
-                            <Card className="border-0 shadow-sm mb-4">
-                                <Card.Body>
-                                    <h6 className="text-uppercase text-muted mb-3">Redirect Behaviour</h6>
-                                    <p className="mb-2">
-                                        <strong>Type:</strong> {redirectType || 'none'}
-                                    </p>
+                            {/* Redirect Configuration */}
+                            <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-navigation mr-2" style={{ color: '#4680ff' }}></i>
+                                    Redirect Configuration
+                                </h5>
+                                <Row>
+                                    <InfoField 
+                                        label="Redirect Type" 
+                                        value={redirectType || 'none'}
+                                        icon="feather icon-arrow-right"
+                                        colSize={6}
+                                    />
                                     {redirectType === 'url' && redirectUrl && (
-                                        <p className="mb-0">
-                                            <strong>Destination URL:</strong>
-                                            <br />
-                                            <a href={redirectUrl} target="_blank" rel="noopener noreferrer">
-                                                {redirectUrl}
-                                            </a>
-                                        </p>
+                                        <InfoField 
+                                            label="Destination URL" 
+                                            value={
+                                                <a href={redirectUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#4680ff', wordBreak: 'break-all' }}>
+                                                    {redirectUrl}
+                                                </a>
+                                            }
+                                            icon="feather icon-link"
+                                            colSize={6}
+                                        />
                                     )}
                                     {redirectType === 'app_page' && appPageRoute && (
-                                        <p className="mb-0">
-                                            <strong>App route:</strong>
-                                            <br />
-                                            <code>{appPageRoute}</code>
-                                        </p>
+                                        <InfoField 
+                                            label="App Route" 
+                                            value={<code style={{ backgroundColor: '#f8f9fa', padding: '2px 6px', borderRadius: '4px' }}>{appPageRoute}</code>}
+                                            icon="feather icon-smartphone"
+                                            colSize={6}
+                                        />
                                     )}
                                     {(!redirectType || redirectType === 'none') && (
-                                        <p className="text-muted mb-0">
-                                            No redirect action configured. Opening the notification keeps the user in the app.
-                                        </p>
+                                        <InfoField 
+                                            label="Redirect Action" 
+                                            value="No redirect action configured. Opening the notification keeps the user in the app."
+                                            icon="feather icon-x-circle"
+                                            colSize={12}
+                                        />
                                     )}
-                                </Card.Body>
-                            </Card>
+                                </Row>
+                            </Col>
 
-                            <Card className="border-0 shadow-sm mt-4">
-                                <Card.Body>
-                                    <h6 className="text-uppercase text-muted mb-3">Message</h6>
-                                    <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                                        {message}
-                                    </p>
-                                </Card.Body>
-                            </Card>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+                            {/* Message Content */}
+                            <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-message-square mr-2" style={{ color: '#4680ff' }}></i>
+                                    Message Content
+                                </h5>
+                                <Row>
+                                    <Col xs={12} style={{ padding: '8px 12px' }}>
+                                        <div style={{ 
+                                            fontSize: '14px', 
+                                            color: '#000000',
+                                            fontWeight: '400',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.6',
+                                            padding: '12px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '4px',
+                                            border: '1px solid #e9ecef'
+                                        }}>
+                                            {message || 'N/A'}
+                                        </div>
+                                    </Col>
+                                </Row>
+                            </Col>
+
+                            {/* Timestamps */}
+                            <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    marginBottom: '16px',
+                                    paddingBottom: '8px',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="feather icon-clock mr-2" style={{ color: '#4680ff' }}></i>
+                                    Timestamps
+                                </h5>
+                                <Row>
+                                    <InfoField 
+                                        label="Created At" 
+                                        value={formatDateTime(createdAt)}
+                                        icon="feather icon-plus-circle"
+                                        colSize={6}
+                                    />
+                                    <InfoField 
+                                        label="Last Updated" 
+                                        value={formatDateTime(updatedAt)}
+                                        icon="feather icon-edit"
+                                        colSize={6}
+                                    />
+                                </Row>
+                            </Col>
+                        </Row>
+                    </Card.Body>
+                </Card>
+            </Container>
         </>
     );
 };
 
 export default ViewPushNotificationPage;
-
