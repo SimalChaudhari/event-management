@@ -175,7 +175,7 @@ export class RegisterEventService {
     }
   }
 
-  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string; page?: number; limit?: number; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) {
+  async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string; page?: number; limit?: number; keyword?: string; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) {
     try {
       // Check if pagination parameters are provided
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
@@ -232,10 +232,11 @@ export class RegisterEventService {
         }
 
         // Apply global search if provided
-        if (filters?.search && filters.search.trim() !== '') {
+        const searchTerm = filters?.keyword || filters?.search;
+        if (searchTerm && searchTerm.trim() !== '') {
           queryBuilder.andWhere(
             '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search) OR LOWER(event.name) LIKE LOWER(:search) OR LOWER(event.location) LIKE LOWER(:search))',
-            { search: `%${filters.search.trim()}%` }
+            { search: `%${searchTerm.trim()}%` }
           );
         }
 
@@ -324,10 +325,11 @@ export class RegisterEventService {
         }
 
         // Apply global search if provided
-        if (filters?.search && filters.search.trim() !== '') {
+        const searchTerm = filters?.keyword || filters?.search;
+        if (searchTerm && searchTerm.trim() !== '') {
           queryBuilder.andWhere(
             '(LOWER(event.name) LIKE LOWER(:search) OR LOWER(event.location) LIKE LOWER(:search))',
-            { search: `%${filters.search.trim()}%` }
+            { search: `%${searchTerm.trim()}%` }
           );
         }
 
@@ -1144,7 +1146,7 @@ export class RegisterEventService {
 
   async getPublicParticipants(
     eventId: string,
-    search?: string,
+    keyword?: string,
   ): Promise<PublicParticipantDto[]> {
     try {
       const queryBuilder = this.registerEventRepository
@@ -1155,8 +1157,8 @@ export class RegisterEventService {
           isRegister: true,
         });
 
-      if (search) {
-        const normalizedSearch = `%${search.toLowerCase()}%`;
+      if (keyword) {
+        const normalizedSearch = `%${keyword.toLowerCase()}%`;
         queryBuilder.andWhere(
           `(LOWER(user.email) LIKE :search OR LOWER(CONCAT(COALESCE(user.firstName, ''), ' ', COALESCE(user.lastName, ''))) LIKE :search)`,
           { search: normalizedSearch },

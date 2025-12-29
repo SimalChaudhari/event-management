@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CsvUploadLogEntity } from './csv-upload-log.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { CsvUploadLogView, EmailLogDetails } from './csv-upload-log.types';
+import { FilterService } from '../service/filter.service';
 
 type JsonParsable = string | object | undefined | null;
 
@@ -38,6 +39,7 @@ export class CsvUploadLogService {
   constructor(
     @InjectRepository(CsvUploadLogEntity)
     private csvUploadLogRepository: Repository<CsvUploadLogEntity>,
+    private filterService: FilterService,
   ) {}
 
   private safeParseJson<T = any>(value: JsonParsable): T | null {
@@ -197,14 +199,153 @@ export class CsvUploadLogService {
   }
 
   /**
-   * Get all logs sorted by creation date (most recent first)
+   * Get all logs with pagination, filters, and sorting
    */
-  async getLogs(): Promise<CsvUploadLogView[]> {
-    const logs = await this.csvUploadLogRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  async getLogs(filters?: {
+    keyword?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+    adminId?: string;
+    fileName?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{
+    data: CsvUploadLogView[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    try {
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
 
-    return logs.map((log) => this.enhanceLog(log));
+      // Build query builder
+      const queryBuilder = this.csvUploadLogRepository.createQueryBuilder('log');
+
+      // Track if WHERE clause has been set
+      let whereClauseSet = false;
+
+      // Filter by keyword if provided - search in fileName
+      if (filters?.keyword && filters.keyword.trim() !== '') {
+        const keyword = filters.keyword.toLowerCase().trim();
+        queryBuilder.where('LOWER(log.fileName) LIKE :keyword', {
+          keyword: `%${keyword}%`,
+        });
+        whereClauseSet = true;
+      }
+
+      // Filter by fileName if provided
+      if (filters?.fileName && filters.fileName.trim() !== '') {
+        const fileName = filters.fileName.trim();
+        if (whereClauseSet) {
+          queryBuilder.andWhere('LOWER(log.fileName) LIKE :fileName', {
+            fileName: `%${fileName.toLowerCase()}%`,
+          });
+        } else {
+          queryBuilder.where('LOWER(log.fileName) LIKE :fileName', {
+            fileName: `%${fileName.toLowerCase()}%`,
+          });
+          whereClauseSet = true;
+        }
+      }
+
+      // Filter by status if provided
+      if (filters?.status && filters.status.trim() !== '') {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('log.status = :status', { status: filters.status });
+        } else {
+          queryBuilder.where('log.status = :status', { status: filters.status });
+          whereClauseSet = true;
+        }
+      }
+
+      // Filter by adminId if provided
+      if (filters?.adminId && filters.adminId.trim() !== '') {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('log.adminId = :adminId', { adminId: filters.adminId });
+        } else {
+          queryBuilder.where('log.adminId = :adminId', { adminId: filters.adminId });
+          whereClauseSet = true;
+        }
+      }
+
+      // Filter by dateFrom if provided
+      if (filters?.dateFrom) {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(log.createdAt) >= :dateFrom', {
+            dateFrom: filters.dateFrom,
+          });
+        } else {
+          queryBuilder.where('DATE(log.createdAt) >= :dateFrom', {
+            dateFrom: filters.dateFrom,
+          });
+          whereClauseSet = true;
+        }
+      }
+
+      // Filter by dateTo if provided
+      if (filters?.dateTo) {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(log.createdAt) <= :dateTo', {
+            dateTo: filters.dateTo,
+          });
+        } else {
+          queryBuilder.where('DATE(log.createdAt) <= :dateTo', {
+            dateTo: filters.dateTo,
+          });
+          whereClauseSet = true;
+        }
+      }
+
+      // Apply sorting
+      if (sortBy === 'fileName') {
+        queryBuilder.orderBy('log.fileName', sortOrder);
+      } else if (sortBy === 'status') {
+        queryBuilder.orderBy('log.status', sortOrder);
+      } else if (sortBy === 'createdAt') {
+        queryBuilder.orderBy('log.createdAt', sortOrder);
+      } else if (sortBy === 'updatedAt') {
+        queryBuilder.orderBy('log.updatedAt', sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('log.createdAt', sortOrder);
+      }
+
+      // Get total count
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination only if pagination parameters are provided
+      let logs: CsvUploadLogEntity[];
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        logs = await queryBuilder.skip(skip).take(limit).getMany();
+
+        return {
+          data: logs.map((log) => this.enhanceLog(log)),
+          pagination: this.filterService.calculatePaginationMetadata(total, page, limit),
+        };
+      } else {
+        // Return all logs if no pagination parameters
+        logs = await queryBuilder.getMany();
+        return {
+          data: logs.map((log) => this.enhanceLog(log)),
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**

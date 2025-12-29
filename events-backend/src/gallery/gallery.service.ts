@@ -12,6 +12,7 @@ import { GalleryDto } from './gallery.dto';
 import * as fs from 'fs';
 import path from 'path';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
+import { FilterService } from '../service/filter.service';
 import { 
   ResourceNotFoundException, 
   ValidationException 
@@ -39,6 +40,7 @@ export class GalleryService {
     private galleryRepository: Repository<Gallery>,
 
     private errorHandler: ErrorHandlerService,
+    private filterService: FilterService,
   ) {}
 
   async getAllGalleryItems(filters: {
@@ -240,12 +242,83 @@ export class GalleryService {
     }
   }
 
-  async getAllGalleries() {
+  async getAllGalleries(filters?: {
+    keyword?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{
+    data: Gallery[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      return await this.galleryRepository.find({
-        relations: ['event'],
-        order: { createdAt: 'DESC' },
-      });
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
+      // Build query builder
+      const queryBuilder = this.galleryRepository
+        .createQueryBuilder('gallery')
+        .leftJoinAndSelect('gallery.event', 'event');
+
+      // Track if WHERE clause has been set
+      let whereClauseSet = false;
+
+      // Filter by keyword if provided - search in gallery title and event name
+      if (filters?.keyword && filters.keyword.trim() !== '') {
+        const keyword = filters.keyword.toLowerCase().trim();
+        queryBuilder.where(
+          '(LOWER(gallery.title) LIKE :keyword OR LOWER(event.name) LIKE :keyword)',
+          { keyword: `%${keyword}%` }
+        );
+        whereClauseSet = true;
+      }
+
+      // Apply sorting
+      if (sortBy === 'title') {
+        queryBuilder.orderBy('gallery.title', sortOrder);
+      } else if (sortBy === 'eventName' || sortBy === 'event.name') {
+        queryBuilder.orderBy('event.name', sortOrder);
+      } else if (sortBy === 'createdAt') {
+        queryBuilder.orderBy('gallery.createdAt', sortOrder);
+      } else if (sortBy === 'updatedAt') {
+        queryBuilder.orderBy('gallery.updatedAt', sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('gallery.createdAt', sortOrder);
+      }
+
+      // Get total count
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination only if pagination parameters are provided
+      let galleries: Gallery[];
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        galleries = await queryBuilder.skip(skip).take(limit).getMany();
+        
+        return {
+          data: galleries,
+          pagination: this.filterService.calculatePaginationMetadata(total, page, limit),
+        };
+      } else {
+        // Return all galleries if no pagination parameters
+        galleries = await queryBuilder.getMany();
+        return {
+          data: galleries,
+        };
+      }
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Galleries retrieval');
     }

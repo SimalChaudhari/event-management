@@ -114,7 +114,7 @@ export class SpeakerProfileService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -132,7 +132,7 @@ export class SpeakerProfileService {
     try {
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const search = filters?.keyword;
       const sortBy = filters?.sortBy || 'firstName';
       const sortOrder = filters?.sortOrder || 'ASC';
 

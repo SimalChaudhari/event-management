@@ -151,7 +151,7 @@ export class UserService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
       isActive?: boolean;
@@ -172,7 +172,7 @@ export class UserService {
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const search = filters?.keyword;
       const sortBy = filters?.sortBy || 'updatedAt';
       const sortOrder = filters?.sortOrder || 'DESC';
       const isActive = filters?.isActive;
@@ -497,7 +497,7 @@ export class UserService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },

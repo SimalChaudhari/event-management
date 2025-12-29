@@ -1,19 +1,71 @@
-import { Controller, Get, Param, UseGuards, Delete, Res, Query } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Delete, Res, Query, Request, HttpStatus } from '@nestjs/common';
 import { CsvUploadLogService } from './csv-upload-log.service';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { Response } from 'express';
+import { SuccessResponse } from '../utils/interfaces/error-response.interface';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
 @Controller('api/logs/csv-upload')
 @UseGuards(JwtAuthGuard)
 export class CsvUploadLogController {
-  constructor(private readonly csvUploadLogService: CsvUploadLogService) {}
+  constructor(
+    private readonly csvUploadLogService: CsvUploadLogService,
+    private readonly errorHandler: ErrorHandlerService,
+  ) {}
 
   /**
-   * Get all CSV upload logs ordered by creation date
+   * Get all CSV upload logs with pagination, filters, and sorting
    */
   @Get()
-  async getLogs() {
-    return await this.csvUploadLogService.getLogs();
+  async getLogs(
+    @Query()
+    filters: {
+      keyword?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      status?: string;
+      adminId?: string;
+      fileName?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Process filter parameters
+      const processedFilters = {
+        keyword: filters.keyword?.trim() || undefined,
+        dateFrom: filters.dateFrom?.trim() || undefined,
+        dateTo: filters.dateTo?.trim() || undefined,
+        status: filters.status?.trim() || undefined,
+        adminId: filters.adminId?.trim() || undefined,
+        fileName: filters.fileName?.trim() || undefined,
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.csvUploadLogService.getLogs(processedFilters);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Logs retrieved successfully',
+        data: result.data,
+        metadata: {
+          ...(result.pagination || {}),
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Logs retrieval', req.user?.id);
+      throw error;
+    }
   }
 
   /**

@@ -24,8 +24,8 @@ export class BaseFilterDto {
     if (!value || value.trim() === '') return undefined;
     return value.trim();
   })
-  @IsString({ message: 'Search must be a string' })
-  search?: string;
+  @IsString({ message: 'Keyword must be a string' })
+  keyword?: string;
 
   @IsOptional()
   @Transform(({ value }: { value: string }) => {

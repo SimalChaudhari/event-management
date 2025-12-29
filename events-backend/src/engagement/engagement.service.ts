@@ -275,7 +275,7 @@ export class EngagementService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
       eventId?: string;
@@ -297,7 +297,7 @@ export class EngagementService {
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const keyword = filters?.keyword;
       const sortBy = filters?.sortBy || 'displayOrder';
       const sortOrder = filters?.sortOrder || 'ASC';
       const eventId = filters?.eventId;
@@ -317,8 +317,8 @@ export class EngagementService {
       }
 
       // Apply search filter - search in track title and event name
-      if (search && search.trim() !== '') {
-        const searchTerm = `%${search.toLowerCase().trim()}%`;
+      if (keyword && keyword.trim() !== '') {
+        const searchTerm = `%${keyword.toLowerCase().trim()}%`;
         queryBuilder.andWhere(
           '(LOWER(track.title) LIKE :searchTerm OR LOWER(event.name) LIKE :searchTerm)',
           { searchTerm },
@@ -629,7 +629,7 @@ export class EngagementService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -689,7 +689,7 @@ export class EngagementService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -729,7 +729,7 @@ export class EngagementService {
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const keyword = filters?.keyword;
       const sortBy = filters?.sortBy || 'sessionDate';
       const sortOrder = filters?.sortOrder || 'ASC';
 
@@ -748,8 +748,8 @@ export class EngagementService {
       }
 
       // Apply search filter - search in title and description
-      if (search && search.trim() !== '') {
-        const searchTerm = `%${search.toLowerCase().trim()}%`;
+      if (keyword && keyword.trim() !== '') {
+        const searchTerm = `%${keyword.toLowerCase().trim()}%`;
         queryBuilder.andWhere(
           '(LOWER(session.title) LIKE :searchTerm OR LOWER(session.description) LIKE :searchTerm)',
           { searchTerm },

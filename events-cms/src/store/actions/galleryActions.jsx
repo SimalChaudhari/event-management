@@ -36,9 +36,11 @@ export const galleryByEvent =
         return false;
     };
 
-export const getAllGalleries = () => async (dispatch) => {
+export const getAllGalleries = (filters = {}) => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/gallery/get-all');
+        const queryParams = new URLSearchParams(filters).toString();
+        const url = queryParams ? `/gallery/get-all?${queryParams}` : '/gallery/get-all';
+        const response = await axiosInstance.get(url);
         
         dispatch({
             type: ALL_GALLERIES,

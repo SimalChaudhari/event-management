@@ -48,7 +48,7 @@ export class CategoryService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -68,7 +68,7 @@ export class CategoryService {
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const search = filters?.keyword;
       const sortBy = filters?.sortBy || 'createdAt';
       const sortOrder = filters?.sortOrder || 'DESC';
 

@@ -106,7 +106,7 @@ export class ExhibitorService {
     filters?: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -126,7 +126,7 @@ export class ExhibitorService {
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
-      const search = filters?.search;
+      const search = filters?.keyword;
       const sortBy = filters?.sortBy || 'createdAt';
       const sortOrder = filters?.sortOrder || 'DESC';
 
@@ -1967,7 +1967,7 @@ export class ExhibitorService {
     filters: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     } = {},
@@ -2065,8 +2065,8 @@ export class ExhibitorService {
       }
 
       // Search filter - search in attendee fields
-      if (filters.search) {
-        const searchTerm = `%${filters.search}%`;
+      if (filters.keyword) {
+        const searchTerm = `%${filters.keyword}%`;
         queryBuilder.andWhere(
           '(attendee.firstName LIKE :search OR attendee.lastName LIKE :search OR attendee.email LIKE :search OR attendee.mobile LIKE :search OR attendee.company LIKE :search)',
           { search: searchTerm },

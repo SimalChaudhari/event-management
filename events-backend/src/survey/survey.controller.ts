@@ -111,7 +111,7 @@ export class SurveyController {
     filters: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       startDate?: string;
       endDate?: string;
       sortBy?: string;

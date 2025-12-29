@@ -17,7 +17,7 @@ export interface PaginatedResult<T> {
 export interface FilterOptions {
   page?: number;
   limit?: number;
-  search?: string;
+  keyword?: string;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
   [key: string]: any; // Allow additional filter properties

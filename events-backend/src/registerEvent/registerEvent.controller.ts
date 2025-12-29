@@ -158,7 +158,7 @@ export class RegisterEventController {
     @Query('endDate') endDate?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('search') search?: string,
+    @Query('keyword') keyword?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'ASC' | 'DESC'
   ) {
@@ -175,7 +175,7 @@ export class RegisterEventController {
         endDate,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
-        search,
+        search: keyword,
         sortBy,
         sortOrder
       });
@@ -286,11 +286,11 @@ export class PublicRegisterEventController {
   async getPublicParticipants(
     @Param('eventId') eventId: string,
     @Res() response: Response,
-    @Query('search') search?: string,
+    @Query('keyword') keyword?: string,
   ) {
     try {
       const participants =
-        await this.registerEventService.getPublicParticipants(eventId, search);
+        await this.registerEventService.getPublicParticipants(eventId, keyword);
 
       const successResponse: SuccessResponse = {
         success: true,

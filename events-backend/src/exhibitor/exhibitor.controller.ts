@@ -277,7 +277,7 @@ export class ExhibitorController {
     filters: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -299,7 +299,7 @@ export class ExhibitorController {
       const processedFilters = {
         page: filters.page ? Number(filters.page) : undefined,
         limit: filters.limit ? Number(filters.limit) : undefined,
-        search: filters.search?.trim() || undefined,
+        keyword: filters.keyword?.trim() || undefined,
         sortBy: filters.sortBy || undefined,
         sortOrder: filters.sortOrder || undefined,
       };
@@ -467,7 +467,7 @@ export class ExhibitorController {
     filters: {
       page?: number;
       limit?: number;
-      search?: string;
+      keyword?: string;
       sortBy?: string;
       sortOrder?: 'ASC' | 'DESC';
     },
@@ -489,7 +489,7 @@ export class ExhibitorController {
       const processedFilters = {
         page: filters.page ? Number(filters.page) : undefined,
         limit: filters.limit ? Number(filters.limit) : undefined,
-        search: filters.search?.trim() || undefined,
+        keyword: filters.keyword?.trim() || undefined,
         sortBy: filters.sortBy || undefined,
         sortOrder: filters.sortOrder || undefined,
       };

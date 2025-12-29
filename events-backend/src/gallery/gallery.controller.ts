@@ -232,16 +232,36 @@ export class GalleryController {
   }
 
   @Get('get-all')
-  async getAllGalleries(@Res() response: Response, @Request() req: any) {
+  async getAllGalleries(
+    @Query()
+    filters: {
+      keyword?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
     try {
-      const galleries = await this.galleryService.getAllGalleries();
+      // Process filter parameters
+      const processedFilters = {
+        keyword: filters.keyword?.trim() || undefined,
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.galleryService.getAllGalleries(processedFilters);
 
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Galleries retrieved successfully',
-        data: galleries,
+        data: result.data,
         metadata: {
-          total: galleries.length,
+          ...(result.pagination || {}),
           timestamp: new Date().toISOString(),
         },
       };

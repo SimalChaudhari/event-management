@@ -931,14 +931,15 @@ export class SurveyService {
   async getAllSurveysWithSessions(filters?: {
     page?: number;
     limit?: number;
-    search?: string;
+    keyword?: string;
     startDate?: string;
     endDate?: string;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
   }) {
     try {
-      // Extract pagination parameters
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const sortBy = filters?.sortBy || 'createdAt';
@@ -956,8 +957,8 @@ export class SurveyService {
       }
 
       // Apply search filter - search by survey title and event name
-      if (filters?.search && filters.search.trim() !== '') {
-        const searchTerm = filters.search.toLowerCase().trim();
+      if (filters?.keyword && filters.keyword.trim() !== '') {
+        const searchTerm = filters.keyword.toLowerCase().trim();
         queryBuilder.where(
           '(LOWER(survey.title) LIKE :searchTerm OR LOWER(event.name) LIKE :searchTerm)',
           { searchTerm: `%${searchTerm}%` },
@@ -987,16 +988,32 @@ export class SurveyService {
       // Get total count before pagination
       const total = await queryBuilder.getCount();
 
-      // Apply pagination
-      const skip = (page - 1) * limit;
-      const surveys = await queryBuilder.skip(skip).take(limit).getMany();
-
-      // Calculate pagination metadata
-      const pagination = this.filterService.calculatePaginationMetadata(
-        total,
-        page,
-        limit,
-      );
+      // Apply pagination only if pagination parameters are provided
+      let surveys;
+      let pagination;
+      
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        surveys = await queryBuilder.skip(skip).take(limit).getMany();
+        
+        // Calculate pagination metadata
+        pagination = this.filterService.calculatePaginationMetadata(
+          total,
+          page,
+          limit,
+        );
+      } else {
+        // Return all surveys if no pagination parameters
+        surveys = await queryBuilder.getMany();
+        pagination = {
+          page: 1,
+          limit: total,
+          total: total,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        };
+      }
 
       // Get sessions and event info for each survey
       const surveysWithSessions = await Promise.all(
