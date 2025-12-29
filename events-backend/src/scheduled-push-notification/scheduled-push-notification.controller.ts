@@ -10,7 +10,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  Request,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../jwt/jwt-auth.guard';
 import { RolesGuard } from '../jwt/roles.guard';
 import { Roles } from '../jwt/roles.decorator';
@@ -22,6 +25,8 @@ import {
   ScheduledPushNotificationResponseDto,
   FilterScheduledPushNotificationDto,
 } from './scheduled-push-notification.dto';
+import { SuccessResponse } from '../utils/interfaces/error-response.interface';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
 @Controller('api/scheduled-push-notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -29,6 +34,7 @@ import {
 export class ScheduledPushNotificationController {
   constructor(
     private readonly scheduledNotificationService: ScheduledPushNotificationService,
+    private readonly errorHandler: ErrorHandlerService,
   ) {}
 
   @Post()
@@ -41,9 +47,48 @@ export class ScheduledPushNotificationController {
 
   @Get()
   async findAll(
-    @Query() filters?: FilterScheduledPushNotificationDto,
-  ): Promise<ScheduledPushNotificationResponseDto[]> {
-    return this.scheduledNotificationService.findAll(filters);
+    @Query()
+    filters: FilterScheduledPushNotificationDto & {
+      keyword?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      // Process filter parameters
+      const processedFilters = {
+        status: filters.status,
+        eventId: filters.eventId,
+        sendToAllUsers: filters.sendToAllUsers,
+        search: filters.search, // Backward compatibility
+        keyword: filters.keyword?.trim() || filters.search?.trim() || undefined,
+        page: filters.page ? Number(filters.page) : undefined,
+        limit: filters.limit ? Number(filters.limit) : undefined,
+        sortBy: filters.sortBy || undefined,
+        sortOrder: filters.sortOrder || undefined,
+      };
+
+      const result = await this.scheduledNotificationService.findAll(processedFilters);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Push notifications retrieved successfully',
+        data: result.data,
+        metadata: {
+          ...(result.pagination || {}),
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error: any) {
+      this.errorHandler.logError(error, 'Push notifications retrieval', req.user?.id);
+      throw error;
+    }
   }
 
   @Get(':id')

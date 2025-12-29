@@ -1,23 +1,23 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import SendConfirmationModal from '../../components/modal/SendConfirmationModal';
 import {
-    fetchPushNotifications,
     deletePushNotification,
     sendPushNotificationNow
 } from '../../store/actions/pushNotificationActions.jsx';
 import { PUSH_NOTIFICATION_PATHS } from '../../utils/constants.js';
-import { setupDateFilter, resetFilters } from '../../utils/dateFilter';
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../hooks/useTableNavigation';
+import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
+import axiosInstance from '../../configs/axiosInstance';
+import { PUSH_NOTIFICATION_LOADING } from '../../store/constants/actionTypes';
 import '../../assets/css/event.css';
 
 // Register DataTable plugin (Bootstrap styling)
@@ -294,184 +294,25 @@ const buildActionsCell = (notification) => {
     `;
 };
 
-const ptable = (data, handlers, restoreTablePage) => {
-    const { onAdd, onView, onSend, onEdit, onDelete } = handlers;
-    const tableSelector = TABLE_SELECTOR;
-
-    $.fn.dataTable.ext.errMode = 'throw';
-
-    const validData = Array.isArray(data) ? data.filter((item) => item && item.id) : [];
-
-    if ($.fn.DataTable.isDataTable(tableSelector)) {
-        $(tableSelector).DataTable().clear().destroy();
-    }
-
-    const dataTable = $(tableSelector).DataTable({
-        data: validData,
-        rowId: 'id',
-        order: [[3, 'desc']],
-        searching: true,
-        searchDelay: 500,
-        pageLength: 5,
-        lengthMenu: [
-            [5, 10, 25, 50, -1],
-            [5, 10, 25, 50, 'All']
-        ],
-        pagingType: 'full_numbers',
-        dom:
-            "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
-            "<'row'<'col-sm-12'<'date-filter-wrapper'>>>" +
-            "<'row'<'col-sm-12'tr>>" +
-            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        columns: [
-            {
-                data: null,
-                title: 'Notification / Schedule',
-                render: (_, __, row) => buildNotificationCell(row)
-            },
-            {
-                data: null,
-                title: 'Audience',
-                render: (_, __, row) => getAudienceDescription(row)
-            },
-            {
-                data: null,
-                title: 'Event',
-                render: (_, __, row) => buildEventCell(row)
-            },
-            {
-                data: null,
-                title: 'Scheduled Date',
-                render: (_, __, row) => buildScheduleCell(row)
-            },
-            {
-                data: null,
-                title: 'Actions',
-                orderable: false,
-                render: (_, __, row) => buildActionsCell(row)
-            }
-        ],
-        drawCallback: function () {
-            if (window.feather && typeof window.feather.replace === 'function') {
-                window.feather.replace();
-            }
-        },
-        initComplete: function () {
-            if (typeof restoreTablePage === 'function') {
-                const api = this.api();
-                restoreTablePage(api);
-            }
-
-            const dateFilterHtml = `
-                <div class="date-filter-container d-flex align-items-center">
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">From:</label>
-                        <input 
-                            type="date" 
-                            id="startDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div class="filter-group mr-3">
-                        <label class="small mr-2">To:</label>
-                        <input 
-                            type="date" 
-                            id="endDateFilter" 
-                            class="form-control form-control-sm"
-                        >
-                    </div>
-                    <div id="clearFilterBtn" class="filter-group" style="display: none;">
-                        <button class="btn btn-light">
-                            <i class="feather icon-x"></i> Clear Filter
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            $('.date-filter-wrapper').html(dateFilterHtml);
-            setupDateFilter(this.api());
-
-            if (!$('#addPushNotificationBtn').length && typeof onAdd === 'function') {
-                $('.add-event-button').html(`
-                    <button class="btn btn-primary d-flex align-items-center ml-2" id="addPushNotificationBtn">
-                        <i class="feather icon-plus mr-1"></i>
-                        Create
-                    </button>
-                `);
-
-                $('#addPushNotificationBtn').on('click', () => onAdd());
-            }
-
-            if (window.feather && typeof window.feather.replace === 'function') {
-                window.feather.replace();
-            }
-        },
-        responsive: true
-    });
-
-    const tableBodySelector = `${tableSelector} tbody`;
-    $(tableBodySelector)
-        .off('click', '.push-view-btn')
-        .on('click', '.push-view-btn', function () {
-            const table = $(tableSelector).DataTable();
-            const rowData = table.row($(this).closest('tr')).data();
-            if (rowData && rowData.id && typeof onView === 'function') {
-                onView(rowData.id);
-            }
-        });
-
-    $(tableBodySelector)
-        .off('click', '.push-send-btn')
-        .on('click', '.push-send-btn', function () {
-            const table = $(tableSelector).DataTable();
-            const rowData = table.row($(this).closest('tr')).data();
-            if (rowData && rowData.id && typeof onSend === 'function') {
-                onSend(rowData.id, rowData.status);
-            }
-        });
-
-    $(tableBodySelector)
-        .off('click', '.push-edit-btn')
-        .on('click', '.push-edit-btn', function () {
-            const table = $(tableSelector).DataTable();
-            const rowData = table.row($(this).closest('tr')).data();
-            if (rowData && rowData.id && typeof onEdit === 'function') {
-                onEdit(rowData.id);
-            }
-        });
-
-    $(tableBodySelector)
-        .off('click', '.push-delete-btn')
-        .on('click', '.push-delete-btn', function () {
-            const table = $(tableSelector).DataTable();
-            const rowData = table.row($(this).closest('tr')).data();
-            if (rowData && rowData.id && typeof onDelete === 'function') {
-                onDelete(rowData.id);
-            }
-        });
-
-    return dataTable;
-};
 
 const PushNotificationsList = () => {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
-    const { notifications } = useSelector((state) => state.pushNotification || {});
+    const tableRef = useRef(null);
 
-    const [currentTable, setCurrentTable] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [notificationToDelete, setNotificationToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [sendModalState, setSendModalState] = useState({
+    const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+    const [notificationToDelete, setNotificationToDelete] = React.useState(null);
+    const [isDeleting, setIsDeleting] = React.useState(false);
+    const [isSending, setIsSending] = React.useState(false);
+    const [sendModalState, setSendModalState] = React.useState({
         show: false,
         notificationId: null,
         status: null
     });
 
-    const tableRef = React.useRef(null);
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    // Use pagination persistence hook
+    const { restoreTablePage } = usePersistedTablePage();
 
+    // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
         tableRef,
         listPath: PUSH_NOTIFICATION_PATHS.LIST_NOTIFICATIONS,
@@ -479,79 +320,6 @@ const PushNotificationsList = () => {
         editPath: PUSH_NOTIFICATION_PATHS.EDIT_NOTIFICATION,
         addPath: PUSH_NOTIFICATION_PATHS.ADD_NOTIFICATION
     });
-
-    const handleNavigateToCreate = useCallback(() => {
-        handleAdd();
-    }, [handleAdd]);
-
-    const handleViewNotification = useCallback(
-        (notificationId) => {
-            if (!notificationId) return;
-            const notification = Array.isArray(notifications) 
-                ? notifications.find((n) => String(n.id) === String(notificationId))
-                : null;
-            if (notification) {
-                let currentPage = null;
-                if (tableRef.current) {
-                    try {
-                        const pageInfo = tableRef.current.page.info();
-                        if (pageInfo && pageInfo.page !== undefined) {
-                            currentPage = (pageInfo.page + 1).toString();
-                        }
-                    } catch (e) {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        currentPage = urlParams.get('page');
-                    }
-                }
-                handleView(notification, currentPage);
-            }
-        },
-        [handleView, notifications]
-    );
-
-    const handleEditNotification = useCallback(
-        (notificationId) => {
-            if (!notificationId) return;
-            const notification = Array.isArray(notifications) 
-                ? notifications.find((n) => String(n.id) === String(notificationId))
-                : null;
-            if (notification) {
-                handleEdit(notification);
-            }
-        },
-        [handleEdit, notifications]
-    );
-
-    const handleDeleteRequest = useCallback((notificationId) => {
-        if (!notificationId) return;
-        setNotificationToDelete(notificationId);
-        setShowDeleteModal(true);
-    }, []);
-
-    const destroyTable = useCallback(() => {
-        if (tableRef.current) {
-            tableRef.current.off('page.dt');
-            const tableBodySelector = `${TABLE_SELECTOR} tbody`;
-            $(tableBodySelector).off('click', '.push-view-btn');
-            $(tableBodySelector).off('click', '.push-send-btn');
-            $(tableBodySelector).off('click', '.push-edit-btn');
-            $(tableBodySelector).off('click', '.push-delete-btn');
-            tableRef.current.destroy();
-            tableRef.current = null;
-            setCurrentTable(null);
-        }
-    }, []);
-
-    useEffect(() => {
-        // Only fetch if notifications are not already loaded in Redux
-        // This prevents unnecessary API calls when navigating back after create/update/delete
-        // Since create/update/delete already update Redux, we don't need to fetch again
-        if (!notifications || notifications.length === 0) {
-            dispatch(fetchPushNotifications());
-        }
-        return () => destroyTable();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const handleOpenSendModal = useCallback(
         (notificationId, status) => {
@@ -578,8 +346,11 @@ const PushNotificationsList = () => {
         if (!sendModalState.notificationId) return;
         setIsSending(true);
         try {
-            // sendPushNotificationNow already calls fetchPushNotifications() internally
             await dispatch(sendPushNotificationNow(sendModalState.notificationId));
+            // Reload table after sending
+            if (tableRef.current) {
+                tableRef.current.ajax.reload(null, false);
+            }
         } finally {
             setIsSending(false);
             setSendModalState({
@@ -590,76 +361,166 @@ const PushNotificationsList = () => {
         }
     }, [dispatch, sendModalState.notificationId]);
 
-    const initializeTable = useCallback(() => {
-        destroyTable();
-
-        if (!Array.isArray(notifications)) {
-            return;
-        }
-
-        const tableData = notifications.map((notification) => ({
-            ...notification,
-            startDate: notification.scheduledAt || notification.createdAt || null
-        }));
-
-        const tableInstance = ptable(
-            tableData,
-            {
-                onAdd: handleNavigateToCreate,
-                onView: handleViewNotification,
-                onSend: handleOpenSendModal,
-                onEdit: handleEditNotification,
-                onDelete: handleDeleteRequest
-            },
-            restoreTablePage
-        );
-
-        setCurrentTable(tableInstance);
-        tableRef.current = tableInstance;
-        if (tableInstance && typeof checkAndAdjustPage === 'function') {
-            checkAndAdjustPage(tableInstance);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [notifications, handleNavigateToCreate, handleViewNotification, handleOpenSendModal, handleEditNotification, handleDeleteRequest, restoreTablePage, checkAndAdjustPage]);
-
-    useEffect(() => {
-        if (notifications) {
-            initializeTable();
-        }
-        return () => {
-            destroyTable();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [notifications]);
-
-    useEffect(() => {
-        return () => {
-            if (tableRef.current && typeof tableRef.current.search === 'function') {
-                resetFilters(tableRef.current);
-            }
-        };
+    const handleDeleteRequest = useCallback((notificationId) => {
+        if (!notificationId) return;
+        setNotificationToDelete(notificationId);
+        setShowDeleteModal(true);
     }, []);
 
-    const handleCloseDeleteModal = () => {
+    const handleCloseDeleteModal = useCallback(() => {
         if (isDeleting) return;
         setShowDeleteModal(false);
         setNotificationToDelete(null);
-    };
+    }, [isDeleting]);
 
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = useCallback(async () => {
         if (!notificationToDelete) return;
         setIsDeleting(true);
-
-        const success = await dispatch(deletePushNotification(notificationToDelete));
-        if (success) {
-            // deletePushNotification already updates Redux directly, no need to fetch again
-            setShowDeleteModal(false);
-            setNotificationToDelete(null);
-            // Table will be automatically reinitialized when notifications data updates via useEffect
+        try {
+            const success = await dispatch(deletePushNotification(notificationToDelete));
+            if (success) {
+                setShowDeleteModal(false);
+                setNotificationToDelete(null);
+                // Reload table after deletion
+                if (tableRef.current) {
+                    tableRef.current.ajax.reload(null, false);
+                }
+            }
+        } finally {
+            setIsDeleting(false);
         }
+    }, [dispatch, notificationToDelete]);
 
-        setIsDeleting(false);
-    };
+    useEffect(() => {
+        const columns = [
+            {
+                data: 'message',
+                title: 'Notification / Schedule',
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.message || '';
+                    }
+                    return buildNotificationCell(row);
+                }
+            },
+            {
+                data: null,
+                title: 'Audience',
+                orderable: false,
+                render: function (data, type, row) {
+                    return getAudienceDescription(row);
+                }
+            },
+            {
+                data: 'event.name',
+                title: 'Event',
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.event?.name || '';
+                    }
+                    return buildEventCell(row);
+                }
+            },
+            {
+                data: 'scheduledAt',
+                title: 'Scheduled Date',
+                render: function (data, type, row) {
+                    if (type === 'sort' || type === 'type') {
+                        return row.scheduledAt || '';
+                    }
+                    return buildScheduleCell(row);
+                }
+            },
+            {
+                data: null,
+                title: 'Actions',
+                orderable: false,
+                render: function (data, type, row) {
+                    return buildActionsCell(row);
+                }
+            }
+        ];
+
+        // Initialize server-side DataTable
+        tableRef.current = initializeServerSideDataTable({
+            tableSelector: TABLE_SELECTOR,
+            ajaxUrl: '/scheduled-push-notifications',
+            ajaxMethod: 'GET',
+            columns: columns,
+            ajaxParams: {},
+            axiosInstance: axiosInstance,
+            dispatch: dispatch,
+            loadingActionType: PUSH_NOTIFICATION_LOADING,
+            dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-event-button ml-2'>>>" +
+                 "<'row'<'col-sm-12'tr>>" +
+                 "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+            pageLength: 10,
+            lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            order: [[3, 'desc']], // Sort by Scheduled Date column (index 3) in descending order
+            onDataLoaded: (data, metadata) => {
+                // Optional: Handle data if needed
+            },
+            restoreTablePage: restoreTablePage,
+            initCompleteCallback: function (settings, json, api) {
+                // Add button initialization
+                if (!$('#addPushNotificationBtn').length) {
+                    $('.add-event-button').html(`
+                        <button class="btn btn-primary d-flex align-items-center ml-2" id="addPushNotificationBtn">
+                            <i class="feather icon-plus mr-1"></i>
+                            Create
+                        </button>
+                    `);
+                    $('#addPushNotificationBtn').on('click', handleAdd);
+                }
+
+                // Attach event listeners for actions
+                $(settings.nTable).off('click', '.push-view-btn').on('click', '.push-view-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleView(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.push-send-btn').on('click', '.push-send-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleOpenSendModal(rowData.id, rowData.status);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.push-edit-btn').on('click', '.push-edit-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleEdit(rowData);
+                    }
+                });
+
+                $(settings.nTable).off('click', '.push-delete-btn').on('click', '.push-delete-btn', function () {
+                    const rowData = api.row($(this).closest('tr')).data();
+                    if (rowData && rowData.id) {
+                        handleDeleteRequest(rowData.id);
+                    }
+                });
+
+                // Feather icons replacement
+                if (window.feather && typeof window.feather.replace === 'function') {
+                    window.feather.replace();
+                }
+            },
+            drawCallback: function () {
+                if (window.feather && typeof window.feather.replace === 'function') {
+                    window.feather.replace();
+                }
+            }
+        });
+
+        return () => {
+            if (tableRef.current) {
+                tableRef.current.destroy();
+                tableRef.current = null;
+            }
+        };
+    }, []); // Only run once on mount
 
     return (
         <>

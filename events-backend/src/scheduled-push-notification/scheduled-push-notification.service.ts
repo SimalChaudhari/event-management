@@ -32,6 +32,7 @@ import {
   ScheduledPushNotificationDelivery,
   DeliveryStatus,
 } from './scheduled-push-notification-delivery.entity';
+import { FilterService } from '../service/filter.service';
 
 @Injectable()
 export class ScheduledPushNotificationService {
@@ -54,6 +55,7 @@ export class ScheduledPushNotificationService {
     private readonly pushNotificationRepository: Repository<PushNotification>,
     private readonly notificationUtil: NotificationUtil,
     private readonly pushNotificationGateway: PushNotificationGateway,
+    private readonly filterService: FilterService,
   ) {}
 
   async create(
@@ -129,41 +131,124 @@ export class ScheduledPushNotificationService {
   }
 
   async findAll(
-    filters?: FilterScheduledPushNotificationDto,
-  ): Promise<ScheduledPushNotificationResponseDto[]> {
+    filters?: FilterScheduledPushNotificationDto & {
+      keyword?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: ScheduledPushNotificationResponseDto[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'createdAt';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
       const queryBuilder =
-        this.scheduledNotificationRepository.createQueryBuilder('notification');
+        this.scheduledNotificationRepository.createQueryBuilder('notification')
+          .leftJoinAndSelect('notification.event', 'event');
+
+      // Track if WHERE clause has been set
+      let whereClauseSet = false;
+
+      // Filter by keyword if provided - search in message and event name
+      if (filters?.keyword && filters.keyword.trim() !== '') {
+        const keyword = filters.keyword.toLowerCase().trim();
+        queryBuilder.where(
+          '(LOWER(notification.message) LIKE :keyword OR LOWER(event.name) LIKE :keyword)',
+          { keyword: `%${keyword}%` },
+        );
+        whereClauseSet = true;
+      } else if (filters?.search && filters.search.trim() !== '') {
+        // Backward compatibility: also check for 'search' parameter
+        const search = filters.search.toLowerCase().trim();
+        queryBuilder.where('LOWER(notification.message) LIKE :search', {
+          search: `%${search}%`,
+        });
+        whereClauseSet = true;
+      }
 
       if (filters?.status) {
-        queryBuilder.andWhere('notification.status = :status', {
-          status: filters.status,
-        });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('notification.status = :status', {
+            status: filters.status,
+          });
+        } else {
+          queryBuilder.where('notification.status = :status', {
+            status: filters.status,
+          });
+          whereClauseSet = true;
+        }
       }
 
       if (filters?.eventId) {
-        queryBuilder.andWhere('notification.eventId = :eventId', {
-          eventId: filters.eventId,
-        });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('notification.eventId = :eventId', {
+            eventId: filters.eventId,
+          });
+        } else {
+          queryBuilder.where('notification.eventId = :eventId', {
+            eventId: filters.eventId,
+          });
+          whereClauseSet = true;
+        }
       }
 
       if (filters?.sendToAllUsers !== undefined) {
-        queryBuilder.andWhere('notification.sendToAllUsers = :sendToAllUsers', {
-          sendToAllUsers: filters.sendToAllUsers,
-        });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('notification.sendToAllUsers = :sendToAllUsers', {
+            sendToAllUsers: filters.sendToAllUsers,
+          });
+        } else {
+          queryBuilder.where('notification.sendToAllUsers = :sendToAllUsers', {
+            sendToAllUsers: filters.sendToAllUsers,
+          });
+          whereClauseSet = true;
+        }
       }
 
-      if (filters?.search) {
-        queryBuilder.andWhere('notification.message ILIKE :search', {
-          search: `%${filters.search}%`,
-        });
+      // Apply sorting
+      if (sortBy === 'message') {
+        queryBuilder.orderBy('notification.message', sortOrder);
+      } else if (sortBy === 'status') {
+        queryBuilder.orderBy('notification.status', sortOrder);
+      } else if (sortBy === 'scheduledAt') {
+        queryBuilder.orderBy('notification.scheduledAt', sortOrder);
+      } else if (sortBy === 'eventName' || sortBy === 'event.name') {
+        queryBuilder.orderBy('event.name', sortOrder);
+      } else if (sortBy === 'createdAt') {
+        queryBuilder.orderBy('notification.createdAt', sortOrder);
+      } else if (sortBy === 'updatedAt') {
+        queryBuilder.orderBy('notification.updatedAt', sortOrder);
+      } else {
+        // Default sorting
+        queryBuilder.orderBy('notification.createdAt', sortOrder);
       }
 
-      queryBuilder
-        .leftJoinAndSelect('notification.event', 'event')
-        .orderBy('notification.createdAt', 'DESC');
+      // Get total count
+      const total = await queryBuilder.getCount();
 
-      const notifications = await queryBuilder.getMany();
+      // Apply pagination only if pagination parameters are provided
+      let notifications: ScheduledPushNotification[];
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        notifications = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        notifications = await queryBuilder.getMany();
+      }
 
       // Load tracks for each notification
       const result = await Promise.all(
@@ -180,7 +265,16 @@ export class ScheduledPushNotificationService {
         }),
       );
 
-      return result;
+      if (hasPagination) {
+        return {
+          data: result,
+          pagination: this.filterService.calculatePaginationMetadata(total, page, limit),
+        };
+      } else {
+        return {
+          data: result,
+        };
+      }
     } catch (error) {
       this.logger.error('Error fetching scheduled notifications:', error);
       throw error;

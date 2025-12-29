@@ -15,6 +15,9 @@ import { NotificationUtil } from '../utils/notification.util';
 import { PushNotificationGateway } from './push-notification.gateway';
 import { EventNotification, EventNotificationRead } from '../settings/event-notification.entity';
 import { UserScheduledPushNotificationController } from './user-scheduled-push-notification.controller';
+import { FilterModule } from '../service/filter.module';
+import { UtilsModule } from '../utils/utils.module';
+import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
 @Module({
   imports: [
@@ -34,9 +37,11 @@ import { UserScheduledPushNotificationController } from './user-scheduled-push-n
       EventNotification,
       EventNotificationRead,
     ]),
+    FilterModule, // Import FilterModule for pagination
+    UtilsModule, // Import UtilsModule for ErrorHandlerService
   ],
   controllers: [ScheduledPushNotificationController, UserScheduledPushNotificationController],
-  providers: [ScheduledPushNotificationService, NotificationUtil, PushNotificationGateway],
+  providers: [ScheduledPushNotificationService, NotificationUtil, PushNotificationGateway, ErrorHandlerService],
   exports: [ScheduledPushNotificationService],
 })
 export class ScheduledPushNotificationModule {}
