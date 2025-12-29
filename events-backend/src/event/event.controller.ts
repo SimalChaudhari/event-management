@@ -140,6 +140,8 @@ export class EventController {
       keyword?: string;
       startDate?: string;
       endDate?: string;
+      publishStartDate?: string; // Publish start date filter
+      publishEndDate?: string; // Publish end date filter
       type?: EventType;
       price?: number;
       location?: string;

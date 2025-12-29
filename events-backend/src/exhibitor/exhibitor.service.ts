@@ -167,13 +167,21 @@ export class ExhibitorService {
         );
       }
 
-      // Apply sorting
-      if (sortBy === 'companyName' || sortBy === 'email' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
-        queryBuilder.orderBy(`exhibitor.${sortBy}`, sortOrder);
-      } else {
-        // Default sorting
-        queryBuilder.orderBy('exhibitor.createdAt', sortOrder);
+      // Apply sorting with case-insensitive handling for string fields
+      let orderByField = 'exhibitor.createdAt'; // default
+      if (sortBy === 'companyName') {
+        orderByField = 'exhibitor.companyName';
+      } else if (sortBy === 'email') {
+        orderByField = 'exhibitor.email';
+      } else if (sortBy === 'createdAt') {
+        orderByField = 'exhibitor.createdAt';
+      } else if (sortBy === 'updatedAt') {
+        orderByField = 'exhibitor.updatedAt';
       }
+      
+      // For string fields (companyName, email), database collation should handle case-insensitivity
+      // If database collation is not case-insensitive, we'll sort in JavaScript after fetching
+      queryBuilder.orderBy(orderByField, sortOrder);
 
       // Get total count
       const total = await queryBuilder.getCount();
@@ -193,7 +201,7 @@ export class ExhibitorService {
       const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
 
       // Format using utility and include event staff
-      const formattedExhibitors = await Promise.all(
+      let formattedExhibitors = await Promise.all(
         exhibitors.map(async (exhibitor) => {
           const basicInfo = ExhibitorUtils.getBasicExhibitorInfo(exhibitor);
 
@@ -217,6 +225,50 @@ export class ExhibitorService {
           };
         })
       );
+
+      // Apply JavaScript-level sorting for case-insensitive sorting (especially for companyName and email)
+      // This ensures consistent case-insensitive sorting regardless of database collation
+      if (sortBy) {
+        formattedExhibitors.sort((a: any, b: any) => {
+          // Map sortBy to actual field values
+          const getFieldValue = (item: any, field: string) => {
+            if (field === 'companyName') {
+              return item.companyName || '';
+            } else if (field === 'email') {
+              return item.email || '';
+            } else if (field === 'createdAt') {
+              return item.createdAt || '';
+            } else if (field === 'updatedAt') {
+              return item.updatedAt || '';
+            }
+            return item.createdAt || '';
+          };
+
+          const fieldA = getFieldValue(a, sortBy);
+          const fieldB = getFieldValue(b, sortBy);
+
+          // Handle date fields
+          if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+            const dateA = fieldA ? new Date(fieldA) : new Date(0);
+            const dateB = fieldB ? new Date(fieldB) : new Date(0);
+            dateA.setHours(0, 0, 0, 0);
+            dateB.setHours(0, 0, 0, 0);
+            return sortOrder === 'ASC' 
+              ? dateA.getTime() - dateB.getTime()
+              : dateB.getTime() - dateA.getTime();
+          }
+
+          // Handle string fields (case-insensitive for companyName and email)
+          const strA = String(fieldA || '').toLowerCase();
+          const strB = String(fieldB || '').toLowerCase();
+          
+          if (sortOrder === 'ASC') {
+            return strA.localeCompare(strB);
+          } else {
+            return strB.localeCompare(strA);
+          }
+        });
+      }
 
       // Return response with or without pagination
       if (hasPagination) {
@@ -2043,37 +2095,60 @@ export class ExhibitorService {
       // Execute query
       const [leads, total] = await queryBuilder.getManyAndCount();
 
-      // Format response
-      const formattedLeads = leads.map((lead) => ({
-        id: lead.id,
-        attendee: {
-          id: lead.attendeeId,
-          firstName: lead.attendee?.firstName,
-          lastName: lead.attendee?.lastName,
-          email: lead.attendee?.email,
-          mobile: lead.attendee?.mobile,
-          company: lead.attendee?.company,
-          designation: lead.attendee?.designation,
-          profilePicture: lead.attendee?.profilePicture,
-        },
-        event: {
-          id: lead.eventId,
-          name: lead.event?.name,
-        },
-        exhibitor: {
-          id: lead.exhibitorId,
-          companyName: lead.exhibitor?.companyName,
-        },
-        scanner: {
-          id: lead.scannedBy,
-          firstName: lead.scanner?.firstName,
-          lastName: lead.scanner?.lastName,
-          email: lead.scanner?.email,
-        },
-        notes: lead.notes,
-        collectedAt: lead.createdAt,
-        updatedAt: lead.updatedAt,
-      }));
+      // Format response based on user role
+      // For exhibitor role: show only attendee information
+      // For admin role: show all information
+      const formattedLeads = leads.map((lead) => {
+        if (userRole === UserRole.Exhibitor) {
+          // Exhibitor role: return only attendee information
+          return {
+            id: lead.id,
+            attendee: {
+              id: lead.attendeeId,
+              firstName: lead.attendee?.firstName,
+              lastName: lead.attendee?.lastName,
+              email: lead.attendee?.email,
+              mobile: lead.attendee?.mobile,
+              company: lead.attendee?.company,
+              designation: lead.attendee?.designation,
+              profilePicture: lead.attendee?.profilePicture,
+            },
+            collectedAt: lead.createdAt,
+          };
+        } else {
+          // Admin role: return all information
+          return {
+            id: lead.id,
+            attendee: {
+              id: lead.attendeeId,
+              firstName: lead.attendee?.firstName,
+              lastName: lead.attendee?.lastName,
+              email: lead.attendee?.email,
+              mobile: lead.attendee?.mobile,
+              company: lead.attendee?.company,
+              designation: lead.attendee?.designation,
+              profilePicture: lead.attendee?.profilePicture,
+            },
+            event: {
+              id: lead.eventId,
+              name: lead.event?.name,
+            },
+            exhibitor: {
+              id: lead.exhibitorId,
+              companyName: lead.exhibitor?.companyName,
+            },
+            scanner: {
+              id: lead.scannedBy,
+              firstName: lead.scanner?.firstName,
+              lastName: lead.scanner?.lastName,
+              email: lead.scanner?.email,
+            },
+            notes: lead.notes,
+            collectedAt: lead.createdAt,
+            updatedAt: lead.updatedAt,
+          };
+        }
+      });
 
       return {
         data: formattedLeads,

@@ -177,7 +177,8 @@ export class RegisterEventService {
 
   async findAll(userId: string, role: string, filters?: { filter?: string; userFilter?: string; eventFilter?: string; userId?: string; eventId?: string; startDate?: string; endDate?: string; page?: number; limit?: number; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) {
     try {
-      // Extract pagination parameters
+      // Check if pagination parameters are provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const sortBy = filters?.sortBy || 'event.startDate';
@@ -241,20 +242,36 @@ export class RegisterEventService {
         // Get total count before pagination
         totalCount = await queryBuilder.getCount();
 
-        // Apply sorting
-        if (sortBy === 'event.startDate') {
-          queryBuilder.orderBy('event.startDate', sortOrder);
-        } else if (sortBy === 'user.firstName' || sortBy === 'user.lastName') {
-          queryBuilder.orderBy(sortBy, sortOrder);
-        } else if (sortBy === 'createdAt') {
-          queryBuilder.orderBy('registerEvent.createdAt', sortOrder);
+        // Apply sorting at database level (will be re-applied in JavaScript after filtering if needed)
+        // Map sortBy field names to actual database fields
+        let orderByField = 'event.startDate'; // default
+        if (sortBy === 'user.firstName' || sortBy === 'firstName' || sortBy === 'user') {
+          orderByField = 'user.firstName';
+        } else if (sortBy === 'user.lastName' || sortBy === 'lastName') {
+          orderByField = 'user.lastName';
+        } else if (sortBy === 'name' || sortBy === 'event.name') {
+          orderByField = 'event.name';
+        } else if (sortBy === 'startDate' || sortBy === 'event.startDate') {
+          orderByField = 'event.startDate';
+        } else if (sortBy === 'location' || sortBy === 'event.location') {
+          orderByField = 'event.location';
+        } else if (sortBy === 'type' || sortBy === 'registerEvent.type') {
+          orderByField = 'registerEvent.type';
+        } else if (sortBy === 'status' || sortBy === 'registerEvent.status') {
+          orderByField = 'registerEvent.status';
+        } else if (sortBy === 'createdAt' || sortBy === 'registerEvent.createdAt') {
+          orderByField = 'registerEvent.createdAt';
         } else {
-          // Default sorting
-          queryBuilder.orderBy('event.startDate', sortOrder);
+          // Default to startDate if unknown field
+          orderByField = 'event.startDate';
         }
+        
+        queryBuilder.orderBy(orderByField, sortOrder);
 
-        // Apply pagination
-        queryBuilder.skip(skip).take(limit);
+        // Apply pagination only if pagination parameters are provided
+        if (hasPagination) {
+          queryBuilder.skip(skip).take(limit);
+        }
 
         registerEvents = await queryBuilder.getMany();
       } else {
@@ -317,18 +334,36 @@ export class RegisterEventService {
         // Get total count before pagination
         totalCount = await queryBuilder.getCount();
 
-        // Apply sorting
-        if (sortBy === 'event.startDate') {
-          queryBuilder.orderBy('event.startDate', sortOrder);
-        } else if (sortBy === 'createdAt') {
-          queryBuilder.orderBy('registerEvent.createdAt', sortOrder);
+        // Apply sorting at database level (will be re-applied in JavaScript after filtering if needed)
+        // Map sortBy field names to actual database fields
+        let orderByField = 'event.startDate'; // default
+        if (sortBy === 'user.firstName' || sortBy === 'firstName' || sortBy === 'user') {
+          orderByField = 'user.firstName';
+        } else if (sortBy === 'user.lastName' || sortBy === 'lastName') {
+          orderByField = 'user.lastName';
+        } else if (sortBy === 'name' || sortBy === 'event.name') {
+          orderByField = 'event.name';
+        } else if (sortBy === 'startDate' || sortBy === 'event.startDate') {
+          orderByField = 'event.startDate';
+        } else if (sortBy === 'location' || sortBy === 'event.location') {
+          orderByField = 'event.location';
+        } else if (sortBy === 'type' || sortBy === 'registerEvent.type') {
+          orderByField = 'registerEvent.type';
+        } else if (sortBy === 'status' || sortBy === 'registerEvent.status') {
+          orderByField = 'registerEvent.status';
+        } else if (sortBy === 'createdAt' || sortBy === 'registerEvent.createdAt') {
+          orderByField = 'registerEvent.createdAt';
         } else {
-          // Default sorting
-          queryBuilder.orderBy('event.startDate', sortOrder);
+          // Default to startDate if unknown field
+          orderByField = 'event.startDate';
         }
+        
+        queryBuilder.orderBy(orderByField, sortOrder);
 
-        // Apply pagination
-        queryBuilder.skip(skip).take(limit);
+        // Apply pagination only if pagination parameters are provided
+        if (hasPagination) {
+          queryBuilder.skip(skip).take(limit);
+        }
 
         registerEvents = await queryBuilder.getMany();
         
@@ -571,22 +606,57 @@ export class RegisterEventService {
         }),
       );
 
-      // Sort registrations by event startDate
-      // For admin: descending order (newest first)
-      // For regular users: ascending order (upcoming first) - already filtered to exclude past events
+      // Always apply JavaScript sorting to ensure correct order (especially after filtering for regular users)
+      // This ensures the sortBy and sortOrder parameters from frontend are properly respected
       registerEventsWithAttendance.sort((a: any, b: any) => {
-        // Create date objects and normalize to midnight (ignore time component)
-        const dateA = a.event?.startDate ? new Date(a.event.startDate) : new Date(0);
-        dateA.setHours(0, 0, 0, 0);
-        const dateB = b.event?.startDate ? new Date(b.event.startDate) : new Date(0);
-        dateB.setHours(0, 0, 0, 0);
+        // Map sortBy to actual field values
+        const getFieldValue = (item: any, field: string) => {
+          if (field === 'user.firstName' || field === 'firstName' || field === 'user') {
+            return (item.user?.firstName || '').toLowerCase();
+          } else if (field === 'user.lastName' || field === 'lastName') {
+            return (item.user?.lastName || '').toLowerCase();
+          } else if (field === 'name' || field === 'event.name') {
+            return item.event?.name || '';
+          } else if (field === 'startDate' || field === 'event.startDate') {
+            return item.event?.startDate || '';
+          } else if (field === 'location' || field === 'event.location') {
+            return item.event?.location || '';
+          } else if (field === 'type' || field === 'registerEvent.type') {
+            return item.type || '';
+          } else if (field === 'status' || field === 'registerEvent.status') {
+            return item.status || '';
+          } else if (field === 'createdAt' || field === 'registerEvent.createdAt') {
+            return item.createdAt || '';
+          }
+          return item.event?.startDate || '';
+        };
+
+        const fieldA = getFieldValue(a, sortBy);
+        const fieldB = getFieldValue(b, sortBy);
+
+        // Handle date fields (startDate, createdAt)
+        if (sortBy === 'startDate' || sortBy === 'event.startDate' || sortBy === 'createdAt' || sortBy === 'registerEvent.createdAt') {
+          const dateA = fieldA ? new Date(fieldA) : new Date(0);
+          const dateB = fieldB ? new Date(fieldB) : new Date(0);
+          dateA.setHours(0, 0, 0, 0);
+          dateB.setHours(0, 0, 0, 0);
+          
+          // ASC: earliest first (1 Jan, 2 Jan) | DESC: latest first (2 Jan, 1 Jan)
+          if (sortOrder === 'ASC') {
+            return dateA.getTime() - dateB.getTime(); // Positive if A > B (A comes after B)
+          } else {
+            return dateB.getTime() - dateA.getTime(); // Positive if B > A (B comes after A)
+          }
+        }
+
+        // Handle string fields (case-insensitive for user names)
+        const strA = String(fieldA || '').toLowerCase();
+        const strB = String(fieldB || '').toLowerCase();
         
-        if (role === 'admin') {
-          // Admin: descending order (newest first)
-          return dateB.getTime() - dateA.getTime();
+        if (sortOrder === 'ASC') {
+          return strA.localeCompare(strB);
         } else {
-          // Regular users: ascending order (upcoming first)
-          return dateA.getTime() - dateB.getTime();
+          return strB.localeCompare(strA);
         }
       });
 
@@ -650,14 +720,31 @@ export class RegisterEventService {
       }
 
       // Build pagination metadata
-      const totalPages = Math.ceil(totalCount / limit);
+      let pagination;
+      if (hasPagination) {
+        const totalPages = Math.ceil(totalCount / limit);
+        pagination = {
+          page: page,
+          limit: limit,
+          total: totalCount,
+          totalPages: totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        };
+      } else {
+        // No pagination - return all data
+        pagination = {
+          page: 1,
+          limit: registerEventsWithAttendance.length,
+          total: totalCount,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        };
+      }
+      
       const metadata = {
         total: totalCount,
-        page: page,
-        limit: limit,
-        totalPages: totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
         timestamp: new Date().toISOString(),
       };
 
@@ -669,6 +756,7 @@ export class RegisterEventService {
             : 'Your registered events fetched successfully',
         count: registerEventsWithAttendance.length,
         data: registerEventsWithAttendance,
+        pagination: pagination,
         metadata: metadata,
         ...(filterData && { filter: filterData }),
       };

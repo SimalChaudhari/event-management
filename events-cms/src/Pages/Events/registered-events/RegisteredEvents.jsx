@@ -79,7 +79,7 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
             },
 
             {
-                data: 'user',
+                data: 'type',
                 title: 'User Type',
                 render: function (data, type, row) {
                     let bgColor = '';
@@ -142,7 +142,7 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
             },
 
             {
-                data: 'location',
+                data: 'event.location',
                 render: function (data, type, row) {
                     return `
                         <div class="d-inline-block align-middle">
@@ -158,13 +158,9 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
                 }
             },
             {
-                data: null,
+                data: 'event.startDate',
                 title: 'Event Schedule',
                 render: function (data, type, row) {
-                    if (type === 'sort' || type === 'type') {
-                        // Return raw date for sorting purposes
-                        return row.event?.startDate ? new Date(row.event.startDate).getTime() : 0;
-                    }
                     return formatDateTimeForTable(row.event.startDate, row.event.startTime);
                 }
             },

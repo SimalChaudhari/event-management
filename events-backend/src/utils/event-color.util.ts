@@ -9,8 +9,6 @@ export const getEventColor = (type: EventType | undefined): string => {
       return '#007bff'; // Blue
     case EventType.Virtual:
       return '#28a745'; // Green
-    case EventType.Hybrid:
-      return '#ffc107'; // Yellow
     default:
       return '#6c757d'; // Gray for unknown or undefined
   }

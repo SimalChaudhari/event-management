@@ -253,6 +253,8 @@ export class EventService {
       globalSearch?: string;
       startDate?: string;
       endDate?: string;
+      publishStartDate?: string; // Publish start date filter
+      publishEndDate?: string; // Publish end date filter
       type?: EventType;
       upcoming?: boolean;
       category?: string;
@@ -292,6 +294,9 @@ export class EventService {
         queryBuilder.andWhere('event.startDate >= :today', { today });
       }
 
+      // Track if WHERE clause has been set
+      let whereClauseSet = false;
+
       // If globalSearch is provided, get all events for comprehensive search
       // If keyword is provided, use basic event field search
       if (filters.globalSearch) {
@@ -301,33 +306,88 @@ export class EventService {
         // Use basic event field search for keyword
         const keyword = filters.keyword.toLowerCase();
         queryBuilder.where(
-          'LOWER(event.name) LIKE :keyword OR LOWER(event.description) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword OR LOWER(event.currency) LIKE :keyword OR LOWER(CAST(event.latitude AS TEXT)) LIKE :keyword OR LOWER(CAST(event.longitude AS TEXT)) LIKE :keyword',
+          'LOWER(event.name) LIKE :keyword OR LOWER(event.venue) LIKE :keyword OR LOWER(event.location) LIKE :keyword OR LOWER(event.country) LIKE :keyword OR LOWER(CAST(event.price AS TEXT)) LIKE :keyword',
           { keyword: `%${keyword}%` },
         );
+        whereClauseSet = true;
       }
 
       // Filter by date range - handle startDate and endDate separately
       if (filters.startDate) {
-        queryBuilder.andWhere('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+        } else {
+          queryBuilder.where('DATE(event.startDate) >= :startDate', { startDate: filters.startDate });
+          whereClauseSet = true;
+        }
       }
       if (filters.endDate) {
-        queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
+        } else {
+          queryBuilder.where('DATE(event.startDate) <= :endDate', { endDate: filters.endDate });
+          whereClauseSet = true;
+        }
       }
 
       if (filters.type) {
-        queryBuilder.andWhere('event.type = :type', { type: filters.type });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('event.type = :type', { type: filters.type });
+        } else {
+          queryBuilder.where('event.type = :type', { type: filters.type });
+          whereClauseSet = true;
+        }
+      }
+
+      // Filter by publish date range
+      if (filters.publishStartDate) {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(event.publishStartDate) >= :publishStartDate', { 
+            publishStartDate: filters.publishStartDate 
+          });
+        } else {
+          queryBuilder.where('DATE(event.publishStartDate) >= :publishStartDate', { 
+            publishStartDate: filters.publishStartDate 
+          });
+          whereClauseSet = true;
+        }
+      }
+      if (filters.publishEndDate) {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('DATE(event.publishEndDate) <= :publishEndDate', { 
+            publishEndDate: filters.publishEndDate 
+          });
+        } else {
+          queryBuilder.where('DATE(event.publishEndDate) <= :publishEndDate', { 
+            publishEndDate: filters.publishEndDate 
+          });
+          whereClauseSet = true;
+        }
       }
 
       if (filters.category) {
         const categoryName = filters.category.toLowerCase();
-        queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
-          categoryName: `%${categoryName}%`,
-        });
+        if (whereClauseSet) {
+          queryBuilder.andWhere('LOWER(category.name) LIKE :categoryName', {
+            categoryName: `%${categoryName}%`,
+          });
+        } else {
+          queryBuilder.where('LOWER(category.name) LIKE :categoryName', {
+            categoryName: `%${categoryName}%`,
+          });
+          whereClauseSet = true;
+        }
       }
 
       if (filters.upcoming) {
         const today = new Date();
-        queryBuilder.andWhere('event.startDate >= :today', { today });
+        today.setHours(0, 0, 0, 0);
+        if (whereClauseSet) {
+          queryBuilder.andWhere('event.startDate >= :today', { today });
+        } else {
+          queryBuilder.where('event.startDate >= :today', { today });
+          whereClauseSet = true;
+        }
       }
 
       if (filters.eventName) {
@@ -338,10 +398,49 @@ export class EventService {
           // Exact name match for dropdown filter
           // Use TRIM on both sides to handle cases where database has "Conference " but search is "Conference"
           // This ensures "Conference " in DB matches "Conference" in search
-          queryBuilder.andWhere('TRIM(event.name) = TRIM(:eventName)', {
-            eventName: trimmedEventName,
-          });
+          if (whereClauseSet) {
+            queryBuilder.andWhere('TRIM(event.name) = TRIM(:eventName)', {
+              eventName: trimmedEventName,
+            });
+          } else {
+            queryBuilder.where('TRIM(event.name) = TRIM(:eventName)', {
+              eventName: trimmedEventName,
+            });
+            whereClauseSet = true;
+          }
         }
+      }
+
+      // Apply sorting in query builder BEFORE getting results (only if not globalSearch)
+      if (!filters.globalSearch) {
+        // Map sortBy field names to actual database fields
+        let orderByField = 'event.startDate'; // default
+        if (sortBy === 'name' || sortBy === 'event.name') {
+          orderByField = 'event.name';
+        } else if (sortBy === 'startDate' || sortBy === 'event.startDate') {
+          orderByField = 'event.startDate';
+        } else if (sortBy === 'endDate' || sortBy === 'event.endDate') {
+          orderByField = 'event.endDate';
+        } else if (sortBy === 'publishStartDate' || sortBy === 'event.publishStartDate') {
+          orderByField = 'event.publishStartDate';
+        } else if (sortBy === 'publishEndDate' || sortBy === 'event.publishEndDate') {
+          orderByField = 'event.publishEndDate';
+        } else if (sortBy === 'location' || sortBy === 'event.location') {
+          orderByField = 'event.location';
+        } else if (sortBy === 'type' || sortBy === 'event.type') {
+          orderByField = 'event.type';
+        } else if (sortBy === 'price' || sortBy === 'event.price') {
+          orderByField = 'event.price';
+        } else if (sortBy === 'createdAt' || sortBy === 'event.createdAt') {
+          orderByField = 'event.createdAt';
+        } else if (sortBy === 'updatedAt' || sortBy === 'event.updatedAt') {
+          orderByField = 'event.updatedAt';
+        } else {
+          // Default to startDate if unknown field
+          orderByField = 'event.startDate';
+        }
+        
+        queryBuilder.orderBy(orderByField, sortOrder);
       }
 
       const events = await queryBuilder.getMany();
@@ -392,19 +491,58 @@ export class EventService {
         });
       }
 
-      // Sort events by startDate in descending order (newest first)
-      // Events on Nov 14, 13, 12 will show as 14, 13, 12
-      // Dec 6, 5, 4, 1 should show before Nov 30, 29, 28
-      filteredEvents.sort((a, b) => {
-        // Create date objects and normalize to midnight (ignore time component)
-        const dateA = new Date(a.startDate);
-        dateA.setHours(0, 0, 0, 0);
-        const dateB = new Date(b.startDate);
-        dateB.setHours(0, 0, 0, 0);
-        
-        // Compare dates in descending order (newest first)
-        return dateB.getTime() - dateA.getTime();
-      });
+      // Only re-sort if we filtered past events (which changes the order) or using globalSearch
+      // Otherwise, query builder already sorted the results
+      if (userRole !== UserRole.Admin || filters.globalSearch) {
+        // Manual sorting needed when filtering past events or using globalSearch
+        filteredEvents.sort((a, b) => {
+          // Map sortBy to actual field names
+          const getFieldValue = (event: any, field: string) => {
+            if (field === 'name' || field === 'event.name') return event.name;
+            if (field === 'startDate' || field === 'event.startDate') return event.startDate;
+            if (field === 'endDate' || field === 'event.endDate') return event.endDate;
+            if (field === 'publishStartDate' || field === 'event.publishStartDate') return event.publishStartDate;
+            if (field === 'location' || field === 'event.location') return event.location;
+            if (field === 'type' || field === 'event.type') return event.type;
+            if (field === 'price' || field === 'event.price') return event.price;
+            if (field === 'createdAt' || field === 'event.createdAt') return event.createdAt;
+            if (field === 'updatedAt' || field === 'event.updatedAt') return event.updatedAt;
+            return event.startDate; // default
+          };
+          
+          const fieldA = getFieldValue(a, sortBy);
+          const fieldB = getFieldValue(b, sortBy);
+          
+          // Handle date fields
+          if (fieldA instanceof Date || (typeof fieldA === 'string' && fieldA.includes('-'))) {
+            const dateA = new Date(fieldA);
+            const dateB = new Date(fieldB);
+            dateA.setHours(0, 0, 0, 0);
+            dateB.setHours(0, 0, 0, 0);
+            return sortOrder === 'ASC' 
+              ? dateA.getTime() - dateB.getTime()
+              : dateB.getTime() - dateA.getTime();
+          }
+          
+          // Handle type field (enum: Physical, Virtual) - sort alphabetically
+          if (sortBy === 'type' || sortBy === 'event.type') {
+            const typeA = (fieldA || '').toString();
+            const typeB = (fieldB || '').toString();
+            if (sortOrder === 'ASC') {
+              return typeA.localeCompare(typeB);
+            } else {
+              return typeB.localeCompare(typeA);
+            }
+          }
+          
+          // Handle string/number fields
+          if (sortOrder === 'ASC') {
+            return fieldA > fieldB ? 1 : fieldA < fieldB ? -1 : 0;
+          } else {
+            return fieldA < fieldB ? 1 : fieldA > fieldB ? -1 : 0;
+          }
+        });
+      }
 
       // Apply pagination to filtered events only if pagination parameters are provided
       const total = filteredEvents.length;

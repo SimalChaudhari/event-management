@@ -21,7 +21,6 @@ class IsTimeFormat {
 export enum EventType {
   Physical = 'Physical',
   Virtual = 'Virtual',
-  Hybrid = 'Hybrid',
 }
 
 export class EventDto {

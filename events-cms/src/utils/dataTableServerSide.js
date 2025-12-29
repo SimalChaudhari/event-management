@@ -121,8 +121,9 @@ export const initializeServerSideDataTable = ({
             };
             
             // Only add search if it has a value
+            // Map DataTable search to backend keyword parameter
             if (data.search?.value && data.search.value.trim() !== '') {
-                filters.search = data.search.value.trim();
+                filters.keyword = data.search.value.trim();
             }
             
             // Clean filters - remove null/undefined/empty/'all' values

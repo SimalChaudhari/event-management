@@ -25,7 +25,6 @@ import { ProgrammeTrack } from '../programme/programme-track.entity';
 export enum EventType {
   Physical = 'Physical',
   Virtual = 'Virtual',
-  Hybrid = 'Hybrid',
 }
 
 @Entity('events')

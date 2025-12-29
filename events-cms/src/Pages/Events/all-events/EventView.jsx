@@ -34,8 +34,12 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
     const columns = [
             {
                 data: 'name',
-
+                orderable: true,
                 render: function (data, type, row) {
+                    // Return raw name value for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return row.name || '';
+                    }
                     const imageUrl = DUMMY_PATH;
                     const eventDate = new Date(row.startDate);
                     const today = new Date();
@@ -65,6 +69,7 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
                         statusText = `in ${daysUntilEvent} days`;
                     }
 
+                    // Return formatted HTML for display
                     return `
                         <div class="d-inline-block align-middle">
                          <img src="${
@@ -88,7 +93,13 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
             {
                 data: 'type',
                 title: 'User Type',
+                orderable: true,
                 render: function (data, type, row) {
+                    // Return raw type value for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return row.type || '';
+                    }
+                    // Return formatted HTML for display
                     let bgColor = '';
                     if (row.type?.toLowerCase() === 'physical') {
                         bgColor =
@@ -106,7 +117,13 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
             {
                 data: 'price',
                 title: 'Price',
+                orderable: true,
                 render: function (data, type, row) {
+                    // Return raw numeric value for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return parseFloat(data) || 0;
+                    }
+                    // Return formatted string for display
                     const currencySymbol = row.currency === 'USD' ? '$' : '';
                     return `${currencySymbol}${parseFloat(data).toFixed(2)}(${row.currency})`;
                 }
@@ -114,7 +131,13 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
             {
                 data: 'location',
                 title: 'Location / Venue / Country',
+                orderable: true,
                 render: function (data, type, row) {
+                    // Return raw location value for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return row.location || '';
+                    }
+                    // Return formatted HTML for display
                     return `
                         <div class="d-inline-block align-middle">
                             <h6 class="m-b-5">${row.location || 'N/A'}</h6>
@@ -131,15 +154,26 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
             {
                 data: 'startDate', // Use startDate for sorting
                 title: 'Event Date',
+                orderable: true,
                 render: function (data, type, row) {
-                    // Display formatting is handled by columnDefs render function
+                    // Return raw date for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return row.startDate ? new Date(row.startDate).getTime() : 0;
+                    }
+                    // Return formatted string for display
                     return formatDateTimeForTable(row.startDate, row.startTime);
                 }
             },
             {
                 data: 'publishStartDate',
                 title: 'Publish Dates',
+                orderable: true,
                 render: function (data, type, row) {
+                    // Return raw date for sorting
+                    if (type === 'sort' || type === 'type') {
+                        return row.publishStartDate ? new Date(row.publishStartDate).getTime() : 0;
+                    }
+                    // Return formatted HTML for display
                     return renderPublishDates(row);
                 }
             },
@@ -311,6 +345,7 @@ const EventView = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const navigate = useNavigate();
     const tableRef = useRef(null);
+    const [selectedType, setSelectedType] = useState('');
 
     // Transform filter events data to match FilterComponent format
     // IMPORTANT: Prioritize filterData?.events (from backend filter response) as it contains ALL available events
@@ -338,8 +373,8 @@ const EventView = () => {
         events: allEvents, 
         loadingDropdowns, 
         activeFilters, 
-        applyFilters, 
-        clearFilters, 
+        applyFilters: baseApplyFilters, 
+        clearFilters: baseClearFilters, 
         handleEventChange, 
         setStartDate, 
         setEndDate 
@@ -351,6 +386,62 @@ const EventView = () => {
         initialFilters: {},
         filterMode: 'event'
     });
+
+    // Initialize type from URL on mount
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const typeFromUrl = urlParams.get('type') || '';
+        if (typeFromUrl) {
+            setSelectedType(typeFromUrl);
+        }
+    }, []);
+
+    // Custom applyFilters that includes type
+    const applyFilters = useCallback((filters = {}) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Update URL with all filters including type
+        if (filters.eventName) {
+            urlParams.set('eventName', filters.eventName);
+        } else {
+            urlParams.delete('eventName');
+        }
+        
+        if (filters.startDate) {
+            urlParams.set('startDate', filters.startDate);
+        } else {
+            urlParams.delete('startDate');
+        }
+        
+        if (filters.endDate) {
+            urlParams.set('endDate', filters.endDate);
+        } else {
+            urlParams.delete('endDate');
+        }
+        
+        if (filters.type || selectedType) {
+            const typeToSet = filters.type || selectedType;
+            urlParams.set('type', typeToSet);
+        } else {
+            urlParams.delete('type');
+        }
+        
+        // Remove page param when filters change
+        urlParams.delete('page');
+        
+        navigate(`${location.pathname}?${urlParams.toString()}`, { replace: true });
+        
+        // Also call base applyFilters for other filter handling
+        baseApplyFilters(filters);
+    }, [selectedType, navigate, location.pathname, baseApplyFilters]);
+
+    // Custom clearFilters that includes type
+    const clearFilters = useCallback(() => {
+        setSelectedType('');
+        baseClearFilters();
+        const urlParams = new URLSearchParams();
+        navigate(`${location.pathname}`, { replace: true });
+    }, [navigate, location.pathname, baseClearFilters]);
 
     // Use pagination persistence hook
     const { initialPage, restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
@@ -506,9 +597,11 @@ const EventView = () => {
                 events={allEvents}
                 loadingDropdowns={loadingDropdowns}
                 selectedEventId={selectedEventId}
+                selectedType={selectedType}
                 startDate={startDate}
                 endDate={endDate}
                 onEventChange={handleEventChange}
+                onTypeChange={setSelectedType}
                 onStartDateChange={setStartDate}
                 onEndDateChange={setEndDate}
                 onApplyFilters={applyFilters}
@@ -516,6 +609,7 @@ const EventView = () => {
                 activeFilters={activeFilters}
                 showUserFilter={false}
                 showEventFilter={true}
+                showTypeFilter={true}
                 showDateFilter={true}
             />
 
