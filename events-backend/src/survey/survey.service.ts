@@ -1758,13 +1758,33 @@ export class SurveyService {
       });
 
       // 6. Validate existing sessions with new survey timing
+      // Only validate sessions that are NOT being updated (if sessions array is provided)
       if (existingSessions.length > 0) {
-        await this.validateExistingSessionsAfterSurveyUpdate(
-          existingSessions,
-          event,
-          new Date(updatedSurveyData.startDate),
-          new Date(updatedSurveyData.endDate),
-        );
+        let sessionsToValidate = existingSessions;
+        
+        // If sessions array is provided, only validate sessions that won't be updated
+        if (updateSurveyDto.sessions && updateSurveyDto.sessions.length > 0) {
+          const incomingSessionIds = new Set(
+            updateSurveyDto.sessions
+              .map(s => (s as any).id)
+              .filter(id => id !== undefined)
+          );
+          
+          // Only validate sessions that are NOT in the incoming update array
+          sessionsToValidate = existingSessions.filter(
+            session => !incomingSessionIds.has(session.id)
+          );
+        }
+        
+        // Only validate if there are sessions that won't be updated
+        if (sessionsToValidate.length > 0) {
+          await this.validateExistingSessionsAfterSurveyUpdate(
+            sessionsToValidate,
+            event,
+            new Date(updatedSurveyData.startDate),
+            new Date(updatedSurveyData.endDate),
+          );
+        }
       }
 
       // 7. Update survey fields

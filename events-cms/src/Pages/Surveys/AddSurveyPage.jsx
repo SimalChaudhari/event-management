@@ -103,7 +103,7 @@ const AddSurveyPage = () => {
             // Load sessions into sessionsList
             if (selectedSurvey.sessions && Array.isArray(selectedSurvey.sessions)) {
                 const formattedSessions = selectedSurvey.sessions.map((session) => ({
-                    id: session.id || Date.now() + Math.random(),
+                    id: session.id, // Preserve existing session ID (required for updates)
                     name: session.name || '',
                     date: session.date ? new Date(session.date).toISOString().split('T')[0] : '',
                     startTime: session.startTime || '',
@@ -112,6 +112,18 @@ const AddSurveyPage = () => {
                     isActive: session.isActive !== undefined ? session.isActive : true
                 }));
                 setSessionsList(formattedSessions);
+            } else if (selectedSurvey.sessions && !Array.isArray(selectedSurvey.sessions)) {
+                // Handle case where sessions is a single object (for non-admin users)
+                const session = selectedSurvey.sessions;
+                setSessionsList([{
+                    id: session.id, // Preserve existing session ID
+                    name: session.name || '',
+                    date: session.date ? new Date(session.date).toISOString().split('T')[0] : '',
+                    startTime: session.startTime || '',
+                    endTime: session.endTime || '',
+                    description: session.description || '',
+                    isActive: session.isActive !== undefined ? session.isActive : true
+                }]);
             }
         }
     }, [selectedSurvey, isEditing]);
@@ -213,15 +225,24 @@ const AddSurveyPage = () => {
                         url: url.url
                     })),
                 sessions: sessionsList
-                    .map((session) => ({
-                        ...(session.id && { id: session.id }), // Include ID if it exists (for updates)
-                        name: session.name,
-                        date: session.date,
-                        startTime: formatTime(session.startTime),
-                        endTime: formatTime(session.endTime),
-                        description: session.description,
-                        isActive: session.isActive
-                    }))
+                    .map((session) => {
+                        // Only include ID if it's an existing session (not a new one with 'new-' prefix)
+                        const sessionData = {
+                            name: session.name,
+                            date: session.date,
+                            startTime: formatTime(session.startTime),
+                            endTime: formatTime(session.endTime),
+                            description: session.description,
+                            isActive: session.isActive
+                        };
+                        
+                        // Include ID only for existing sessions (UUID format, not 'new-' prefix)
+                        if (session.id && !session.id.toString().startsWith('new-')) {
+                            sessionData.id = session.id;
+                        }
+                        
+                        return sessionData;
+                    })
                     .filter((session) => session.name && session.date) // Only include sessions with name and date
             };
 
@@ -251,7 +272,7 @@ const AddSurveyPage = () => {
 
     const addSession = () => {
         const newSession = {
-            id: Date.now(),
+            id: `new-${Date.now()}`, // Prefix with 'new-' to distinguish from existing sessions
             name: '',
             date: '',
             startTime: '',

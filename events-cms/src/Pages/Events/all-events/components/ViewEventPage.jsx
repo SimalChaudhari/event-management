@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal, Form } from 'react-bootstrap';
+import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
@@ -196,98 +196,109 @@ const ViewEventPage = () => {
         }
     };
 
-    const renderEventStats = () => (
-        <Row>
-            <Col xs={6} md={3} className="mb-4">
-                <div
-                    className="text-center p-3"
-                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
-                >
-                    <i className="fas fa-users text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                        Registered Participants
-                    </h6>
-                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
-                        {eventData.attendanceCount || 0}
-                    </p>
-                </div>
-            </Col>
-            <Col xs={6} md={3} className="mb-4">
-                <div
-                    className="text-center p-3"
-                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
-                >
-                    <i className="fas fa-microphone text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                        Speakers
-                    </h6>
-                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {eventData.speakers?.length || 0}
-                    </p>
-                </div>
-            </Col>
-            <Col xs={6} md={3} className="mb-4">
-                <div
-                    className="text-center p-3"
-                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
-                >
-                    <i className="fas fa-images text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                        Images
-                    </h6>
-                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {eventData.images?.length || 0}
-                    </p>
-                </div>
-            </Col>
-            <Col xs={6} md={3} className="mb-4">
-                <div
-                    className="text-center p-3"
-                    style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
-                >
-                    <i className="fas fa-file-pdf text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                    <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                        Documents
-                    </h6>
-                    <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {eventData.documents?.length || 0}
-                    </p>
-                </div>
-            </Col>
-            {eventData?.galleries?.length > 0 && (
-                <Col xs={6} md={3} className="mb-4">
+    const renderEventStats = () => {
+        // Calculate total number of cards to determine column size
+        let totalCards = 4; // Base: Participants, Speakers, Images, Documents
+        if (eventData?.galleries?.length > 0) totalCards++;
+        if (eventData?.exhibitors?.exhibitors?.length > 0 || eventData?.exhibitorsData?.exhibitors?.length > 0) totalCards++;
+        
+        // Calculate column size: 12 / totalCards (rounded down for Bootstrap grid)
+        const colSize = Math.floor(12 / totalCards);
+        const colSizeMd = colSize > 0 ? colSize : 2; // Minimum 2 columns
+        
+        return (
+            <Row className="g-2">
+                <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
                     <div
-                        className="text-center p-3"
-                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                        className="text-center p-2"
+                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
                     >
-                        <i className="fas fa-photo-video text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                            Galleries
+                        <i className="fas fa-users text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                        <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                            Registered Participants
                         </h6>
-                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                            {eventData.galleries.length}
+                        <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500', color: '#28a745' }}>
+                            {eventData.attendanceCount || 0}
                         </p>
                     </div>
                 </Col>
-            )}
-            {(eventData?.exhibitors?.exhibitors?.length > 0 || eventData?.exhibitorsData?.exhibitors?.length > 0) && (
-                <Col xs={6} md={3} className="mb-4">
+                <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
                     <div
-                        className="text-center p-3"
-                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '20px' }}
+                        className="text-center p-2"
+                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
                     >
-                        <i className="fas fa-store text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
-                        <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                            Exhibitors
+                        <i className="fas fa-microphone text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                        <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                            Speakers
                         </h6>
-                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                            {(eventData.exhibitors?.exhibitors || eventData.exhibitorsData?.exhibitors)?.length || 0}
+                        <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                            {eventData.speakers?.length || 0}
                         </p>
                     </div>
                 </Col>
-            )}
-        </Row>
-    );
+                <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
+                    <div
+                        className="text-center p-2"
+                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
+                    >
+                        <i className="fas fa-images text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                        <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                            Images
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                            {eventData.images?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+                <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
+                    <div
+                        className="text-center p-2"
+                        style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
+                    >
+                        <i className="fas fa-file-pdf text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                        <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                            Documents
+                        </h6>
+                        <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                            {eventData.documents?.length || 0}
+                        </p>
+                    </div>
+                </Col>
+                {eventData?.galleries?.length > 0 && (
+                    <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
+                        <div
+                            className="text-center p-2"
+                            style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
+                        >
+                            <i className="fas fa-th text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                            <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                                Galleries
+                            </h6>
+                            <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                                {eventData.galleries.length}
+                            </p>
+                        </div>
+                    </Col>
+                )}
+                {(eventData?.exhibitors?.exhibitors?.length > 0 || eventData?.exhibitorsData?.exhibitors?.length > 0) && (
+                    <Col xs={6} sm={4} md={colSizeMd} className="mb-3">
+                        <div
+                            className="text-center p-2"
+                            style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}
+                        >
+                            <i className="fas fa-store text-primary mb-2" style={{ fontSize: '1.3rem' }}></i>
+                            <h6 className="mb-1 d-none d-md-block" style={{ color: '#495057', fontSize: '0.85rem', lineHeight: '1.2' }}>
+                                Exhibitors
+                            </h6>
+                            <p className="mb-0" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                                {(eventData.exhibitors?.exhibitors || eventData.exhibitorsData?.exhibitors)?.length || 0}
+                            </p>
+                        </div>
+                    </Col>
+                )}
+            </Row>
+        );
+    };
 
     // Get image source
     const getImageSrc = (image) => {
@@ -458,34 +469,53 @@ const ViewEventPage = () => {
                     className="mb-4"
                     style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h4 className="card-title">View</h4>
-                        <div className="d-flex">
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h4 className="card-title mb-0">View</h4>
+                        <div className="d-flex flex-wrap" style={{ gap: '10px' }}>
                             {/* Always show button for testing - change back to {isAdmin && ( after testing */}
-                            <Button
-                                variant="outline-primary"
-                                onClick={() => setShowTabVisibilityModal(true)}
-                                size="sm"
-                                style={{ marginRight: '10px' }}
+                            <OverlayTrigger
+                                placement="bottom"
+                                overlay={<Tooltip id="manage-tabs-tooltip">Manage Tabs</Tooltip>}
                             >
-                                <i className="fas fa-cog" style={{ marginRight: '8px' }}></i>
-                                Manage Tabs
-                            </Button>
+                                <Button
+                                    variant="outline-primary"
+                                    onClick={() => setShowTabVisibilityModal(true)}
+                                    size="sm"
+                                    className="d-flex align-items-center justify-content-center"
+                                    style={{ minWidth: '40px' }}
+                                >
+                                    <i className="fas fa-cog"></i>
+                                    <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Manage Tabs</span>
+                                </Button>
+                            </OverlayTrigger>
 
-                            <div className="d-flex gap-2">
+                            <OverlayTrigger
+                                placement="bottom"
+                                overlay={<Tooltip id="attendance-tooltip">Attendance Tracking</Tooltip>}
+                            >
                                 <Button 
                                     variant="primary" 
                                     onClick={() => navigate(`/events/attendance/${id}`)}
-                                    style={{ marginRight: '8px' }}
+                                    className="d-flex align-items-center"
                                 >
-                                    <i className="fas fa-clipboard-check" style={{ marginRight: '8px' }}></i>
-                                    Attendance Tracking
+                                    <i className="fas fa-clipboard-check"></i>
+                                    <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Attendance Tracking</span>
                                 </Button>
-                                <Button variant="secondary" onClick={handleBack}>
-                                    <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
-                                    Back
+                            </OverlayTrigger>
+
+                            <OverlayTrigger
+                                placement="bottom"
+                                overlay={<Tooltip id="back-tooltip">Back</Tooltip>}
+                            >
+                                <Button 
+                                    variant="secondary" 
+                                    onClick={handleBack}
+                                    className="d-flex align-items-center"
+                                >
+                                    <i className="fas fa-arrow-left"></i>
+                                    <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Back</span>
                                 </Button>
-                            </div>
+                            </OverlayTrigger>
                         </div>
                     </div>
                     <hr />
@@ -570,7 +600,7 @@ const ViewEventPage = () => {
                                     {isTabVisible('gallery') && (
                                         <Nav.Item>
                                             <Nav.Link eventKey="gallery">
-                                                <i className="fas fa-photo-video" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                                <i className="fas fa-th" style={{ marginRight: '8px', color: '#4680ff' }}></i>
                                                 Gallery
                                                 {isAdmin && eventData?.tabVisibility?.gallery === false && (
                                                     <Badge bg="warning" className="ms-2" style={{ fontSize: '10px' }}>
