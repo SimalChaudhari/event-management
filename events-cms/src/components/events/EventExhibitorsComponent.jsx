@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Button, Badge, Row, Col } from 'react-bootstrap';
+import { Button, Badge, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
-import StandardComponentTemplate from '../StandardComponentTemplate';
 import ImageModalComponent from './ImageModalComponent';
 import EventStaffComponent from './EventStaffComponent';
+import { ExpandableDescription } from '../ExpandableDescription';
 
 /**
  * EventExhibitorsComponent - Component to display event exhibitors
@@ -44,16 +44,50 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
     // Check if exhibitors are available
     if (!exhibitors?.exhibitors?.length) {
         return (
-            <StandardComponentTemplate 
-                title="Event Exhibitors" 
-                // icon="fas fa-building"
-                borderColor="orange"
-            >
-                <div className="text-center py-4">
-                    <i className="fas fa-store fa-2x text-muted mb-2"></i>
-                    <p className="text-muted">No exhibitors available.</p>
+            <div>
+                {/* Desktop: Card wrapper */}
+                <div className="d-none d-md-block">
+                    <Card style={{ 
+                        backgroundColor: '#fff', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        border: '1px solid #e9ecef',
+                        overflow: 'hidden'
+                    }}>
+                        <Card.Body style={{ padding: '24px' }}>
+                            <h5 className="mb-3 pb-2" style={{ 
+                                fontSize: '16px', 
+                                fontWeight: '600', 
+                                color: '#000000',
+                                borderBottom: '2px solid #4680ff'
+                            }}>
+                                <i className="fas fa-building mr-2" style={{ color: '#4680ff' }}></i>
+                                Event Exhibitors
+                            </h5>
+                            <div className="text-center py-4">
+                                <i className="fas fa-store fa-2x text-muted mb-2"></i>
+                                <p className="text-muted">No exhibitors available.</p>
+                            </div>
+                        </Card.Body>
+                    </Card>
                 </div>
-            </StandardComponentTemplate>
+                {/* Mobile: No card wrapper, minimal padding */}
+                <div className="d-block d-md-none px-2 py-2">
+                    <h5 className="mb-3 pb-2" style={{ 
+                        fontSize: '16px', 
+                        fontWeight: '600', 
+                        color: '#000000',
+                        borderBottom: '2px solid #4680ff'
+                    }}>
+                        <i className="fas fa-building mr-2" style={{ color: '#4680ff' }}></i>
+                        Event Exhibitors
+                    </h5>
+                    <div className="text-center py-4">
+                        <i className="fas fa-store fa-2x text-muted mb-2"></i>
+                        <p className="text-muted">No exhibitors available.</p>
+                    </div>
+                </div>
+            </div>
         );
     }
 
@@ -64,200 +98,403 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
         }
 
         return (
-            <div className="mb-4">
-                <h6>Exhibitor Description:</h6>
-                <hr />
-                <div 
-                    style={{ 
-                        textAlign: 'justify',
-                        fontSize: '14px', 
-                        lineHeight: '1.6' 
-                    }}
-                    dangerouslySetInnerHTML={{ 
-                        __html: exhibitors.exhibitorDescription || '' 
-                    }}
-                />
-            </div>
+            <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#000000',
+                    borderBottom: '2px solid #4680ff'
+                }}>
+                    <i className="fas fa-sticky-note mr-2" style={{ color: '#4680ff' }}></i>
+                    Exhibitor Description
+                </h5>
+                <Row>
+                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                        <div style={{ 
+                            padding: '8px 12px',
+                            borderBottom: '1px solid #e9ecef',
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '4px',
+                            width: '100%',
+                            maxWidth: '100%',
+                            boxSizing: 'border-box'
+                        }}
+                        className="px-md-3 px-2 py-md-2 py-2"
+                        >
+                            {/* Mobile & Tablet: Label on top */}
+                            <div className="d-block d-md-none">
+                                <div style={{ 
+                                    fontSize: '13px', 
+                                    fontWeight: '600', 
+                                    color: '#4680ff',
+                                    marginBottom: '4px',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word'
+                                }}>
+                                    <span>Description:</span>
+                                </div>
+                                <div style={{ 
+                                    fontSize: '14px', 
+                                    color: '#000000',
+                                    fontWeight: '400',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                    width: '100%',
+                                    lineHeight: '1.5'
+                                }}>
+                                    <ExpandableDescription text={exhibitors.exhibitorDescription} maxLines={2} />
+                                </div>
+                            </div>
+                            {/* Desktop: Label and value side by side */}
+                            <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                <div style={{ 
+                                    minWidth: '140px',
+                                    maxWidth: '140px',
+                                    fontSize: '13px', 
+                                    fontWeight: '600', 
+                                    color: '#4680ff',
+                                    marginRight: '12px',
+                                    flexShrink: 0
+                                }}>
+                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Description:</span>
+                                </div>
+                                <div style={{ 
+                                    fontSize: '14px', 
+                                    color: '#000000',
+                                    fontWeight: '400',
+                                    flex: 1,
+                                    minWidth: 0,
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                    overflow: 'hidden'
+                                }}>
+                                    <ExpandableDescription text={exhibitors.exhibitorDescription} maxLines={2} />
+                                </div>
+                            </div>
+                        </div>
+                    </Col>
+                </Row>
+            </Col>
         );
     };
 
-    // Get colorful icons based on icon class
-    const getIconColor = (iconClass) => {
-        const colorMap = {
-            'fas fa-building': '#007bff', // Blue for building
-            'fas fa-image': '#28a745', // Green for image
-            'fas fa-toggle-on': '#ffc107', // Yellow for toggle
-            'fas fa-eye': '#17a2b8', // Teal for view
-            'fas fa-sticky-note': '#6c757d', // Gray for description
-            'fas fa-envelope': '#dc3545', // Red for email
-            'fas fa-phone': '#28a745', // Green for phone
-            'fas fa-id-card': '#6f42c1', // Purple for UEN
-            'fas fa-qrcode': '#28a745' // Green for booth code
-        };
-        return colorMap[iconClass] || '#495057';
-    };
-
-    // InfoField component for consistent styling
-    const InfoField = ({ label, value, iconClass = null }) => (
-        <div
-            className="info-field-container mb-2 py-2"
-            style={{
-                borderBottom: '1px solid #f1f1f1'
+    // InfoField component matching EventBasicComponent pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
             }}
-        >
-            <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
-                {label}:
-            </span>
-            <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
-                {typeof value === 'string' || typeof value === 'number' ? value : value}
-            </span>
-        </div>
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        {icon && <i className={icon} style={{ marginRight: '8px', color: '#4680ff' }}></i>}
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        {icon && <i className={icon} style={{ marginRight: '8px', color: '#4680ff' }}></i>}
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+            </div>
+        </Col>
     );
 
     // Render individual exhibitor
     const renderExhibitor = (exhibitor) => (
-        <div key={exhibitor.id} className="mb-5">
-            <div className="card border-0 shadow-sm">
-                <div className="card-body p-4">
+        <div key={exhibitor.id} className="mb-4">
+            <Card style={{ 
+                backgroundColor: '#fff', 
+                borderRadius: '8px', 
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                border: '1px solid #e9ecef',
+                overflow: 'hidden'
+            }}>
+                <Card.Body>
                     <Row>
-                        {/* Left Column - Logo Image (Shows first) */}
-                        <Col lg={4} md={5} className="mb-3">
-                            {/* Logo Label */}
-                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
-                                    <i className="fas fa-image" style={{ marginRight: '8px', color: getIconColor('fas fa-image') }}></i>
-                                    Logo:
-                                </div>
-                                {/* Logo Image */}
-                                <div>
-                                    {exhibitor.logo && getImageSrc(exhibitor.logo) ? (
-                                        <div
-                                            style={{
-                                                position: 'relative',
-                                                cursor: 'pointer',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                border: '2px solid #ddd',
-                                                transition: 'transform 0.2s ease, border-color 0.2s ease',
-                                                width: '100%',
-                                                aspectRatio: '1',
-                                                maxWidth: '180px'
-                                            }}
-                                            onClick={() => handleLogoClick(getImageSrc(exhibitor.logo), exhibitor.name, exhibitor.companyName)}
-                                            onMouseOver={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1.02)';
-                                                e.currentTarget.style.borderColor = '#007bff';
-                                            }}
-                                            onMouseOut={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1)';
-                                                e.currentTarget.style.borderColor = '#ddd';
-                                            }}
-                                        >
-                                            <img
-                                                src={getImageSrc(exhibitor.logo)}
-                                                alt={exhibitor.companyName || 'Exhibitor Logo'}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover'
-                                                }}
-                                            />
-                                            {/* Zoom Icon */}
+                        {/* Left Column - Logo Image */}
+                        <Col xs={12} md={4} lg={4} className="mb-3 mb-md-0">
+                            <div style={{ 
+                                padding: '8px 12px',
+                                borderBottom: '1px solid #e9ecef',
+                                width: '100%',
+                                maxWidth: '100%',
+                                boxSizing: 'border-box'
+                            }}
+                            className="px-md-3 px-2 py-md-2 py-2"
+                            >
+                                {/* Mobile & Tablet: Label on top */}
+                                <div className="d-block d-md-none">
+                                    <div style={{ 
+                                        fontSize: '13px', 
+                                        fontWeight: '600', 
+                                        color: '#4680ff',
+                                        marginBottom: '8px',
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'break-word'
+                                    }}>
+                                        <i className="fas fa-image" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                        <span>Logo:</span>
+                                    </div>
+                                    <div>
+                                        {exhibitor.logo && getImageSrc(exhibitor.logo) ? (
                                             <div
                                                 style={{
-                                                    position: 'absolute',
-                                                    top: '8px',
-                                                    right: '8px',
-                                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                                    color: 'white',
-                                                    padding: '4px 6px',
-                                                    borderRadius: '50%',
-                                                    fontSize: '12px'
+                                                    position: 'relative',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    border: '2px solid #ddd',
+                                                    transition: 'transform 0.2s ease, border-color 0.2s ease',
+                                                    width: '100%',
+                                                    aspectRatio: '1',
+                                                    maxWidth: '180px'
+                                                }}
+                                                onClick={() => handleLogoClick(getImageSrc(exhibitor.logo), exhibitor.name, exhibitor.companyName)}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.02)';
+                                                    e.currentTarget.style.borderColor = '#4680ff';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    e.currentTarget.style.borderColor = '#ddd';
                                                 }}
                                             >
-                                                <i className="fas fa-search-plus"></i>
+                                                <img
+                                                    src={getImageSrc(exhibitor.logo)}
+                                                    alt={exhibitor.companyName || 'Exhibitor Logo'}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover'
+                                                    }}
+                                                />
+                                                {/* Zoom Icon */}
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '8px',
+                                                        right: '8px',
+                                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                                        color: 'white',
+                                                        padding: '4px 6px',
+                                                        borderRadius: '50%',
+                                                        fontSize: '12px'
+                                                    }}
+                                                >
+                                                    <i className="fas fa-search-plus"></i>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            style={{
-                                                position: 'relative',
-                                                cursor: 'default',
-                                                borderRadius: '8px',
-                                                overflow: 'hidden',
-                                                border: '2px dashed #ccc',
-                                                width: '100%',
-                                                aspectRatio: '1',
-                                                maxWidth: '180px',
-                                                backgroundColor: '#f8f9fa',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}
-                                        >
-                                            <div style={{ textAlign: 'center', color: '#6c757d' }}>
-                                                <i className="fas fa-image" style={{ fontSize: '24px', marginBottom: '8px' }}></i>
-                                                <div style={{ fontSize: '12px' }}>No Logo Available</div>
+                                        ) : (
+                                            <div
+                                                style={{
+                                                    position: 'relative',
+                                                    cursor: 'default',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    border: '2px dashed #ccc',
+                                                    width: '100%',
+                                                    aspectRatio: '1',
+                                                    maxWidth: '180px',
+                                                    backgroundColor: '#f8f9fa',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                            >
+                                                <div style={{ textAlign: 'center', color: '#6c757d' }}>
+                                                    <i className="fas fa-image" style={{ fontSize: '24px', marginBottom: '8px' }}></i>
+                                                    <div style={{ fontSize: '12px' }}>No Logo Available</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Desktop: Label and value side by side */}
+                                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                    <div style={{ 
+                                        minWidth: '140px',
+                                        maxWidth: '140px',
+                                        fontSize: '13px', 
+                                        fontWeight: '600', 
+                                        color: '#4680ff',
+                                        marginRight: '12px',
+                                        flexShrink: 0
+                                    }}>
+                                        <i className="fas fa-image" style={{ marginRight: '8px', color: '#4680ff' }}></i>
+                                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Logo:</span>
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        {exhibitor.logo && getImageSrc(exhibitor.logo) ? (
+                                            <div
+                                                style={{
+                                                    position: 'relative',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    border: '2px solid #ddd',
+                                                    transition: 'transform 0.2s ease, border-color 0.2s ease',
+                                                    width: '100%',
+                                                    aspectRatio: '1',
+                                                    maxWidth: '180px'
+                                                }}
+                                                onClick={() => handleLogoClick(getImageSrc(exhibitor.logo), exhibitor.name, exhibitor.companyName)}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.02)';
+                                                    e.currentTarget.style.borderColor = '#4680ff';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    e.currentTarget.style.borderColor = '#ddd';
+                                                }}
+                                            >
+                                                <img
+                                                    src={getImageSrc(exhibitor.logo)}
+                                                    alt={exhibitor.companyName || 'Exhibitor Logo'}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover'
+                                                    }}
+                                                />
+                                                {/* Zoom Icon */}
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '8px',
+                                                        right: '8px',
+                                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                                        color: 'white',
+                                                        padding: '4px 6px',
+                                                        borderRadius: '50%',
+                                                        fontSize: '12px'
+                                                    }}
+                                                >
+                                                    <i className="fas fa-search-plus"></i>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                style={{
+                                                    position: 'relative',
+                                                    cursor: 'default',
+                                                    borderRadius: '8px',
+                                                    overflow: 'hidden',
+                                                    border: '2px dashed #ccc',
+                                                    width: '100%',
+                                                    aspectRatio: '1',
+                                                    maxWidth: '180px',
+                                                    backgroundColor: '#f8f9fa',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                            >
+                                                <div style={{ textAlign: 'center', color: '#6c757d' }}>
+                                                    <i className="fas fa-image" style={{ fontSize: '24px', marginBottom: '8px' }}></i>
+                                                    <div style={{ fontSize: '12px' }}>No Logo Available</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </Col>
 
                         {/* Right Column - Company Info */}
-                        <Col lg={8} md={7}>
-                            {/* Company Name */}
-                            <InfoField 
-                                label="Company Name" 
-                                value={exhibitor.companyName || 'N/A'} 
-                                iconClass="fas fa-building" 
-                            />
-
-                        
-
-                            {/* Email */}
-                            <InfoField 
-                                label="Email" 
-                                value={exhibitor.email || 'N/A'} 
-                                iconClass="fas fa-envelope" 
-                            />
-
-                            {/* Mobile */}
-                            <InfoField 
-                                label="Mobile" 
-                                value={exhibitor.mobile || 'N/A'} 
-                                iconClass="fa fa-address-card" 
-                            />
-
-                            {/* UEN */}
-                            <InfoField 
-                                label="UEN" 
-                                value={exhibitor.uen || 'N/A'} 
-                                iconClass="fas fa-id-card" 
-                            />
-
-                            {/* Booth Code - Only visible to Admin */}
-                            {exhibitor.boothCode && (
+                        <Col xs={12} md={8} lg={8}>
+                            <Row>
                                 <InfoField 
-                                    label="Booth Code" 
-                                    value={
-                                        <Badge 
-                                            bg="success" 
-                                            style={{ 
-                                                fontSize: '14px', 
-                                                padding: '6px 12px',
-                                                fontWeight: '600',
-                                                letterSpacing: '1px'
-                                            }}
-                                        >
-                                            {exhibitor.boothCode}
-                                        </Badge>
-                                    } 
-                                    iconClass="fas fa-qrcode" 
+                                    label="Company Name" 
+                                    value={exhibitor.companyName || 'N/A'} 
+                                    icon="fas fa-building"
+                                    colSize={12}
                                 />
-                            )}
+                                <InfoField 
+                                    label="Email" 
+                                    value={exhibitor.email || 'N/A'} 
+                                    icon="fas fa-envelope"
+                                    colSize={12}
+                                />
+                                <InfoField 
+                                    label="Mobile" 
+                                    value={exhibitor.mobile || 'N/A'} 
+                                    icon="fas fa-phone"
+                                    colSize={12}
+                                />
+                                <InfoField 
+                                    label="UEN" 
+                                    value={exhibitor.uen || 'N/A'} 
+                                    icon="fas fa-id-card"
+                                    colSize={12}
+                                />
+                                {exhibitor.boothCode && (
+                                    <InfoField 
+                                        label="Booth Code" 
+                                        value={
+                                            <Badge 
+                                                bg="success" 
+                                                style={{ 
+                                                    fontSize: '14px', 
+                                                    padding: '6px 12px',
+                                                    fontWeight: '600',
+                                                    letterSpacing: '1px'
+                                                }}
+                                            >
+                                                {exhibitor.boothCode}
+                                            </Badge>
+                                        } 
+                                        icon="fas fa-qrcode"
+                                        colSize={12}
+                                    />
+                                )}
+                            </Row>
                         </Col>
                     </Row>
 
@@ -266,36 +503,43 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                         <div className="mt-4 pt-4" style={{ 
                             borderTop: '2px solid #e9ecef',
                             backgroundColor: '#f8f9fa',
-                            marginLeft: '-16px',
-                            marginRight: '-16px',
-                            paddingLeft: '16px',
-                            paddingRight: '16px',
+                            marginLeft: '-24px',
+                            marginRight: '-24px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
                             paddingBottom: '16px',
                             borderRadius: '0 0 8px 8px',
-                            width: 'calc(100% + 32px)'
+                            width: 'calc(100% + 48px)'
                         }}>
                             <div className="mb-3">
                                 <h6 style={{ 
-                                    fontSize: '17px', 
-                                    fontWeight: '700', 
-                                    color: '#2c3e50',
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
                                     marginBottom: '16px',
                                     display: 'flex',
-                                    alignItems: 'center'
+                                    flexWrap: 'wrap',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    borderBottom: '2px solid #4680ff',
+                                    paddingBottom: '8px',
+                                    width: '100%',
+                                    maxWidth: '100%',
+                                    boxSizing: 'border-box'
                                 }}>
-                                    <i className="fas fa-users me-2" style={{ 
-                                        color: '#17a2b8',
-                                        fontSize: '18px',
-                                        backgroundColor: '#e7f3f5',
-                                        padding: '8px',
-                                        borderRadius: '8px',
-                                        width: '36px',
-                                        height: '36px',
-                                        display: 'flex',
+                                    <div style={{ 
+                                        display: 'flex', 
                                         alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}></i>
-                                    <span>Event Staff</span>
+                                        flexShrink: 0,
+                                        minWidth: 0
+                                    }}>
+                                        <i className="fas fa-users mr-2" style={{ color: '#4680ff', flexShrink: 0 }}></i>
+                                        <span style={{ 
+                                            wordBreak: 'break-word',
+                                            overflowWrap: 'break-word',
+                                            whiteSpace: 'nowrap'
+                                        }}>Event Staff</span>
+                                    </div>
                                     <Badge 
                                         bg="info" 
                                         style={{ 
@@ -303,7 +547,8 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                                             padding: '4px 10px',
                                             borderRadius: '12px',
                                             fontWeight: '600',
-                                            marginLeft: '12px'
+                                            flexShrink: 0,
+                                            whiteSpace: 'nowrap'
                                         }}
                                     >
                                         {exhibitor.eventStaff.length} {exhibitor.eventStaff.length === 1 ? 'Member' : 'Members'}
@@ -325,34 +570,64 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                                 padding: '8px 16px',
                                 fontSize: '14px',
                                 fontWeight: '500',
-                                transition: 'none'
+                                transition: 'none',
+                                borderColor: '#4680ff',
+                                color: '#4680ff'
                             }}
                             className="no-hover"
                         >
-                            <i className="fas fa-eye me-2" style={{ marginRight: 5, color: getIconColor('fas fa-eye') }}></i>
+                            <i className="fas fa-eye me-2"></i>
                             View More
                         </Button>
                     </div>
-                </div>
-            </div>
+                </Card.Body>
+            </Card>
         </div>
     );
 
-    return (
-        <StandardComponentTemplate 
-            title="Event Exhibitors" 
-            // icon="fas fa-building"
-            borderColor="orange"
-        >
-          
-
+    const content = (
+        <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
             {/* Exhibitors List */}
-            <div>
-                {exhibitors.exhibitors.map(renderExhibitor)}
-            </div>
+            <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#000000',
+                    borderBottom: '2px solid #4680ff'
+                }}>
+                    <i className="fas fa-building mr-2" style={{ color: '#4680ff' }}></i>
+                    Event Exhibitors
+                </h5>
+                <div>
+                    {exhibitors.exhibitors.map(renderExhibitor)}
+                </div>
+            </Col>
 
-              {/* Exhibitor Description */}
-              {renderExhibitorDescription()}
+            {/* Exhibitor Description */}
+            {renderExhibitorDescription()}
+        </Row>
+    );
+
+    return (
+        <div>
+            {/* Desktop: Card wrapper */}
+            <div className="d-none d-md-block">
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {content}
+                    </Card.Body>
+                </Card>
+            </div>
+            {/* Mobile: No card wrapper, minimal padding */}
+            <div className="d-block d-md-none">
+                {content}
+            </div>
 
             {/* Image Modal for Logo Zoom */}
             {selectedImage && (
@@ -364,35 +639,32 @@ const EventExhibitorsComponent = ({ exhibitors, getImageSrc }) => {
                     downloadFileName={selectedImage.downloadFileName}
                     currentIndex={0}
                     totalImages={1}
-                    // title={selectedImage.title}
                 />
-
-                
             )}
 
             {/* CSS to disable hover effects on View More button */}
             <style jsx>{`
                 .no-hover:hover {
                     background-color: transparent !important;
-                    border-color: #007bff !important;
-                    color: #007bff !important;
+                    border-color: #4680ff !important;
+                    color: #4680ff !important;
                     transform: none !important;
                     box-shadow: none !important;
                 }
                 .no-hover:focus {
                     background-color: transparent !important;
-                    border-color: #007bff !important;
-                    color: #007bff !important;
+                    border-color: #4680ff !important;
+                    color: #4680ff !important;
                     box-shadow: none !important;
                 }
                 .no-hover:active {
                     background-color: transparent !important;
-                    border-color: #007bff !important;
-                    color: #007bff !important;
+                    border-color: #4680ff !important;
+                    color: #4680ff !important;
                     box-shadow: none !important;
                 }
             `}</style>
-        </StandardComponentTemplate>
+        </div>
     );
 };
 

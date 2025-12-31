@@ -1,34 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Row, Col } from 'react-bootstrap';
 import { API_URL } from '../../configs/env';
-
-/**
- * ReadMoreComponent - Component to handle read more/less functionality
- */
-const ReadMoreComponent = ({ text, maxLength = 100, className = '' }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
-    if (!text) return null;
-
-    const shouldTruncate = text.length > maxLength;
-    const displayText = isExpanded || !shouldTruncate ? text : text.substring(0, maxLength) + '...';
-
-    return (
-        <p className={`mb-2 ${className}`} style={{ fontSize: '14px' }}>
-            {displayText}
-            {shouldTruncate && (
-                <button
-                    type="button"
-                    className="btn btn-link p-0 ml-1"
-                    style={{ fontSize: '12px', textDecoration: 'none' }}
-                    onClick={() => setIsExpanded(!isExpanded)}
-                >
-                    {isExpanded ? 'Read Less' : 'Read More'}
-                </button>
-            )}
-        </p>
-    );
-};
+import { ExpandableDescription } from '../ExpandableDescription';
+import { SPEAKER_PATHS } from '../../utils/constants';
 
 /**
  * EventEngagementComponent - Reusable component to display event engagements
@@ -36,6 +11,8 @@ const ReadMoreComponent = ({ text, maxLength = 100, className = '' }) => {
  * @param {Function} formatTime - Function to format time to 12-hour format
  */
 const EventEngagementComponent = ({ engagements, formatTime }) => {
+    const navigate = useNavigate();
+    
     // Handle both object and array formats for backward compatibility
     let programmeTracks = [];
     
@@ -68,127 +45,578 @@ const EventEngagementComponent = ({ engagements, formatTime }) => {
         );
     }
 
-    return (
-        <>
-            <h5 className="mb-4">Event Engagements</h5>
-            {programmeTracks.map((track, engagementIndex) => {
-                // track is already the programmeTrack object
-                const isActive = track.isActive !== undefined ? track.isActive : true;
+    // Handle speaker click navigation
+    const handleSpeakerClick = (speakerId) => {
+        if (speakerId) {
+            navigate(`${SPEAKER_PATHS.VIEW_SPEAKER}/${speakerId}`);
+        }
+    };
 
+    // InfoField component matching EventBasicComponent pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+            }}
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+            </div>
+        </Col>
+    );
+
+    const content = (
+        <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+            {programmeTracks.map((track, engagementIndex) => {
+                const isActive = track.isActive !== undefined ? track.isActive : true;
+                
                 return (
-                    <div key={track.engagementId || track.id || engagementIndex} className="mb-4">
-                        <Card className="border-0 shadow-sm">
-                            <Card.Header style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #4680ff' }}>
-                                <div className="d-flex justify-content-between align-items-start">
-                                    <div style={{ flex: 1 }}>
-                                        <h6 className="mb-0 text-primary">
-                                            <i className="fas fa-layer-group" style={{ marginRight: '8px' }}></i>
-                                            <strong className="text-primary">Engagement Track (Title/Name) {engagementIndex + 1}:</strong> {track.title || 'Unknown Track'}
-                                        </h6>
-                                        {track.description && (
-                                            <div className="mt-2">
-                                                <ReadMoreComponent text={track.description} maxLength={120} className="text-muted mb-0" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <Badge bg={isActive ? 'success' : 'secondary'} className="ms-2" style={{ fontSize: '10px' }}>
+                    <Col xs={12} key={track.engagementId || track.id || engagementIndex} className="mb-md-4 mb-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {/* Engagement Overview Section */}
+                        <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                            fontSize: '16px', 
+                            fontWeight: '600', 
+                            color: '#000000',
+                            borderBottom: '2px solid #4680ff'
+                        }}>
+                            <i className="fas fa-layer-group mr-2" style={{ color: '#4680ff' }}></i>
+                            Engagement {engagementIndex + 1} Overview
+                        </h5>
+                        
+                        <Row>
+                            <InfoField 
+                                label="Engagement Title" 
+                                value={track.title || 'N/A'} 
+                                icon="fas fa-layer-group"
+                                colSize={12}
+                            />
+                            
+                            <InfoField
+                                label="Status"
+                                value={
+                                    <Badge bg={isActive ? 'success' : 'secondary'} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
                                         {isActive ? 'Active' : 'Inactive'}
                                     </Badge>
-                                </div>
-                            </Card.Header>
-                            <Card.Body>
-                                {track.sessions && track.sessions.length > 0 ? (
-                                    track.sessions.map((session, sessionIndex) => (
-                                        <div key={session.id || sessionIndex} className={`${sessionIndex > 0 ? 'mt-4 pt-4 border-top' : ''}`}>
-                                            <div className="d-flex justify-content-between align-items-start mb-3">
-                                                <div>
-                                                    <h6 className="mb-2">
-                                                        <i className="fas fa-presentation" style={{ color: '#6c757d' }}></i>
-                                                     
-                                                        <strong className="text-primary" style={{ textDecoration: 'underline' }}>Session (Title/Name)</strong> : <span className="text-dark font-weight-bold">{session.title}</span>
-                                                    </h6>
-                                                    {session.description && (
-                                                        <ReadMoreComponent 
-                                                            text={session.description} 
-                                                            maxLength={150} 
-                                                            className="text-muted mb-2" 
-                                                        />
-                                                    )}
-                                                </div>
+                                }
+                                icon="fas fa-check-circle"
+                                colSize={6}
+                            />
+                            
+                            {track.description && (
+                                <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                    <div style={{ 
+                                        padding: '8px 12px',
+                                        borderBottom: '1px solid #e9ecef',
+                                        backgroundColor: '#f8f9fa',
+                                        borderRadius: '4px',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    className="px-md-3 px-2 py-md-2 py-2"
+                                    >
+                                        {/* Mobile & Tablet: Label on top */}
+                                        <div className="d-block d-md-none">
+                                            <div style={{ 
+                                                fontSize: '13px', 
+                                                fontWeight: '600', 
+                                                color: '#4680ff',
+                                                marginBottom: '4px',
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word'
+                                            }}>
+                                                <span>Engagement Description:</span>
                                             </div>
-                                            <Row className="mb-3">
-                                                <Col md={12}>
-                                                    <div className="d-flex align-items-center text-muted" style={{ fontSize: '14px' }}>
-                                                        <i className="fas fa-clock" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                        <span><strong>Time:</strong> {session.startTime && formatTime ? formatTime(session.startTime) : (session.startTime || 'Not set')} - {session.endTime && formatTime ? formatTime(session.endTime) : (session.endTime || 'Not set')}</span>
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                            {session.speakers && session.speakers.length > 0 && (
-                                                <div>
-                                                    <h6 className="mb-3" style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                                                        <i className="fas fa-users" style={{ marginRight: '8px', color: '#6c757d' }}></i>
-                                                        Speakers:
+                                            <div style={{ 
+                                                fontSize: '14px', 
+                                                color: '#000000',
+                                                fontWeight: '400',
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                width: '100%',
+                                                lineHeight: '1.5'
+                                            }}>
+                                                <ExpandableDescription text={track.description} maxLines={2} />
+                                            </div>
+                                        </div>
+                                        {/* Desktop: Label and value side by side */}
+                                        <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                            <div style={{ 
+                                                minWidth: '140px',
+                                                maxWidth: '140px',
+                                                fontSize: '13px', 
+                                                fontWeight: '600', 
+                                                color: '#4680ff',
+                                                marginRight: '12px',
+                                                flexShrink: 0
+                                            }}>
+                                                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Engagement Description:</span>
+                                            </div>
+                                            <div style={{ 
+                                                fontSize: '14px', 
+                                                color: '#000000',
+                                                fontWeight: '400',
+                                                flex: 1,
+                                                minWidth: 0,
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                overflow: 'hidden'
+                                            }}>
+                                                <ExpandableDescription text={track.description} maxLines={2} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Col>
+                            )}
+
+                            {/* Sessions Section */}
+                            {track.sessions && track.sessions.length > 0 ? (
+                                <Row style={{ width: '100%', marginLeft: 0, marginRight: 0 }}>
+                                    {track.sessions.map((session, sessionIndex) => {
+                                        // Determine column size: full width (12) if only 1 session, otherwise 2-column grid (6)
+                                        const sessionColSize = track.sessions.length === 1 ? 12 : 6;
+                                        
+                                        // Unique colors for each session to make them visually distinct
+                                        const sessionColors = [
+                                            { border: '#4680ff', bg: '#f0f4ff', icon: 'fa-calendar-alt' },
+                                            { border: '#28a745', bg: '#f0fff4', icon: 'fa-clock' },
+                                            { border: '#ffc107', bg: '#fffbf0', icon: 'fa-calendar-check' },
+                                            { border: '#dc3545', bg: '#fff5f5', icon: 'fa-calendar-times' },
+                                            { border: '#17a2b8', bg: '#f0f9fa', icon: 'fa-calendar-day' },
+                                            { border: '#6f42c1', bg: '#f5f0ff', icon: 'fa-calendar-week' }
+                                        ];
+                                        const colorIndex = sessionIndex % sessionColors.length;
+                                        const sessionStyle = sessionColors[colorIndex];
+                                        
+                                        return (
+                                            <Col xs={12} md={sessionColSize} key={session.id || sessionIndex} className="mb-md-3 mb-3" style={{ overflow: 'hidden' }}>
+                                                <div style={{ 
+                                                    padding: '12px',
+                                                    border: `2px solid ${sessionStyle.border}`,
+                                                    borderLeft: `5px solid ${sessionStyle.border}`,
+                                                    borderRadius: '8px',
+                                                    backgroundColor: sessionStyle.bg,
+                                                    height: '100%',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}>
+                                                    <h6 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                        fontSize: '15px', 
+                                                        fontWeight: '600', 
+                                                        color: '#000000',
+                                                        borderBottom: `2px solid ${sessionStyle.border}`
+                                                    }}>
+                                                        <i className={`fas ${sessionStyle.icon} mr-2`} style={{ color: sessionStyle.border }}></i>
+                                                        Session {sessionIndex + 1}
                                                     </h6>
-                                                    <Row>
-                                                        {session.speakers.map((speaker) => (
-                                                            <Col md={6} key={speaker.id} className="mb-2">
-                                                                <div className="d-flex align-items-center p-2 rounded" style={{ backgroundColor: '#f8f9fa' }}>
-                                                                    {speaker.profilePicture ? (
-                                                                        <img
-                                                                            src={`${API_URL}/${speaker.profilePicture}`}
-                                                                            alt={speaker.name}
-                                                                            style={{
-                                                                                width: '40px',
-                                                                                height: '40px',
-                                                                                borderRadius: '50%',
-                                                                                objectFit: 'cover',
-                                                                                marginRight: '12px'
-                                                                            }}
-                                                                        />
-                                                                    ) : (
-                                                                        <div
-                                                                            style={{
-                                                                                width: '40px',
-                                                                                height: '40px',
-                                                                                borderRadius: '50%',
-                                                                                backgroundColor: '#e9ecef',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center',
-                                                                                marginRight: '12px'
-                                                                            }}
-                                                                        >
-                                                                            <i className="fas fa-user" style={{ color: '#6c757d' }}></i>
+                                                    
+                                                    <Row style={{ width: '100%', marginLeft: 0, marginRight: 0 }}>
+                                                        <InfoField 
+                                                            label="Session Title" 
+                                                            value={session.title || 'N/A'} 
+                                                            icon="fas fa-calendar-alt"
+                                                            colSize={12}
+                                                        />
+                                                        
+                                                        <InfoField
+                                                            label="Time"
+                                                            value={session.startTime && session.endTime && formatTime
+                                                                ? `${formatTime(session.startTime)} - ${formatTime(session.endTime)}`
+                                                                : session.startTime && session.endTime
+                                                                ? `${session.startTime} - ${session.endTime}`
+                                                                : 'N/A'}
+                                                            icon="fas fa-clock"
+                                                            colSize={12}
+                                                        />
+                                                        
+                                                        {/* Speakers */}
+                                                        {session.speakers && session.speakers.length > 0 && (
+                                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                <div style={{ 
+                                                                    padding: '8px 12px',
+                                                                    borderBottom: '1px solid #e9ecef',
+                                                                    width: '100%',
+                                                                    maxWidth: '100%',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                                >
+                                                                    {/* Mobile & Tablet: Label on top */}
+                                                                    <div className="d-block d-md-none">
+                                                                        <div style={{ 
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginBottom: '8px',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word'
+                                                                        }}>
+                                                                            <span>Speakers:</span>
                                                                         </div>
-                                                                    )}
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontWeight: '500', fontSize: '14px' }}>
-                                                                            {speaker.name}
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            width: '100%',
+                                                                            lineHeight: '1.5'
+                                                                        }}>
+                                                                            <Row>
+                                                                                {session.speakers.map((speaker) => (
+                                                                                    <Col xs={12} sm={6} key={speaker.id} className="mb-2">
+                                                                                        <div className="d-flex align-items-center p-2 rounded" style={{ backgroundColor: '#ffffff' }}>
+                                                                                            {speaker.profilePicture ? (
+                                                                                                <img
+                                                                                                    src={`${API_URL}/${speaker.profilePicture}`}
+                                                                                                    alt={speaker.name}
+                                                                                                    style={{
+                                                                                                        width: '40px',
+                                                                                                        height: '40px',
+                                                                                                        borderRadius: '50%',
+                                                                                                        objectFit: 'cover',
+                                                                                                        marginRight: '12px',
+                                                                                                        flexShrink: 0
+                                                                                                    }}
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <div
+                                                                                                    style={{
+                                                                                                        width: '40px',
+                                                                                                        height: '40px',
+                                                                                                        borderRadius: '50%',
+                                                                                                        backgroundColor: '#e9ecef',
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        justifyContent: 'center',
+                                                                                                        marginRight: '12px',
+                                                                                                        flexShrink: 0
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <i className="fas fa-user" style={{ color: '#6c757d' }}></i>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => handleSpeakerClick(speaker.id)}>
+                                                                                                <div style={{ 
+                                                                                                    fontWeight: '500', 
+                                                                                                    fontSize: '14px', 
+                                                                                                    wordBreak: 'break-word',
+                                                                                                    color: '#4680ff',
+                                                                                                    textDecoration: 'none',
+                                                                                                    transition: 'all 0.2s ease'
+                                                                                                }}
+                                                                                                onMouseEnter={(e) => {
+                                                                                                    e.target.style.textDecoration = 'underline';
+                                                                                                    e.target.style.color = '#0056b3';
+                                                                                                }}
+                                                                                                onMouseLeave={(e) => {
+                                                                                                    e.target.style.textDecoration = 'none';
+                                                                                                    e.target.style.color = '#4680ff';
+                                                                                                }}
+                                                                                                >
+                                                                                                    {speaker.name || 'N/A'}
+                                                                                                </div>
+                                                                                                {speaker.position && (
+                                                                                                    <div style={{ 
+                                                                                                        fontSize: '12px', 
+                                                                                                        color: '#6c757d', 
+                                                                                                        wordBreak: 'break-word',
+                                                                                                        cursor: 'pointer',
+                                                                                                        transition: 'all 0.2s ease'
+                                                                                                    }}
+                                                                                                    onMouseEnter={(e) => {
+                                                                                                        e.target.style.color = '#4680ff';
+                                                                                                    }}
+                                                                                                    onMouseLeave={(e) => {
+                                                                                                        e.target.style.color = '#6c757d';
+                                                                                                    }}
+                                                                                                    onClick={() => handleSpeakerClick(speaker.id)}
+                                                                                                    >
+                                                                                                        {speaker.position}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </Col>
+                                                                                ))}
+                                                                            </Row>
                                                                         </div>
-                                                                        {speaker.position && (
-                                                                            <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                                                                                {speaker.position}
-                                                                            </div>
-                                                                        )}
+                                                                    </div>
+                                                                    {/* Desktop: Label and value side by side */}
+                                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                        <div style={{ 
+                                                                            minWidth: '140px',
+                                                                            maxWidth: '140px',
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginRight: '12px',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Speakers:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            flex: 1,
+                                                                            minWidth: 0,
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            overflow: 'hidden'
+                                                                        }}>
+                                                                            <Row>
+                                                                                {session.speakers.map((speaker) => (
+                                                                                    <Col md={12} key={speaker.id} className="mb-2">
+                                                                                        <div className="d-flex align-items-center p-2 rounded" style={{ backgroundColor: '#ffffff' }}>
+                                                                                            {speaker.profilePicture ? (
+                                                                                                <img
+                                                                                                    src={`${API_URL}/${speaker.profilePicture}`}
+                                                                                                    alt={speaker.name}
+                                                                                                    style={{
+                                                                                                        width: '40px',
+                                                                                                        height: '40px',
+                                                                                                        borderRadius: '50%',
+                                                                                                        objectFit: 'cover',
+                                                                                                        marginRight: '12px',
+                                                                                                        flexShrink: 0
+                                                                                                    }}
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <div
+                                                                                                    style={{
+                                                                                                        width: '40px',
+                                                                                                        height: '40px',
+                                                                                                        borderRadius: '50%',
+                                                                                                        backgroundColor: '#e9ecef',
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        justifyContent: 'center',
+                                                                                                        marginRight: '12px',
+                                                                                                        flexShrink: 0
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <i className="fas fa-user" style={{ color: '#6c757d' }}></i>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => handleSpeakerClick(speaker.id)}>
+                                                                                                <div style={{ 
+                                                                                                    fontWeight: '500', 
+                                                                                                    fontSize: '14px', 
+                                                                                                    wordBreak: 'break-word',
+                                                                                                    color: '#4680ff',
+                                                                                                    textDecoration: 'none',
+                                                                                                    transition: 'all 0.2s ease'
+                                                                                                }}
+                                                                                                onMouseEnter={(e) => {
+                                                                                                    e.target.style.textDecoration = 'underline';
+                                                                                                    e.target.style.color = '#0056b3';
+                                                                                                }}
+                                                                                                onMouseLeave={(e) => {
+                                                                                                    e.target.style.textDecoration = 'none';
+                                                                                                    e.target.style.color = '#4680ff';
+                                                                                                }}
+                                                                                                >
+                                                                                                    {speaker.name || 'N/A'}
+                                                                                                </div>
+                                                                                                {speaker.position && (
+                                                                                                    <div style={{ 
+                                                                                                        fontSize: '12px', 
+                                                                                                        color: '#6c757d', 
+                                                                                                        wordBreak: 'break-word',
+                                                                                                        cursor: 'pointer',
+                                                                                                        transition: 'all 0.2s ease'
+                                                                                                    }}
+                                                                                                    onMouseEnter={(e) => {
+                                                                                                        e.target.style.color = '#4680ff';
+                                                                                                    }}
+                                                                                                    onMouseLeave={(e) => {
+                                                                                                        e.target.style.color = '#6c757d';
+                                                                                                    }}
+                                                                                                    onClick={() => handleSpeakerClick(speaker.id)}
+                                                                                                    >
+                                                                                                        {speaker.position}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </Col>
+                                                                                ))}
+                                                                            </Row>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </Col>
-                                                        ))}
+                                                        )}
+                                                        
+                                                        {/* Session Description - Last */}
+                                                        {session.description && (
+                                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                <div style={{ 
+                                                                    padding: '8px 12px',
+                                                                    borderBottom: '1px solid #e9ecef',
+                                                                    backgroundColor: '#ffffff',
+                                                                    borderRadius: '4px',
+                                                                    width: '100%',
+                                                                    maxWidth: '100%',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                                >
+                                                                    {/* Mobile & Tablet: Label on top */}
+                                                                    <div className="d-block d-md-none">
+                                                                        <div style={{ 
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginBottom: '4px',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word'
+                                                                        }}>
+                                                                            <span>Session Description:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            width: '100%',
+                                                                            lineHeight: '1.5'
+                                                                        }}>
+                                                                            <ExpandableDescription text={session.description} maxLines={2} />
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Desktop: Label and value side by side */}
+                                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                        <div style={{ 
+                                                                            minWidth: '140px',
+                                                                            maxWidth: '140px',
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginRight: '12px',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Session Description:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            flex: 1,
+                                                                            minWidth: 0,
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            overflow: 'hidden'
+                                                                        }}>
+                                                                            <ExpandableDescription text={session.description} maxLines={2} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </Col>
+                                                        )}
                                                     </Row>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-muted mb-0">No sessions available for this engagement.</p>
-                                )}
-                            </Card.Body>
-                        </Card>
-                    </div>
+                                            </Col>
+                                        );
+                                    })}
+                                </Row>
+                            ) : (
+                                <Col xs={12} className="mb-2">
+                                    <div style={{ 
+                                        padding: '8px 12px',
+                                        borderBottom: '1px solid #e9ecef',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    className="px-md-3 px-2 py-md-2 py-2"
+                                    >
+                                        <p className="text-muted mb-0" style={{ fontSize: '14px' }}>No sessions available for this engagement.</p>
+                                    </div>
+                                </Col>
+                            )}
+                        </Row>
+                    </Col>
                 );
             })}
-        </>
+        </Row>
+    );
+
+    return (
+        <div>
+            {/* Desktop: Card wrapper */}
+            <div className="d-none d-md-block">
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {content}
+                    </Card.Body>
+                </Card>
+            </div>
+            {/* Mobile: No card wrapper, minimal padding */}
+            <div>
+                {content}
+            </div>
+        </div>
     );
 };
 

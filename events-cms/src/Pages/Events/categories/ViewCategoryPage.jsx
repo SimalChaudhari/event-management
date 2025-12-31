@@ -61,222 +61,600 @@ const ViewCategoryPage = () => {
 
     const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
         <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
-            <div style={{ 
-                padding: '8px 12px',
-                borderBottom: '1px solid #e9ecef',
-                width: '100%',
-                maxWidth: '100%',
-                boxSizing: 'border-box',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-            }}>
-                {icon && (
-                    <i 
-                        className={icon} 
-                        style={{ 
-                            fontSize: '14px', 
-                            flexShrink: 0,
-                            width: '16px',
-                            textAlign: 'center',
-                            color: '#4680ff'
+            <div
+                style={{
+                    padding: '8px 12px',
+                    borderBottom: '1px solid #e9ecef',
+                    width: '100%',
+                    maxWidth: '100%',
+                    boxSizing: 'border-box'
+                }}
+                className="px-md-3 px-0 py-md-2 py-0"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div
+                        style={{
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            color: '#4680ff',
+                            marginBottom: '4px',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word'
                         }}
-                    ></i>
-                )}
-                <span style={{ 
-                    fontSize: '13px', 
-                    fontWeight: '600', 
-                    color: '#000000',
-                    minWidth: '120px',
-                    flexShrink: 0
-                }}>
-                    {label}:
-                </span>
-                <span style={{ 
-                    fontSize: '14px', 
-                    color: '#000000',
-                    fontWeight: '400',
-                    flex: 1,
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word'
-                }}>
-                    {value || 'N/A'}
-                </span>
+                    >
+                        <span>{label}:</span>
+                    </div>
+                    <div
+                        style={{
+                            fontSize: '14px',
+                            color: '#000000',
+                            fontWeight: '400',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                            width: '100%',
+                            lineHeight: '1.5'
+                        }}
+                    >
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div
+                        style={{
+                            minWidth: '140px',
+                            maxWidth: '140px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            color: '#4680ff',
+                            marginRight: '12px',
+                            flexShrink: 0
+                        }}
+                    >
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div
+                        style={{
+                            fontSize: '14px',
+                            color: '#000000',
+                            fontWeight: '400',
+                            flex: 1,
+                            minWidth: 0,
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        {value || 'N/A'}
+                    </div>
+                </div>
             </div>
         </Col>
     );
 
     return (
         <>
-            <Container fluid className="mt-4" style={{ overflowX: 'hidden', width: '100%', maxWidth: '100%' }}>
+            <Container
+                fluid
+                className="mt-4"
+                style={{ overflowX: 'hidden', width: '100%', maxWidth: '100%', paddingLeft: '0', paddingRight: '0' }}
+            >
                 {/* Header */}
-                <div style={{ 
-                    backgroundColor: '#fff', 
-                    borderRadius: '8px', 
-                    padding: '20px', 
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    marginBottom: '24px',
-                    borderTop: '4px solid #4680ff'
-                }}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4 style={{ 
-                                margin: 0, 
-                                color: '#000000',
-                                fontWeight: '600'
-                            }}>
-                                <i className="feather icon-folder mr-2" style={{ color: '#4680ff' }}></i>
+                <div
+                    style={{
+                        backgroundColor: '#fff',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        marginBottom: '24px',
+                        borderTop: '4px solid #4680ff'
+                    }}
+                >
+                    <div className="d-flex justify-content-between align-items-center flex-wrap">
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                            <h4
+                                style={{
+                                    margin: 0,
+                                    color: '#000000',
+                                    fontWeight: '600',
+                                    fontSize: 'clamp(18px, 4vw, 24px)',
+                                    wordBreak: 'break-word'
+                                }}
+                            >
+                                <i
+                                    className="feather icon-folder mr-2"
+                                    style={{ color: '#4680ff', fontSize: 'clamp(16px, 3.5vw, 20px)' }}
+                                ></i>
                                 Category Profile
                             </h4>
-                            <p style={{ 
-                                margin: '8px 0 0 0', 
-                                color: '#000000',
-                                fontSize: '14px'
-                            }}>
-                                View detailed information about this category
-                            </p>
                         </div>
-                        <Button 
-                            variant="outline-secondary" 
+                        <Button
+                            variant="outline-secondary"
                             onClick={() => handleBack()}
-                            style={{ 
+                            className="mt-2 mt-md-0"
+                            style={{
                                 borderRadius: '8px',
-                                padding: '8px 16px',
+                                padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 16px)',
                                 border: '1px solid #dee2e6',
-                                fontWeight: '500'
+                                fontWeight: '500',
+                                fontSize: 'clamp(12px, 2.5vw, 14px)',
+                                whiteSpace: 'nowrap'
                             }}
                         >
-                            <i className="fas fa-arrow-left me-2" style={{marginRight: '10px'}}></i>
+                            <i className="fas fa-arrow-left me-2" style={{ marginRight: '10px', fontSize: 'clamp(12px, 2.5vw, 14px)' }}></i>
                             Back
                         </Button>
                     </div>
                 </div>
 
                 {/* Main Content Card */}
-                <Card style={{ 
-                    backgroundColor: '#fff', 
-                    borderRadius: '8px', 
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    border: '1px solid #e9ecef',
-                    overflow: 'hidden'
-                }}>
-                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                        <Row style={{ margin: 0, width: '100%', maxWidth: '100%' }}>
-                            {/* Category Information */}
-                            <Col xs={12} style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                                <h5 style={{ 
-                                    fontSize: '16px', 
-                                    fontWeight: '600', 
-                                    color: '#000000',
-                                    marginBottom: '16px',
-                                    paddingBottom: '8px',
-                                    borderBottom: '2px solid #4680ff'
-                                }}>
-                                    <i className="feather icon-folder mr-2" style={{ color: '#4680ff' }}></i>
-                                    Category Information
-                                </h5>
-                                <Row>
-                                    <InfoField 
-                                        label="Category Name" 
-                                        value={categoryData.name}
-                                        icon="feather icon-folder"
-                                        colSize={12}
-                                    />
-                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
-                                        <div style={{ 
-                                            padding: '8px 12px',
-                                            borderBottom: '1px solid #e9ecef',
-                                            width: '100%',
-                                            maxWidth: '100%',
-                                            boxSizing: 'border-box',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}>
-                                            <i 
-                                                className="feather icon-check-circle" 
-                                                style={{ 
-                                                    fontSize: '14px', 
-                                                    flexShrink: 0,
-                                                    width: '16px',
-                                                    textAlign: 'center',
-                                                    color: '#4680ff'
-                                                }}
-                                            ></i>
-                                            <span style={{ 
-                                                fontSize: '13px', 
-                                                fontWeight: '600', 
+                <div>
+                    {/* Desktop: Card wrapper */}
+                    <div className="d-none d-md-block">
+                        <Card
+                            style={{
+                                backgroundColor: '#fff',
+                                borderRadius: '8px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                border: '1px solid #e9ecef',
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <Row style={{ margin: 0, width: '100%', maxWidth: '100%' }}>
+                                    {/* Category Information */}
+                                    <Col xs={12} style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                        <h5
+                                            style={{
+                                                fontSize: '16px',
+                                                fontWeight: '600',
                                                 color: '#000000',
-                                                minWidth: '120px',
-                                                flexShrink: 0
-                                            }}>
-                                                Status:
-                                            </span>
-                                            <Badge 
-                                                bg={categoryData.status === 'active' ? 'success' : 'secondary'}
-                                                style={{ 
-                                                    fontSize: '12px', 
-                                                    padding: '6px 12px',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                {categoryData.status ? categoryData.status.charAt(0).toUpperCase() + categoryData.status.slice(1) : 'N/A'}
-                                            </Badge>
-                                        </div>
+                                                marginBottom: '16px',
+                                                paddingBottom: '8px',
+                                                borderBottom: '2px solid #4680ff'
+                                            }}
+                                        >
+                                            <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                            Category Information
+                                        </h5>
+                                        <Row>
+                                            <InfoField
+                                                label="Category Name"
+                                                value={categoryData.name}
+                                                icon="feather icon-folder"
+                                                colSize={12}
+                                            />
+                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                <div
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderBottom: '1px solid #e9ecef',
+                                                        width: '100%',
+                                                        maxWidth: '100%',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                    className="px-md-3 px-0 py-md-2 py-0"
+                                                >
+                                                    {/* Mobile & Tablet: Label on top */}
+                                                    <div className="d-block d-md-none">
+                                                        <div
+                                                            style={{
+                                                                fontSize: '13px',
+                                                                fontWeight: '600',
+                                                                color: '#4680ff',
+                                                                marginBottom: '4px',
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'break-word'
+                                                            }}
+                                                        >
+                                                            <span>Status:</span>
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                fontSize: '14px',
+                                                                color: '#000000',
+                                                                fontWeight: '400',
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'break-word',
+                                                                width: '100%',
+                                                                lineHeight: '1.5'
+                                                            }}
+                                                        >
+                                                            <Badge
+                                                                bg={categoryData.status === 'active' ? 'success' : 'secondary'}
+                                                                style={{
+                                                                    fontSize: '12px',
+                                                                    padding: '6px 12px',
+                                                                    fontWeight: '600'
+                                                                }}
+                                                            >
+                                                                {categoryData.status
+                                                                    ? categoryData.status.charAt(0).toUpperCase() +
+                                                                      categoryData.status.slice(1)
+                                                                    : 'N/A'}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                    {/* Desktop: Label and value side by side */}
+                                                    <div
+                                                        className="d-none d-md-flex align-items-center"
+                                                        style={{ width: '100%', minWidth: 0 }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                minWidth: '140px',
+                                                                maxWidth: '140px',
+                                                                fontSize: '13px',
+                                                                fontWeight: '600',
+                                                                color: '#4680ff',
+                                                                marginRight: '12px',
+                                                                flexShrink: 0
+                                                            }}
+                                                        >
+                                                            <span>Status:</span>
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                flex: 1,
+                                                                minWidth: 0
+                                                            }}
+                                                        >
+                                                            <Badge
+                                                                bg={categoryData.status === 'active' ? 'success' : 'secondary'}
+                                                                style={{
+                                                                    fontSize: '12px',
+                                                                    padding: '6px 12px',
+                                                                    fontWeight: '600'
+                                                                }}
+                                                            >
+                                                                {categoryData.status
+                                                                    ? categoryData.status.charAt(0).toUpperCase() +
+                                                                      categoryData.status.slice(1)
+                                                                    : 'N/A'}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                            {categoryData.description && (
+                                                <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                    <div
+                                                        style={{
+                                                            padding: '8px 12px',
+                                                            borderBottom: '1px solid #e9ecef',
+                                                            backgroundColor: '#f8f9fa',
+                                                            borderRadius: '4px',
+                                                            width: '100%',
+                                                            maxWidth: '100%',
+                                                            boxSizing: 'border-box'
+                                                        }}
+                                                        className="px-md-3 px-2 py-md-2 py-2"
+                                                    >
+                                                        {/* Mobile & Tablet: Label on top */}
+                                                        <div className="d-block d-md-none">
+                                                            <div
+                                                                style={{
+                                                                    fontSize: '13px',
+                                                                    fontWeight: '600',
+                                                                    color: '#4680ff',
+                                                                    marginBottom: '4px',
+                                                                    wordBreak: 'break-word',
+                                                                    overflowWrap: 'break-word'
+                                                                }}
+                                                            >
+                                                                <span>Description:</span>
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: '14px',
+                                                                    color: '#000000',
+                                                                    fontWeight: '400',
+                                                                    wordBreak: 'break-word',
+                                                                    overflowWrap: 'break-word',
+                                                                    width: '100%',
+                                                                    lineHeight: '1.5'
+                                                                }}
+                                                            >
+                                                                {categoryData.description}
+                                                            </div>
+                                                        </div>
+                                                        {/* Desktop: Label and value side by side */}
+                                                        <div
+                                                            className="d-none d-md-flex align-items-start"
+                                                            style={{ width: '100%', minWidth: 0 }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    minWidth: '140px',
+                                                                    maxWidth: '140px',
+                                                                    fontSize: '13px',
+                                                                    fontWeight: '600',
+                                                                    color: '#4680ff',
+                                                                    marginRight: '12px',
+                                                                    flexShrink: 0
+                                                                }}
+                                                            >
+                                                                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                                                                    Description:
+                                                                </span>
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: '14px',
+                                                                    color: '#000000',
+                                                                    fontWeight: '400',
+                                                                    flex: 1,
+                                                                    minWidth: 0,
+                                                                    wordBreak: 'break-word',
+                                                                    overflowWrap: 'break-word',
+                                                                    overflow: 'hidden'
+                                                                }}
+                                                            >
+                                                                {categoryData.description}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            )}
+                                        </Row>
+                                    </Col>
+
+                                    {/* Additional Details */}
+                                    <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                        <h5
+                                            style={{
+                                                fontSize: '16px',
+                                                fontWeight: '600',
+                                                color: '#000000',
+                                                marginBottom: '16px',
+                                                paddingBottom: '8px',
+                                                borderBottom: '2px solid #4680ff'
+                                            }}
+                                        >
+                                            <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                            Additional Details
+                                        </h5>
+                                        <Row>
+                                            {categoryData.createdAt && (
+                                                <InfoField
+                                                    label="Created At"
+                                                    value={new Date(categoryData.createdAt).toLocaleString()}
+                                                    icon="feather icon-user-plus"
+                                                    colSize={12}
+                                                />
+                                            )}
+                                            {categoryData.updatedAt && (
+                                                <InfoField
+                                                    label="Last Updated"
+                                                    value={new Date(categoryData.updatedAt).toLocaleString()}
+                                                    icon="feather icon-edit"
+                                                    colSize={12}
+                                                />
+                                            )}
+                                        </Row>
                                     </Col>
                                 </Row>
-                            </Col>
-
-                            {/* Description */}
-                            {categoryData.description && (
-                                <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                                    <h5 style={{ 
-                                        fontSize: '16px', 
-                                        fontWeight: '600', 
+                            </Card.Body>
+                        </Card>
+                    </div>
+                    {/* Mobile: No card, just white background */}
+                    <div
+                        className="d-block d-md-none"
+                        style={{ backgroundColor: '#fff', overflow: 'hidden', width: '100%', maxWidth: '100%' }}
+                    >
+                        <Row style={{ margin: '20px 0 0 0', width: '100%', maxWidth: '100%' }}>
+                            {/* Category Information */}
+                            <Col xs={12} style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5
+                                    style={{
+                                        fontSize: '16px',
+                                        fontWeight: '600',
                                         color: '#000000',
                                         marginBottom: '16px',
                                         paddingBottom: '8px',
                                         borderBottom: '2px solid #4680ff'
-                                    }}>
-                                        <i className="feather icon-file-text mr-2" style={{ color: '#4680ff' }}></i>
-                                        Description
-                                    </h5>
-                                    <div style={{ 
-                                        padding: '12px',
-                                        color: '#000000',
-                                        lineHeight: '1.6',
-                                        fontSize: '14px'
-                                    }}>
-                                        {categoryData.description}
-                                    </div>
-                                </Col>
-                            )}
+                                    }}
+                                >
+                                    <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                    Category Information
+                                </h5>
+                                <Row>
+                                    <InfoField label="Category Name" value={categoryData.name} icon="feather icon-folder" colSize={12} />
+                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                        <div
+                                            style={{
+                                                padding: '8px 12px',
+                                                borderBottom: '1px solid #e9ecef',
+                                                width: '100%',
+                                                maxWidth: '100%',
+                                                boxSizing: 'border-box'
+                                            }}
+                                            className="px-md-3 px-0 py-md-2 py-0"
+                                        >
+                                            {/* Mobile & Tablet: Label on top */}
+                                            <div className="d-block d-md-none">
+                                                <div
+                                                    style={{
+                                                        fontSize: '13px',
+                                                        fontWeight: '600',
+                                                        color: '#4680ff',
+                                                        marginBottom: '4px',
+                                                        wordBreak: 'break-word',
+                                                        overflowWrap: 'break-word'
+                                                    }}
+                                                >
+                                                    <span>Status:</span>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontSize: '14px',
+                                                        color: '#000000',
+                                                        fontWeight: '400',
+                                                        wordBreak: 'break-word',
+                                                        overflowWrap: 'break-word',
+                                                        width: '100%',
+                                                        lineHeight: '1.5'
+                                                    }}
+                                                >
+                                                    <Badge
+                                                        bg={categoryData.status === 'active' ? 'success' : 'secondary'}
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            padding: '6px 12px',
+                                                            fontWeight: '600'
+                                                        }}
+                                                    >
+                                                        {categoryData.status
+                                                            ? categoryData.status.charAt(0).toUpperCase() + categoryData.status.slice(1)
+                                                            : 'N/A'}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            {/* Desktop: Label and value side by side */}
+                                            <div className="d-none d-md-flex align-items-center" style={{ width: '100%', minWidth: 0 }}>
+                                                <div
+                                                    style={{
+                                                        minWidth: '140px',
+                                                        maxWidth: '140px',
+                                                        fontSize: '13px',
+                                                        fontWeight: '600',
+                                                        color: '#4680ff',
+                                                        marginRight: '12px',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    <span>Status:</span>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        flex: 1,
+                                                        minWidth: 0
+                                                    }}
+                                                >
+                                                    <Badge
+                                                        bg={categoryData.status === 'active' ? 'success' : 'secondary'}
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            padding: '6px 12px',
+                                                            fontWeight: '600'
+                                                        }}
+                                                    >
+                                                        {categoryData.status
+                                                            ? categoryData.status.charAt(0).toUpperCase() + categoryData.status.slice(1)
+                                                            : 'N/A'}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+                                    {categoryData.description && (
+                                        <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                            <div
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    borderBottom: '1px solid #e9ecef',
+                                                    backgroundColor: '#f8f9fa',
+                                                    borderRadius: '4px',
+                                                    width: '100%',
+                                                    maxWidth: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                className="px-md-3 px-2 py-md-2 py-2"
+                                            >
+                                                {/* Mobile & Tablet: Label on top */}
+                                                <div className="d-block d-md-none">
+                                                    <div
+                                                        style={{
+                                                            fontSize: '13px',
+                                                            fontWeight: '600',
+                                                            color: '#4680ff',
+                                                            marginBottom: '4px',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word'
+                                                        }}
+                                                    >
+                                                        <span>Description:</span>
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '14px',
+                                                            color: '#000000',
+                                                            fontWeight: '400',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            width: '100%',
+                                                            lineHeight: '1.5'
+                                                        }}
+                                                    >
+                                                        {categoryData.description}
+                                                    </div>
+                                                </div>
+                                                {/* Desktop: Label and value side by side */}
+                                                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                    <div
+                                                        style={{
+                                                            minWidth: '140px',
+                                                            maxWidth: '140px',
+                                                            fontSize: '13px',
+                                                            fontWeight: '600',
+                                                            color: '#4680ff',
+                                                            marginRight: '12px',
+                                                            flexShrink: 0
+                                                        }}
+                                                    >
+                                                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                                                            Description:
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: '14px',
+                                                            color: '#000000',
+                                                            fontWeight: '400',
+                                                            flex: 1,
+                                                            minWidth: 0,
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            overflow: 'hidden'
+                                                        }}
+                                                    >
+                                                        {categoryData.description}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Col>
+                                    )}
+                                </Row>
+                            </Col>
 
-                            {/* Account Details */}
+                            {/* Additional Details */}
                             <Col xs={12} className="mt-4" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                                <h5 style={{ 
-                                    fontSize: '16px', 
-                                    fontWeight: '600', 
-                                    color: '#000000',
-                                    marginBottom: '16px',
-                                    paddingBottom: '8px',
-                                    borderBottom: '2px solid #4680ff'
-                                }}>
-                                    <i className="feather icon-settings mr-2" style={{ color: '#4680ff' }}></i>
+                                <h5
+                                    style={{
+                                        fontSize: '16px',
+                                        fontWeight: '600',
+                                        color: '#000000',
+                                        marginBottom: '16px',
+                                        paddingBottom: '8px',
+                                        borderBottom: '2px solid #4680ff'
+                                    }}
+                                >
+                                    <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
                                     Additional Details
                                 </h5>
                                 <Row>
                                     {categoryData.createdAt && (
-                                        <InfoField 
-                                            label="Created At" 
+                                        <InfoField
+                                            label="Created At"
                                             value={new Date(categoryData.createdAt).toLocaleString()}
                                             icon="feather icon-user-plus"
                                             colSize={12}
                                         />
                                     )}
                                     {categoryData.updatedAt && (
-                                        <InfoField 
-                                            label="Last Updated" 
+                                        <InfoField
+                                            label="Last Updated"
                                             value={new Date(categoryData.updatedAt).toLocaleString()}
                                             icon="feather icon-edit"
                                             colSize={12}
@@ -285,8 +663,8 @@ const ViewCategoryPage = () => {
                                 </Row>
                             </Col>
                         </Row>
-                    </Card.Body>
-                </Card>
+                    </div>
+                </div>
             </Container>
         </>
     );

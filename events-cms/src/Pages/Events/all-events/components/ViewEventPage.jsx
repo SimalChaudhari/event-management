@@ -712,7 +712,7 @@ const ViewEventPage = () => {
                         <Tab.Content>
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <div className="p-3">
+                                <div>
                                     <EventBasicComponent eventData={eventData} formatTime={formatTime} />
                                 </div>
                             </Tab.Pane>
@@ -818,7 +818,7 @@ const ViewEventPage = () => {
                             {/* Survey Tab */}
                             {isTabVisible('survey') && (
                                 <Tab.Pane eventKey="survey">
-                                    <div className="p-3">
+                                    <div>
                                         <EventSurveyComponent surveyDetails={eventData?.surveyDetails} formatTime={formatTime} />
                                     </div>
                                 </Tab.Pane>
@@ -837,7 +837,7 @@ const ViewEventPage = () => {
                             {/* Programme Tab */}
                             {isTabVisible('programme') && (
                                 <Tab.Pane eventKey="programme">
-                                    <div className="p-3">
+                                    <div>
                                         <EventProgrammeComponent 
                                             programmeTracks={eventData?.programmeTracks}
                                             formatTime={formatTime}
@@ -849,7 +849,7 @@ const ViewEventPage = () => {
                             {/* Engagement Tab */}
                             {isTabVisible('engagement') && (
                                 <Tab.Pane eventKey="engagement">
-                                    <div className="p-3">
+                                    <div>
                                         <EventEngagementComponent 
                                             engagements={eventData?.engagements}
                                             formatTime={formatTime}

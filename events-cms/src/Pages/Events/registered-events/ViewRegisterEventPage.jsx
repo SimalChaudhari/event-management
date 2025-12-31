@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Row, Col, Badge, Nav, Tab, Container } from 'react-bootstrap';
+import { Button, Row, Col, Badge, Nav, Tab, Container, Card } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { registerEventById } from '../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../utils/constants';
 import EventBasicComponent from '../../../components/events/EventBasicComponent';
 import axiosInstance from '../../../configs/axiosInstance';
 import { toast } from 'react-toastify';
+import { formatPhoneDisplay } from '../../../utils/phoneFormatter';
+import { ExpandableDescription } from '../../../components/ExpandableDescription';
 
 const ViewRegisterEventPage = () => {
     const { id } = useParams();
@@ -66,13 +68,87 @@ const ViewRegisterEventPage = () => {
     if (loading) return <div>Loading...</div>;
     if (!eventData) return <div>No register event found.</div>;
 
-    const regDate = new Date(eventData.createdAt).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    // Format timestamp to readable date
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return 'N/A';
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
+    const regDate = formatTimestamp(eventData.createdAt);
+
+    // InfoField component matching EventBasicComponent pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+            }}
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+            </div>
+        </Col>
+    );
 
     return (
         <>
@@ -131,532 +207,614 @@ const ViewRegisterEventPage = () => {
                         <Tab.Content>
                             {/* Registration Information Tab */}
                             <Tab.Pane eventKey="registration">
-                                <div className="p-2 bg-light">
-                                    {/* User Information Section */}
-                                    <div
-                                        className="mb-4"
-                                        style={{
-                                            backgroundColor: '#fff',
-                                            borderRadius: '8px',
-                                            padding: '20px',
+                                <div>
+                                    {/* Desktop: Card wrapper */}
+                                    <div className="d-none d-md-block">
+                                        <Card style={{ 
+                                            backgroundColor: '#fff', 
+                                            borderRadius: '8px', 
                                             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                                             border: '1px solid #e9ecef',
-                                            borderLeft: '4px solid #3498db'
-                                        }}
-                                    >
-                                        <div style={{ padding: '24px' }}>
-                                            <h5
-                                                style={{
-                                                    fontSize: '18px',
-                                                    fontWeight: '600',
-                                                    color: '#2c3e50',
-                                                    marginBottom: '20px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '10px',
-                                                    borderBottom: '2px solid #3498db',
-                                                    paddingBottom: '8px'
-                                                }}
-                                            >
-                                                <i className="fas fa-user-circle" style={{ fontSize: '20px', color: '#3498db' }}></i>
-                                                User Information
-                                            </h5>
-                                            <Row>
-                                                <Col lg={6} md={12}>
-                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className="fas fa-user"
-                                                                        style={{ marginRight: '8px', color: '#007bff' }}
-                                                                    ></i>
-                                                                    Registered By:
-                                                                </div>
-                                                                <div
-                                                                    className="field-value"
-                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
-                                                                >
-                                                                    {eventData.user?.firstName} {eventData.user?.lastName}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className="fas fa-envelope"
-                                                                        style={{ marginRight: '8px', color: '#17a2b8' }}
-                                                                    ></i>
-                                                                    Email:
-                                                                </div>
-                                                                <div
-                                                                    className="field-value"
-                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
-                                                                >
-                                                                    {eventData.user?.email}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className="fas fa-phone"
-                                                                        style={{ marginRight: '8px', color: '#28a745' }}
-                                                                    ></i>
-                                                                    Mobile:
-                                                                </div>
-                                                                <div
-                                                                    className="field-value"
-                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
-                                                                >
-                                                                    {eventData.user?.mobile || 'N/A'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </Col>
-
-                                                <Col lg={6} md={12}>
-                                                    <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className="fas fa-calendar-alt"
-                                                                        style={{ marginRight: '8px', color: '#fd7e14' }}
-                                                                    ></i>
-                                                                    Registration Date:
-                                                                </div>
-                                                                <div
-                                                                    className="field-value"
-                                                                    style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}
-                                                                >
-                                                                    {regDate}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                            <div className="info-field-container">
-                                                                <div
-                                                                    className="field-label"
-                                                                    style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                >
-                                                                    <i
-                                                                        className="fas fa-tag"
-                                                                        style={{ marginRight: '8px', color: '#6f42c1' }}
-                                                                    ></i>
-                                                                    User Type:
-                                                                </div>
-                                                                <div className="field-value">
-                                                                    <Badge bg="secondary" className="px-3 py-1">
+                                            overflow: 'hidden'
+                                        }}>
+                                            <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                                    {/* User Information Section */}
+                                                    <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                        <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                            fontSize: '16px', 
+                                                            fontWeight: '600', 
+                                                            color: '#000000',
+                                                            borderBottom: '2px solid #4680ff'
+                                                        }}>
+                                                            <i className="fas fa-user mr-2" style={{ color: '#4680ff' }}></i>
+                                                            User Information
+                                                        </h5>
+                                                        <Row>
+                                                            <InfoField 
+                                                                label="Registered By" 
+                                                                value={`${eventData.user?.firstName || ''} ${eventData.user?.lastName || ''}`.trim() || 'N/A'}
+                                                                icon="fas fa-user"
+                                                                colSize={6}
+                                                            />
+                                                            <InfoField 
+                                                                label="Email" 
+                                                                value={eventData.user?.email || 'N/A'}
+                                                                icon="fas fa-envelope"
+                                                                colSize={6}
+                                                            />
+                                                            <InfoField 
+                                                                label="Mobile Number" 
+                                                                value={formatPhoneDisplay(eventData.user?.mobile)}
+                                                                icon="fas fa-phone"
+                                                                colSize={6}
+                                                            />
+                                                            <InfoField 
+                                                                label="Registration Date" 
+                                                                value={regDate}
+                                                                icon="fas fa-calendar-alt"
+                                                                colSize={6}
+                                                            />
+                                                            <InfoField 
+                                                                label="User Type" 
+                                                                value={
+                                                                    <Badge bg="secondary" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
                                                                         {eventData.type || 'N/A'}
                                                                     </Badge>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {eventData.isCreatedByAdmin && (
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div
-                                                                        className="field-label"
-                                                                        style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}
-                                                                    >
-                                                                        <i
-                                                                            className="fas fa-shield-alt"
-                                                                            style={{ marginRight: '8px', color: '#dc3545' }}
-                                                                        ></i>
-                                                                        Created By:
-                                                                    </div>
-                                                                    <div className="field-value">
-                                                                        <Badge bg="danger" className="px-3 py-1">
+                                                                }
+                                                                icon="fas fa-tag"
+                                                                colSize={6}
+                                                            />
+                                                            {eventData.isCreatedByAdmin && (
+                                                                <InfoField 
+                                                                    label="Created By" 
+                                                                    value={
+                                                                        <Badge bg="danger" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
                                                                             Admin
                                                                         </Badge>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                        </div>
-                                    </div>
+                                                                    }
+                                                                    icon="fas fa-shield-alt"
+                                                                    colSize={6}
+                                                                />
+                                                            )}
+                                                        </Row>
+                                                    </Col>
 
-                                    {/* Order Details Section */}
-                                    {eventData?.order && (
-                                        <div
-                                            className="mb-4"
-                                            style={{
-                                                backgroundColor: '#fff',
-                                                borderRadius: '8px',
-                                                padding: '20px',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                                border: '1px solid #e9ecef',
-                                                borderLeft: '4px solid #ffc107'
-                                            }}
-                                        >
-                                            <div style={{ padding: '24px' }}>
-                                                <h5
-                                                    style={{
-                                                        fontSize: '18px',
-                                                        fontWeight: '600',
-                                                        color: '#2c3e50',
-                                                        marginBottom: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '10px',
-                                                        borderBottom: '2px solid #ffc107',
-                                                        paddingBottom: '8px'
-                                                    }}
-                                                >
-                                                    <i className="fas fa-receipt" style={{ fontSize: '20px', color: '#ffc107' }}></i>
-                                                    Order Details
-                                                </h5>
-                                                <Row>
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-hashtag" style={{ marginRight: '8px', color: '#007bff' }}></i>
-                                                                        Order Number:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.order?.orderNo || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-credit-card" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
-                                                                        Payment Status:
-                                                                    </div>
-                                                                    <div className="field-value">
-                                                                        <Badge
+                                                    {/* Order Details Section */}
+                                                    {eventData?.order && (
+                                                        <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                                fontSize: '16px', 
+                                                                fontWeight: '600', 
+                                                                color: '#000000',
+                                                                borderBottom: '2px solid #4680ff'
+                                                            }}>
+                                                                <i className="fas fa-receipt mr-2" style={{ color: '#4680ff' }}></i>
+                                                                Order Details
+                                                            </h5>
+                                                            <Row>
+                                                                <InfoField 
+                                                                    label="Order Number" 
+                                                                    value={eventData.order?.orderNo || 'N/A'}
+                                                                    icon="fas fa-hashtag"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Payment Status" 
+                                                                    value={
+                                                                        <Badge 
                                                                             bg={
                                                                                 eventData.order?.status === 'Success'
                                                                                     ? 'success'
                                                                                     : eventData.order?.status === 'Withdraw'
                                                                                     ? 'danger'
                                                                                     : 'warning'
-                                                                            }
-                                                                            className="px-3 py-1"
+                                                                            } 
+                                                                            style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
                                                                         >
                                                                             {eventData.order?.status || 'N/A'}
                                                                         </Badge>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-dollar-sign" style={{ marginRight: '8px', color: '#28a745' }}></i>
-                                                                        Amount Paid:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </Col>
-
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-wallet" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                                        Payment Method:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.order.paymentMethod || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-calendar-check" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
-                                                                        Transaction Date:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {regDate || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-file-invoice" style={{ marginRight: '8px', color: '#dc3545' }}></i>
-                                                                        Receipt/Invoice:
-                                                                    </div>
-                                                                    <div className="field-value">
-                                                                        {eventData.receiptUrl && (
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline-info"
-                                                                                className="me-2"
-                                                                                onClick={() => window.open(eventData.receiptUrl, '_blank')}
-                                                                            >
-                                                                                <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
-                                                                                Receipt
-                                                                            </Button>
-                                                                        )}
-                                                                        {eventData.invoiceUrl && (
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline-primary"
-                                                                                onClick={() => window.open(eventData.invoiceUrl, '_blank')}
-                                                                            >
-                                                                                <i className="fas fa-file-invoice" style={{ marginRight: '6px' }}></i>
-                                                                                Invoice
-                                                                            </Button>
-                                                                        )}
-                                                                        {!eventData.receiptUrl && !eventData.invoiceUrl && (
-                                                                            <span className="text-muted">N/A</span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </Col>
+                                                                    }
+                                                                    icon="fas fa-credit-card"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Amount Paid" 
+                                                                    value={
+                                                                        <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                            {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
+                                                                        </span>
+                                                                    }
+                                                                    icon="fas fa-dollar-sign"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Payment Method" 
+                                                                    value={eventData.order.paymentMethod || 'N/A'}
+                                                                    icon="fas fa-wallet"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Transaction Date" 
+                                                                    value={regDate}
+                                                                    icon="fas fa-calendar-check"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Receipt/Invoice" 
+                                                                    value={
+                                                                        <div>
+                                                                            {eventData.receiptUrl && (
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="outline-info"
+                                                                                    className="me-2"
+                                                                                    onClick={() => window.open(eventData.receiptUrl, '_blank')}
+                                                                                >
+                                                                                    <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
+                                                                                    Receipt
+                                                                                </Button>
+                                                                            )}
+                                                                            {eventData.invoiceUrl && (
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="outline-primary"
+                                                                                    onClick={() => window.open(eventData.invoiceUrl, '_blank')}
+                                                                                >
+                                                                                    <i className="fas fa-file-invoice" style={{ marginRight: '6px' }}></i>
+                                                                                    Invoice
+                                                                                </Button>
+                                                                            )}
+                                                                            {!eventData.receiptUrl && !eventData.invoiceUrl && (
+                                                                                <span className="text-muted">N/A</span>
+                                                                            )}
+                                                                        </div>
+                                                                    }
+                                                                    icon="fas fa-file-invoice"
+                                                                    colSize={6}
+                                                                />
+                                                            </Row>
+                                                        </Col>
+                                                    )}
                                                 </Row>
-                                            </div>
-                                        </div>
-                                    )}
+                                            </Card.Body>
+                                        </Card>
+                                    </div>
+                                    {/* Mobile: No card wrapper, minimal padding */}
+                                    <div className="d-block d-md-none px-2 py-2">
+                                        <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                            {/* User Information Section */}
+                                            <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                    fontSize: '16px', 
+                                                    fontWeight: '600', 
+                                                    color: '#000000',
+                                                    borderBottom: '2px solid #4680ff'
+                                                }}>
+                                                    <i className="fas fa-user mr-2" style={{ color: '#4680ff' }}></i>
+                                                    User Information
+                                                </h5>
+                                                <Row>
+                                                    <InfoField 
+                                                        label="Registered By" 
+                                                        value={`${eventData.user?.firstName || ''} ${eventData.user?.lastName || ''}`.trim() || 'N/A'}
+                                                        icon="fas fa-user"
+                                                        colSize={6}
+                                                    />
+                                                    <InfoField 
+                                                        label="Email" 
+                                                        value={eventData.user?.email || 'N/A'}
+                                                        icon="fas fa-envelope"
+                                                        colSize={6}
+                                                    />
+                                                    <InfoField 
+                                                        label="Mobile Number" 
+                                                        value={formatPhoneDisplay(eventData.user?.mobile)}
+                                                        icon="fas fa-phone"
+                                                        colSize={6}
+                                                    />
+                                                    <InfoField 
+                                                        label="Registration Date" 
+                                                        value={regDate}
+                                                        icon="fas fa-calendar-alt"
+                                                        colSize={6}
+                                                    />
+                                                    <InfoField 
+                                                        label="User Type" 
+                                                        value={
+                                                            <Badge bg="secondary" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                                                {eventData.type || 'N/A'}
+                                                            </Badge>
+                                                        }
+                                                        icon="fas fa-tag"
+                                                        colSize={6}
+                                                    />
+                                                    {eventData.isCreatedByAdmin && (
+                                                        <InfoField 
+                                                            label="Created By" 
+                                                            value={
+                                                                <Badge bg="danger" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                                                    Admin
+                                                                </Badge>
+                                                            }
+                                                            icon="fas fa-shield-alt"
+                                                            colSize={6}
+                                                        />
+                                                    )}
+                                                </Row>
+                                            </Col>
 
-                                    {/* Custom CSS for Responsive Behavior */}
-                                    <style jsx>{`
-                                        /* Desktop: side-by-side layout */
-                                        .info-field-container {
-                                            display: flex;
-                                            justify-content: space-between;
-                                            align-items: center;
-                                        }
-
-                                        .field-label {
-                                            min-width: 140px;
-                                        }
-
-                                        .field-value {
-                                            text-align: right;
-                                            flex: 1;
-                                        }
-
-                                        /* Mobile: stacked layout */
-                                        @media (max-width: 768px) {
-                                            .info-field-container {
-                                                display: block !important;
-                                                text-align: left !important;
-                                            }
-
-                                            .field-label {
-                                                margin-bottom: 5px;
-                                            }
-
-                                            .field-value {
-                                                text-align: left !important;
-                                                margin-left: 20px;
-                                            }
-                                        }
-                                    `}</style>
+                                            {/* Order Details Section */}
+                                            {eventData?.order && (
+                                                <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                    <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                        fontSize: '16px', 
+                                                        fontWeight: '600', 
+                                                        color: '#000000',
+                                                        borderBottom: '2px solid #4680ff'
+                                                    }}>
+                                                        <i className="fas fa-receipt mr-2" style={{ color: '#4680ff' }}></i>
+                                                        Order Details
+                                                    </h5>
+                                                    <Row>
+                                                        <InfoField 
+                                                            label="Order Number" 
+                                                            value={eventData.order?.orderNo || 'N/A'}
+                                                            icon="fas fa-hashtag"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Payment Status" 
+                                                            value={
+                                                                <Badge 
+                                                                    bg={
+                                                                        eventData.order?.status === 'Success'
+                                                                            ? 'success'
+                                                                            : eventData.order?.status === 'Withdraw'
+                                                                            ? 'danger'
+                                                                            : 'warning'
+                                                                    } 
+                                                                    style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
+                                                                >
+                                                                    {eventData.order?.status || 'N/A'}
+                                                                </Badge>
+                                                            }
+                                                            icon="fas fa-credit-card"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Amount Paid" 
+                                                            value={
+                                                                <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                    {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
+                                                                </span>
+                                                            }
+                                                            icon="fas fa-dollar-sign"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Payment Method" 
+                                                            value={eventData.order.paymentMethod || 'N/A'}
+                                                            icon="fas fa-wallet"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Transaction Date" 
+                                                            value={regDate}
+                                                            icon="fas fa-calendar-check"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Receipt/Invoice" 
+                                                            value={
+                                                                <div>
+                                                                    {eventData.receiptUrl && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline-info"
+                                                                            className="me-2"
+                                                                            onClick={() => window.open(eventData.receiptUrl, '_blank')}
+                                                                        >
+                                                                            <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
+                                                                            Receipt
+                                                                        </Button>
+                                                                    )}
+                                                                    {eventData.invoiceUrl && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline-primary"
+                                                                            onClick={() => window.open(eventData.invoiceUrl, '_blank')}
+                                                                        >
+                                                                            <i className="fas fa-file-invoice" style={{ marginRight: '6px' }}></i>
+                                                                            Invoice
+                                                                        </Button>
+                                                                    )}
+                                                                    {!eventData.receiptUrl && !eventData.invoiceUrl && (
+                                                                        <span className="text-muted">N/A</span>
+                                                                    )}
+                                                                </div>
+                                                            }
+                                                            icon="fas fa-file-invoice"
+                                                            colSize={6}
+                                                        />
+                                                    </Row>
+                                                </Col>
+                                            )}
+                                        </Row>
+                                    </div>
                                 </div>
                             </Tab.Pane>
 
                             {/* Admin Information Tab */}
                             {eventData?.adminInfo && (
                                 <Tab.Pane eventKey="adminInfo">
-                                    <div className="p-2 bg-light">
-                                        <div
-                                            className="mb-4"
-                                            style={{
-                                                backgroundColor: '#fff',
-                                                borderRadius: '8px',
-                                                padding: '20px',
+                                    <div>
+                                        {/* Desktop: Card wrapper */}
+                                        <div className="d-none d-md-block">
+                                            <Card style={{ 
+                                                backgroundColor: '#fff', 
+                                                borderRadius: '8px', 
                                                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                                                 border: '1px solid #e9ecef',
-                                                borderLeft: '4px solid #6f42c1'
-                                            }}
-                                        >
-                                            <div style={{ padding: '24px' }}>
-                                                <h5
-                                                    style={{
-                                                        fontSize: '18px',
-                                                        fontWeight: '600',
-                                                        color: '#2c3e50',
-                                                        marginBottom: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '10px',
-                                                        borderBottom: '2px solid #6f42c1',
-                                                        paddingBottom: '8px'
-                                                    }}
-                                                >
-                                                    <i className="fas fa-info-circle" style={{ fontSize: '20px', color: '#6f42c1' }}></i>
-                                                    Admin Information
-                                                </h5>
-                                                <Row>
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            {eventData.adminInfo.tableNumber && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-table" style={{ marginRight: '8px', color: '#007bff' }}></i>
-                                                                            Table Number:
-                                                                        </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {eventData.adminInfo.tableNumber}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {eventData.adminInfo.dressCode && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-tshirt" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                                            Dress Code:
-                                                                        </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {eventData.adminInfo.dressCode}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {eventData.adminInfo.luckyDrawNumber && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-ticket-alt" style={{ marginRight: '8px', color: '#ffc107' }}></i>
-                                                                            Lucky Draw Number:
-                                                                        </div>
-                                                                        <div className="field-value">
-                                                                            <Badge bg="warning" className="px-3 py-1" style={{ fontSize: '14px' }}>
+                                                overflow: 'hidden'
+                                            }}>
+                                                <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                    <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                                        <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                                fontSize: '16px', 
+                                                                fontWeight: '600', 
+                                                                color: '#000000',
+                                                                borderBottom: '2px solid #4680ff'
+                                                            }}>
+                                                                <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                                                Admin Information
+                                                            </h5>
+                                                            <Row>
+                                                                {eventData.adminInfo.tableNumber && (
+                                                                    <InfoField 
+                                                                        label="Table Number" 
+                                                                        value={eventData.adminInfo.tableNumber}
+                                                                        icon="fas fa-table"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.adminInfo.dressCode && (
+                                                                    <InfoField 
+                                                                        label="Dress Code" 
+                                                                        value={eventData.adminInfo.dressCode}
+                                                                        icon="fas fa-tshirt"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.adminInfo.luckyDrawNumber && (
+                                                                    <InfoField 
+                                                                        label="Lucky Draw Number" 
+                                                                        value={
+                                                                            <Badge bg="warning" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
                                                                                 {eventData.adminInfo.luckyDrawNumber}
                                                                             </Badge>
+                                                                        }
+                                                                        icon="fas fa-ticket-alt"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.adminInfo.hall && (
+                                                                    <InfoField 
+                                                                        label="Hall" 
+                                                                        value={eventData.adminInfo.hall}
+                                                                        icon="fas fa-building"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.adminInfo.luckyDrawDateTime && (
+                                                                    <InfoField 
+                                                                        label="Lucky Draw Date/Time" 
+                                                                        value={formatTimestamp(eventData.adminInfo.luckyDrawDateTime)}
+                                                                        icon="fas fa-calendar-alt"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.adminInfo.additionalInformation && (
+                                                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                        <div style={{ 
+                                                                            padding: '8px 12px',
+                                                                            borderBottom: '1px solid #e9ecef',
+                                                                            backgroundColor: '#f8f9fa',
+                                                                            borderRadius: '4px',
+                                                                            width: '100%',
+                                                                            maxWidth: '100%',
+                                                                            boxSizing: 'border-box'
+                                                                        }}
+                                                                        className="px-md-3 px-2 py-md-2 py-2"
+                                                                        >
+                                                                            {/* Mobile & Tablet: Label on top */}
+                                                                            <div className="d-block d-md-none">
+                                                                                <div style={{ 
+                                                                                    fontSize: '13px', 
+                                                                                    fontWeight: '600', 
+                                                                                    color: '#4680ff',
+                                                                                    marginBottom: '4px',
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word'
+                                                                                }}>
+                                                                                    <span>Additional Information:</span>
+                                                                                </div>
+                                                                                <div style={{ 
+                                                                                    fontSize: '14px', 
+                                                                                    color: '#000000',
+                                                                                    fontWeight: '400',
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word',
+                                                                                    width: '100%',
+                                                                                    lineHeight: '1.5'
+                                                                                }}>
+                                                                                    <ExpandableDescription text={eventData.adminInfo.additionalInformation} maxLines={2} />
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Desktop: Label and value side by side */}
+                                                                            <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                                <div style={{ 
+                                                                                    minWidth: '140px',
+                                                                                    maxWidth: '140px',
+                                                                                    fontSize: '13px', 
+                                                                                    fontWeight: '600', 
+                                                                                    color: '#4680ff',
+                                                                                    marginRight: '12px',
+                                                                                    flexShrink: 0
+                                                                                }}>
+                                                                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Additional Information:</span>
+                                                                                </div>
+                                                                                <div style={{ 
+                                                                                    fontSize: '14px', 
+                                                                                    color: '#000000',
+                                                                                    fontWeight: '400',
+                                                                                    flex: 1,
+                                                                                    minWidth: 0,
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word',
+                                                                                    overflow: 'hidden'
+                                                                                }}>
+                                                                                    <ExpandableDescription text={eventData.adminInfo.additionalInformation} maxLines={2} />
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </Col>
-
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            {eventData.adminInfo.hall && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-building" style={{ marginRight: '8px', color: '#28a745' }}></i>
-                                                                            Hall:
-                                                                        </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {eventData.adminInfo.hall}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {eventData.adminInfo.additionalInformation && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-sticky-note" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
-                                                                            Additional Information:
-                                                                        </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {eventData.adminInfo.additionalInformation}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {eventData.adminInfo.luckyDrawDateTime && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-calendar-alt" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
-                                                                            Lucky Draw Date/Time:
-                                                                        </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {new Date(eventData.adminInfo.luckyDrawDateTime).toLocaleString('en-GB', {
-                                                                                day: '2-digit',
-                                                                                month: 'short',
-                                                                                year: 'numeric',
-                                                                                hour: '2-digit',
-                                                                                minute: '2-digit'
-                                                                            })}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </Col>
-                                                </Row>
-                                            </div>
+                                                                    </Col>
+                                                                )}
+                                                            </Row>
+                                                        </Col>
+                                                    </Row>
+                                                </Card.Body>
+                                            </Card>
                                         </div>
-
-                                        {/* Custom CSS for Responsive Behavior */}
-                                        <style jsx>{`
-                                            /* Desktop: side-by-side layout */
-                                            .info-field-container {
-                                                display: flex;
-                                                justify-content: space-between;
-                                                align-items: center;
-                                            }
-
-                                            .field-label {
-                                                min-width: 140px;
-                                            }
-
-                                            .field-value {
-                                                text-align: right;
-                                                flex: 1;
-                                            }
-
-                                            /* Mobile: stacked layout */
-                                            @media (max-width: 768px) {
-                                                .info-field-container {
-                                                    display: block !important;
-                                                    text-align: left !important;
-                                                }
-
-                                                .field-label {
-                                                    margin-bottom: 5px;
-                                                }
-
-                                                .field-value {
-                                                    text-align: left !important;
-                                                    margin-left: 20px;
-                                                }
-                                            }
-                                        `}</style>
+                                        {/* Mobile: No card wrapper, minimal padding */}
+                                        <div className="d-block d-md-none px-2 py-2">
+                                            <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                                <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                    <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                        fontSize: '16px', 
+                                                        fontWeight: '600', 
+                                                        color: '#000000',
+                                                        borderBottom: '2px solid #4680ff'
+                                                    }}>
+                                                        <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                                        Admin Information
+                                                    </h5>
+                                                    <Row>
+                                                        {eventData.adminInfo.tableNumber && (
+                                                            <InfoField 
+                                                                label="Table Number" 
+                                                                value={eventData.adminInfo.tableNumber}
+                                                                icon="fas fa-table"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.adminInfo.dressCode && (
+                                                            <InfoField 
+                                                                label="Dress Code" 
+                                                                value={eventData.adminInfo.dressCode}
+                                                                icon="fas fa-tshirt"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.adminInfo.luckyDrawNumber && (
+                                                            <InfoField 
+                                                                label="Lucky Draw Number" 
+                                                                value={
+                                                                    <Badge bg="warning" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                                                        {eventData.adminInfo.luckyDrawNumber}
+                                                                    </Badge>
+                                                                }
+                                                                icon="fas fa-ticket-alt"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.adminInfo.hall && (
+                                                            <InfoField 
+                                                                label="Hall" 
+                                                                value={eventData.adminInfo.hall}
+                                                                icon="fas fa-building"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.adminInfo.luckyDrawDateTime && (
+                                                            <InfoField 
+                                                                label="Lucky Draw Date/Time" 
+                                                                value={formatTimestamp(eventData.adminInfo.luckyDrawDateTime)}
+                                                                icon="fas fa-calendar-alt"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.adminInfo.additionalInformation && (
+                                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                <div style={{ 
+                                                                    padding: '8px 12px',
+                                                                    borderBottom: '1px solid #e9ecef',
+                                                                    backgroundColor: '#f8f9fa',
+                                                                    borderRadius: '4px',
+                                                                    width: '100%',
+                                                                    maxWidth: '100%',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                                >
+                                                                    {/* Mobile & Tablet: Label on top */}
+                                                                    <div className="d-block d-md-none">
+                                                                        <div style={{ 
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginBottom: '4px',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word'
+                                                                        }}>
+                                                                            <span>Additional Information:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            width: '100%',
+                                                                            lineHeight: '1.5'
+                                                                        }}>
+                                                                            <ExpandableDescription text={eventData.adminInfo.additionalInformation} maxLines={2} />
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Desktop: Label and value side by side */}
+                                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                        <div style={{ 
+                                                                            minWidth: '140px',
+                                                                            maxWidth: '140px',
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginRight: '12px',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Additional Information:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            flex: 1,
+                                                                            minWidth: 0,
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            overflow: 'hidden'
+                                                                        }}>
+                                                                            <ExpandableDescription text={eventData.adminInfo.additionalInformation} maxLines={2} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </Col>
+                                                        )}
+                                                    </Row>
+                                                </Col>
+                                            </Row>
+                                        </div>
                                     </div>
                                 </Tab.Pane>
                             )}
@@ -664,280 +822,431 @@ const ViewRegisterEventPage = () => {
                             {/* Payment Details Tab */}
                             {eventData?.checkout && (
                                 <Tab.Pane eventKey="payment">
-                                    <div className="p-2 bg-light">
-                                        <div
-                                            className="mb-4"
-                                            style={{
-                                                backgroundColor: '#fff',
-                                                borderRadius: '8px',
-                                                padding: '20px',
+                                    <div>
+                                        {/* Desktop: Card wrapper */}
+                                        <div className="d-none d-md-block">
+                                            <Card style={{ 
+                                                backgroundColor: '#fff', 
+                                                borderRadius: '8px', 
                                                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                                                 border: '1px solid #e9ecef',
-                                                borderLeft: '4px solid #28a745'
-                                            }}
-                                        >
-                                            <div style={{ padding: '24px' }}>
-                                                <h5
-                                                    style={{
-                                                        fontSize: '18px',
-                                                        fontWeight: '600',
-                                                        color: '#2c3e50',
-                                                        marginBottom: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '10px',
-                                                        borderBottom: '2px solid #28a745',
-                                                        paddingBottom: '8px'
-                                                    }}
-                                                >
-                                                    <i className="fas fa-credit-card" style={{ fontSize: '20px', color: '#28a745' }}></i>
-                                                    Payment Details
-                                                </h5>
-                                                {eventData.checkout?.status === 'Completed' && (
-                                                    <div className="mb-3 text-center">
-                                                        <Button
-                                                            variant="success"
-                                                            size="sm"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const response = await axiosInstance.get(
-                                                                        `/register-events/${id}/receipt`,
-                                                                        {
-                                                                            responseType: 'blob',
-                                                                        }
-                                                                    );
-                                                                    
-                                                                    // Create blob URL and download
-                                                                    const blob = new Blob([response.data], { type: 'application/pdf' });
-                                                                    const url = window.URL.createObjectURL(blob);
-                                                                    const link = document.createElement('a');
-                                                                    link.href = url;
-                                                                    link.download = `Receipt-${eventData.checkout?.checkoutId || id}.pdf`;
-                                                                    document.body.appendChild(link);
-                                                                    link.click();
-                                                                    document.body.removeChild(link);
-                                                                    window.URL.revokeObjectURL(url);
-                                                                } catch (error) {
-                                                                    toast.error('Failed to download receipt. Please try again.');
-                                                                    console.error('Receipt download error:', error);
-                                                                }
-                                                            }}
-                                                            className="px-4"
-                                                        >
-                                                            <i className="fas fa-file-pdf mr-2"></i>
-                                                            Download Receipt (PDF)
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                                <Row>
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-hashtag" style={{ marginRight: '8px', color: '#007bff' }}></i>
-                                                                        Checkout ID:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.checkoutId || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-dollar-sign" style={{ marginRight: '8px', color: '#28a745' }}></i>
-                                                                        Total Amount:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.totalAmount ? `$${parseFloat(eventData.checkout.totalAmount).toFixed(2)}` : 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-tag" style={{ marginRight: '8px', color: '#ffc107' }}></i>
-                                                                        Discount:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.discount ? `$${parseFloat(eventData.checkout.discount).toFixed(2)}` : '$0.00'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-ticket-alt" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
-                                                                        Coupon Code:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.couponCode || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-tag" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                                        Promo Code:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.promoCode || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                overflow: 'hidden'
+                                            }}>
+                                                <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                    {eventData.checkout?.status === 'Completed' && (
+                                                        <div className="mb-3 text-center">
+                                                            <Button
+                                                                variant="success"
+                                                                size="sm"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const response = await axiosInstance.get(
+                                                                            `/register-events/${id}/receipt`,
+                                                                            {
+                                                                                responseType: 'blob',
+                                                                            }
+                                                                        );
+                                                                        
+                                                                        // Create blob URL and download
+                                                                        const blob = new Blob([response.data], { type: 'application/pdf' });
+                                                                        const url = window.URL.createObjectURL(blob);
+                                                                        const link = document.createElement('a');
+                                                                        link.href = url;
+                                                                        link.download = `Receipt-${eventData.checkout?.checkoutId || id}.pdf`;
+                                                                        document.body.appendChild(link);
+                                                                        link.click();
+                                                                        document.body.removeChild(link);
+                                                                        window.URL.revokeObjectURL(url);
+                                                                    } catch (error) {
+                                                                        toast.error('Failed to download receipt. Please try again.');
+                                                                        console.error('Receipt download error:', error);
+                                                                    }
+                                                                }}
+                                                                className="px-4"
+                                                            >
+                                                                <i className="fas fa-file-pdf mr-2"></i>
+                                                                Download Receipt (PDF)
+                                                            </Button>
                                                         </div>
-                                                    </Col>
-
-                                                    <Col lg={6} md={12}>
-                                                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-wallet" style={{ marginRight: '8px', color: '#17a2b8' }}></i>
-                                                                        Payment Gateway:
-                                                                    </div>
-                                                                    <div className="field-value">
-                                                                        <Badge bg="info" className="px-3 py-1">
+                                                    )}
+                                                    <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                                        <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                                fontSize: '16px', 
+                                                                fontWeight: '600', 
+                                                                color: '#000000',
+                                                                borderBottom: '2px solid #4680ff'
+                                                            }}>
+                                                                <i className="fas fa-credit-card mr-2" style={{ color: '#4680ff' }}></i>
+                                                                Payment Details
+                                                            </h5>
+                                                            <Row>
+                                                                <InfoField 
+                                                                    label="Checkout ID" 
+                                                                    value={eventData.checkout?.checkoutId || 'N/A'}
+                                                                    icon="fas fa-hashtag"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Total Amount" 
+                                                                    value={
+                                                                        <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                            {eventData.checkout?.totalAmount ? `$${parseFloat(eventData.checkout.totalAmount).toFixed(2)}` : 'N/A'}
+                                                                        </span>
+                                                                    }
+                                                                    icon="fas fa-dollar-sign"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Discount" 
+                                                                    value={
+                                                                        <span style={{ color: '#ffc107', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                            {eventData.checkout?.discount ? `$${parseFloat(eventData.checkout.discount).toFixed(2)}` : '$0.00'}
+                                                                        </span>
+                                                                    }
+                                                                    icon="fas fa-tag"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Coupon Code" 
+                                                                    value={eventData.checkout?.couponCode || 'N/A'}
+                                                                    icon="fas fa-ticket-alt"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Promo Code" 
+                                                                    value={eventData.checkout?.promoCode || 'N/A'}
+                                                                    icon="fas fa-tag"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Payment Gateway" 
+                                                                    value={
+                                                                        <Badge bg="info" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
                                                                             {eventData.checkout?.paymentGateway || 'N/A'}
                                                                         </Badge>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-credit-card" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
-                                                                        Payment Method:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.paymentMethod || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-receipt" style={{ marginRight: '8px', color: '#dc3545' }}></i>
-                                                                        Transaction ID:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.transactionId || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-info-circle" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
-                                                                        Status:
-                                                                    </div>
-                                                                    <div className="field-value">
-                                                                        <Badge bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} className="px-3 py-1">
+                                                                    }
+                                                                    icon="fas fa-wallet"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Payment Method" 
+                                                                    value={eventData.checkout?.paymentMethod || 'N/A'}
+                                                                    icon="fas fa-credit-card"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Transaction ID" 
+                                                                    value={eventData.checkout?.transactionId || 'N/A'}
+                                                                    icon="fas fa-receipt"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Status" 
+                                                                    value={
+                                                                        <Badge 
+                                                                            bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
+                                                                            style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
+                                                                        >
                                                                             {eventData.checkout?.status || 'N/A'}
                                                                         </Badge>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                <div className="info-field-container">
-                                                                    <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                        <i className="fas fa-calendar-check" style={{ marginRight: '8px', color: '#fd7e14' }}></i>
-                                                                        Created At:
-                                                                    </div>
-                                                                    <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                        {eventData.checkout?.createdAt ? new Date(eventData.checkout.createdAt).toLocaleString('en-GB', {
-                                                                            day: '2-digit',
-                                                                            month: 'short',
-                                                                            year: 'numeric',
-                                                                            hour: '2-digit',
-                                                                            minute: '2-digit'
-                                                                        }) : 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {eventData.checkout?.completedAt && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-check-circle" style={{ marginRight: '8px', color: '#28a745' }}></i>
-                                                                            Completed At:
+                                                                    }
+                                                                    icon="fas fa-info-circle"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Created At" 
+                                                                    value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.checkout?.createdAt)}</span>}
+                                                                    icon="fas fa-calendar-check"
+                                                                    colSize={6}
+                                                                />
+                                                                {eventData.checkout?.completedAt && (
+                                                                    <InfoField 
+                                                                        label="Completed At" 
+                                                                        value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.checkout.completedAt)}</span>}
+                                                                        icon="fas fa-check-circle"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
+                                                                {eventData.checkout?.paymentNotes && (
+                                                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                        <div style={{ 
+                                                                            padding: '8px 12px',
+                                                                            borderBottom: '1px solid #e9ecef',
+                                                                            backgroundColor: '#f8f9fa',
+                                                                            borderRadius: '4px',
+                                                                            width: '100%',
+                                                                            maxWidth: '100%',
+                                                                            boxSizing: 'border-box'
+                                                                        }}
+                                                                        className="px-md-3 px-2 py-md-2 py-2"
+                                                                        >
+                                                                            {/* Mobile & Tablet: Label on top */}
+                                                                            <div className="d-block d-md-none">
+                                                                                <div style={{ 
+                                                                                    fontSize: '13px', 
+                                                                                    fontWeight: '600', 
+                                                                                    color: '#4680ff',
+                                                                                    marginBottom: '4px',
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word'
+                                                                                }}>
+                                                                                    <span>Payment Notes:</span>
+                                                                                </div>
+                                                                                <div style={{ 
+                                                                                    fontSize: '14px', 
+                                                                                    color: '#000000',
+                                                                                    fontWeight: '400',
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word',
+                                                                                    width: '100%',
+                                                                                    lineHeight: '1.5'
+                                                                                }}>
+                                                                                    {eventData.checkout.paymentNotes}
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Desktop: Label and value side by side */}
+                                                                            <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                                <div style={{ 
+                                                                                    minWidth: '140px',
+                                                                                    maxWidth: '140px',
+                                                                                    fontSize: '13px', 
+                                                                                    fontWeight: '600', 
+                                                                                    color: '#4680ff',
+                                                                                    marginRight: '12px',
+                                                                                    flexShrink: 0
+                                                                                }}>
+                                                                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Payment Notes:</span>
+                                                                                </div>
+                                                                                <div style={{ 
+                                                                                    fontSize: '14px', 
+                                                                                    color: '#000000',
+                                                                                    fontWeight: '400',
+                                                                                    flex: 1,
+                                                                                    minWidth: 0,
+                                                                                    wordBreak: 'break-word',
+                                                                                    overflowWrap: 'break-word',
+                                                                                    overflow: 'hidden'
+                                                                                }}>
+                                                                                    {eventData.checkout.paymentNotes}
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
-                                                                            {new Date(eventData.checkout.completedAt).toLocaleString('en-GB', {
-                                                                                day: '2-digit',
-                                                                                month: 'short',
-                                                                                year: 'numeric',
-                                                                                hour: '2-digit',
-                                                                                minute: '2-digit'
-                                                                            })}
+                                                                    </Col>
+                                                                )}
+                                                            </Row>
+                                                        </Col>
+                                                    </Row>
+                                                </Card.Body>
+                                            </Card>
+                                        </div>
+                                        {/* Mobile: No card wrapper, minimal padding */}
+                                        <div className="d-block d-md-none px-2 py-2">
+                                            {eventData.checkout?.status === 'Completed' && (
+                                                <div className="mb-3 text-center">
+                                                    <Button
+                                                        variant="success"
+                                                        size="sm"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const response = await axiosInstance.get(
+                                                                    `/register-events/${id}/receipt`,
+                                                                    {
+                                                                        responseType: 'blob',
+                                                                    }
+                                                                );
+                                                                
+                                                                // Create blob URL and download
+                                                                const blob = new Blob([response.data], { type: 'application/pdf' });
+                                                                const url = window.URL.createObjectURL(blob);
+                                                                const link = document.createElement('a');
+                                                                link.href = url;
+                                                                link.download = `Receipt-${eventData.checkout?.checkoutId || id}.pdf`;
+                                                                document.body.appendChild(link);
+                                                                link.click();
+                                                                document.body.removeChild(link);
+                                                                window.URL.revokeObjectURL(url);
+                                                            } catch (error) {
+                                                                toast.error('Failed to download receipt. Please try again.');
+                                                                console.error('Receipt download error:', error);
+                                                            }
+                                                        }}
+                                                        className="px-4"
+                                                    >
+                                                        <i className="fas fa-file-pdf mr-2"></i>
+                                                        Download Receipt (PDF)
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                                <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                                    <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                                        fontSize: '16px', 
+                                                        fontWeight: '600', 
+                                                        color: '#000000',
+                                                        borderBottom: '2px solid #4680ff'
+                                                    }}>
+                                                        <i className="fas fa-credit-card mr-2" style={{ color: '#4680ff' }}></i>
+                                                        Payment Details
+                                                    </h5>
+                                                    <Row>
+                                                        <InfoField 
+                                                            label="Checkout ID" 
+                                                            value={eventData.checkout?.checkoutId || 'N/A'}
+                                                            icon="fas fa-hashtag"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Total Amount" 
+                                                            value={
+                                                                <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                    {eventData.checkout?.totalAmount ? `$${parseFloat(eventData.checkout.totalAmount).toFixed(2)}` : 'N/A'}
+                                                                </span>
+                                                            }
+                                                            icon="fas fa-dollar-sign"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Discount" 
+                                                            value={
+                                                                <span style={{ color: '#ffc107', fontWeight: 'bold', fontSize: '14px' }}>
+                                                                    {eventData.checkout?.discount ? `$${parseFloat(eventData.checkout.discount).toFixed(2)}` : '$0.00'}
+                                                                </span>
+                                                            }
+                                                            icon="fas fa-tag"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Coupon Code" 
+                                                            value={eventData.checkout?.couponCode || 'N/A'}
+                                                            icon="fas fa-ticket-alt"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Promo Code" 
+                                                            value={eventData.checkout?.promoCode || 'N/A'}
+                                                            icon="fas fa-tag"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Payment Gateway" 
+                                                            value={
+                                                                <Badge bg="info" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                                                    {eventData.checkout?.paymentGateway || 'N/A'}
+                                                                </Badge>
+                                                            }
+                                                            icon="fas fa-wallet"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Payment Method" 
+                                                            value={eventData.checkout?.paymentMethod || 'N/A'}
+                                                            icon="fas fa-credit-card"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Transaction ID" 
+                                                            value={eventData.checkout?.transactionId || 'N/A'}
+                                                            icon="fas fa-receipt"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Status" 
+                                                            value={
+                                                                <Badge 
+                                                                    bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
+                                                                    style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
+                                                                >
+                                                                    {eventData.checkout?.status || 'N/A'}
+                                                                </Badge>
+                                                            }
+                                                            icon="fas fa-info-circle"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Created At" 
+                                                            value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.checkout?.createdAt)}</span>}
+                                                            icon="fas fa-calendar-check"
+                                                            colSize={6}
+                                                        />
+                                                        {eventData.checkout?.completedAt && (
+                                                            <InfoField 
+                                                                label="Completed At" 
+                                                                value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.checkout.completedAt)}</span>}
+                                                                icon="fas fa-check-circle"
+                                                                colSize={6}
+                                                            />
+                                                        )}
+                                                        {eventData.checkout?.paymentNotes && (
+                                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                                <div style={{ 
+                                                                    padding: '8px 12px',
+                                                                    borderBottom: '1px solid #e9ecef',
+                                                                    backgroundColor: '#f8f9fa',
+                                                                    borderRadius: '4px',
+                                                                    width: '100%',
+                                                                    maxWidth: '100%',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                                >
+                                                                    {/* Mobile & Tablet: Label on top */}
+                                                                    <div className="d-block d-md-none">
+                                                                        <div style={{ 
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginBottom: '4px',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word'
+                                                                        }}>
+                                                                            <span>Payment Notes:</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            width: '100%',
+                                                                            lineHeight: '1.5'
+                                                                        }}>
+                                                                            {eventData.checkout.paymentNotes}
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-
-                                                            {eventData.checkout?.paymentNotes && (
-                                                                <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                                                    <div className="info-field-container">
-                                                                        <div className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                                                                            <i className="fas fa-sticky-note" style={{ marginRight: '8px', color: '#6f42c1' }}></i>
-                                                                            Payment Notes:
+                                                                    {/* Desktop: Label and value side by side */}
+                                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                                        <div style={{ 
+                                                                            minWidth: '140px',
+                                                                            maxWidth: '140px',
+                                                                            fontSize: '13px', 
+                                                                            fontWeight: '600', 
+                                                                            color: '#4680ff',
+                                                                            marginRight: '12px',
+                                                                            flexShrink: 0
+                                                                        }}>
+                                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Payment Notes:</span>
                                                                         </div>
-                                                                        <div className="field-value" style={{ color: '#2c3e50', fontSize: '14px', fontWeight: '500' }}>
+                                                                        <div style={{ 
+                                                                            fontSize: '14px', 
+                                                                            color: '#000000',
+                                                                            fontWeight: '400',
+                                                                            flex: 1,
+                                                                            minWidth: 0,
+                                                                            wordBreak: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            overflow: 'hidden'
+                                                                        }}>
                                                                             {eventData.checkout.paymentNotes}
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    </Col>
-                                                </Row>
-                                            </div>
+                                                            </Col>
+                                                        )}
+                                                    </Row>
+                                                </Col>
+                                            </Row>
                                         </div>
-
-                                        {/* Custom CSS for Responsive Behavior */}
-                                        <style jsx>{`
-                                            .info-field-container {
-                                                display: flex;
-                                                justify-content: space-between;
-                                                align-items: center;
-                                            }
-
-                                            .field-label {
-                                                min-width: 140px;
-                                            }
-
-                                            .field-value {
-                                                text-align: right;
-                                                flex: 1;
-                                            }
-
-                                            @media (max-width: 768px) {
-                                                .info-field-container {
-                                                    display: block !important;
-                                                    text-align: left !important;
-                                                }
-
-                                                .field-label {
-                                                    margin-bottom: 5px;
-                                                }
-
-                                                .field-value {
-                                                    text-align: left !important;
-                                                    margin-left: 20px;
-                                                }
-                                            }
-                                        `}</style>
                                     </div>
                                 </Tab.Pane>
                             )}
