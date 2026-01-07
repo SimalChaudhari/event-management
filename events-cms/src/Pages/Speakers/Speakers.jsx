@@ -5,10 +5,9 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { deleteSpeaker } from '../../store/actions/speakerActions';
-import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
@@ -25,15 +24,14 @@ $.DataTable = require('datatables.net-bs');
 
 const Speakers = () => {
     const dispatch = useDispatch();
-    const { speakers, pagination: reduxPagination } = useSelector((state) => state.speaker || {});
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const navigate = useNavigate();
     const tableRef = useRef(null);
 
     // Use pagination persistence hook
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    const { restoreTablePage } = usePersistedTablePage();
 
     // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
@@ -48,6 +46,12 @@ const Speakers = () => {
         setItemToDelete({ id: speakerId });
         setShowDeleteModal(true);
     }, []);
+
+    // Store handlers in refs to avoid dependency issues in useEffect
+    const handlersRef = useRef({ handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch });
+    useEffect(() => {
+        handlersRef.current = { handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch };
+    }, [handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch]);
 
     const handleConfirmDelete = async () => {
         if (!itemToDelete) return;
@@ -199,7 +203,7 @@ const Speakers = () => {
             order: [[4, 'desc']],
             ajaxParams: {},
             axiosInstance: axiosInstance,
-            dispatch: dispatch, // Pass dispatch for loading state
+            dispatch: handlersRef.current.dispatch, // Pass dispatch for loading state
             loadingActionType: SPEAKER_LOADING, // Use SPEAKER_LOADING to show GlobalLoader
             dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-speaker-button ml-2'>>>" +
                  "<'row'<'col-sm-12'tr>>" +
@@ -209,7 +213,7 @@ const Speakers = () => {
             onDataLoaded: (data, metadata) => {
                 // Optional: Handle data if needed
             },
-            restoreTablePage: restoreTablePage,
+            restoreTablePage: handlersRef.current.restoreTablePage,
             initCompleteCallback: function (settings, json, api) {
                 // Add button initialization
                 if (!$('#addSpeakerBtn').length) {
@@ -219,28 +223,28 @@ const Speakers = () => {
                             Add
                         </button>
                     `);
-                    $('#addSpeakerBtn').on('click', handleAdd);
+                    $('#addSpeakerBtn').on('click', () => handlersRef.current.handleAdd());
                 }
 
                 // Attach event listeners for actions
                 $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleView(rowData);
+                        handlersRef.current.handleView(rowData);
                     }
                 });
 
                 $(settings.nTable).off('click', '.edit-btn').on('click', '.edit-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleEdit(rowData);
+                        handlersRef.current.handleEdit(rowData);
                     }
                 });
 
                 $(settings.nTable).off('click', '.delete-btn').on('click', '.delete-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleDelete(rowData.id);
+                        handlersRef.current.handleDelete(rowData.id);
                     }
                 });
             }
@@ -252,7 +256,7 @@ const Speakers = () => {
                 tableRef.current = null;
             }
         };
-    }, []); // Only run once on mount
+    }, []); // Only run once on mount - handlers are stored in refs to avoid re-initialization
 
     return (
         <>
