@@ -216,7 +216,7 @@ const Speakers = () => {
                     $('.add-speaker-button').html(`
                         <button class="btn btn-primary d-flex align-items-center ml-2" id="addSpeakerBtn">
                             <i class="feather icon-plus mr-1"></i>
-                            Add Speaker
+                            Add
                         </button>
                     `);
                     $('#addSpeakerBtn').on('click', handleAdd);

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
+import { Button, Row, Col, Container, Alert } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { createUser, editUser, userById, userList } from '../../store/actions/userActions';
+import { useNavigate, useParams } from 'react-router-dom';
+import { createUser, editUser, userById } from '../../store/actions/userActions';
 import { API_URL } from '../../configs/env';
 import { USER_PATHS } from '../../utils/constants';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
-import useTableNavigation from '../../hooks/useTableNavigation';
+import CountrySelect from '../../components/common/CountrySelect';
 
 const AddUserPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const location = useLocation();
     const { id } = useParams(); // Edit mode
     const { error, userByID } = useSelector((state) => state.user); // Use state.user as per store structure
     const [loading, setIsLoading] = useState(false);
@@ -42,25 +41,6 @@ const AddUserPage = () => {
         profilePicture: null
     });
     const [imagePreview, setImagePreview] = useState(null);
-    const previousPageRef = React.useRef(null);
-
-    const { handleBack: handleBackNavigation } = useTableNavigation({
-        tableRef: null,
-        listPath: USER_PATHS.LIST_USERS,
-        viewPath: USER_PATHS.VIEW_USER,
-        editPath: USER_PATHS.EDIT_USER,
-        addPath: USER_PATHS.ADD_USER
-    });
-
-    useEffect(() => {
-        const urlParams = new URLSearchParams(location.search || window.location.search);
-        const pageParam = urlParams.get('page');
-        if (pageParam) {
-            previousPageRef.current = parseInt(pageParam, 10);
-        } else if (location.state?.page) {
-            previousPageRef.current = location.state.page;
-        }
-    }, [id ,location.search, location.state]);
 
     // Load edit data if id exists
     useEffect(() => {
@@ -144,6 +124,7 @@ const AddUserPage = () => {
                 setImagePreview(null);
             }
         } else {
+            // For select/input fields - just update state, no API calls
             setFormData((prev) => ({
                 ...prev,
                 [name]: type === 'checkbox' ? checked : value
@@ -192,19 +173,11 @@ const AddUserPage = () => {
             if (id) {
                 const response = await dispatch(editUser(id, formDataToSend));
                 if (response) {
-                    // Redux is already updated with UPDATE_USER action, no need to fetch again
-                    // Just navigate back - DataTable will use updated Redux state or reload if needed
-                    const targetPage = previousPageRef.current;
-                    if (targetPage) {
-                        navigate(USER_PATHS.LIST_USERS)
-                    } else {
-                        navigate(USER_PATHS.LIST_USERS);
-                    }
+                    navigate(USER_PATHS.LIST_USERS);
                 }
             } else {
                 const response = await dispatch(createUser(formDataToSend));
                 if (response) {
-                    // Redux is already updated with CREATE_USER action, no need to fetch again
                     setFormData({
                         firstName: '',
                         lastName: '',
@@ -232,9 +205,8 @@ const AddUserPage = () => {
                         profilePicture: null
                     });
                     setImagePreview(null);
-                    // Redux is already updated, just navigate back - no need to fetch again
                     navigate(USER_PATHS.LIST_USERS);
-                }
+                }   
             }
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -243,19 +215,12 @@ const AddUserPage = () => {
         }
     };
 
-    const getCurrentPageForNavigation = () => {
-        const urlParams = new URLSearchParams(location.search || window.location.search);
-        return urlParams.get('page') || location.state?.page || previousPageRef.current;
-    };
-
     const handleCancel = () => {
-        const targetPage = getCurrentPageForNavigation();
-        handleBackNavigation(targetPage);
+        navigate(-1);
     };
 
     const handleBack = () => {
-        const targetPage = getCurrentPageForNavigation();
-        handleBackNavigation(targetPage);
+        navigate(-1);
     };
 
     return (
@@ -510,13 +475,12 @@ const AddUserPage = () => {
                                             <label className="floating-label" htmlFor="country">
                                                 Country
                                             </label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
+                                            <CountrySelect
+                                                id="country"
                                                 name="country"
                                                 value={formData.country}
                                                 onChange={handleChange}
-                                                placeholder="Country"
+                                                placeholder="Select Country"
                                             />
                                         </div>
                                     </Col>

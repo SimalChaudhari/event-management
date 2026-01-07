@@ -1,6 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
-import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER, SPEAKER_LOADING } from "../constants/actionTypes";
+import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER, SPEAKER_LOADING, SPEAKER_BY_ID } from "../constants/actionTypes";
 import { buildUrlWithParams } from "../../utils/buildQueryParams";
 
 // Helper function to dispatch loading state
@@ -51,6 +51,11 @@ export const speakerById = (id) => async (dispatch) => {
     try {
         setSpeakerLoading(dispatch, true);
         const response = await axiosInstance.get(`/users/speakers/${id}`);
+        const speakerData = response.data?.data || response.data;
+        dispatch({
+            type: SPEAKER_BY_ID,
+            payload: speakerData
+        });
         return response.data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch speaker details';

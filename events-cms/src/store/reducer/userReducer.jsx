@@ -25,17 +25,23 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
         case USER_LIST:
             // Handle both old format (array) and new format (object with data and pagination)
             if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.data) {
+                // Filter out any undefined/null entries
+                const validUsers = (payload.data || []).filter(u => u && u.id !== undefined && u.id !== null);
                 return {
                     ...state,
-                    user: payload.data,
+                    user: validUsers,
                     pagination: payload.pagination,
                     loading: false
                 };
             }
             // Backward compatibility: if payload is array, store it directly
+            // Filter out any undefined/null entries
+            const validUsersList = Array.isArray(payload) 
+                ? payload.filter(u => u && u.id !== undefined && u.id !== null)
+                : [];
             return {
                 ...state,
-                user: Array.isArray(payload) ? payload : [],
+                user: validUsersList,
                 pagination: {},
                 loading: false
             };
@@ -48,9 +54,15 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
             };
 
         case CREATE_USER:
+            // Ensure payload is valid before adding
+            if (!payload || !payload.id) {
+                return state;
+            }
+            // Filter out any undefined/null values from existing users
+            const validUsersForCreate = (state.user || []).filter(u => u && u.id !== undefined && u.id !== null);
             return {
                 ...state,
-                user: [...state.user, payload],
+                user: [...validUsersForCreate, payload],
                 loading: false
             };
 
@@ -59,22 +71,24 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
             if (!payload || !payload.id) {
                 return state;
             }
+            // Ensure user array exists and filter out any undefined/null values
+            const validUsers = (state.user || []).filter(u => u && u.id !== undefined && u.id !== null);
             // Convert ids to strings for consistent comparison
             const updateId = String(payload.id);
             // Check if user exists in the list
-            const userIndex = state.user.findIndex(u => String(u.id) === updateId);
+            const userIndex = validUsers.findIndex(u => u && String(u.id) === updateId);
             if (userIndex === -1) {
                 // User doesn't exist, add it instead
                 return {
                     ...state,
-                    user: [payload, ...state.user],
+                    user: [payload, ...validUsers],
                     loading: false
                 };
             }
             // Update the existing user
             return {
                 ...state,
-                user: state.user.map((user) => (String(user.id) === updateId ? payload : user)),
+                user: validUsers.map((user) => (user && String(user.id) === updateId ? payload : user)),
                 loading: false
             };
 
@@ -83,11 +97,13 @@ const userReducer = (state = initialState, { type, payload } = {}) => {
             if (!payload) {
                 return state;
             }
+            // Ensure user array exists and filter out any undefined/null values
+            const validUsersForDelete = (state.user || []).filter(u => u && u.id !== undefined && u.id !== null);
             // Convert id to string for consistent comparison
             const deleteId = String(payload);
             return {
                 ...state,
-                user: state.user.filter((user) => String(user.id) !== deleteId),
+                user: validUsersForDelete.filter((user) => user && String(user.id) !== deleteId),
                 loading: false
             };
 

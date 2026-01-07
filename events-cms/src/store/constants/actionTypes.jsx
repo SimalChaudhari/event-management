@@ -80,6 +80,7 @@ export const COUNTRY_LIST = 'COUNTRY_LIST';
 export const CREATE_SPEAKER = 'CREATE_SPEAKER';
 export const UPDATE_SPEAKER = 'UPDATE_SPEAKER';
 export const DELETE_SPEAKER = 'DELETE_SPEAKER';
+export const SPEAKER_BY_ID = 'SPEAKER_BY_ID';
 
 // Banner Action Types
 export const GET_BANNERS = 'GET_BANNERS';

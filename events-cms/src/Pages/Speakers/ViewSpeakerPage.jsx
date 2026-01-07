@@ -1,97 +1,27 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Row, Col, Card, Container, Modal, Badge } from 'react-bootstrap';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { speakerById } from '../../store/actions/speakerActions';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
-import { SPEAKER_PATHS, EVENT_PATHS } from '../../utils/constants';
+import { SPEAKER_PATHS } from '../../utils/constants';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 
 const ViewSpeakerPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const location = useLocation();
-    const [speakerData, setSpeakerData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { speakerByID } = useSelector(state => state.speaker);
     const [showProfileImageModal, setShowProfileImageModal] = useState(false);
-    
-    // Get current speaker page from URL for passing to components
-    const [speakerPageFromUrl, setSpeakerPageFromUrl] = useState(null);
-    
-    useEffect(() => {
-        // Capture page parameter from URL when component mounts or URL changes
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const pageParam = urlParams.get('page');
-        if (pageParam) {
-            setSpeakerPageFromUrl(pageParam);
-        } else {
-            // Also check location.state as fallback
-            if (location.state?.page) {
-                setSpeakerPageFromUrl(location.state.page);
-            }
-        }
-    }, [location.search, location.state]);
-
-    // Custom handleBack that uses the captured page parameter
-    const handleBack = useCallback(() => {
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const pageFromUrl = urlParams.get('page');
-        const currentPage = speakerPageFromUrl || pageFromUrl || location.state?.page;
-        
-        if (currentPage) {
-            navigate(`${SPEAKER_PATHS.LIST_SPEAKERS}?page=${currentPage}`);
-        } else {
-            navigate(SPEAKER_PATHS.LIST_SPEAKERS);
-        }
-    }, [navigate, speakerPageFromUrl, location.search, location.state]);
-
-    // Check if we came from an event view page and create appropriate back handler
-    const handleBackNavigation = useMemo(() => {
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const fromEvent = urlParams.get('fromEvent');
-        const eventPage = urlParams.get('eventPage');
-        
-        // If we came from an event view page, navigate back to that event
-        if (fromEvent) {
-            return () => {
-                if (eventPage) {
-                    navigate(`${EVENT_PATHS.VIEW_EVENT}/${fromEvent}?page=${eventPage}`);
-                } else {
-                    navigate(`${EVENT_PATHS.VIEW_EVENT}/${fromEvent}`);
-                }
-            };
-        }
-        
-        // Otherwise, use the custom back navigation (to speaker list)
-        return handleBack;
-    }, [location.search, navigate, handleBack]);
 
     useEffect(() => {
-        const loadSpeakerData = async () => {
-            try {
-                const response = await dispatch(speakerById(id));
-                if (response?.data) {
-                    setSpeakerData(response.data);
-                }
-                setLoading(false);
-            } catch (error) {
-                console.error('Error loading speaker data:', error);
-                setLoading(false);
-            }
-        };
-        
         if (id) {
-            loadSpeakerData();
+            dispatch(speakerById(id));
         }
     }, [id, dispatch]);
 
-    if (loading) {
-        return <div>Loading...</div>;
-    }
-
-    if (!speakerData) {
+    if (!speakerByID) {
         return (
             <NoDataFound
                 title="Speaker Not Found"
@@ -105,6 +35,8 @@ const ViewSpeakerPage = () => {
             />
         );
     }
+
+    const speakerData = speakerByID;
 
     const handleProfileImageClick = () => {
         if (speakerData.profilePicture) {
@@ -205,7 +137,7 @@ const ViewSpeakerPage = () => {
                         </div>
                         <Button 
                             variant="outline-secondary" 
-                            onClick={handleBackNavigation}
+                            onClick={() => navigate(-1)}
                             className="mt-2 mt-md-0"
                             style={{ 
                                 borderRadius: '8px',

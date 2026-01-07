@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import axiosInstance from '../../configs/axiosInstance';
-import { USER_LIST, USER_LOADING, USER_ERROR, CREATE_USER, UPDATE_USER, DELETE_USER, USER_BY_ID } from '../constants/actionTypes';
+import { USER_LIST, USER_LOADING, CREATE_USER, UPDATE_USER, DELETE_USER, USER_BY_ID } from '../constants/actionTypes';
 import { buildUrlWithParams } from '../../utils/buildQueryParams';
 
 // Helper function to dispatch loading state
@@ -105,6 +105,7 @@ export const editUser = (id, userData) => async (dispatch) => {
         }
         return false;
     } catch (error) {
+        console.log(error);
         const errorMessage = error?.response?.data?.message || 'Failed to update user';
         toast.error(errorMessage);
         return false;

@@ -18,33 +18,8 @@ const ViewRegisterEventPage = () => {
     const [eventData, setEventData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Get current registration page from URL for preservation
-    const [registrationPageFromUrl, setRegistrationPageFromUrl] = useState(null);
-    
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const pageParam = urlParams.get('page');
-        if (pageParam) {
-            setRegistrationPageFromUrl(pageParam);
-        } else {
-            if (location.state?.page) {
-                setRegistrationPageFromUrl(location.state.page);
-            }
-        }
-    }, [location.search, location.state]);
 
-    // Custom handleBack that uses the captured page parameter
-    const handleBack = useCallback(() => {
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const pageFromUrl = urlParams.get('page');
-        const currentPage = registrationPageFromUrl || pageFromUrl || location.state?.page;
-        
-        if (currentPage) {
-            navigate(`${EVENT_PATHS.REGISTERED_EVENTS}?page=${currentPage}`);
-        } else {
-            navigate(EVENT_PATHS.REGISTERED_EVENTS);
-        }
-    }, [navigate, registrationPageFromUrl, location.search, location.state]);
+
 
     useEffect(() => {
         const loadRegisterEventData = async () => {
@@ -159,7 +134,7 @@ const ViewRegisterEventPage = () => {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View Registration</h4>
-                        <Button variant="secondary" onClick={handleBack}>
+                        <Button variant="secondary" onClick={() => navigate(-1)}>
                             <i className="fas fa-arrow-left" style={{ marginRight: '8px' }}></i>
                             Back
                         </Button>

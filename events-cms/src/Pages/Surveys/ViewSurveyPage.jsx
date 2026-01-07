@@ -12,7 +12,7 @@ const ViewSurveyPage = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     
-    const { selectedSurvey, loading } = useSelector((state) => state.survey);
+    const { selectedSurvey } = useSelector((state) => state.survey);
     const [activeTab, setActiveTab] = useState('details');
 
     useEffect(() => {
@@ -20,23 +20,6 @@ const ViewSurveyPage = () => {
             dispatch(surveyDetail(id));
         }
     }, [dispatch, id]);
-
-    if (loading) {
-        return (
-            <Row>
-                <Col sm={12}>
-                    <Card>
-                        <Card.Body className="text-center">
-                            <div className="spinner-border text-primary" role="status">
-                                <span className="sr-only">Loading...</span>
-                            </div>
-                            <p className="mt-2">Loading survey details...</p>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
-        );
-    }
 
     if (!selectedSurvey) {
         return (
@@ -86,7 +69,7 @@ const ViewSurveyPage = () => {
         }
     };
 
-    const surveyStatus = formatSurveyStatus(selectedSurvey);
+    const surveyStatus = selectedSurvey ? formatSurveyStatus(selectedSurvey) : { variant: 'secondary', text: 'N/A' };
 
     // 12-hour AM/PM format helper
     const formatTime = (timeStr) => {
@@ -110,7 +93,7 @@ const ViewSurveyPage = () => {
                         Sessions
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>
-                        {selectedSurvey.sessions?.length || 0}
+                        {selectedSurvey?.sessions?.length || 0}
                     </p>
                 </div>
             </Col>
@@ -124,7 +107,7 @@ const ViewSurveyPage = () => {
                         Total Days
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {selectedSurvey.eventStats?.totalDays || 'N/A'}
+                        {selectedSurvey?.eventStats?.totalDays || 'N/A'}
                     </p>
                 </div>
             </Col>
@@ -138,7 +121,7 @@ const ViewSurveyPage = () => {
                         Total Hours
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        {selectedSurvey.eventStats?.totalHours || 'N/A'}
+                        {selectedSurvey?.eventStats?.totalHours || 'N/A'}
                     </p>
                 </div>
             </Col>
@@ -152,8 +135,8 @@ const ViewSurveyPage = () => {
                         Status
                     </h6>
                     <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                        <Badge bg={selectedSurvey.isActive ? 'success' : 'danger'}>
-                            {selectedSurvey.isActive ? 'Active' : 'Inactive'}
+                        <Badge bg={selectedSurvey?.isActive ? 'success' : 'danger'}>
+                            {selectedSurvey?.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                     </p>
                 </div>
@@ -170,13 +153,13 @@ const ViewSurveyPage = () => {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h4 className="card-title">View Survey</h4>
-                        <div>
+                        <div style={{ display: 'flex', gap: '12px' }}>
                             <Button 
-                                variant="warning" 
-                                className="me-2"
-                                onClick={() => navigate(`/surveys/edit/${selectedSurvey.id}`)}
+                                variant="primary"
+                                style={{ backgroundColor: '#4680ff', borderColor: '#4680ff', color: '#ffffff' }}
+                                onClick={() => navigate(`/surveys/edit/${selectedSurvey?.id}`)}
                             >
-                                <i className="fas fa-edit me-2"></i> Edit
+                                <i className="fas fa-edit me-2" style={{ color: '#ffffff' }}></i> Edit
                             </Button>
                             <Button 
                                 variant="secondary"
@@ -214,13 +197,13 @@ const ViewSurveyPage = () => {
                         <Tab.Content>
                             {/* Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <SurveyBasicComponent surveyData={selectedSurvey} />
+                                <SurveyBasicComponent surveyData={selectedSurvey || {}} />
                             </Tab.Pane>
 
                             {/* Sessions Tab */}
                             <Tab.Pane eventKey="sessions">
                                 <SurveySessionsComponent 
-                                    sessions={selectedSurvey.sessions} 
+                                    sessions={selectedSurvey?.sessions || []} 
                                     formatTime={formatTime} 
                                 />
                             </Tab.Pane>

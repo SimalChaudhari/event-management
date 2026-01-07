@@ -5,14 +5,14 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import ExportConfirmationModal from '../../components/modal/ExportConfirmationModal';
 import CsvUploadModal from '../../components/modals/CsvUploadModal';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
 import UserFilterComponent from '../../components/common/UserFilterComponent';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
@@ -265,10 +265,8 @@ function userTable(
 
 const UserList = () => {
  
-    const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
-    const { user } = useSelector((state) => state.user);
+    const { fetchData, deleteUserData, exportUsersData } = FetchUsers();
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const location = useLocation();
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
@@ -281,7 +279,7 @@ const UserList = () => {
     const roleFilterRef = React.useRef('all'); // Ref to store current filter for immediate access
     const tableRef = React.useRef(null);
 
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    const { restoreTablePage } = usePersistedTablePage();
     
     // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
@@ -330,11 +328,18 @@ const UserList = () => {
         setIsLoading(true);
         if (userIdToDelete) {
             try {
-                await deleteUserData(userIdToDelete);
-                setShowConfirmModal(false);
-                // deleteUserData already updates Redux directly, no need to fetch again
+                const success = await deleteUserData(userIdToDelete);
+                if (success) {
+                    setShowConfirmModal(false);
+                    setUserIdToDelete(null);
+                    // Reload DataTable to reflect the deleted user
+                    if (tableRef.current && $.fn.DataTable.isDataTable('#user-data-table')) {
+                        tableRef.current.ajax.reload(null, false); // false = keep current page
+                    }
+                }
             } catch (error) {
                 // Error deleting user
+                console.error('Error deleting user:', error);
             }
         }
         setIsLoading(false);

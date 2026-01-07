@@ -136,13 +136,12 @@ const ViewUserPage = () => {
                          
                         </div>
                         <Button 
-                            variant="outline-secondary" 
+                            variant="secondary" 
                             onClick={() => navigate(-1)}
                             className="mt-2 mt-md-0"
                             style={{ 
                                 borderRadius: '8px',
                                 padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 16px)',
-                                border: '1px solid #dee2e6',
                                 fontWeight: '500',
                                 fontSize: 'clamp(12px, 2.5vw, 14px)',
                                 whiteSpace: 'nowrap'
@@ -246,6 +245,15 @@ const ViewUserPage = () => {
                                     Personal Information
                                 </h5>
                                 <Row>
+                                {userData.salutation && (
+                                        <InfoField 
+                                            label="Salutation" 
+                                            value={userData.salutation}
+                                            icon="feather icon-user"
+                                            colSize={6}
+                                        />
+                                    )}
+                                    
                                     <InfoField 
                                         label="Full Name" 
                                         value={`${userData.salutation ? userData.salutation + ' ' : ''}${userData.firstName} ${userData.lastName}`}
@@ -264,14 +272,7 @@ const ViewUserPage = () => {
                                         icon="feather icon-phone"
                                         colSize={6}
                                     />
-                                    {userData.salutation && (
-                                        <InfoField 
-                                            label="Salutation" 
-                                            value={userData.salutation}
-                                            icon="feather icon-user"
-                                            colSize={6}
-                                        />
-                                    )}
+                                 
                                     {userData.company && (
                                         <InfoField 
                                             label="Company" 

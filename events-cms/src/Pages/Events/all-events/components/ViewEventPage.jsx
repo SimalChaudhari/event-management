@@ -74,45 +74,6 @@ const ViewEventPage = () => {
         setIsUpcomingEventPage(isUpcoming);
     }, [location.search, location.state, location.pathname]);
 
-    // Custom handleBack that uses the captured page parameter
-    // This ensures we always have the page number even if URL changes
-    // Also detects if we're viewing an upcoming event to navigate back to upcoming events list
-    const handleBack = useCallback(() => {
-        // Use the captured state for upcoming event detection (primary check)
-        // This is the most reliable since it was captured on mount
-        // Also double-check pathname as fallback
-        const pathname = window.location.pathname || location.pathname;
-        const isUpcoming = isUpcomingEventPage || 
-                          (pathname && (
-                              pathname.includes('/upcoming/view-upcoming-event') ||
-                              pathname.startsWith('/upcoming/view-upcoming-event/') ||
-                              pathname.indexOf('/upcoming/') === 0
-                          ));
-        
-        // Priority: captured page from state > URL > location.state > null
-        // We prioritize the captured state because it was set when the component mounted
-        // and might be more reliable than the current URL
-        const urlParams = new URLSearchParams(window.location.search || location.search);
-        const pageFromUrl = urlParams.get('page');
-        const currentPage = eventPageFromUrl || pageFromUrl || location.state?.page;
-        
-        // Navigate back to the appropriate list based on the event type
-        if (isUpcoming) {
-            // Navigate back to upcoming events list
-            if (currentPage) {
-                navigate(`${EVENT_PATHS.UPCOMING_EVENTS}?page=${currentPage}`);
-            } else {
-                navigate(EVENT_PATHS.UPCOMING_EVENTS);
-            }
-        } else {
-            // Navigate back to regular events list
-            if (currentPage) {
-                navigate(`${EVENT_PATHS.LIST_EVENTS}?page=${currentPage}`);
-            } else {
-                navigate(EVENT_PATHS.LIST_EVENTS);
-            }
-        }
-    }, [navigate, eventPageFromUrl, isUpcomingEventPage, location.search, location.state, location.pathname]);
 
     // Get current event page from URL for passing to speaker component
     const getEventPage = () => {
@@ -509,7 +470,8 @@ const ViewEventPage = () => {
                             >
                                 <Button 
                                     variant="secondary" 
-                                    onClick={handleBack}
+                                    // onClick={handleBack}
+                                    onClick={() => navigate(-1)}
                                     className="d-flex align-items-center"
                                 >
                                     <i className="fas fa-arrow-left"></i>
