@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Button, Row, Col, Card, Badge, Alert, Tab, Nav, Modal } from 'react-bootstrap';
+import { Button, Row, Col, Card, Badge, Alert, Modal } from 'react-bootstrap';
 import { getSessionsByEvent, getTracksByEvent, getAllSessions, getAllTracks } from '../../store/actions/programmeActions';
 import { PROGRAMME_PATHS } from '../../utils/constants';
 import { API_URL } from '../../configs/env';
 import EventSpeakersComponent from '../../components/events/EventSpeakersComponent';
+import { ExpandableDescription } from '../../components/ExpandableDescription';
 
 const ViewSessionPage = () => {
     const { id } = useParams();
@@ -23,7 +24,6 @@ const ViewSessionPage = () => {
     // Speaker image modal state
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
-    const [showFullDescription, setShowFullDescription] = useState(false);
 
     useEffect(() => {
         if (eventIdFromUrl) {
@@ -55,63 +55,70 @@ const ViewSessionPage = () => {
         }
     }, [session, tracks]);
 
-    // InfoCard component for consistent styling similar to ViewExhibitorPage
-    const InfoCard = ({ title, icon, children, borderColor = "#4680ff", className = "" }) => (
-        <div className={`mb-4 ${className}`} style={{ 
-            backgroundColor: '#fff', 
-            borderRadius: '8px', 
-            padding: '20px', 
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            border: '1px solid #e9ecef',
-            borderLeft: `4px solid ${borderColor}`
-        }}>
-            <div style={{ padding: '24px' }}>
-                <h5 style={{ 
-                    fontSize: '18px', 
-                    fontWeight: '600', 
-                    color: '#2c3e50',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    borderBottom: `2px solid ${borderColor}`,
-                    paddingBottom: '8px',
-                    position: 'relative'
-                }}>
-                    <span style={{ fontSize: '20px' }}>{icon}</span>
-                    {title}
-                </h5>
-                {children}
-            </div>
-        </div>
-    );
-
-    const InfoField = ({ label, value, icon = null }) => (
-        <div className="mb-3">
+    // InfoField component matching EventBasicComponent pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
             <div style={{ 
-                fontSize: '1rem', 
-                fontWeight: '600', 
-                color: '#495057',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-            }}>
-                {icon && <span style={{ fontSize: '16px' }}>{icon}</span>}
-                {label}:
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+            }}
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
             </div>
-            <div style={{ 
-                fontSize: '15px', 
-                color: '#2c3e50',
-                fontWeight: '500',
-                backgroundColor: '#f8f9fa',
-                padding: '10px 15px',
-                borderRadius: '8px',
-                border: '1px solid #e9ecef'
-            }}>
-                {value || 'N/A'}
-            </div>
-        </div>
+        </Col>
     );
 
 
@@ -186,15 +193,9 @@ const ViewSessionPage = () => {
                                 color: '#2c3e50',
                                 fontWeight: '600'
                             }}>
-                                📅 Session Profile
+                                 Session Profile
                             </h4>
-                            <p style={{ 
-                                margin: '8px 0 0 0', 
-                                color: '#6c757d',
-                                fontSize: '14px'
-                            }}>
-                                View detailed session information and related data
-                            </p>
+                           
                             </div>
                                 <Button 
                                     variant="secondary" 
@@ -213,280 +214,367 @@ const ViewSessionPage = () => {
                                     </div>
 
 
-            {/* Tabbed Content Section */}
-            <InfoCard title="Session Information" icon="📋" borderColor="#e74c3c">
-                <Tab.Container defaultActiveKey="details">
-                    <Nav variant="pills" className="mb-4" style={{ 
-                        borderBottom: '2px solid #e74c3c',
-                        paddingBottom: '12px',
-                        gap: '15px'
+            {/* Session Information Section */}
+            <div>
+                {/* Desktop: Card wrapper */}
+                <div className="d-none d-md-block">
+                    <Card style={{ 
+                        backgroundColor: '#fff', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        border: '1px solid #e9ecef',
+                        overflow: 'hidden'
                     }}>
-                        <Nav.Item>
-                            <Nav.Link 
-                                eventKey="details"
-                                style={{
-                                    borderRadius: '8px',
-                                    fontWeight: '500',
-                                    border: '1px solid #dee2e6',
-                                    fontSize: '14px',
-                                    padding: '8px 16px'
-                                }}
-                            >
-                                📋 Session Details
-                            </Nav.Link>
-                        </Nav.Item>
-                        <Nav.Item>
-                            <Nav.Link 
-                                eventKey="timing"
-                                style={{
-                                    borderRadius: '8px',
-                                    fontWeight: '500',
-                                    border: '1px solid #dee2e6',
-                                    fontSize: '14px',
-                                    padding: '8px 16px'
-                                }}
-                            >
-                                ⏰ Timing Information
-                            </Nav.Link>
-                        </Nav.Item>
-                        {session.speakers && session.speakers.length > 0 && (
-                            <Nav.Item>
-                                <Nav.Link 
-                                    eventKey="speakers"
-                                    style={{
-                                        borderRadius: '8px',
-                                        fontWeight: '500',
-                                        border: '1px solid #dee2e6',
-                                        fontSize: '14px',
-                                        padding: '8px 16px'
-                                    }}
-                                >
-                                    🎤 Speakers ({session.speakers.length})
-                                </Nav.Link>
-                            </Nav.Item>
-                        )}
-                    </Nav>
+                        <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                            <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                                {/* Session Overview Section */}
+                                <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                    <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                        fontSize: '16px', 
+                                        fontWeight: '600', 
+                                        color: '#000000',
+                                        borderBottom: '2px solid #4680ff'
+                                    }}>
+                                        <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                        Session Overview
+                                    </h5>
+                                    <Row>
+                                        <InfoField 
+                                            label="Session Title" 
+                                            value={session.title || 'N/A'} 
+                                            icon="fas fa-calendar-alt"
+                                            colSize={12}
+                                        />
+                                        <InfoField
+                                            label="Track"
+                                            value={track ? track.title : 'N/A'}
+                                            icon="fas fa-folder"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Venue"
+                                            value={session.venue || 'TBA'}
+                                            icon="fas fa-map-marker-alt"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Status"
+                                            value={
+                                                <Badge bg={session.isActive ? 'success' : 'danger'} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                                    {session.isActive ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                            }
+                                            icon="fas fa-check-circle"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Session Date"
+                                            value={session.sessionDate ? new Date(session.sessionDate).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            }) : 'N/A'}
+                                            icon="fas fa-calendar"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Start Time"
+                                            value={session.startTime || 'N/A'}
+                                            icon="fas fa-play-circle"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="End Time"
+                                            value={session.endTime || 'N/A'}
+                                            icon="fas fa-stop-circle"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Created At"
+                                            value={new Date(session.createdAt).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            })}
+                                            icon="fas fa-calendar"
+                                            colSize={6}
+                                        />
+                                        <InfoField
+                                            label="Updated At"
+                                            value={new Date(session.updatedAt).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            })}
+                                            icon="fas fa-edit"
+                                            colSize={6}
+                                        />
+                                        {session.description && (
+                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                <div style={{ 
+                                                    padding: '8px 12px',
+                                                    borderBottom: '1px solid #e9ecef',
+                                                    backgroundColor: '#f8f9fa',
+                                                    borderRadius: '4px',
+                                                    width: '100%',
+                                                    maxWidth: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                >
+                                                    {/* Mobile & Tablet: Label on top */}
+                                                    <div className="d-block d-md-none">
+                                                        <div style={{ 
+                                                            fontSize: '13px', 
+                                                            fontWeight: '600', 
+                                                            color: '#4680ff',
+                                                            marginBottom: '4px',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word'
+                                                        }}>
+                                                            <span>Session Description:</span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            fontSize: '14px', 
+                                                            color: '#000000',
+                                                            fontWeight: '400',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            width: '100%',
+                                                            lineHeight: '1.5'
+                                                        }}>
+                                                            <ExpandableDescription text={session.description} maxLines={2} />
+                                                        </div>
+                                                    </div>
+                                                    {/* Desktop: Label and value side by side */}
+                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                        <div style={{ 
+                                                            minWidth: '140px',
+                                                            maxWidth: '140px',
+                                                            fontSize: '13px', 
+                                                            fontWeight: '600', 
+                                                            color: '#4680ff',
+                                                            marginRight: '12px',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Session Description:</span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            fontSize: '14px', 
+                                                            color: '#000000',
+                                                            fontWeight: '400',
+                                                            flex: 1,
+                                                            minWidth: 0,
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            <ExpandableDescription text={session.description} maxLines={2} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                        )}
+                                    </Row>
+                                </Col>
 
-                    <Tab.Content style={{ marginTop: '20px' }}>
-                        {/* Session Details Tab */}
-                        <Tab.Pane eventKey="details">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                {/* Speakers Section */}
+                                {session.speakers && session.speakers.length > 0 && (
+                                    <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                        <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                            fontSize: '16px', 
+                                            fontWeight: '600', 
+                                            color: '#000000',
+                                            borderBottom: '2px solid #4680ff'
+                                        }}>
+                                            <i className="fas fa-users mr-2" style={{ color: '#4680ff' }}></i>
+                                            Speakers
+                                        </h5>
+                                        <EventSpeakersComponent 
+                                            speakers={session.speakers} 
+                                            handleSpeakerImageClick={handleSpeakerImageClick}
+                                        />
+                                    </Col>
+                                )}
+                            </Row>
+                        </Card.Body>
+                    </Card>
+                </div>
+                {/* Mobile: No card wrapper, minimal padding */}
+                <div className="d-block d-md-none px-2 py-2">
+                    <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                        {/* Session Overview Section */}
+                        <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                fontSize: '16px', 
+                                fontWeight: '600', 
+                                color: '#000000',
+                                borderBottom: '2px solid #4680ff'
                             }}>
-                                <Row>
-                                    <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-file-text text-primary mr-2"></i>
-                                                <label className="text-muted small mb-0">Session Title</label>
-                                            </div>
-                                            <h5 className="text-dark font-weight-bold mb-0">{session.title}</h5>
-                                    </div>
-                                </Col>
-                                    <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-folder text-info mr-2"></i>
-                                                <label className="text-muted small mb-0">Track</label>
-                                            </div>
-                                            <h5 className="text-dark font-weight-bold mb-0">{track ? track.title : 'N/A'}</h5>
-                                    </div>
-                                </Col>
-                                <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-map-pin text-warning mr-2"></i>
-                                                <label className="text-muted small mb-0">Venue</label>
-                                            </div>
-                                            <h5 className="text-dark font-weight-bold mb-0">{session.venue || 'TBA'}</h5>
-                                    </div>
-                                </Col>
-                                <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-check-circle text-success mr-2"></i>
-                                                <label className="text-muted small mb-0">Status</label>
-                                            </div>
-                                            <Badge 
-                                                bg={session.isActive ? 'success' : 'danger'} 
-                                                style={{ fontSize: '14px', padding: '6px 12px', fontWeight: 'bold' }}
-                                            >
-                                                {session.isActive ? 'Active' : 'Inactive'}
+                                <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                Session Overview
+                            </h5>
+                            <Row>
+                                <InfoField 
+                                    label="Session Title" 
+                                    value={session.title || 'N/A'} 
+                                    icon="fas fa-calendar-alt"
+                                    colSize={12}
+                                />
+                                <InfoField
+                                    label="Track"
+                                    value={track ? track.title : 'N/A'}
+                                    icon="fas fa-folder"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Venue"
+                                    value={session.venue || 'TBA'}
+                                    icon="fas fa-map-marker-alt"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Status"
+                                    value={
+                                        <Badge bg={session.isActive ? 'success' : 'danger'} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                            {session.isActive ? 'Active' : 'Inactive'}
                                         </Badge>
-                                    </div>
-                                </Col>
-                                    <Col md={6}>
-                                        <div className="mb-3">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-calendar text-danger mr-2"></i>
-                                                <label className="text-muted small mb-0">Created At</label>
+                                    }
+                                    icon="fas fa-check-circle"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Session Date"
+                                    value={session.sessionDate ? new Date(session.sessionDate).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    }) : 'N/A'}
+                                    icon="fas fa-calendar"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Start Time"
+                                    value={session.startTime || 'N/A'}
+                                    icon="fas fa-play-circle"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="End Time"
+                                    value={session.endTime || 'N/A'}
+                                    icon="fas fa-stop-circle"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Created At"
+                                    value={new Date(session.createdAt).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                    icon="fas fa-calendar"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Updated At"
+                                    value={new Date(session.updatedAt).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                    icon="fas fa-edit"
+                                    colSize={6}
+                                />
+                                {session.description && (
+                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                        <div style={{ 
+                                            padding: '8px 12px',
+                                            borderBottom: '1px solid #e9ecef',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            maxWidth: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                        className="px-md-3 px-2 py-md-2 py-2"
+                                        >
+                                            {/* Mobile & Tablet: Label on top */}
+                                            <div className="d-block d-md-none">
+                                                <div style={{ 
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#4680ff',
+                                                    marginBottom: '4px',
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word'
+                                                }}>
+                                                    <span>Session Description:</span>
+                                                </div>
+                                                <div style={{ 
+                                                    fontSize: '14px', 
+                                                    color: '#000000',
+                                                    fontWeight: '400',
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                    width: '100%',
+                                                    lineHeight: '1.5'
+                                                }}>
+                                                    <ExpandableDescription text={session.description} maxLines={2} />
+                                                </div>
                                             </div>
-                                            <div className="bg-light p-2 rounded">
-                                                <span className="text-dark font-weight-medium">
-                                                    {new Date(session.createdAt).toLocaleDateString('en-US', {
-                                                        year: 'numeric',
-                                                        month: 'long',
-                                                        day: 'numeric'
-                                                    })}
-                                                </span>
+                                            {/* Desktop: Label and value side by side */}
+                                            <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                <div style={{ 
+                                                    minWidth: '140px',
+                                                    maxWidth: '140px',
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#4680ff',
+                                                    marginRight: '12px',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Session Description:</span>
+                                                </div>
+                                                <div style={{ 
+                                                    fontSize: '14px', 
+                                                    color: '#000000',
+                                                    fontWeight: '400',
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <ExpandableDescription text={session.description} maxLines={2} />
+                                                </div>
                                             </div>
                                         </div>
                                     </Col>
-                                    <Col md={6}>
-                                        <div className="mb-3">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-clock text-info mr-2"></i>
-                                                <label className="text-muted small mb-0">Updated At</label>
-                                            </div>
-                                            <div className="bg-light p-2 rounded">
-                                                <span className="text-dark font-weight-medium">
-                                                    {new Date(session.updatedAt).toLocaleDateString('en-US', {
-                                                        year: 'numeric',
-                                                        month: 'long',
-                                                        day: 'numeric'
-                                                    })}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                    {session.description && (
-                                        <Col md={12}>
-                                            <div className="mb-3">
-                                                <div className="d-flex align-items-center mb-2">
-                                                    <i className="feather icon-file-text text-info mr-2"></i>
-                                                    <label className="text-muted small mb-0">Description</label>
-                                                </div>
-                                                <div className="bg-light p-3 rounded">
-                                                    <p className="text-dark mb-0" style={{
-                                                        fontSize: '14px',
-                                                        lineHeight: '1.6',
-                                                        textAlign: 'justify'
-                                                    }}>
-                                                        {showFullDescription || session.description.length <= 150
-                                                            ? session.description 
-                                                            : (
-                                                                <>
-                                                                    {session.description.substring(0, 150)}...
-                                                                    <span 
-                                                                        onClick={() => setShowFullDescription(!showFullDescription)}
-                                                                        style={{
-                                                                            color: '#007bff',
-                                                                            textDecoration: 'underline',
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '14px',
-                                                                            fontWeight: '500',
-                                                                            marginLeft: '5px'
-                                                                        }}
-                                                                    >
-                                                                        Read More
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        {showFullDescription && session.description.length > 150 && (
-                                                            <span 
-                                                                onClick={() => setShowFullDescription(!showFullDescription)}
-                                                                style={{
-                                                                    color: '#007bff',
-                                                                    textDecoration: 'underline',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: '14px',
-                                                                    fontWeight: '500',
-                                                                    marginLeft: '5px'
-                                                                }}
-                                                            >
-                                                                Show Less
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </Col>
-                                    )}
-                                </Row>
-                            </div>
-                        </Tab.Pane>
+                                )}
+                            </Row>
+                        </Col>
 
-                        {/* Timing Information Tab */}
-                        <Tab.Pane eventKey="timing">
-                            <div style={{
-                                backgroundColor: '#fff',
-                                padding: '20px',
-                                borderRadius: '8px',
-                                border: '1px solid #e9ecef',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                            }}>
-                                <Row>
-                                <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-calendar text-primary mr-2"></i>
-                                                <label className="text-muted small mb-0">Session Date</label>
-                                            </div>
-                                            <div className="bg-light p-3 rounded">
-                                                <h5 className="text-dark font-weight-bold mb-0">
-                                                    {session.sessionDate ? new Date(session.sessionDate).toLocaleDateString('en-US', {
-                                                        year: 'numeric',
-                                                        month: 'long',
-                                                        day: 'numeric'
-                                                    }) : 'N/A'}
-                                                </h5>
-                                            </div>
-                                    </div>
-                                </Col>
-                                    <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-play-circle text-success mr-2"></i>
-                                                <label className="text-muted small mb-0">Start Time</label>
-                                            </div>
-                                            <div className="bg-light p-3 rounded">
-                                                <h5 className="text-dark font-weight-bold mb-0">
-                                                    {session.startTime || 'N/A'}
-                                                </h5>
-                                            </div>
-                                    </div>
-                                </Col>
-                                    <Col md={6}>
-                                    <div className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="feather icon-stop-circle text-danger mr-2"></i>
-                                                <label className="text-muted small mb-0">End Time</label>
-                                            </div>
-                                            <div className="bg-light p-3 rounded">
-                                                <h5 className="text-dark font-weight-bold mb-0">
-                                                    {session.endTime || 'N/A'}
-                                                </h5>
-                                            </div>
-                                    </div>
-                                </Col>
-                                </Row>
-                            </div>
-                        </Tab.Pane>
-
-                        {/* Speakers Tab */}
+                        {/* Speakers Section */}
                         {session.speakers && session.speakers.length > 0 && (
-                            <Tab.Pane eventKey="speakers">
-                                <div style={{
-                                    backgroundColor: '#fff',
-                                    padding: '20px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e9ecef',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    borderBottom: '2px solid #4680ff'
                                 }}>
-                                    <EventSpeakersComponent 
-                                        speakers={session.speakers} 
-                                        handleSpeakerImageClick={handleSpeakerImageClick}
-                                    />
-                                    </div>
-                            </Tab.Pane>
+                                    <i className="fas fa-users mr-2" style={{ color: '#4680ff' }}></i>
+                                    Speakers
+                                </h5>
+                                <EventSpeakersComponent 
+                                    speakers={session.speakers} 
+                                    handleSpeakerImageClick={handleSpeakerImageClick}
+                                />
+                            </Col>
                         )}
-                    </Tab.Content>
-                </Tab.Container>
-            </InfoCard>
+                    </Row>
+                </div>
+            </div>
 
             {/* Speaker Image Modal */}
             <Modal

@@ -198,6 +198,44 @@ export class UserUtils {
     };
   }
 
+
+  static sanitizeUserDataForQRCode(user: UserEntity, event?: any): any {
+    // Return only the required fields for QR code contact card
+    // Based on the contact card design: Name, Company, Mobile, Email, Industry, LinkedIn
+    // Also include isStampFeature based on event tab visibility
+    
+    // Check if stamp feature is enabled for the event
+    // If event.tabVisibility.stamps is false or undefined, stamp feature is disabled
+    // If event.tabVisibility.stamps is true, stamp feature is enabled
+    // If no event provided, default to false
+    console.log('event', event);
+    let isStampFeature = false;
+    if (event) {
+      // Check tab visibility for stamps
+      // If tabVisibility exists and stamps is explicitly false, then disabled
+      // Otherwise, if stamps is true or undefined (default), then enabled
+      if (event.tabVisibility && event.tabVisibility.stamps === false) {
+        isStampFeature = false;
+      } else {
+        // If stamps is true or undefined, consider it enabled (default behavior)
+        isStampFeature = event.tabVisibility?.stamps !== false;
+      }
+    }
+    
+    return {
+      id: user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      company: user.company || '',
+      mobile: user.mobile || '',
+      email: user.email || '',
+      industry: user.industry || '',
+      linkedinProfile: user.linkedinProfile || '',
+      isStampFeature: isStampFeature,
+    };
+  }
+
+
   /**
    * Check if user has required fields for specific role
    * @param user User entity with optional speakerProfile

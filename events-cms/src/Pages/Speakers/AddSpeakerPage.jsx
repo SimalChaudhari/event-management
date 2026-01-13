@@ -1,22 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Row, Col, Card, Container, Alert } from 'react-bootstrap';
+import { Button, Row, Col, Container } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { createSpeaker, updateSpeaker, speakerById, speakerList } from '../../store/actions/speakerActions';
+import { useNavigate, useParams } from 'react-router-dom';
+import { createSpeaker, updateSpeaker, speakerById } from '../../store/actions/speakerActions';
 import SingaporePhoneInput from '../../components/SingaporePhoneInput';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { SPEAKER_PATHS } from '../../utils/constants';
-import useTableNavigation from '../../hooks/useTableNavigation';
 import SettingsEditor from '../../App/components/CkEditor/SettingsEditor';
 
 const AddSpeakerPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const location = useLocation();
     const { id } = useParams(); 
-
-    // Store the page number from where we came from (for edit mode)
-    const previousPageRef = React.useRef(null);
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -31,21 +26,6 @@ const AddSpeakerPage = () => {
     });
     const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
-
-    // Capture the page number from URL when entering add/edit page
-    useEffect(() => {
-        // Get page parameter from URL if it exists (for both add and edit mode)
-        const urlParams = new URLSearchParams(location.search || window.location.search);
-        const pageParam = urlParams.get('page');
-        if (pageParam) {
-            previousPageRef.current = parseInt(pageParam, 10);
-        } else {
-            // Also check if page is in location state (from navigation)
-            if (location.state?.page) {
-                previousPageRef.current = location.state.page;
-            }
-        }
-    }, [id, location.search, location.state]);
 
     // Load edit data if id exists
     useEffect(() => {
@@ -111,20 +91,9 @@ const AddSpeakerPage = () => {
         }
     };
 
-    // Use reusable table navigation hook for back navigation with page preservation
-    const { handleBack: handleBackNavigation } = useTableNavigation({
-        tableRef: null, // Not needed for back navigation
-        listPath: SPEAKER_PATHS.LIST_SPEAKERS,
-        viewPath: SPEAKER_PATHS.VIEW_SPEAKER,
-        editPath: SPEAKER_PATHS.EDIT_SPEAKER,
-        addPath: SPEAKER_PATHS.ADD_SPEAKER
-    });
-    
-    // Handle Back button click - preserve page from URL or location state
+    // Handle Back button click
     const handleBack = () => {
-        const urlParams = new URLSearchParams(location.search || window.location.search);
-        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
-        handleBackNavigation(currentPage);
+        navigate(-1);
     };
 
     const handleSubmit = async (e) => {
@@ -143,13 +112,7 @@ const AddSpeakerPage = () => {
                 const response = await dispatch(updateSpeaker(id, submitData));
                 if (response) {
                     // Redux is already updated with UPDATE_SPEAKER action, no need to fetch again
-                    // Just navigate back - DataTable will use updated Redux state or reload if needed
-                    const targetPage = previousPageRef.current;
-                    if (targetPage) {
-                        navigate(SPEAKER_PATHS.LIST_SPEAKERS);
-                    } else {
-                        navigate(SPEAKER_PATHS.LIST_SPEAKERS);
-                    }
+                    navigate(SPEAKER_PATHS.LIST_SPEAKERS);
                 }
             } else {
                 const response = await dispatch(createSpeaker(submitData));
@@ -178,12 +141,6 @@ const AddSpeakerPage = () => {
         }
     };
 
-    const handleCancel = () => {
-        // Use the reusable handleBackNavigation function which preserves page from URL or location state
-        const urlParams = new URLSearchParams(location.search || window.location.search);
-        const currentPage = urlParams.get('page') || location.state?.page || previousPageRef.current;
-        handleBackNavigation(currentPage);
-    };
 
     return (
         <Container fluid>
@@ -364,7 +321,7 @@ const AddSpeakerPage = () => {
                                 <div className="row mt-4">
                                     <div className="col-12">
                                         <div className="d-flex justify-content-between gap-2">
-                                            <Button variant="danger" onClick={handleCancel}>
+                                            <Button variant="danger" onClick={handleBack}>
                                                 Cancel
                                             </Button>
                                             <Button

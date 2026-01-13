@@ -15,6 +15,7 @@ import { ExhibitorUtils } from '../utils/exhibitor.utils';
 import { AgendaUtils } from '../utils/agenda.utils';
 import { Engagement } from '../engagement/engagement.entity';
 import { EventStaff } from '../event/event-staff.entity';
+import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 
 @Injectable()
 export class FavoriteEventService {
@@ -34,6 +35,9 @@ export class FavoriteEventService {
 
     @InjectRepository(EventStaff)
     private eventStaffRepository: Repository<EventStaff>,
+
+    @InjectRepository(ExhibitorRating)
+    private exhibitorRatingRepository: Repository<ExhibitorRating>,
 
     private readonly surveyUtils: SurveyUtils,
   ) {}
@@ -267,6 +271,13 @@ export class FavoriteEventService {
                       this.eventStaffRepository,
                       favorite.eventId || '',
                       exhibitorId,
+                    );
+
+                    // Get average rating for this exhibitor in this event
+                    (exhibitorData as any).rating = await ExhibitorUtils.getExhibitorRating(
+                      this.exhibitorRatingRepository,
+                      exhibitorId,
+                      favorite.eventId || '',
                     );
 
                     return exhibitorData;

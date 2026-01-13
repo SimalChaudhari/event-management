@@ -2,6 +2,8 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorLead } from './exhibitor-lead.entity';
+import { ExhibitorView } from './exhibitor-view.entity';
+import { ExhibitorRating } from './exhibitor-rating.entity';
 import { BoothBanner } from './booth-banner.entity';
 import { ExhibitorService } from './exhibitor.service';
 import { ExhibitorController } from './exhibitor.controller';
@@ -14,7 +16,7 @@ import { Event } from '../event/event.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Exhibitor, ExhibitorLead, BoothBanner, UserEntity, Event]),
+        TypeOrmModule.forFeature([Exhibitor, ExhibitorLead, ExhibitorView, ExhibitorRating, BoothBanner, UserEntity, Event]),
         JwtModule.register({
             secret: process.env.JWT_SECRET,
             signOptions: { },

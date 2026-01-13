@@ -2,6 +2,7 @@
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { Repository } from 'typeorm';
 import { EventStaff } from '../event/event-staff.entity';
+import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 
 export class ExhibitorUtils {
   /**
@@ -110,5 +111,53 @@ export class ExhibitorUtils {
 
     // Format event staff data for this exhibitor using utility
     return this.formatEventStaff(exhibitorStaffs);
+  }
+
+  /**
+   * Get rating information for an exhibitor in a specific event
+   * @param exhibitorRatingRepository Repository for ExhibitorRating entity
+   * @param exhibitorId Exhibitor ID
+   * @param eventId Event ID
+   * @returns Rating information object with averageRating and totalRatings
+   */
+  static async getExhibitorRating(
+    exhibitorRatingRepository: Repository<ExhibitorRating>,
+    exhibitorId: string,
+    eventId: string,
+  ): Promise<{ averageRating: number; totalRatings: number }> {
+    if (!exhibitorId || !eventId) {
+      return {
+        averageRating: 0,
+        totalRatings: 0,
+      };
+    }
+
+    try {
+      const ratings = await exhibitorRatingRepository.find({
+        where: {
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+          isActive: true,
+        },
+        select: ['rating'],
+      });
+
+      let averageRating = 0;
+      if (ratings.length > 0) {
+        const totalRating = ratings.reduce((sum, r) => sum + parseFloat(String(r.rating)), 0);
+        averageRating = parseFloat((totalRating / ratings.length).toFixed(1));
+      }
+
+      return {
+        averageRating,
+        totalRatings: ratings.length,
+      };
+    } catch (error) {
+      // If there's an error, return default values
+      return {
+        averageRating: 0,
+        totalRatings: 0,
+      };
+    }
   }
 }

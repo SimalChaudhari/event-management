@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Container, Modal, Alert, Badge } from 'react-bootstrap';
+import { Button, Row, Col, Card, Modal, Badge } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { getGalleryById } from '../../../store/actions/galleryActions';
 import { MEDIA_MANAGER_PATHS, EVENT_PATHS } from '../../../utils/constants';
@@ -16,17 +16,6 @@ const ViewGalleryPage = () => {
     // For image modal
     const [showImageModal, setShowImageModal] = useState(false);
     const [currentImage, setCurrentImage] = useState('');
-    // For responsive design
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     useEffect(() => {
         const loadData = async () => {
@@ -58,280 +47,384 @@ const ViewGalleryPage = () => {
         setShowImageModal(true);
     };
 
-    // Get colorful icons
-    const getIconColor = (iconClass) => {
-        const colorMap = {
-            'fas fa-image': '#007bff',
-            'fas fa-calendar': '#28a745',
-            'fas fa-calendar-alt': '#dc3545',
-            'fas fa-images': '#17a2b8',
-            'fas fa-map-marker-alt': '#e74c3c',
-            'fas fa-building': '#6f42c1',
-            'fas fa-globe': '#17a2b8'
-        };
-        return colorMap[iconClass] || '#495057';
-    };
-
-    // InfoCard component for consistent styling
-    const InfoCard = ({ title, iconClass, children, borderColor = '#4680ff' }) => (
-        <div
-            className="mb-4"
-            style={{
-                backgroundColor: '#fff',
-                borderRadius: '8px',
-                padding: isMobile ? '15px' : '20px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                border: '1px solid #e9ecef',
-                borderLeft: `4px solid ${borderColor}`
+    // InfoField component matching EventBasicComponent pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
             }}
-        >
-            <div style={{ padding: isMobile ? '12px' : '24px' }}>
-                <h5
-                    style={{
-                        fontSize: isMobile ? '16px' : '18px',
-                        fontWeight: '600',
-                        color: '#2c3e50',
-                        marginBottom: isMobile ? '15px' : '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        borderBottom: `2px solid ${borderColor}`,
-                        paddingBottom: '8px',
-                        flexWrap: 'wrap'
-                    }}
-                >
-                    <i className={iconClass} style={{ fontSize: isMobile ? '16px' : '20px', color: getIconColor(iconClass) }}></i>
-                    <span>{title}</span>
-                </h5>
-                {children}
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
             </div>
-        </div>
+        </Col>
     );
 
-    const InfoField = ({ label, value, iconClass = null }) => (
-        <div
-            className="info-field-container mb-2 py-2"
-            style={{
-                borderBottom: '1px solid #f1f1f1',
-                display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
-                justifyContent: isMobile ? 'flex-start' : 'space-between',
-                alignItems: isMobile ? 'flex-start' : 'center',
-                gap: isMobile ? '8px' : '0'
-            }}
-        >
-            <span 
-                className="field-label" 
-                style={{ 
-                    fontWeight: 'bold', 
-                    color: '#495057', 
-                    fontSize: isMobile ? '13px' : '14px',
-                    minWidth: isMobile ? 'auto' : '140px'
-                }}
-            >
-                {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
-                {label}:
-            </span>
-            <span 
-                className="field-value" 
-                style={{ 
-                    color: '#212529', 
-                    fontWeight: 'normal', 
-                    fontSize: isMobile ? '14px' : '15px', 
-                    textAlign: isMobile ? 'left' : 'right', 
-                    flex: 1,
-                    wordBreak: 'break-word'
-                }}
-            >
-                {value}
-            </span>
-        </div>
+    const content = (
+        <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+            {/* Gallery Information Section */}
+            <Col xs={12} className="mb-md-4 mb-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#000000',
+                    borderBottom: '2px solid #4680ff'
+                }}>
+                    <i className="fas fa-image mr-2" style={{ color: '#4680ff' }}></i>
+                    Gallery Information
+                </h5>
+                
+                <Row>
+                    <InfoField 
+                        label="Gallery Title" 
+                        value={galleryData.title || 'N/A'} 
+                        icon="fas fa-image"
+                        colSize={12}
+                    />
+                    <InfoField 
+                        label="Event Name" 
+                        value={galleryData.event?.name || 'Unknown Event'} 
+                        icon="fas fa-calendar-alt"
+                        colSize={6}
+                    />
+                    <InfoField 
+                        label="Total Images" 
+                        value={
+                            <Badge bg="info" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                {galleryData.galleryImages?.length || 0} images
+                            </Badge>
+                        } 
+                        icon="fas fa-images"
+                        colSize={6}
+                    />
+                    <InfoField 
+                        label="Location" 
+                        value={galleryData.event?.location || 'N/A'} 
+                        icon="fas fa-map-marker-alt"
+                        colSize={6}
+                    />
+                    <InfoField 
+                        label="Venue" 
+                        value={galleryData.event?.venue || 'N/A'} 
+                        icon="fas fa-building"
+                        colSize={6}
+                    />
+                    <InfoField 
+                        label="Created Date" 
+                        value={new Date(galleryData.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        })} 
+                        icon="fas fa-calendar"
+                        colSize={6}
+                    />
+                </Row>
+            </Col>
+
+            {/* Gallery Images Section */}
+            <Col xs={12} className="mb-md-4 mb-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#000000',
+                    borderBottom: '2px solid #4680ff'
+                }}>
+                    <i className="fas fa-images mr-2" style={{ color: '#4680ff' }}></i>
+                    Gallery Images
+                </h5>
+                
+                {galleryData.galleryImages && galleryData.galleryImages.length > 0 ? (
+                    <Row style={{ marginLeft: '-8px', marginRight: '-8px' }}>
+                        {galleryData.galleryImages.map((imagePath, index) => (
+                            <Col lg={3} md={4} sm={6} xs={12} key={index} style={{ paddingLeft: '8px', paddingRight: '8px', marginBottom: '16px' }}>
+                                <div 
+                                    style={{ 
+                                        position: 'relative',
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        cursor: 'pointer',
+                                        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}
+                                    onClick={() => handleImageClick(imagePath)}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1.02)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                                    }}
+                                >
+                                    <ImageWithFallback
+                                        src={`${process.env.REACT_APP_API_URL}/${imagePath}`}
+                                        alt={`Gallery Image ${index + 1}`}
+                                        style={{
+                                            width: '100%',
+                                            height: '220px',
+                                            objectFit: 'cover',
+                                            display: 'block',
+                                            transition: 'transform 0.3s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.transform = 'scale(1.05)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.transform = 'scale(1)';
+                                        }}
+                                    />
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '12px',
+                                            right: '12px',
+                                            backgroundColor: 'rgba(0,0,0,0.75)',
+                                            color: 'white',
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '16px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            zIndex: 10
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(70, 128, 255, 0.9)';
+                                            e.currentTarget.style.transform = 'scale(1.1)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.75)';
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleImageClick(imagePath);
+                                        }}
+                                    >
+                                        <i className="fas fa-search-plus"></i>
+                                    </div>
+                                  
+                                </div>
+                            </Col>
+                        ))}
+                    </Row>
+                ) : (
+                    <Row>
+                        <Col xs={12} className="text-center">
+                            <div style={{ 
+                                position: 'relative', 
+                                display: 'inline-block', 
+                                maxWidth: '400px', 
+                                width: '100%',
+                                marginTop: '20px'
+                            }}>
+                                <ImageWithFallback
+                                    src={DUMMY_PATH_GALLERY}
+                                    alt="No Gallery Images"
+                                    style={{
+                                        width: '100%',
+                                        height: '300px',
+                                        objectFit: 'cover',
+                                        borderRadius: '8px',
+                                        border: '2px solid #e9ecef',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}
+                                />
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: '20px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        color: 'white',
+                                        padding: '12px 24px',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    <i className="fas fa-images me-2"></i>
+                                    No images in this gallery
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                )}
+            </Col>
+        </Row>
     );
 
     return (
-        <>
-            <Container fluid className="mt-4">
-                <div
-                    className="mb-3"
-                    style={{ 
+        <div className="p-2 bg-light">
+            {/* Header Section */}
+            <div className="mb-md-4 mb-3">
+                <div className="d-none d-md-block">
+                    <Card style={{ 
                         backgroundColor: '#fff', 
                         borderRadius: '8px', 
-                        padding: isMobile ? '15px' : '20px', 
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
-                    }}
-                >
-                    <div className={`d-flex ${isMobile ? 'flex-column' : 'justify-content-between'} align-items-${isMobile ? 'start' : 'center'} gap-3`}>
-                        <h4 
-                            className="card-title mb-0"
-                            style={{ 
-                                fontSize: isMobile ? '18px' : '24px',
-                                fontWeight: '600'
-                            }}
-                        >
-                            View Gallery
-                        </h4>
-                        <div 
-                            className='d-flex'
-                            style={{ gap: '5px', marginTop: isMobile ? '5PX' : '' }}
-                        >
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        border: '1px solid #e9ecef',
+                        overflow: 'hidden',
+                        marginBottom: '24px'
+                    }}>
+                        <Card.Body style={{ padding: '20px' }}>
+                            <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h4 style={{ 
+                                        margin: 0, 
+                                        color: '#2c3e50',
+                                        fontWeight: '600'
+                                    }}>
+                                        <i className="fas fa-images mr-2" style={{ color: '#4680ff' }}></i>
+                                        View Gallery
+                                    </h4>
+                                </div>
+                                <div className="d-flex" style={{ gap: '8px' }}>
+                                    <Button 
+                                        variant="primary" 
+                                        onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}
+                                        style={{ 
+                                            padding: '8px 16px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        <i className="fas fa-edit mr-2"></i>
+                                        Edit
+                                    </Button>
+                                    <Button 
+                                        variant="secondary" 
+                                        onClick={() => navigate(-1)}
+                                        style={{ 
+                                            padding: '8px 16px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        <i className="fas fa-arrow-left mr-2"></i>
+                                        Back
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </div>
+                <div className="d-block d-md-none px-2 py-2">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 style={{ 
+                                margin: 0, 
+                                color: '#2c3e50',
+                                fontWeight: '600',
+                                fontSize: '18px'
+                            }}>
+                                <i className="fas fa-images mr-2" style={{ color: '#4680ff' }}></i>
+                                View Gallery
+                            </h4>
+                        </div>
+                        <div className="d-flex" style={{ gap: '8px' }}>
                             <Button 
                                 variant="primary" 
+                                size="sm"
                                 onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}
-                                className={isMobile ? 'flex-fill' : ''}
-                                size={isMobile ? 'sm' : undefined}
-                                style={{ marginRight: isMobile ? '0' : '5px' }}
+                                style={{ 
+                                    padding: '6px 12px',
+                                    fontWeight: '500'
+                                }}
                             >
-                                <i className="fas fa-edit me-2"></i>
+                                <i className="fas fa-edit mr-2"></i>
                                 Edit
                             </Button>
                             <Button 
                                 variant="secondary" 
+                                size="sm"
                                 onClick={() => navigate(-1)}
-                                className={isMobile ? 'flex-fill' : ''}
-                                size={isMobile ? 'sm' : undefined}
+                                style={{ 
+                                    padding: '6px 12px',
+                                    fontWeight: '500'
+                                }}
                             >
-                                <i className="fas fa-arrow-left me-2"></i>
+                                <i className="fas fa-arrow-left mr-2"></i>
                                 Back
                             </Button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="p-2 bg-light" style={{ padding: isMobile ? '8px' : '16px' }}>
-                    {/* Gallery Information Section */}
-                    <InfoCard title="Gallery Information" iconClass="fas fa-image" borderColor="#3498db">
-                        <Row>
-                            <Col lg={6} md={12} className="mb-3 mb-md-0">
-                                <div style={{ fontSize: isMobile ? '14px' : '15px', lineHeight: '1.6' }}>
-                                    <InfoField 
-                                        label="Gallery Title" 
-                                        value={galleryData.title} 
-                                        iconClass="fas fa-image" 
-                                    />
-                                    <InfoField 
-                                        label="Event Name" 
-                                        value={galleryData.event?.name || 'Unknown Event'} 
-                                        iconClass="fas fa-calendar-alt" 
-                                    />
-                                    <InfoField 
-                                        label="Total Images" 
-                                        value={
-                                            <Badge bg="info" className="px-3 py-1" style={{ fontSize: isMobile ? '12px' : '14px' }}>
-                                                {galleryData.galleryImages?.length || 0} images
-                                            </Badge>
-                                        } 
-                                        iconClass="fas fa-images" 
-                                    />
-                                </div>
-                            </Col>
-                            <Col lg={6} md={12}>
-                                <div style={{ fontSize: isMobile ? '14px' : '15px', lineHeight: '1.6' }}>
-                                    <InfoField 
-                                        label="Location" 
-                                        value={galleryData.event?.location || 'N/A'} 
-                                        iconClass="fas fa-map-marker-alt" 
-                                    />
-                                    <InfoField 
-                                        label="Venue" 
-                                        value={galleryData.event?.venue || 'N/A'} 
-                                        iconClass="fas fa-building" 
-                                    />
-                                    <InfoField 
-                                        label="Created Date" 
-                                        value={new Date(galleryData.createdAt).toLocaleDateString('en-GB', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })} 
-                                        iconClass="fas fa-calendar" 
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
-                    </InfoCard> 
-
-                    {/* Gallery Images Section */}
-                    <InfoCard title="Gallery Images" iconClass="fas fa-images" borderColor="#28a745">
-                        {galleryData.galleryImages && galleryData.galleryImages.length > 0 ? (
-                            <Row className="g-3">
-                                {galleryData.galleryImages.map((imagePath, index) => (
-                                    <Col lg={3} md={4} sm={6} xs={12} key={index}>
-                                        <div style={{ position: 'relative' }}>
-                                            <ImageWithFallback
-                                                src={`${process.env.REACT_APP_API_URL}/${imagePath}`}
-                                                alt={`Gallery Image ${index + 1}`}
-                                                onClick={() => handleImageClick(imagePath)}
-                                                style={{
-                                                    width: '100%',
-                                                    height: isMobile ? '180px' : '200px',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #28a745',
-                                                    cursor: 'pointer',
-                                                    transition: 'transform 0.2s',
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                                                }}
-                                            />
-                                            <div
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: isMobile ? '8px' : '10px',
-                                                    right: isMobile ? '8px' : '10px',
-                                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                                    color: 'white',
-                                                    padding: isMobile ? '6px 8px' : '8px 10px',
-                                                    borderRadius: '50%',
-                                                    fontSize: isMobile ? '12px' : '14px',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onClick={() => handleImageClick(imagePath)}
-                                            >
-                                                <i className="fas fa-search-plus"></i>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                ))}
-                            </Row>
-                        ) : (
-                            <Row>
-                                <Col xs={12} className="text-center">
-                                    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '400px', width: '100%' }}>
-                                        <ImageWithFallback
-                                            src={DUMMY_PATH_GALLERY}
-                                            alt="No Gallery Images"
-                                            style={{
-                                                width: '100%',
-                                                height: '300px',
-                                                objectFit: 'cover',
-                                                borderRadius: '8px',
-                                                border: '2px solid #e9ecef',
-                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                            }}
-                                        />
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                bottom: '20px',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                                color: 'white',
-                                                padding: '12px 24px',
-                                                borderRadius: '8px',
-                                                fontSize: '14px'
-                                            }}
-                                        >
-                                            <i className="fas fa-images me-2"></i>
-                                            No images in this gallery
-                                        </div>
-                                    </div>
-                                </Col>
-                            </Row>
-                        )}
-                    </InfoCard>
-                </div>
-            </Container>
+            {/* Main Content Section */}
+            <div className="d-none d-md-block">
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {content}
+                    </Card.Body>
+                </Card>
+            </div>
+            <div className="d-block d-md-none px-2 py-2">
+                {content}
+            </div>
 
             {/* Image Modal */}
             <Modal
@@ -356,11 +449,11 @@ const ViewGalleryPage = () => {
                         onClick={() => setShowImageModal(false)}
                         style={{
                             position: 'fixed',
-                            top: isMobile ? '10px' : '20px',
-                            right: isMobile ? '10px' : '20px',
+                            top: '20px',
+                            right: '20px',
                             borderRadius: '50%',
-                            width: isMobile ? '35px' : '40px',
-                            height: isMobile ? '35px' : '40px',
+                            width: '40px',
+                            height: '40px',
                             zIndex: 1000,
                             backgroundColor: 'rgba(0,0,0,0.7)',
                             border: 'none',
@@ -370,7 +463,7 @@ const ViewGalleryPage = () => {
                             justifyContent: 'center'
                         }}
                     >
-                        <i className="fas fa-times" style={{ fontSize: isMobile ? '14px' : '16px' }}></i>
+                        <i className="fas fa-times"></i>
                     </Button>
 
                     {/* Download Button */}
@@ -385,11 +478,11 @@ const ViewGalleryPage = () => {
                         }}
                         style={{
                             position: 'fixed',
-                            top: isMobile ? '10px' : '20px',
-                            left: isMobile ? '10px' : '20px',
+                            top: '20px',
+                            left: '20px',
                             borderRadius: '50%',
-                            width: isMobile ? '35px' : '40px',
-                            height: isMobile ? '35px' : '40px',
+                            width: '40px',
+                            height: '40px',
                             zIndex: 1000,
                             backgroundColor: 'rgba(0,0,0,0.7)',
                             border: 'none',
@@ -399,7 +492,7 @@ const ViewGalleryPage = () => {
                             justifyContent: 'center'
                         }}
                     >
-                        <i className="fas fa-download" style={{ fontSize: isMobile ? '14px' : '16px' }}></i>
+                        <i className="fas fa-download"></i>
                     </Button>
 
                     {/* Image Container */}
@@ -408,8 +501,8 @@ const ViewGalleryPage = () => {
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
-                            minHeight: isMobile ? '70vh' : '90vh',
-                            padding: isMobile ? '40px 20px' : '60px 80px 80px 80px'
+                            minHeight: '70vh',
+                            padding: '60px 40px 40px 40px'
                         }}
                     >
                         <ImageWithFallback
@@ -425,7 +518,7 @@ const ViewGalleryPage = () => {
                     </div>
                 </Modal.Body>
             </Modal>
-        </>
+        </div>
     );
 };
 

@@ -47,6 +47,7 @@ import {
 } from '../utils/searchEvent';
 import { QnaUtils } from '../utils/qna.utils';
 import { FilterService } from '../service/filter.service';
+import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 
 @Injectable()
 export class EventService {
@@ -93,6 +94,8 @@ export class EventService {
     private attendanceRepository: Repository<EventAttendance>,
     @InjectRepository(Feedback)
     private feedbackRepository: Repository<Feedback>,
+    @InjectRepository(ExhibitorRating)
+    private exhibitorRatingRepository: Repository<ExhibitorRating>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
@@ -681,6 +684,13 @@ export class EventService {
                       this.eventStaffRepository,
                       event.id,
                       exhibitorId,
+                    );
+
+                    // Get average rating for this exhibitor in this event
+                    (exhibitorData as any).rating = await ExhibitorUtils.getExhibitorRating(
+                      this.exhibitorRatingRepository,
+                      exhibitorId,
+                      event.id,
                     );
 
                     return exhibitorData;

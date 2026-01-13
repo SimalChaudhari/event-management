@@ -5,12 +5,12 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { deleteSpeaker } from '../../store/actions/speakerActions';
-import { useLocation, useNavigate } from 'react-router-dom';
 import '../../assets/css/event.css';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import ImageViewModal from '../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
@@ -25,15 +25,16 @@ $.DataTable = require('datatables.net-bs');
 
 const Speakers = () => {
     const dispatch = useDispatch();
-    const { speakers, pagination: reduxPagination } = useSelector((state) => state.speaker || {});
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const navigate = useNavigate();
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
     const tableRef = useRef(null);
 
     // Use pagination persistence hook
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    const { restoreTablePage } = usePersistedTablePage();
 
     // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
@@ -48,6 +49,19 @@ const Speakers = () => {
         setItemToDelete({ id: speakerId });
         setShowDeleteModal(true);
     }, []);
+
+    const handleImageClick = (imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH_USER) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
+    };
+
+    // Store handlers in refs to avoid dependency issues in useEffect
+    const handlersRef = useRef({ handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch, handleImageClick });
+    useEffect(() => {
+        handlersRef.current = { handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch, handleImageClick };
+    }, [handleView, handleEdit, handleAdd, handleDelete, restoreTablePage, dispatch, handleImageClick]);
 
     const handleConfirmDelete = async () => {
         if (!itemToDelete) return;
@@ -80,6 +94,8 @@ const Speakers = () => {
         }
     };
 
+ 
+
     useEffect(() => {
         const columns = [
             {
@@ -95,9 +111,13 @@ const Speakers = () => {
                     
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${imageUrl}" alt="speaker" class="img-radius align-top m-r-15" 
-                                 style="width:50px; height:50px; object-fit:cover;" 
-                                 onerror="this.src='${DUMMY_PATH_USER}';">
+                            <span class="speaker-image-clickable" data-image-url="${imageUrl}" title="Click to view image">
+                                <img src="${imageUrl}" alt="speaker" class="img-radius align-top m-r-15" 
+                                     style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s; cursor: pointer;" 
+                                     onerror="this.src='${DUMMY_PATH_USER}';"
+                                     onmouseover="this.style.opacity='0.8'"
+                                     onmouseout="this.style.opacity='1'">
+                            </span>
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${fullName}</h6>
                                 <p class="text-muted m-b-0">${row.email || 'No email'}</p>
@@ -199,7 +219,7 @@ const Speakers = () => {
             order: [[4, 'desc']],
             ajaxParams: {},
             axiosInstance: axiosInstance,
-            dispatch: dispatch, // Pass dispatch for loading state
+            dispatch: handlersRef.current.dispatch, // Pass dispatch for loading state
             loadingActionType: SPEAKER_LOADING, // Use SPEAKER_LOADING to show GlobalLoader
             dom: "<'row mb-3'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 d-flex justify-content-end align-items-center'<'search-container'f><'add-speaker-button ml-2'>>>" +
                  "<'row'<'col-sm-12'tr>>" +
@@ -209,38 +229,47 @@ const Speakers = () => {
             onDataLoaded: (data, metadata) => {
                 // Optional: Handle data if needed
             },
-            restoreTablePage: restoreTablePage,
+            restoreTablePage: handlersRef.current.restoreTablePage,
             initCompleteCallback: function (settings, json, api) {
                 // Add button initialization
                 if (!$('#addSpeakerBtn').length) {
                     $('.add-speaker-button').html(`
                         <button class="btn btn-primary d-flex align-items-center ml-2" id="addSpeakerBtn">
                             <i class="feather icon-plus mr-1"></i>
-                            Add Speaker
+                            Add
                         </button>
                     `);
-                    $('#addSpeakerBtn').on('click', handleAdd);
+                    $('#addSpeakerBtn').on('click', () => handlersRef.current.handleAdd());
                 }
+
+                // Add event listener for clickable speaker image
+                $(settings.nTable).off('click', '.speaker-image-clickable').on('click', '.speaker-image-clickable', function (e) {
+                    e.stopPropagation(); // Prevent event bubbling
+                    const imageUrl = $(this).data('image-url');
+                    if (imageUrl && handlersRef.current.handleImageClick) {
+                        handlersRef.current.handleImageClick(imageUrl);
+                    }
+                });
 
                 // Attach event listeners for actions
                 $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleView(rowData);
+                        handlersRef.current.handleView(rowData);
                     }
                 });
 
                 $(settings.nTable).off('click', '.edit-btn').on('click', '.edit-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleEdit(rowData);
+                        handlersRef.current.handleEdit(rowData);
                     }
                 });
 
                 $(settings.nTable).off('click', '.delete-btn').on('click', '.delete-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
-                        handleDelete(rowData.id);
+                        handlersRef.current.handleDelete(rowData.id);
                     }
                 });
             }
@@ -248,11 +277,13 @@ const Speakers = () => {
 
         return () => {
             if (tableRef.current) {
+                const tableSelector = '#data-table-zero';
+                $(tableSelector + ' tbody').off('click', '.speaker-image-clickable');
                 tableRef.current.destroy();
                 tableRef.current = null;
             }
         };
-    }, []); // Only run once on mount
+    }, []); // Only run once on mount - handlers are stored in refs to avoid re-initialization
 
     return (
         <>
@@ -262,6 +293,16 @@ const Speakers = () => {
                 onConfirm={handleConfirmDelete} 
                 isLoading={isDeleting} 
             />
+
+            {/* Profile Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Speaker Profile"
+                downloadFileName={`speaker-profile-${Date.now()}.jpg`}
+            />
+
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">

@@ -830,10 +830,11 @@ export class UserController {
   @Get('qr-code/scan/:qrCodeData')
   async scanQRCode(
     @Param('qrCodeData') qrCodeData: string,
+    @Query('eventId') eventId: string | undefined,
     @Res() response: Response,
   ) {
     try {
-      const userInfo = await this.userService.getUserInfoFromQRCode(qrCodeData);
+      const userInfo = await this.userService.getUserInfoFromQRCode(qrCodeData, eventId);
       
       const successResponse = {
         success: true,

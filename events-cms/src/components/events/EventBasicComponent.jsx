@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Row, Col, Badge } from 'react-bootstrap';
+import React from 'react';
+import { Row, Col, Badge, Card } from 'react-bootstrap';
 import DateTimeFormatter from '../dateTime/DateTimeFormatter';
 import { ExpandableDescription } from '../ExpandableDescription';
 
@@ -27,284 +27,423 @@ const EventBasicComponent = ({ eventData }) => {
         });
     };
 
-    // Get colorful icons based on icon class
-    const getIconColor = (iconClass) => {
-        const colorMap = {
-            'fas fa-calendar-alt': '#007bff', // Blue for calendar
-            'fas fa-tag': '#28a745', // Green for tag
-            'fas fa-tags': '#ffc107', // Yellow for tags
-            'fas fa-clock': '#dc3545', // Red for clock
-            'fas fa-map-marker-alt': '#e74c3c', // Red for location
-            'fas fa-building': '#6f42c1', // Purple for building
-            'fas fa-globe': '#17a2b8', // Teal for globe
-            'fas fa-dollar-sign': '#28a745', // Green for money
-            'fas fa-calendar-plus': '#20c997', // Teal for created
-            'fas fa-edit': '#fd7e14', // Orange for edit
-            'fas fa-gift': '#e91e63', // Pink for lucky draw
-            'fa fa-sticky-note': '#6c757d', // Gray for text
-            'fas fa-info-circle': '#17a2b8', // Teal for info
-            'fa fa-sticky-note': '#007bff',
-            'fas fa-calendar-check': '#28a745', // Green for publish start
-            'fas fa-calendar-times': '#dc3545' // Red for publish end
-        };
-        return colorMap[iconClass] || '#495057';
-    };
-
-    // InfoCard component for consistent styling similar to exhibitor view
-    const InfoCard = ({ title, iconClass, children, borderColor = '#4680ff', className = '' }) => (
-        <div
-            className={`mb-4 ${className}`}
-            style={{
-                backgroundColor: '#fff',
-                borderRadius: '8px',
-                padding: '20px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                border: '1px solid #e9ecef',
-                borderLeft: `4px solid ${borderColor}`
+    // InfoField component matching speaker view pattern - responsive design
+    const InfoField = ({ label, value, icon = null, colSize = 6 }) => (
+        <Col xs={12} sm={12} md={colSize} className="mb-2" style={{ overflow: 'hidden' }}>
+            <div style={{ 
+                padding: '8px 12px',
+                borderBottom: '1px solid #e9ecef',
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
             }}
-        >
-            <div style={{ padding: '24px' }}>
-                <h5
-                    style={{
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        color: '#2c3e50',
-                        marginBottom: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        borderBottom: `2px solid ${borderColor}`,
-                        paddingBottom: '8px',
-                        position: 'relative'
-                    }}
-                >
-                    <i className={iconClass} style={{ fontSize: '20px', color: getIconColor(iconClass) }}></i>
-                    {title}
-                </h5>
-                {children}
+            className="px-md-3 px-2 py-md-2 py-2"
+            >
+                {/* Mobile & Tablet: Label on top */}
+                <div className="d-block d-md-none">
+                    <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginBottom: '4px',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}>
+                        <span>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        width: '100%',
+                        lineHeight: '1.5'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
+                {/* Desktop: Label and value side by side */}
+                <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                    <div style={{ 
+                        minWidth: '140px',
+                        maxWidth: '140px',
+                        fontSize: '13px', 
+                        fontWeight: '600', 
+                        color: '#4680ff',
+                        marginRight: '12px',
+                        flexShrink: 0
+                    }}>
+                        <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>{label}:</span>
+                    </div>
+                    <div style={{ 
+                        fontSize: '14px', 
+                        color: '#000000',
+                        fontWeight: '400',
+                        flex: 1,
+                        minWidth: 0,
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        overflow: 'hidden'
+                    }}>
+                        {value || 'N/A'}
+                    </div>
+                </div>
             </div>
-        </div>
+        </Col>
     );
 
-    const InfoField = ({ label, value, iconClass = null }) => (
-        <div
-            className="info-field-container mb-2 py-2"
-            style={{
-                borderBottom: '1px solid #f1f1f1'
-            }}
-        >
-            <span className="field-label" style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px' }}>
-                {iconClass && <i className={iconClass} style={{ marginRight: '8px', color: getIconColor(iconClass) }}></i>}
-                {label}:
-            </span>
-            <span className="field-value" style={{ color: '#212529', fontWeight: 'normal', fontSize: '15px' }}>
-                {value}
-            </span>
-        </div>
+
+    const content = (
+        <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
+                        {/* Event Overview Section */}
+                        <Col xs={12} className="p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                fontSize: '16px', 
+                                fontWeight: '600', 
+                                color: '#000000',
+                                borderBottom: '2px solid #4680ff'
+                            }}>
+                                <i className="fas fa-info-circle mr-2" style={{ color: '#4680ff' }}></i>
+                                Event Overview
+                            </h5>
+                            <Row>
+                                <InfoField 
+                                    label="Event Name" 
+                                    value={eventData.name} 
+                                    icon="fas fa-calendar-alt"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Ticket Price"
+                                    value={
+                                        <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
+                                            {eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free'}
+                                        </span>
+                                    }
+                                    icon="fas fa-dollar-sign"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Start Date & Time"
+                                    value={<DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />}
+                                    icon="fas fa-clock"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="End Date & Time"
+                                    value={<DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />}
+                                    icon="fas fa-clock"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Event Type"
+                                    value={
+                                        <Badge bg="secondary" style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                            {eventData.type || 'N/A'}
+                                        </Badge>
+                                    }
+                                    icon="fas fa-tag"
+                                    colSize={6}
+                                />
+                                <InfoField 
+                                    label="Lucky Draw Feature" 
+                                    value={
+                                        <Badge bg={eventData.enableLuckyDrawFeature ? 'success' : 'danger'} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}>
+                                            {eventData.enableLuckyDrawFeature ? 'Enabled' : 'Disabled'}
+                                            <i
+                                                style={{ marginLeft: '4px' }}
+                                                className={`fas fa-${eventData.enableLuckyDrawFeature ? 'check-circle' : 'times-circle'} me-1`}
+                                            ></i>
+                                        </Badge>
+                                    }
+                                    icon="fas fa-gift"
+                                    colSize={6}
+                                />
+                                <InfoField label="Location" value={eventData.location || 'N/A'} icon="fas fa-map-marker-alt" colSize={6} />
+                                <InfoField label="Venue" value={eventData.venue || 'N/A'} icon="fas fa-building" colSize={6} />
+                                <InfoField label="Country" value={eventData.country || 'N/A'} icon="fas fa-globe" colSize={6} />
+                                <InfoField label="Attendance Count" value={eventData.attendanceCount || '0'} icon="fas fa-users" colSize={6} />
+                                {eventData?.publishStartDate && (
+                                    <InfoField
+                                        label="Publish Start Date"
+                                        value={new Date(eventData.publishStartDate).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })}
+                                        icon="fas fa-calendar-check"
+                                        colSize={6}
+                                    />
+                                )}
+                                {eventData?.publishEndDate && (
+                                    <InfoField
+                                        label="Publish End Date"
+                                        value={new Date(eventData.publishEndDate).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })}
+                                        icon="fas fa-calendar-times"
+                                        colSize={6}
+                                    />
+                                )}
+                                <InfoField
+                                    label="Created At"
+                                    value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.createdAt)}</span>}
+                                    icon="fas fa-calendar-plus"
+                                    colSize={6}
+                                />
+                                <InfoField
+                                    label="Last Updated"
+                                    value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.updatedAt)}</span>}
+                                    icon="fas fa-edit"
+                                    colSize={6}
+                                />
+                                {eventData?.description && (
+                                    <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                        <div style={{ 
+                                            padding: '8px 12px',
+                                            borderBottom: '1px solid #e9ecef',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            maxWidth: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                        className="px-md-3 px-2 py-md-2 py-2"
+                                        >
+                                            {/* Mobile & Tablet: Label on top */}
+                                            <div className="d-block d-md-none">
+                                                <div style={{ 
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#4680ff',
+                                                    marginBottom: '4px',
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word'
+                                                }}>
+                                                    <span>Event Description:</span>
+                                                </div>
+                                                <div style={{ 
+                                                    fontSize: '14px', 
+                                                    color: '#000000',
+                                                    fontWeight: '400',
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                    width: '100%',
+                                                    lineHeight: '1.5'
+                                                }}>
+                                                    <ExpandableDescription text={eventData.description} maxLines={2} />
+                                                </div>
+                                            </div>
+                                            {/* Desktop: Label and value side by side */}
+                                            <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                <div style={{ 
+                                                    minWidth: '140px',
+                                                    maxWidth: '140px',
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600', 
+                                                    color: '#4680ff',
+                                                    marginRight: '12px',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Event Description:</span>
+                                                </div>
+                                                <div style={{ 
+                                                    fontSize: '14px', 
+                                                    color: '#000000',
+                                                    fontWeight: '400',
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    wordBreak: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <ExpandableDescription text={eventData.description} maxLines={2} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+                                )}
+                            </Row>
+                        </Col>
+
+                        {/* Event Categories - Separate Section */}
+                        {eventData?.categories?.length > 0 && (
+                            <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
+                                    fontSize: '16px', 
+                                    fontWeight: '600', 
+                                    color: '#000000',
+                                    borderBottom: '2px solid #4680ff'
+                                }}>
+                                    <i className="fas fa-tags mr-2" style={{ color: '#4680ff' }}></i>
+                                    Event Categories
+                                </h5>
+                                <Row>
+                                    {eventData.categories.map((category, index) => (
+                                        <React.Fragment key={category.id}>
+                                            <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                <div style={{ 
+                                                    padding: '8px 12px',
+                                                    borderBottom: '1px solid #e9ecef',
+                                                    borderLeft: '4px solid #4680ff',
+                                                    backgroundColor: '#f0f4ff',
+                                                    borderRadius: '4px',
+                                                    width: '100%',
+                                                    maxWidth: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                className="px-md-3 px-2 py-md-2 py-2"
+                                                >
+                                                    {/* Mobile & Tablet: Label on top */}
+                                                    <div className="d-block d-md-none">
+                                                        <div style={{ 
+                                                            fontSize: '13px', 
+                                                            fontWeight: '600', 
+                                                            color: '#4680ff',
+                                                            marginBottom: '4px',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word'
+                                                        }}>
+                                                            <span>Category {index + 1}:</span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            fontSize: '14px', 
+                                                            color: '#000000',
+                                                            fontWeight: '500',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            width: '100%',
+                                                            lineHeight: '1.5'
+                                                        }}>
+                                                            {category.name || 'N/A'}
+                                                        </div>
+                                                    </div>
+                                                    {/* Desktop: Label and value side by side */}
+                                                    <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                        <div style={{ 
+                                                            minWidth: '140px',
+                                                            maxWidth: '140px',
+                                                            fontSize: '13px', 
+                                                            fontWeight: '600', 
+                                                            color: '#4680ff',
+                                                            marginRight: '12px',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Category {index + 1}:</span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            fontSize: '14px', 
+                                                            color: '#000000',
+                                                            fontWeight: '500',
+                                                            flex: 1,
+                                                            minWidth: 0,
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            {category.name || 'N/A'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                            {category.description && (
+                                                <Col xs={12} sm={12} md={12} className="mb-2" style={{ overflow: 'hidden' }}>
+                                                    <div style={{ 
+                                                        padding: '8px 12px',
+                                                        borderBottom: '1px solid #e9ecef',
+                                                        borderLeft: '4px solid #ffc107',
+                                                        backgroundColor: '#fffbf0',
+                                                        borderRadius: '4px',
+                                                        width: '100%',
+                                                        maxWidth: '100%',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                    className="px-md-3 px-2 py-md-2 py-2"
+                                                    >
+                                                        {/* Mobile & Tablet: Label on top */}
+                                                        <div className="d-block d-md-none">
+                                                            <div style={{ 
+                                                                fontSize: '13px', 
+                                                                fontWeight: '600', 
+                                                                color: '#4680ff',
+                                                                marginBottom: '4px',
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'break-word'
+                                                            }}>
+                                                                <span>Category {index + 1} Description:</span>
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: '14px', 
+                                                                color: '#000000',
+                                                                fontWeight: '400',
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'break-word',
+                                                                width: '100%',
+                                                                lineHeight: '1.5'
+                                                            }}>
+                                                                <ExpandableDescription text={category.description} maxLines={2} />
+                                                            </div>
+                                                        </div>
+                                                        {/* Desktop: Label and value side by side */}
+                                                        <div className="d-none d-md-flex align-items-start" style={{ width: '100%', minWidth: 0 }}>
+                                                            <div style={{ 
+                                                                minWidth: '140px',
+                                                                maxWidth: '140px',
+                                                                fontSize: '13px', 
+                                                                fontWeight: '600', 
+                                                                color: '#4680ff',
+                                                                marginRight: '12px',
+                                                                flexShrink: 0
+                                                            }}>
+                                                                <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>Description:</span>
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: '14px', 
+                                                                color: '#000000',
+                                                                fontWeight: '400',
+                                                                flex: 1,
+                                                                minWidth: 0,
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'break-word',
+                                                                overflow: 'hidden'
+                                                            }}>
+                                                                <ExpandableDescription text={category.description} maxLines={2} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </Row>
+                            </Col>
+                        )}
+                    </Row>
     );
-
-    const renderCategories = () => {
-        if (!eventData?.categories?.length) {
-            return <p className="text-muted">No categories listed.</p>;
-        }
-        return (
-            <Row>
-                {eventData?.categories?.map((category, index) => (
-                    <Col lg={6} md={12} key={category.id} className="mb-3">
-                        <div className="mb-3">
-                            {/* Category Name - Same line like other fields */}
-                            <InfoField label="Category Name" value={category.name} iconClass="fas fa-tag" />
-
-                            {/* Description - Always stacked */}
-                            <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                                <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
-                                    <i
-                                        className="fa fa-sticky-note"
-                                        style={{ marginRight: '8px', color: getIconColor('fa fa-sticky-note') }}
-                                    ></i>
-                                    Description:
-                                </div>
-                                <ExpandableDescription text={category.description} maxLines={2} />
-                            </div>
-                        </div>
-                    </Col>
-                ))}
-            </Row>
-        );
-    };
 
     return (
-        <div className="p-2 bg-light">
-            {/* Event Overview Section */}
-            <InfoCard title="Event Overview" iconClass="fas fa-info-circle" borderColor="#3498db">
-                <Row>
-                    <Col lg={6} md={12}>
-                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                            <InfoField label="Event Name" value={eventData.name} iconClass="fas fa-calendar-alt" />
-                            <InfoField
-                                label="Ticket Price"
-                                value={
-                                    <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '16px' }}>
-                                        {eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free'}
-                                    </span>
-                                }
-                                iconClass="fas fa-dollar-sign"
-                            />
-                            <InfoField
-                                label="Start Date & Time"
-                                value={<DateTimeFormatter date={eventData.startDate} time={eventData.startTime} />}
-                                iconClass="fas fa-clock"
-                            />
-                            <InfoField
-                                label="End Date & Time"
-                                value={<DateTimeFormatter date={eventData.endDate} time={eventData.endTime} />}
-                                iconClass="fas fa-clock"
-                            />
-
-                            <InfoField
-                                label="Lucky Draw Feature"
-                                value={
-                                    <Badge bg={eventData.enableLuckyDrawFeature ? 'success' : 'danger'} className="px-3 py-1">
-                                        {eventData.enableLuckyDrawFeature ? 'Enabled' : 'Disabled'}
-                                        <i
-                                            style={{ marginLeft: '4px' }}
-                                            className={`fas fa-${eventData.enableLuckyDrawFeature ? 'check-circle' : 'times-circle'} me-1`}
-                                        ></i>
-                                    </Badge>
-                                }
-                                iconClass="fas fa-gift"
-                            />
-                            <InfoField
-                                label="Created At"
-                                value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.createdAt)}</span>}
-                                iconClass="fas fa-calendar-plus"
-                            />
-                        </div>
-                    </Col>
-
-                    <Col lg={6} md={12}>
-                        <div style={{ fontSize: '15px', lineHeight: '1.6' }}>
-                            <InfoField
-                                label="Event Type"
-                                value={
-                                    <Badge bg="secondary" className="px-3 py-1">
-                                        {eventData.type || 'N/A'}
-                                    </Badge>
-                                }
-                                iconClass="fas fa-tag"
-                            />
-                            <InfoField label="Location" value={eventData.location || 'N/A'} iconClass="fas fa-map-marker-alt" />
-                            <InfoField label="Venue" value={eventData.venue || 'N/A'} iconClass="fas fa-building" />
-                            <InfoField label="Country" value={eventData.country || 'N/A'} iconClass="fas fa-globe" />
-
-                            <InfoField label="Attendance Count" value={eventData.attendanceCount || '0'} iconClass="fas fa-users" />
-                            <InfoField
-                                label="Last Updated"
-                                value={<span style={{ color: '#6c757d', fontSize: '13px' }}>{formatTimestamp(eventData.updatedAt)}</span>}
-                                iconClass="fas fa-edit"
-                            />
-                        </div>
-                    </Col>
-
-                    <Col lg={12} md={12}>
-                        {eventData?.publishStartDate && (
-                            <InfoField
-                                label="Publish Start Date"
-                                value={new Date(eventData.publishStartDate).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                })}
-                                iconClass="fas fa-calendar-check"
-                            />
-                        )}
-                        {eventData?.publishEndDate && (
-                            <InfoField
-                                label="Publish End Date"
-                                value={new Date(eventData.publishEndDate).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                })}
-                                iconClass="fas fa-calendar-times"
-                            />
-                        )}
-                    </Col>
-
-                    <Col lg={12} md={12}>
-                        <div className="mb-2 py-2" style={{ borderBottom: '1px solid #f1f1f1' }}>
-                            <div style={{ fontWeight: 'bold', color: '#495057', fontSize: '14px', marginBottom: '8px' }}>
-                                <i
-                                    className="fa fa-sticky-note"
-                                    style={{ marginRight: '8px', color: getIconColor('fa fa-sticky-note') }}
-                                ></i>
-                                Event Description:
-                            </div>
-                            <ExpandableDescription text={eventData.description} maxLines={2} />
-                        </div>
-                    </Col>
-                </Row>
-            </InfoCard>
-
-            {/* Categories Section */}
-            <InfoCard title="Event Categories" iconClass="fas fa-tags" borderColor="#f39c12">
-                {renderCategories()}
-            </InfoCard>
-
-            {/* Custom CSS for Responsive Behavior */}
-            <style jsx>{`
-                /* Desktop: side-by-side layout */
-                .info-field-container {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-
-                .field-label {
-                    min-width: 140px;
-                }
-
-                .field-value {
-                    text-align: right;
-                    flex: 1;
-                }
-
-                /* Mobile: stacked layout */
-                @media (max-width: 768px) {
-                    .info-field-container {
-                        display: block !important;
-                        text-align: left !important;
-                    }
-
-                    .field-label {
-                        display: block !important;
-                        min-width: auto !important;
-                        margin-bottom: 4px !important;
-                        font-size: 13px !important;
-                        color: #495057 !important;
-                    }
-
-                    .field-value {
-                        display: block !important;
-                        text-align: left !important;
-                        font-size: 14px !important;
-                        font-weight: 600 !important;
-                        color: #212529 !important;
-                        padding-left: 0 !important;
-                        margin-left: 0 !important;
-                    }
-                }
-
-                @media (max-width: 576px) {
-                    .field-label {
-                        font-size: 12px !important;
-                    }
-
-                    .field-value {
-                        font-size: 13px !important;
-                    }
-                }
-            `}</style>
+        <div>
+            {/* Desktop: Card wrapper */}
+            <div className="d-none d-md-block">
+                <Card style={{ 
+                    backgroundColor: '#fff', 
+                    borderRadius: '8px', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    border: '1px solid #e9ecef',
+                    overflow: 'hidden'
+                }}>
+                    <Card.Body style={{ padding: '24px', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                        {content}
+                    </Card.Body>
+                </Card>
+            </div>
+            {/* Mobile: No card wrapper, minimal padding */}
+            <div className="d-block d-md-none px-2 py-2">
+                {content}
+            </div>
         </div>
     );
 };

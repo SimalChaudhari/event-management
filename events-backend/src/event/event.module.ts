@@ -34,6 +34,7 @@ import { ProgrammeModule } from '../programme/programme.module';
 import { ProgrammeSession } from '../programme/programme-session.entity';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { Engagement } from '../engagement/engagement.entity';
+import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { FilterModule } from '../service/filter.module';
 
 @Module({
@@ -66,6 +67,7 @@ import { FilterModule } from '../service/filter.module';
         Feedback,
         ProgrammeSession,
         ProgrammeTrack,
+        ExhibitorRating,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({

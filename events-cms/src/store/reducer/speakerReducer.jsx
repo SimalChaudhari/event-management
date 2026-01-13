@@ -1,7 +1,8 @@
-import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER } from "../constants/actionTypes";
+import { SPEAKER_LIST, CREATE_SPEAKER, UPDATE_SPEAKER, DELETE_SPEAKER, SPEAKER_BY_ID } from "../constants/actionTypes";
 
 const initialState = {
     speakers: [],
+    speakerByID: null,
     pagination: {},
     loading: false,
     error: null
@@ -38,6 +39,13 @@ const speakerReducer = (state = initialState, { type, payload } = {}) => {
             return {
                 ...state,
                 speakers: state.speakers.filter(speaker => speaker.id !== payload),
+                loading: false,
+                error: null
+            };
+        case SPEAKER_BY_ID:
+            return {
+                ...state,
+                speakerByID: payload,
                 loading: false,
                 error: null
             };

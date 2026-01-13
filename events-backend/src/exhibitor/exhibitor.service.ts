@@ -3,6 +3,8 @@ import { Repository, Between } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorLead } from './exhibitor-lead.entity';
+import { ExhibitorView } from './exhibitor-view.entity';
+import { ExhibitorRating } from './exhibitor-rating.entity';
 import { BoothBanner } from './booth-banner.entity';
 import { ExhibitorDto, DocumentDto, EventImageDto } from './exhibitor.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
@@ -23,6 +25,10 @@ export class ExhibitorService {
     private exhibitorRepository: Repository<Exhibitor>,
     @InjectRepository(ExhibitorLead)
     private exhibitorLeadRepository: Repository<ExhibitorLead>,
+    @InjectRepository(ExhibitorView)
+    private exhibitorViewRepository: Repository<ExhibitorView>,
+    @InjectRepository(ExhibitorRating)
+    private exhibitorRatingRepository: Repository<ExhibitorRating>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     @InjectRepository(Event)
@@ -1418,12 +1424,14 @@ export class ExhibitorService {
       const { FavoriteEvent } = await import('../favorite-event/favorite-event.entity');
       const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
       const { EventAttendance } = await import('../attendance/attendance.entity');
+      const { ExhibitorStamp } = await import('../attendance/exhibitor-stamp.entity');
 
       const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
       const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
       const favoriteEventRepository = this.exhibitorRepository.manager.getRepository(FavoriteEvent);
       const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
       const attendanceRepository = this.exhibitorRepository.manager.getRepository(EventAttendance);
+      const exhibitorStampRepository = this.exhibitorRepository.manager.getRepository(ExhibitorStamp);
 
       // Verify user is staff member for this event
       const userStaffRecord = await eventStaffRepository.findOne({
@@ -1447,61 +1455,132 @@ export class ExhibitorService {
         throw new ResourceNotFoundException('Event', eventId);
       }
 
-      // Get number of likes (favorites)
-      const likesCount = await favoriteEventRepository.count({
+      // Get total leads collected for this event (from ExhibitorLead)
+      const totalLeadsCount = await this.exhibitorLeadRepository.count({
         where: { eventId: eventId },
       });
 
-      // Get total registrations (leads) for this event
-      const totalLeads = await registerEventRepository.count({
+      // Get leads collected by staff (for bar chart)
+      const leadsByStaff = await this.exhibitorLeadRepository
+        .createQueryBuilder('lead')
+        .select('lead.scannedBy', 'staffId')
+        .addSelect('COUNT(*)', 'count')
+        .where('lead.eventId = :eventId', { eventId })
+        .groupBy('lead.scannedBy')
+        .getRawMany();
+
+      // Get all staff members for this event to map staff IDs to names
+      const allStaff = await eventStaffRepository.find({
+        where: { eventId: eventId },
+        relations: ['user'],
+      });
+
+      // Map leads by staff with staff names
+      const leadsByStaffData = leadsByStaff.map((item, index) => {
+        const staff = allStaff.find((s) => s.userId === item.staffId);
+        return {
+          staffId: item.staffId,
+          staffName: staff?.user?.firstName && staff?.user?.lastName
+            ? `${staff.user.firstName} ${staff.user.lastName}`
+            : `Staff ${index + 1}`,
+          count: parseInt(item.count),
+        };
+      }).sort((a, b) => b.count - a.count); // Sort by count descending for display
+
+      // Get total stamps issued for this event
+      const stampsIssued = await exhibitorStampRepository.count({
+        where: { eventId: eventId },
+      });
+
+      // Get total number of registered attendees for percentage calculation
+      // Formula: (Total Leads / Total Registered Attendees) * 100
+      // Example: If 5 leads out of 5 registered attendees = 100%
+      // Example from image: If 86 leads out of ~782 registered attendees = 11%
+      const totalAttendees = await registerEventRepository.count({
         where: {
           eventId: eventId,
+          type: 'Attendee',
           isRegister: true,
         },
       });
 
-      // Get monthly views - using attendance count as proxy (people who checked in)
-      // Or we can use registration count for current month
-      const now = new Date();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      // Calculate leads collected percentage: (Total Leads / Total Registered Attendees) * 100
+      // Round to 1 decimal place (e.g., 11.0%)
+      // Formula: If 86 leads and 782 attendees = 86/782 * 100 = 11.0%
+      // Example: If 5 leads and 5 attendees = 5/5 * 100 = 100.0%
+      const leadsCollectedPercentage = totalAttendees > 0
+        ? parseFloat(((totalLeadsCount / totalAttendees) * 100).toFixed(1))
+        : 0;
 
-      const monthlyViews = await registerEventRepository.count({
-        where: {
-          eventId: eventId,
-          createdAt: Between(currentMonthStart, currentMonthEnd),
-        },
+      // Get total view count for this event (from ExhibitorView)
+      const totalViewCount = await this.exhibitorViewRepository.count({
+        where: { eventId: eventId, isActive: true },
       });
 
-      // Get number of downloads - count event documents
-      // For now, we'll count documents in the event
-      const eventWithDocuments = await eventRepository.findOne({
-        where: { id: eventId },
-        select: ['documents'],
+      // Get view count over time (grouped by date) for line chart
+      const views = await this.exhibitorViewRepository.find({
+        where: { eventId: eventId, isActive: true },
+        select: ['createdAt'],
+        order: { createdAt: 'ASC' },
       });
 
-      const downloadsCount = eventWithDocuments?.documents?.length || 0;
-
-      // Get attendance count (people who actually attended)
-      const { AttendanceStatus } = await import('../attendance/attendance.entity');
-      const attendanceCount = await attendanceRepository.count({
-        where: {
-          eventId: eventId,
-          status: AttendanceStatus.CheckedIn,
-        },
+      // Group views by date and track first timestamp for each date
+      // Use ISO timestamp format for dates
+      const viewCountByDate: { [key: string]: { count: number; firstTimestamp: Date } } = {};
+      views.forEach((view) => {
+        const FormattedDate = new Date(view.createdAt);
+        // Format date to YYYY-MM-DD for grouping (without time)
+     
+        if (!viewCountByDate[FormattedDate.toString()]) {
+          viewCountByDate[FormattedDate.toString()] = {
+            count: 0,
+            firstTimestamp: FormattedDate,
+          };
+        }
+        viewCountByDate[FormattedDate.toString()].count += 1;
       });
+
+      // Convert to array format for line chart (daily counts, not cumulative)
+      // Sort dates properly and format as ISO timestamp
+      const viewCountChartData = Object.keys(viewCountByDate)
+        .sort((a, b) => {
+          const dateA = new Date(a);
+          const dateB = new Date(b);
+          return dateA.getTime() - dateB.getTime();
+        }) // ISO date strings sort naturally
+        .map((dateKey) => {
+          const viewData = viewCountByDate[dateKey];
+          return {
+            date: viewData.firstTimestamp.toISOString(), // Format: "2026-01-12T08:38:43.503Z"
+            count: viewData.count,
+          };
+        });
+
+      // Get average rating score for this event (from ExhibitorRating)
+      const ratings = await this.exhibitorRatingRepository.find({
+        where: { eventId: eventId, isActive: true },
+        select: ['rating'],
+      });
+
+      let ratingScore = 0;
+      if (ratings.length > 0) {
+        const totalRating = ratings.reduce((sum, r) => sum + parseFloat(String(r.rating)), 0);
+        ratingScore = parseFloat((totalRating / ratings.length).toFixed(1));
+      } else {
+        ratingScore = 0; // No ratings yet
+      }
 
       return {
-        event: {
-          id: event.id,
-          name: event.name,
+        leadsCollected: {
+          totalLeadsCount,
+          leadsCollectedPercentage,
+          stampsIssued,
+          leadsByStaff: leadsByStaffData,
         },
-        statistics: {
-          likes: likesCount,
-          monthlyViews: monthlyViews,
-          downloads: downloadsCount,
-          totalLeads: totalLeads,
-          attendanceCount: attendanceCount,
+        boothProfileStatistics: {
+          totalViewCount,
+          ratingScore,
+          viewCountOverTime: viewCountChartData,
         },
       };
     } catch (error) {
@@ -1902,7 +1981,7 @@ export class ExhibitorService {
       // Build response matching GET response structure
       return {
         success: true,
-        message: 'Manual lead created successfully',
+        message: 'Lead created successfully',
         data: {
           id: savedLead.id,
           attendee: {
@@ -2349,6 +2428,432 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Lead notes update');
+    }
+  }
+
+  /**
+   * Track exhibitor profile view count
+   * One view per registered user per exhibitor per event
+   * If user views same exhibitor in different event, it counts as separate view
+   * If user views same exhibitor in same event multiple times, it only counts as 1 view
+   * @param exhibitorId Exhibitor ID whose profile was viewed
+   * @param eventId Event ID where the view occurred
+   * @param userId User ID of the registered user who viewed
+   * @returns View count information
+   */
+  async trackExhibitorView(
+    exhibitorId: string,
+    eventId: string,
+    userId: string,
+  ): Promise<any> {
+    try {
+      // Verify exhibitor exists
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Verify user exists and is registered
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Check if user is registered for this event
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      
+      const registration = await registerEventRepository.findOne({
+        where: {
+          userId: userId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
+        throw new BadRequestException('User must be registered for this event to view exhibitor profiles');
+      }
+
+      // Check if view already exists for this user-exhibitor-event combination
+      const existingView = await this.exhibitorViewRepository.findOne({
+        where: {
+          userId: userId,
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+        },
+      });
+
+      let viewRecord;
+      let isNewView = false;
+
+      if (!existingView) {
+        // Create new view record (first time this user views this exhibitor in this event)
+        viewRecord = this.exhibitorViewRepository.create({
+          userId: userId,
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+        });
+
+        viewRecord = await this.exhibitorViewRepository.save(viewRecord);
+        isNewView = true;
+      } else {
+        // View already exists, return existing record
+        viewRecord = existingView;
+        isNewView = false;
+      }
+
+      // Get total view count for this exhibitor in this event
+      const totalViewCount = await this.exhibitorViewRepository.count({
+        where: {
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+          isActive: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: isNewView ? 'View counted successfully' : 'View already recorded',
+        data: {
+          view: {
+            id: viewRecord.id,
+            viewedAt: viewRecord.createdAt,
+          },
+          exhibitor: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+          },
+          event: {
+            id: event.id,
+            name: event.name,
+          },
+          totalViewCount,
+          isNewView,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor view tracking');
+    }
+  }
+
+  /**
+   * Submit or update exhibitor rating
+   * One rating per registered user per exhibitor per event
+   * Rating value should be between 1.0 and 5.0
+   * @param exhibitorId Exhibitor ID being rated
+   * @param eventId Event ID where the rating is given
+   * @param userId User ID of the registered user giving the rating
+   * @param rating Rating value (1.0 to 5.0)
+   * @param comment Optional comment/review
+   * @returns Rating information
+   */
+  async submitExhibitorRating(
+    exhibitorId: string,
+    eventId: string,
+    userId: string,
+    rating: number,
+    comment?: string,
+  ): Promise<any> {
+    try {
+      // Validate rating value (1.0 to 5.0)
+      if (rating < 1.0 || rating > 5.0) {
+        throw new BadRequestException('Rating must be between 1.0 and 5.0');
+      }
+
+      // Verify exhibitor exists
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Verify user exists and is registered
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new ResourceNotFoundException('User', userId);
+      }
+
+      // Check if user is registered for this event
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      
+      const registration = await registerEventRepository.findOne({
+        where: {
+          userId: userId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
+        throw new BadRequestException('User must be registered for this event to rate exhibitors');
+      }
+
+      // Check if rating already exists for this user-exhibitor-event combination
+      const existingRating = await this.exhibitorRatingRepository.findOne({
+        where: {
+          userId: userId,
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+        },
+      });
+
+      let ratingRecord;
+      let isNewRating = false;
+
+      if (existingRating) {
+        // Update existing rating
+        existingRating.rating = rating;
+        if (comment !== undefined) {
+          existingRating.comment = comment || undefined;
+        }
+        ratingRecord = await this.exhibitorRatingRepository.save(existingRating);
+        isNewRating = false;
+      } else {
+        // Create new rating
+        ratingRecord = this.exhibitorRatingRepository.create({
+          userId: userId,
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+          rating: rating,
+          comment: comment || undefined,
+        });
+
+        ratingRecord = await this.exhibitorRatingRepository.save(ratingRecord);
+        isNewRating = true;
+      }
+
+      // Get average rating for this exhibitor in this event
+      const allRatings = await this.exhibitorRatingRepository.find({
+        where: {
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+          isActive: true,
+        },
+        select: ['rating'],
+      });
+
+      let averageRating = 0;
+      if (allRatings.length > 0) {
+        const totalRating = allRatings.reduce((sum, r) => sum + parseFloat(String(r.rating)), 0);
+        averageRating = parseFloat((totalRating / allRatings.length).toFixed(1));
+      }
+
+      return {
+        success: true,
+        message: isNewRating ? 'Rating submitted successfully' : 'Rating updated successfully',
+        data: {
+          rating: {
+            id: ratingRecord.id,
+            rating: parseFloat(String(ratingRecord.rating)),
+            comment: ratingRecord.comment || null,
+            submittedAt: ratingRecord.createdAt,
+            updatedAt: ratingRecord.updatedAt,
+          },
+          exhibitor: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+          },
+          event: {
+            id: event.id,
+            name: event.name,
+          },
+          averageRating,
+          totalRatings: allRatings.length,
+          isNewRating,
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor rating submission');
+    }
+  }
+
+  /**
+   * Get ratings for an exhibitor in an event
+   * Admin and Exhibitor can see all ratings
+   * Regular users can only see their own rating
+   * @param exhibitorId Exhibitor ID
+   * @param eventId Event ID
+   * @param userId User ID of the requesting user
+   * @param userRole Role of the requesting user
+   * @returns Rating information
+   */
+  async getExhibitorRatings(
+    exhibitorId: string,
+    eventId: string,
+    userId: string,
+    userRole: string,
+  ): Promise<any> {
+    try {
+      // Verify exhibitor exists
+      const exhibitor = await this.exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+      }
+
+      // Verify event exists
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        throw new ResourceNotFoundException('Event', eventId);
+      }
+
+      // Build query conditions
+      const whereConditions: any = {
+        exhibitorId: exhibitorId,
+        eventId: eventId,
+        isActive: true,
+      };
+
+      // Admin and Exhibitor can see all ratings
+      // Regular users can only see their own rating
+      const canSeeAllRatings = userRole === UserRole.Admin || userRole === UserRole.Exhibitor;
+      
+      if (!canSeeAllRatings) {
+        // Regular user can only see their own rating
+        whereConditions.userId = userId;
+      }
+
+      // Get ratings
+      const ratings = await this.exhibitorRatingRepository.find({
+        where: whereConditions,
+        relations: ['user'],
+        order: { createdAt: 'DESC' },
+      });
+
+      // Get all ratings for average calculation (regardless of user role)
+      const allRatings = await this.exhibitorRatingRepository.find({
+        where: {
+          exhibitorId: exhibitorId,
+          eventId: eventId,
+          isActive: true,
+        },
+        select: ['rating'],
+      });
+
+      // Calculate average rating from all ratings
+      let averageRating = 0;
+      if (allRatings.length > 0) {
+        const totalRating = allRatings.reduce((sum, r) => sum + parseFloat(String(r.rating)), 0);
+        averageRating = parseFloat((totalRating / allRatings.length).toFixed(1));
+      }
+
+      // Format ratings data
+      const formattedRatings = ratings.map((rating) => ({
+        id: rating.id,
+        rating: parseFloat(String(rating.rating)),
+        comment: rating.comment || null,
+        user: {
+          id: rating.user?.id,
+          firstName: rating.user?.firstName || '',
+          lastName: rating.user?.lastName || '',
+          email: rating.user?.email || '',
+          profilePicture: rating.user?.profilePicture || null,
+        },
+        submittedAt: rating.createdAt,
+        updatedAt: rating.updatedAt,
+      }));
+
+      // Get user's own rating (if exists)
+      const userRating = ratings.find(r => r.userId === userId);
+      const formattedUserRating = userRating ? {
+        id: userRating.id,
+        rating: parseFloat(String(userRating.rating)),
+        comment: userRating.comment || null,
+        submittedAt: userRating.createdAt,
+        updatedAt: userRating.updatedAt,
+      } : null;
+
+      // For regular users, return single rating object instead of array
+      // For Admin/Exhibitor, return array of all ratings
+      // Build response data
+      const responseData: any = {
+        exhibitor: {
+          id: exhibitor.id,
+          companyName: exhibitor.companyName,
+        },
+        event: {
+          id: event.id,
+          name: event.name,
+        },
+        averageRating,
+        totalRatings: allRatings.length,
+      };
+
+      if (canSeeAllRatings) {
+        // Admin/Exhibitor: return array of all ratings and optionally their own rating
+        responseData.ratings = formattedRatings;
+        // Only include userRating if admin/exhibitor has their own rating
+        if (formattedUserRating) {
+          responseData.userRating = formattedUserRating;
+        }
+      } else {
+        // Regular User: only return their own rating (single object, not array)
+        responseData.rating = formattedUserRating;
+      }
+
+      return {
+        success: true,
+        message: canSeeAllRatings 
+          ? 'All ratings retrieved successfully'
+          : (formattedUserRating ? 'Your rating retrieved successfully' : 'No rating found'),
+        data: responseData,
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Get exhibitor ratings');
     }
   }
 }

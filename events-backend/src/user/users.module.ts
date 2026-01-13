@@ -7,6 +7,7 @@ import { QrScanController } from './qr-scan.controller';
 import { UserEntity } from './users.entity';
 import { AddressEntity } from './address.entity';
 import { SpeakerProfile } from './speaker-profile.entity';
+import { Event } from '../event/event.entity';
 import { SpeakerProfileService } from './speaker-profile.service';
 import { AddressService } from './address.service';
 import { JwtModule } from '@nestjs/jwt';
@@ -17,7 +18,7 @@ import { FilterModule } from '../service/filter.module';
 
 @Module({
     imports: [
-      TypeOrmModule.forFeature([UserEntity, AddressEntity, SpeakerProfile]),
+      TypeOrmModule.forFeature([UserEntity, AddressEntity, SpeakerProfile, Event]),
       JwtModule.register({
         secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
         signOptions: { }, // Set your token expiration

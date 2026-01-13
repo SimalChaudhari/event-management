@@ -1771,6 +1771,186 @@ export class ExhibitorController {
     }
   }
 
+  /**
+   * Track exhibitor profile view count
+   * When a registered user visits an exhibitor profile, count it as 1 view
+   * Per user can only count 1 view per exhibitor per event
+   * If different event and same company, then you can count them
+   * But per event only one exhibitor view count per user
+   * Access: All authenticated users (registered users only)
+   */
+  @Post('view-count/:exhibitorId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor, UserRole.User)
+  async trackExhibitorView(
+    @Param('exhibitorId', ParseUUIDPipe) exhibitorId: string,
+    @Query('eventId') eventId: string | undefined,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!exhibitorId) {
+        throw new BadRequestException('Missing required field: exhibitorId');
+      }
+
+      if (!eventId) {
+        throw new BadRequestException('Missing required field: eventId');
+      }
+
+      // Track view count
+      const result = await this.exhibitorService.trackExhibitorView(
+        exhibitorId,
+        eventId,
+        userId,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitor view count tracking', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Submit or update exhibitor rating
+   * One rating per registered user per exhibitor per event
+   * Rating value should be between 1.0 and 5.0
+   * Access: All authenticated users (registered users only)
+   */
+  @Post('rating/:exhibitorId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor, UserRole.User)
+  async submitExhibitorRating(
+    @Param('exhibitorId', ParseUUIDPipe) exhibitorId: string,
+    @Query('eventId') eventId: string | undefined,
+    @Body() body: { rating: number; comment?: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const { rating, comment } = body;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!exhibitorId) {
+        throw new BadRequestException('Missing required field: exhibitorId');
+      }
+
+      if (!eventId) {
+        throw new BadRequestException('Missing required field: eventId');
+      }
+
+      if (!rating) {
+        throw new BadRequestException('Missing required field: rating');
+      }
+
+      // Submit rating
+      const result = await this.exhibitorService.submitExhibitorRating(
+        exhibitorId,
+        eventId,
+        userId,
+        rating,
+        comment,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitor rating submission', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get ratings for an exhibitor in an event
+   * Admin and Exhibitor can see all ratings
+   * Regular users can only see their own rating
+   * Access: All authenticated users
+   */
+  @Get('rating/:exhibitorId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor, UserRole.User)
+  async getExhibitorRatings(
+    @Param('exhibitorId', ParseUUIDPipe) exhibitorId: string,
+    @Query('eventId') eventId: string | undefined,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!exhibitorId) {
+        throw new BadRequestException('Missing required field: exhibitorId');
+      }
+
+      if (!eventId) {
+        throw new BadRequestException('Missing required field: eventId');
+      }
+
+      // Get ratings (service handles role-based filtering)
+      const result = await this.exhibitorService.getExhibitorRatings(
+        exhibitorId,
+        eventId,
+        userId,
+        userRole,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get exhibitor ratings', req.user?.id);
+      throw error;
+    }
+  }
+
   // Helper method to format exhibitor response
   private formatExhibitorResponse(exhibitor: any, response: Response, message: string, statusCode: number) {
     const successResponse: SuccessResponse = {

@@ -5,14 +5,15 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import * as $ from 'jquery';
 import { API_URL, DUMMY_PATH_USER } from '../../configs/env';
 import { FetchUsers } from './fetchApi/FetchApi';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
 import ExportConfirmationModal from '../../components/modal/ExportConfirmationModal';
 import CsvUploadModal from '../../components/modals/CsvUploadModal';
-import { useNavigate, useLocation } from 'react-router-dom';
+import ImageViewModal from '../../components/modal/ImageViewModal';
+import { useLocation } from 'react-router-dom';
 import { USER_PATHS } from '../../utils/constants';
 import UserFilterComponent from '../../components/common/UserFilterComponent';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
@@ -34,7 +35,8 @@ function userTable(
     handleExportUsers,
     restoreTablePage, 
     dispatch = null,
-    getRoleFilter = null // Function to get current roleFilter dynamically
+    getRoleFilter = null, // Function to get current roleFilter dynamically
+    handleImageClick = null // Function to handle image click
 ) {
     let tableZero = '#user-data-table';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -81,9 +83,13 @@ function userTable(
                     // For display only - sorting is handled by backend
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15" 
-                                 style="width:50px; height:50px; object-fit:cover;" 
-                                 onerror="this.src='${DUMMY_PATH_USER}';">
+                            <span class="user-image-clickable" data-image-url="${imageUrl}" title="Click to view image">
+                                <img src="${imageUrl}" alt="user" class="img-radius align-top m-r-15 cursor: pointer" 
+                                     style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s;" 
+                                     onerror="this.src='${DUMMY_PATH_USER}';"
+                                     onmouseover="this.style.opacity='0.8'"
+                                     onmouseout="this.style.opacity='1'">
+                            </span>
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.firstName || ''} ${row.lastName || ''}</h6>
                                 <p class="m-b-5 text-muted">${row.email || 'N/A'}</p>
@@ -224,6 +230,15 @@ function userTable(
                 $('#addUserBtn').on('click', handleAddUser);
             }
 
+            // Add event listener for clickable user image
+            $(tableZero + ' tbody').off('click', '.user-image-clickable').on('click', '.user-image-clickable', function (e) {
+                e.stopPropagation(); // Prevent event bubbling
+                const imageUrl = $(this).data('image-url');
+                if (imageUrl && handleImageClick) {
+                    handleImageClick(imageUrl);
+                }
+            });
+
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const table = $(tableZero).DataTable();
@@ -265,10 +280,8 @@ function userTable(
 
 const UserList = () => {
  
-    const { fetchData, deleteUserData, uploadCsvData, downloadCsvSample, exportUsersData } = FetchUsers();
-    const { user } = useSelector((state) => state.user);
+    const { fetchData, deleteUserData, exportUsersData } = FetchUsers();
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const location = useLocation();
     const [showConfirmModal, setShowConfirmModal] = React.useState(false);
     const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
@@ -280,8 +293,10 @@ const UserList = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const roleFilterRef = React.useRef('all'); // Ref to store current filter for immediate access
     const tableRef = React.useRef(null);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
 
-    const { restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    const { restoreTablePage } = usePersistedTablePage();
     
     // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
@@ -330,11 +345,18 @@ const UserList = () => {
         setIsLoading(true);
         if (userIdToDelete) {
             try {
-                await deleteUserData(userIdToDelete);
-                setShowConfirmModal(false);
-                // deleteUserData already updates Redux directly, no need to fetch again
+                const success = await deleteUserData(userIdToDelete);
+                if (success) {
+                    setShowConfirmModal(false);
+                    setUserIdToDelete(null);
+                    // Reload DataTable to reflect the deleted user
+                    if (tableRef.current && $.fn.DataTable.isDataTable('#user-data-table')) {
+                        tableRef.current.ajax.reload(null, false); // false = keep current page
+                    }
+                }
             } catch (error) {
                 // Error deleting user
+                console.error('Error deleting user:', error);
             }
         }
         setIsLoading(false);
@@ -375,6 +397,13 @@ const UserList = () => {
         setShowExportConfirmModal(true);
     };
 
+    const handleImageClick = (imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH_USER) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
+    };
+
     const confirmExportUsers = async () => {
         setIsExporting(true);
         try {
@@ -399,6 +428,7 @@ const UserList = () => {
             currentTable.off('page.dt');
             const tableSelector = '#user-data-table';
             const tableBodySelector = `${tableSelector} tbody`;
+            $(tableBodySelector).off('click', '.user-image-clickable');
             $(tableBodySelector).off('click', '.view-btn');
             $(tableBodySelector).off('click', '.edit-btn');
             $(tableBodySelector).off('click', '.delete-btn');
@@ -424,7 +454,8 @@ const UserList = () => {
                 handleExportUsers,
                 restoreTablePage,
                 dispatch,
-                () => roleFilterRef.current // Function to get current roleFilter from ref (immediate access)
+                () => roleFilterRef.current, // Function to get current roleFilter from ref (immediate access)
+                handleImageClick // Pass image click handler
             );
             tableRef.current = table;
             setCurrentTable(table);
@@ -465,6 +496,15 @@ const UserList = () => {
                 show={showCsvUploadModal}
                 onHide={() => setShowCsvUploadModal(false)}
                 onUploadSuccess={handleCsvUploadSuccess}
+            />
+
+            {/* Profile Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="User Profile"
+                downloadFileName={`user-profile-${Date.now()}.jpg`}
             />
             
             <Row>
