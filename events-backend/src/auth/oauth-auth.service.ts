@@ -12,7 +12,7 @@ export class OAuthAuthService {
   private readonly salesforceConfig = {
     clientId: process.env.SALESFORCE_CLIENT_ID || '',
     clientSecret: process.env.SALESFORCE_CLIENT_SECRET || '',
-    redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://events.isca.org.sg:5000/api/auth/oauth/callback',
+    redirectUri: process.env.SALESFORCE_REDIRECT_URI || 'https://app.evential.sg:5000/api/auth/oauth/callback',
     mobileRedirectUri: 'iscaevential://auth',
     scope: process.env.SALESFORCE_SCOPE || 'id profile email openid',
     instanceUrl: process.env.SALESFORCE_INSTANCE_URL || 'https://eservices.isca.org.sg',

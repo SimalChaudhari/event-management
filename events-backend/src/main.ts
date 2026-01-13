@@ -16,8 +16,8 @@ async function bootstrap() {
     let httpsOptions = undefined;
     
     if (!isDevelopment) {
-      const sslKeyPath = process.env.SSL_KEY_PATH || join(__dirname, '..', 'ssl', 'events.isca.org.sg-key.pem');
-      const sslCertPath = process.env.SSL_CERT_PATH || join(__dirname, '..', 'ssl', 'events.isca.org.sg-chain.pem');
+      const sslKeyPath = process.env.SSL_KEY_PATH || join(__dirname, '..', 'ssl', 'app.evential.sg-key.pem');
+      const sslCertPath = process.env.SSL_CERT_PATH || join(__dirname, '..', 'ssl', 'app.evential.sg-chain.pem');
 
       console.log(`🔍 Checking SSL certificates:`);
       console.log(`   Key path: ${sslKeyPath}`);
@@ -53,7 +53,7 @@ async function bootstrap() {
     const port = process.env.PORT || 5000;
     await app.listen(port);
     const protocol = httpsOptions ? 'https' : 'http';
-    const host = isDevelopment ? 'localhost' : 'events.isca.org.sg';
+    const host = isDevelopment ? 'localhost' : 'app.evential.sg';
     console.log(
       `✅ Server running on: ${protocol}://${host}:${port}`
     );

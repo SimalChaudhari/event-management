@@ -405,7 +405,7 @@
             <div class="connection-form">
                 <div class="form-group">
                     <label for="serverUrl">Server URL</label>
-                    <input type="text" id="serverUrl" placeholder="https://events.isca.org.sg:5000 or http://localhost:5000">
+                    <input type="text" id="serverUrl" placeholder="https://app.evential.sg:5000 or http://localhost:5000">
                     <small style="color: #6c757d; font-size: 0.85em; display: block; margin-top: 5px;">
                         Use <strong>wss://</strong> for production (secure WebSocket). Don't include /qna - it's added automatically.
                     </small>
@@ -1040,9 +1040,9 @@
             const serverUrlInput = document.getElementById('serverUrl');
             
             // If on production domain, use production URL, otherwise use current origin
-            if (window.location.hostname.includes('events.isca.org.sg')) {
+            if (window.location.hostname.includes('app.evential.sg')) {
                 // Use HTTPS for production
-                serverUrlInput.value = 'https://events.isca.org.sg:5000';
+                serverUrlInput.value = 'https://app.evential.sg:5000';
             } else {
                 serverUrlInput.value = currentUrl;
             }

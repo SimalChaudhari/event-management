@@ -4,8 +4,8 @@
 
 **Before implementing, test if WSS is working:**
 
-1. Open: `https://events.isca.org.sg:5000/qna-realtime`
-2. Enter URL: `https://events.isca.org.sg:5000`
+1. Open: `https://app.evential.sg:5000/qna-realtime`
+2. Enter URL: `https://app.evential.sg:5000`
 3. Click **"Test WSS Connection"** button
 4. Check result:
    - ✅ "Connection successful!" → WSS is working, proceed
@@ -46,7 +46,7 @@ Body: {
 ### 1. Connect & Join
 ```java
 // Use https:// (Socket.IO auto-converts to wss:// for WebSocket)
-socket = IO.socket("https://events.isca.org.sg:5000/qna");
+socket = IO.socket("https://app.evential.sg:5000/qna");
 socket.connect();
 
 // Join session room

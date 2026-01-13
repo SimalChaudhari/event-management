@@ -393,7 +393,7 @@ export class EmailTemplateUtils {
               overflow: hidden;
               border: 1px solid #e0e0e0;
           ">
-              <img src="https://events.isca.org.sg:3000/image.png" alt="${data.eventName} - What to Expect" style="display: block; width: 100%; height: auto;" />
+              <img src="https://app.evential.sg:3000/image.png" alt="${data.eventName} - What to Expect" style="display: block; width: 100%; height: auto;" />
           </div>
 
           <div style="height: 2px;"></div>

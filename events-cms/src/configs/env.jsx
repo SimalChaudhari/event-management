@@ -19,7 +19,7 @@ export const API_CONFIG = {
     },
     // Production
     production: {
-        BASE_URL: process.env.REACT_APP_API_BASE_URL || 'https://events.isca.org.sg:5000',
+        BASE_URL: process.env.REACT_APP_API_BASE_URL || 'https://app.evential.sg:5000',
         TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT) || 20000,
         RETRY_ATTEMPTS: parseInt(process.env.REACT_APP_API_RETRY_ATTEMPTS) || 3,
         RETRY_DELAY: parseInt(process.env.REACT_APP_API_RETRY_DELAY) || 3000
