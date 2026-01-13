@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Row, Col, Badge, Nav, Tab, Container, Card } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { registerEventById } from '../../../store/actions/eventActions';
-import { EVENT_PATHS } from '../../../utils/constants';
 import EventBasicComponent from '../../../components/events/EventBasicComponent';
 import axiosInstance from '../../../configs/axiosInstance';
 import { toast } from 'react-toastify';
@@ -14,7 +13,7 @@ const ViewRegisterEventPage = () => {
     const { id } = useParams();
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const location = useLocation();
+
     const [eventData, setEventData] = useState(null);
     const [loading, setLoading] = useState(true);
 

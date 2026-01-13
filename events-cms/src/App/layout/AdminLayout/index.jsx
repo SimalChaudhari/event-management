@@ -24,7 +24,6 @@ const AdminLayout = () => {
         const prevWidth = prevWidthRef.current;
         const wasInMediumRange = prevWidth > 992 && prevWidth <= 1024;
         const isInMediumRange = windowWidth > 992 && windowWidth <= 1024;
-        const wasAboveLarge = prevWidth > 1024;
         const isAboveLarge = windowWidth > 1024;
 
         // Only auto-collapse when entering medium range from outside, not on every resize

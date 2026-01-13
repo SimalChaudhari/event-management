@@ -35,6 +35,7 @@ import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { CheckoutUtils } from '../utils/checkout.utils';
 import { EventStaff } from '../event/event-staff.entity';
+import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -84,6 +85,9 @@ export class RegisterEventService {
 
     @InjectRepository(EventStaff)
     private readonly eventStaffRepository: Repository<EventStaff>,
+
+    @InjectRepository(ExhibitorRating)
+    private readonly exhibitorRatingRepository: Repository<ExhibitorRating>,
 
     private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
@@ -556,6 +560,13 @@ export class RegisterEventService {
                             exhibitorId,
                           )
                         : [];
+
+                      // Get average rating for this exhibitor in this event
+                      (exhibitorData as any).rating = await ExhibitorUtils.getExhibitorRating(
+                        this.exhibitorRatingRepository,
+                        exhibitorId,
+                        registerEvent.eventId || '',
+                      );
 
                       return exhibitorData;
                     })

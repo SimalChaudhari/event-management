@@ -30,16 +30,20 @@ import {
   deleteUserRelatedData,
   deleteProfilePicture,
 } from '../utils/user-deletion.utils';
+import { Event } from '../event/event.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+    @InjectRepository(Event)
+    private eventRepository: Repository<Event>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly emailService: EmailService,
     private readonly speakerProfileService: SpeakerProfileService,
     private readonly addressService: AddressService,
+  
   ) {}
 
   // Helper function to send speaker credentials via email
@@ -1028,9 +1032,10 @@ export class UserService {
   /**
    * Get user information from scanned QR code
    * @param qrCodeId QR code identifier (user ID)
+   * @param eventId Optional event ID to check stamp feature visibility
    * @returns User information
    */
-  async getUserInfoFromQRCode(qrCodeId: string): Promise<Partial<UserEntity>> {
+  async getUserInfoFromQRCode(qrCodeId: string, eventId?: string): Promise<Partial<UserEntity>> {
     try {
       // Use qrCodeId directly as user ID
       const userId = qrCodeId;
@@ -1044,8 +1049,17 @@ export class UserService {
         throw new ResourceNotFoundException('User', userId);
       }
 
-      // Return sanitized user data
-      return UserUtils.sanitizeUserData(user);
+      // Fetch event data if eventId is provided
+      let event = null;
+      if (eventId) {
+        event = await this.eventRepository.findOne({
+          where: { id: eventId },
+          select: ['id', 'tabVisibility'],
+        });
+      }
+
+      // Return sanitized user data with event context for stamp feature
+      return UserUtils.sanitizeUserDataForQRCode(user, event);
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;

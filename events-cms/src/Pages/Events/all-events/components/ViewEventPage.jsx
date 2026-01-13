@@ -1,11 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Row, Col, Card, Badge, Nav, Tab, Container, Modal, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Button, Row, Col, Badge, Nav, Tab, Modal, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
-import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
-import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
-import { EVENT_PATHS, EXHIBITOR_PATHS } from '../../../../utils/constants';
+import { API_URL } from '../../../../configs/env';
 import EventBasicComponent from '../../../../components/events/EventBasicComponent';
 import EventLocationComponent from '../../../../components/events/EventLocationComponent';
 import EventSpeakersComponent from '../../../../components/events/EventSpeakersComponent';
@@ -36,8 +34,7 @@ const ViewEventPage = () => {
     // This should be read once when component mounts to preserve it
     const [eventPageFromUrl, setEventPageFromUrl] = useState(null);
     // Track if we're viewing an upcoming event - capture this on mount
-    const [isUpcomingEventPage, setIsUpcomingEventPage] = useState(false);
-    
+ 
     useEffect(() => {
         // Capture page parameter from URL when component mounts or URL changes
         // This ensures we preserve the page number even if the URL query params change
@@ -51,27 +48,6 @@ const ViewEventPage = () => {
                 setEventPageFromUrl(location.state.page);
             }
         }
-
-        // Detect if this is an upcoming event page - check pathname
-        // Use window.location.pathname for the most reliable check
-        // React Router's location.pathname might not always be accurate
-        const pathname = window.location.pathname || location.pathname;
-        
-        // Check multiple ways to detect upcoming event:
-        // 1. Check if pathname includes '/upcoming/view-upcoming-event'
-        // 2. Check if pathname starts with '/upcoming/view-upcoming-event/'
-        // 3. Check if pathname starts with '/upcoming/'
-        // 4. Check query parameter or state
-        const isUpcoming = 
-            pathname && (
-                pathname.includes('/upcoming/view-upcoming-event') || 
-                pathname.startsWith('/upcoming/view-upcoming-event/') ||
-                pathname.indexOf('/upcoming/') === 0
-            ) ||
-            urlParams.get('fromUpcoming') === 'true' ||
-            location.state?.fromUpcoming === true;
-        
-        setIsUpcomingEventPage(isUpcoming);
     }, [location.search, location.state, location.pathname]);
 
 
@@ -97,8 +73,6 @@ const ViewEventPage = () => {
 
     const [showSpeakerImageModal, setShowSpeakerImageModal] = useState(false);
     const [currentSpeakerImage, setCurrentSpeakerImage] = useState('');
-
-    const [activeTab, setActiveTab] = useState('offers');
 
     // Tab visibility management
     const [showTabVisibilityModal, setShowTabVisibilityModal] = useState(false);
