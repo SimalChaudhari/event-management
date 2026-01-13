@@ -51,7 +51,7 @@ export class ExhibitorUtils {
       mobile: exhibitor.mobile || '',
       logo: exhibitor.logo || '',
       uen: exhibitor.uen || '',
-      bothNumber: exhibitor.bothNumber || '',
+      boothNumber: exhibitor.boothNumber || '',
       website: exhibitor.website || '',
       socialMedia: combinedSocialMedia.length > 0 ? combinedSocialMedia : [],
       promotionalOfferNote: exhibitor.promotionalOfferNote || '',

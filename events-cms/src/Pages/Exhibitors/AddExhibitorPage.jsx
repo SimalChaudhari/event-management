@@ -207,7 +207,7 @@ function AddExhibitorPage() {
         companyDescription: '',
         logo: null,
         uen: '',
-        bothNumber: '',
+        boothNumber: '',
         website: '',
         facebookUrl: '',
         instagramUrl: '',
@@ -400,7 +400,7 @@ function AddExhibitorPage() {
                             companyDescription: editData.companyDescription || '',
                             logo: editData.logo || null,
                             uen: editData.uen || '',
-                            bothNumber: editData.bothNumber || '',
+                            boothNumber: editData.boothNumber || '',
                             website: editData.website || '',
                             facebookUrl: editData.facebookUrl || '',
                             instagramUrl: editData.instagramUrl || '',
@@ -1318,14 +1318,14 @@ function AddExhibitorPage() {
 
                                     <Col sm={4}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="bothNumber">
+                                            <label className="floating-label" htmlFor="boothNumber">
                                                 Booth Number (Optional)
                                             </label>
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                name="bothNumber"
-                                                value={formData.bothNumber}
+                                                name="boothNumber"
+                                                value={formData.boothNumber}
                                                 onChange={handleChange}
                                                 placeholder="Booth Number"
                                             />

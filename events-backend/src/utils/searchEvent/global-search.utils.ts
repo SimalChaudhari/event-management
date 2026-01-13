@@ -438,7 +438,7 @@ export class GlobalSearchUtils {
       if (event.exhibitorsData.exhibitors && Array.isArray(event.exhibitorsData.exhibitors)) {
         const matchedExhibitorList: any[] = [];
         event.exhibitorsData.exhibitors.forEach((exhibitor: any, index: number) => {
-          const exhibitorFields = ['companyName', 'companyDescription', 'email', 'mobile', 'uen', 'bothNumber'];
+          const exhibitorFields = ['companyName', 'companyDescription', 'email', 'mobile', 'uen', 'boothNumber'];
           let exhibitorHasMatch = false;
           
           exhibitorFields.forEach(field => {

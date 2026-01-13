@@ -117,7 +117,7 @@ const Exhibitors = () => {
                                  onerror="this.src='${DUMMY_PATH}';">
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.companyName || 'N/A'}</h6>
-                                <p class="m-b-5 text-muted">Booth: ${row.bothNumber || 'N/A'}</p>
+                                <p class="m-b-5 text-muted">Booth: ${row.boothNumber || 'N/A'}</p>
                                 <span class="badge ${badgeClass}">
                                     ${statusText}
                                 </span>

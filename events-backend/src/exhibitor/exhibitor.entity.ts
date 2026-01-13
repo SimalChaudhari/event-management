@@ -28,9 +28,9 @@ export class Exhibitor {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  // Add new bothNumber field
+  // Add new boothNumber field
   @Column({ type: 'varchar', nullable: true })
-  bothNumber?: string;
+  boothNumber?: string;
 
   // Booth banner relationship - now stored in separate table
   @OneToMany(() => BoothBanner, (boothBanner) => boothBanner.exhibitor)

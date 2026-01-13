@@ -254,7 +254,7 @@ export class EventQueryBuilderUtils {
         LOWER(exhibitor.email) LIKE :searchTerm OR
         LOWER(exhibitor.mobile) LIKE :searchTerm OR
         LOWER(exhibitor.uen) LIKE :searchTerm OR
-        LOWER(exhibitor.bothNumber) LIKE :searchTerm OR
+        LOWER(exhibitor.boothNumber) LIKE :searchTerm OR
         
         -- Survey fields
         LOWER(surveys.title) LIKE :searchTerm OR

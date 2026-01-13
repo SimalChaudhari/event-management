@@ -1204,7 +1204,7 @@ const ViewExhibitorPage = () => {
                                                 />
                                                 <InfoField 
                                                     label="Booth Number" 
-                                                    value={exhibitor.bothNumber || 'Not provided'} 
+                                                    value={exhibitor.boothNumber || 'Not provided'} 
                                                     icon="fas fa-door-open"
                                                     colSize={6}
                                                 />
@@ -1431,7 +1431,7 @@ const ViewExhibitorPage = () => {
                                         />
                                         <InfoField 
                                             label="Booth Number" 
-                                            value={exhibitor.bothNumber || 'Not provided'} 
+                                            value={exhibitor.boothNumber || 'Not provided'} 
                                             icon="fas fa-door-open"
                                             colSize={12}
                                         />
