@@ -11,6 +11,7 @@ import { EVENT_FILTER_LIST, EVENT_LIST, EVENT_LOADING } from '../../../store/con
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
+import ImageViewModal from '../../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
@@ -26,7 +27,7 @@ import axiosInstance from '../../../configs/axiosInstance';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams = {}, dispatch = null) {
+function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams = {}, dispatch = null, handleImageClick = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -70,11 +71,16 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
                     }
 
                     // Return formatted HTML for display
+                    const eventImageUrl = row.images ? `${API_URL}/${row.images[0]}` : imageUrl;
                     return `
                         <div class="d-inline-block align-middle">
-                         <img src="${
-                             row.image ? `${API_URL}/${row.image}` : imageUrl
-                         }" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                            <span class="event-image-clickable" data-image-url="${eventImageUrl}" title="Click to view image">
+                                <img src="${eventImageUrl}" alt="event" class="img-radius align-top m-r-15" 
+                                     style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s; cursor: pointer;" 
+                                     onerror="this.src='${imageUrl}';"
+                                     onmouseover="this.style.opacity='0.8'"
+                                     onmouseout="this.style.opacity='1'">
+                            </span>
                               <div class="d-inline-block">
                             <p class="m-b-0">
                                  <h6>${row.name}</h6>
@@ -254,6 +260,15 @@ function eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGalle
                 $('#addEventBtn').on('click', handleAdd);
             }
 
+            // Add event listener for clickable event image
+            $(tableZero + ' tbody').off('click', '.event-image-clickable').on('click', '.event-image-clickable', function (e) {
+                e.stopPropagation(); // Prevent event bubbling
+                const imageUrl = $(this).data('image-url');
+                if (imageUrl && handleImageClick) {
+                    handleImageClick(imageUrl);
+                }
+            });
+
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const table = $(tableZero).DataTable();
@@ -343,6 +358,8 @@ const EventView = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
     const navigate = useNavigate();
     const tableRef = useRef(null);
     const [selectedType, setSelectedType] = useState('');
@@ -458,7 +475,9 @@ const EventView = () => {
     const destroyTable = useCallback(() => {
         if (tableRef.current) {
             tableRef.current.off('page.dt');
-            $('#data-table-zero').off('click', '.delete-btn');
+            const tableSelector = '#data-table-zero';
+            $(tableSelector + ' tbody').off('click', '.event-image-clickable');
+            $(tableSelector).off('click', '.delete-btn');
             tableRef.current.destroy();
             tableRef.current = null;
             setCurrentTable(null);
@@ -496,6 +515,13 @@ const EventView = () => {
         [navigate]
     );
 
+    const handleImageClick = useCallback((imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
+    }, []);
+
     const initializeTable = useCallback(() => {
         destroyTable();
         try {
@@ -514,7 +540,7 @@ const EventView = () => {
                 return params;
             };
             
-            const table = eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams, dispatch);
+            const table = eventTable(handleAdd, handleEdit, handleDelete, handleView, handleGallery, handleQA, restoreTablePage, ajaxParams, dispatch, handleImageClick);
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
@@ -614,6 +640,16 @@ const EventView = () => {
             />
 
             <DeleteConfirmationModal show={showDeleteModal} onHide={handleClose} onConfirm={handleConfirmDelete} isLoading={isDeleting} />
+
+            {/* Event Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Event Image"
+                downloadFileName={`event-image-${Date.now()}.jpg`}
+            />
+
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">

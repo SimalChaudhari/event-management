@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Row, Col, Card, Container, Modal, Badge } from 'react-bootstrap';
+import { Button, Row, Col, Card, Container, Badge } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { speakerById } from '../../store/actions/speakerActions';
 import { API_URL } from '../../configs/env';
 import NoDataFound from '../../components/NoDataFound';
 import { SPEAKER_PATHS } from '../../utils/constants';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
+import ImageViewModal from '../../components/modal/ImageViewModal';
 
 const ViewSpeakerPage = () => {
     const { id } = useParams();
@@ -919,95 +920,13 @@ const ViewSpeakerPage = () => {
 
             {/* Profile Image Modal */}
             {speakerData.profilePicture && (
-                <Modal
+                <ImageViewModal
                     show={showProfileImageModal}
                     onHide={() => setShowProfileImageModal(false)}
-                    size="xl"
-                    centered
-                    style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-                >
-                    <Modal.Body
-                        style={{
-                            padding: 0,
-                            backgroundColor: 'transparent',
-                            position: 'relative',
-                            minHeight: '90vh'
-                        }}
-                    >
-                        {/* Close Button */}
-                        <Button
-                            variant="light"
-                            size="sm"
-                            onClick={() => setShowProfileImageModal(false)}
-                            style={{
-                                position: 'fixed',
-                                top: '20px',
-                                right: '20px',
-                                borderRadius: '50%',
-                                width: '40px',
-                                height: '40px',
-                                zIndex: 1000,
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                border: 'none',
-                                color: 'white'
-                            }}
-                        >
-                            <i className="fas fa-times"></i>
-                        </Button>
-
-                        {/* Download Button */}
-                        <Button
-                            variant="light"
-                            size="sm"
-                            onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = `${API_URL}/${speakerData.profilePicture.replace(/\\/g, '/')}`;
-                                link.download = `speaker-profile.jpg`;
-                                link.click();
-                            }}
-                            style={{
-                                position: 'fixed',
-                                top: '20px',
-                                left: '20px',
-                                borderRadius: '50%',
-                                width: '40px',
-                                height: '40px',
-                                zIndex: 1000,
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                border: 'none',
-                                color: 'white'
-                            }}
-                        >
-                            <i className="fas fa-download"></i>
-                        </Button>
-
-                        {/* Image Container */}
-                        <div
-                            style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                minHeight: '90vh',
-                                padding: '60px 80px 80px 80px'
-                            }}
-                        >
-                            <img
-                                src={`${API_URL}/${speakerData.profilePicture.replace(/\\/g, '/')}`}
-                                alt="Speaker Profile"
-                                style={{
-                                    maxWidth: '100%',
-                                    maxHeight: '100%',
-                                    objectFit: 'contain',
-                                    borderRadius: '8px'
-                                }}
-                                onError={(e) => {
-                                    console.error('Speaker profile image failed to load:', speakerData.profilePicture);
-                                    e.target.style.display = 'none';
-                                }}
-                            />
-                        </div>
-                    </Modal.Body>
-                </Modal>
+                    imageSrc={`${API_URL}/${speakerData.profilePicture.replace(/\\/g, '/')}`}
+                    imageAlt="Speaker Profile"
+                    downloadFileName="speaker-profile.jpg"
+                />
             )}
         </>
     );
