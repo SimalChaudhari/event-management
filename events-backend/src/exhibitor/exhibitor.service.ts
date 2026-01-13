@@ -1571,6 +1571,10 @@ export class ExhibitorService {
       }
 
       return {
+        event: {
+          id: event.id,
+          name: event.name,
+        },
         leadsCollected: {
           totalLeadsCount,
           leadsCollectedPercentage,
