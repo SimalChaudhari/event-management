@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZIP Download Test - Event Reports</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #999;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .info-box code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #d63384;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 ZIP Download Test</h1>
+        <p class="subtitle">Download Event Statistics & Lead Collection Reports (ZIP File)</p>
+        
+        <div class="info-box">
+            <p><strong>Endpoint:</strong> <code>GET /api/exhibitors/report/event/statistics/:eventId/download</code></p>
+            <p><strong>Download:</strong> ZIP file containing 2 Excel files (Statistics.xlsx & Lead_Collection.xlsx)</p>
+            <p><strong>Note:</strong> You need to be authenticated (Admin or Exhibitor role)</p>
+            <p><strong>Tip:</strong> Open browser DevTools → Network tab to see the request</p>
+        </div>
+        
+        <form id="downloadForm">
+            <div class="form-group">
+                <label for="eventId">Event ID (UUID):</label>
+                <input 
+                    type="text" 
+                    id="eventId" 
+                    name="eventId" 
+                    placeholder="e.g., 0f0283a6-42d5-47a3-a397-161385baf5af"
+                    required
+                />
+            </div>
+            
+            <div class="form-group">
+                <label for="token">JWT Token (Optional - for testing):</label>
+                <input 
+                    type="text" 
+                    id="token" 
+                    name="token" 
+                    placeholder="Leave empty if testing from browser with cookies"
+                />
+            </div>
+            
+            <button type="submit" class="btn" id="downloadBtn">
+                📦 Download ZIP File
+            </button>
+        </form>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('downloadForm');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusDiv = document.getElementById('status');
+        const eventIdInput = document.getElementById('eventId');
+        const tokenInput = document.getElementById('token');
+
+        // Get API base URL from current location
+        const getApiBaseUrl = () => {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            const baseUrl = port ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`;
+            return baseUrl;
+        };
+
+        const showStatus = (message, type = 'info') => {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const eventId = eventIdInput.value.trim();
+            const token = tokenInput.value.trim();
+            
+            if (!eventId) {
+                showStatus('Please enter an Event ID', 'error');
+                return;
+            }
+
+            // Validate UUID format (basic check)
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(eventId)) {
+                showStatus('Invalid Event ID format. Please enter a valid UUID.', 'error');
+                return;
+            }
+
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = '⏳ Downloading ZIP...';
+            showStatus('Downloading ZIP file with Excel reports...', 'info');
+
+            try {
+                const apiBaseUrl = getApiBaseUrl();
+                const url = `${apiBaseUrl}/api/exhibitors/report/event/statistics/${eventId}/download`;
+                
+                const headers = {
+                    'Accept': 'application/zip, application/x-zip-compressed, application/octet-stream',
+                };
+
+                // Add token to headers if provided
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: headers,
+                    credentials: 'include', // Include cookies for authentication
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = `Download failed: ${response.status} ${response.statusText}`;
+                    
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.message || errorMessage;
+                    } catch (e) {
+                        // If not JSON, use the text
+                        if (errorText) {
+                            errorMessage = errorText.substring(0, 200);
+                        }
+                    }
+                    
+                    showStatus(errorMessage, 'error');
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = '📦 Download ZIP File';
+                    return;
+                }
+
+                // Get the blob from response
+                const blob = await response.blob();
+                
+                // Check if it's a ZIP file
+                if (blob.type !== 'application/zip' && 
+                    blob.type !== 'application/x-zip-compressed' &&
+                    blob.type !== 'application/octet-stream') {
+                    showStatus(`Warning: Expected ZIP file but got ${blob.type}`, 'error');
+                }
+
+                // Create download link
+                const url_blob = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url_blob;
+                
+                // Get filename from Content-Disposition header or use default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `event_reports_${eventId}_${new Date().toISOString().split('T')[0]}.zip`;
+                
+                if (contentDisposition) {
+                    // Try to get filename from filename* (UTF-8 encoded)
+                    const utf8Match = contentDisposition.match(/filename\*=UTF-8''(.+)/i);
+                    if (utf8Match) {
+                        filename = decodeURIComponent(utf8Match[1]);
+                    } else {
+                        // Fallback to regular filename
+                        const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1].trim();
+                        }
+                    }
+                }
+                
+                // Ensure filename has .zip extension
+                if (!filename.toLowerCase().endsWith('.zip')) {
+                    filename = filename.replace(/\.[^.]*$/, '') + '.zip';
+                }
+                
+                // Remove any invalid characters from filename
+                filename = filename.replace(/[<>:"/\\|?*]/g, '_');
+                
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url_blob);
+
+                showStatus(`✅ ZIP file downloaded successfully: ${filename} (Contains: Statistics.xlsx & Lead_Collection.xlsx)`, 'success');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '📦 Download ZIP File';
+
+            } catch (error) {
+                console.error('Download error:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '📦 Download ZIP File';
+            }
+        });
+
+        // Auto-fill with example if needed
+        const urlParams = new URLSearchParams(window.location.search);
+        const eventIdParam = urlParams.get('eventId');
+        if (eventIdParam) {
+            eventIdInput.value = eventIdParam;
+        }
+    </script>
+</body>
+</html>

@@ -43,7 +43,6 @@ export class UserService {
     private readonly emailService: EmailService,
     private readonly speakerProfileService: SpeakerProfileService,
     private readonly addressService: AddressService,
-  
   ) {}
 
   // Helper function to send speaker credentials via email
@@ -867,10 +866,36 @@ export class UserService {
             isCurrent: true,
           });
           await eventStaffRepository.save(currentEventStaff);
+
+    
+
+          // Auto-create stamp for exhibitor when user switches to exhibitor role
+          try {
+            await this.autoCreateStampForExhibitorOnRoleSwitch(
+              eventBooth.exhibitorId,
+              eventBooth.eventId,
+            );
+          } catch (stampError) {
+            // Log error but don't fail role switch if stamp creation fails
+            console.error(`❌ [ROLE SWITCH] Failed to auto-create stamp when user switched to exhibitor role:`, stampError);
+          }
         } else {
+          
           // Update existing EventStaff entry to mark as current
           currentEventStaff.isCurrent = true;
           await eventStaffRepository.save(currentEventStaff);
+          
+          try {
+            // Check if stamp exists by calling the auto-create function
+            // It will check internally and only create if it doesn't exist
+            await this.autoCreateStampForExhibitorOnRoleSwitch(
+              eventBooth.exhibitorId,
+              eventBooth.eventId,
+            );
+          } catch (stampError) {
+            // Log error but don't fail role switch if stamp creation fails
+            console.error(`❌ [ROLE SWITCH] Failed to check/create stamp when EventStaff already exists:`, stampError);
+          }
         }
 
         // Auto-register user for the event if not already registered
@@ -961,6 +986,146 @@ export class UserService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Role switch');
+    }
+  }
+
+  /**
+   * Auto-create stamp for exhibitor when user switches to exhibitor role
+   * Creates a stamp if stamp feature is enabled for the event
+   */
+  private async autoCreateStampForExhibitorOnRoleSwitch(
+    exhibitorId: string,
+    eventId: string,
+  ): Promise<void> {
+    try {
+    // Get EventStamp and EventStampEvent repositories
+      const { EventStamp } = await import('../event/event-stamp.entity');
+      const { EventStampEvent } = await import('../event/event-stamp-event.entity');
+      const { Exhibitor } = await import('../exhibitor/exhibitor.entity');
+
+      const eventStampRepository = this.userRepository.manager.getRepository(EventStamp);
+      const eventStampEventRepository = this.userRepository.manager.getRepository(EventStampEvent);
+      const exhibitorRepository = this.userRepository.manager.getRepository(Exhibitor);
+
+      // Get exhibitor
+      const exhibitor = await exhibitorRepository.findOne({
+        where: { id: exhibitorId },
+      });
+
+      if (!exhibitor) {
+        console.log(`❌ [STAMP] Exhibitor not found: ${exhibitorId}`);
+        return;
+      }
+
+    
+      // Get event
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+
+      if (!event) {
+        console.log(`❌ [STAMP] Event not found: ${eventId}`);
+        return;
+      }
+
+      // Check if stamp feature is enabled for this event
+      // Stamp feature is enabled if tabVisibility.stamps is not explicitly false
+      const isStampFeatureEnabled = event.tabVisibility?.stamps !== false;
+
+      if (!isStampFeatureEnabled) {
+        console.log(`⚠️ [STAMP] Stamp feature is disabled for event: ${event.name}`);
+        return;
+      }
+
+   // Check if stamp already exists with the SAME booth number for this event
+      // We'll use boothNumber as the stamp name
+      // If booth number is same, skip creation (even if it's from different company, booth number should be unique per event)
+      const stampName = exhibitor.boothNumber || exhibitor.companyName || 'Exhibitor Stamp';
+      
+      
+      // Get all stamps for this event
+      const existingStamps = await eventStampEventRepository.find({
+        where: { eventId: event.id },
+        relations: ['eventStamp'],
+      });
+
+      // First, check if a stamp with this exhibitorId already exists for this event
+      const existingStampByExhibitorId = existingStamps.find(
+        (ese) => ese.eventStamp.exhibitorId === exhibitorId
+      );
+
+      if (existingStampByExhibitorId) {
+        // Stamp already exists for this exhibitor
+        return;
+      }
+
+      // If no stamp found by exhibitorId, check by booth number (for backward compatibility)
+      const existingStampByBoothNumber = existingStamps.find(
+        (ese) => ese.eventStamp.name === stampName
+      );
+
+      if (existingStampByBoothNumber) {
+        // Stamp with same booth number exists but different exhibitorId
+        // This means another company has the same booth number
+        // We should still create a new stamp for this company
+        console.log(`⚠️ [STAMP] Stamp with booth number "${stampName}" exists but for different exhibitor`);
+        console.log(`   [STAMP] Existing stamp exhibitorId: ${existingStampByBoothNumber.eventStamp.exhibitorId}`);
+        console.log(`   [STAMP] Current exhibitorId: ${exhibitorId}`);
+        console.log(`   [STAMP] Will create new stamp for this company`);
+        // Continue to create new stamp
+      } else {
+        // No stamp with this booth number exists
+        console.log(`✅ [STAMP] No existing stamp found for this exhibitor`);
+        console.log(`   [STAMP] Will create new stamp for company: ${exhibitor.companyName}, Booth: ${stampName}`);
+      }
+
+    
+      // Determine stamp image: use logo if available, otherwise use default from existing stamps
+      let stampImage: string | undefined = exhibitor.logo;
+
+      if (stampImage) {
+        console.log(`✅ [STAMP] Using exhibitor logo: ${stampImage}`);
+      } else {
+        console.log(`⚠️ [STAMP] No logo found for exhibitor "${exhibitor.companyName}", checking for default image...`);
+         
+        // Find an existing stamp from this event to use as default
+        const allEventStamps = await eventStampEventRepository.find({
+          where: { eventId: event.id },
+          relations: ['eventStamp'],
+        });
+        
+        const eventStamps = allEventStamps
+          .map((ese: any) => ese.eventStamp)
+          .filter((stamp: any) => stamp.image);
+
+        if (eventStamps.length > 0) {
+          // Use the first existing stamp's image as default
+          stampImage = eventStamps[0].image;
+              } else {
+          // No existing stamps with images - create stamp without image
+          // Frontend will show placeholder with booth number
+                stampImage = undefined; // Explicitly set to undefined
+        }
+      }
+
+      // Create the stamp
+       const newStamp = eventStampRepository.create({
+        name: stampName, // Booth number
+        image: stampImage,
+        exhibitorId: exhibitorId, // Add exhibitor ID
+        isVisited: false, // Default false
+      });
+
+      const savedStamp = await eventStampRepository.save(newStamp);
+      const stampEvent = eventStampEventRepository.create({
+        eventId: event.id,
+        eventStampId: savedStamp.id,
+      });
+
+      await eventStampEventRepository.save(stampEvent);
+       } catch (error) {
+      // Log error but don't throw - we don't want to fail role switch if stamp creation fails
+        throw error;
     }
   }
 

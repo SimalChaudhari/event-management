@@ -44,11 +44,17 @@ import { ModeratorModule } from './moderator/moderator.module';
 import { ScheduledPushNotificationModule } from './scheduled-push-notification/scheduled-push-notification.module';
 import { EmailTemplateModule } from './email-template/email-template.module';
 import { JwtAuthModule } from './jwt/jwt-auth.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // Load environment variables
     JwtAuthModule, // Import JwtAuthModule globally so JwtAuthGuard is available everywhere
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      serveRoot: '/public',
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,

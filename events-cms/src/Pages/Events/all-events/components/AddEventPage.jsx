@@ -13,6 +13,7 @@ import {
     removeEventFloorPlan,
     removeEventBackgroundImage,
     removeEventStampImage,
+    deleteEventStamp,
     getCountries,
     getSpeakersForEvent,
     getCategoriesForEvent,
@@ -28,6 +29,7 @@ import { createCategory } from '../../../../store/actions/categoryActions';
 import { removeEventImage, removeEventDocument } from '../../../../store/actions/eventActions';
 import { EVENT_PATHS } from '../../../../utils/constants';
 import useTableNavigation from '../../../../hooks/useTableNavigation';
+import { toast } from 'react-toastify';
 import EventProgrammeManagement from '../../../../components/events/EventProgrammeManagement';
 import { createTrack, createSession } from '../../../../store/actions/programmeActions';
 import SettingsEditor from '../../../../App/components/CkEditor/SettingsEditor';
@@ -74,8 +76,9 @@ function AddEventPage() {
         backgroundImage: null,
         exhibitorIds: [],
         exhibitorDescription: '',
-        eventStampDescription: '',
-        eventStampImages: [],
+        eventStampDescription: '', // Description for event stamps
+        eventStampIds: [], // Array of existing stamp IDs to associate
+        newStamps: [], // Array of new stamps to create: [{ name: string, image: File }]
         enableLuckyDrawFeature: false
     });
     const [showMapModal, setShowMapModal] = useState(false);
@@ -110,8 +113,11 @@ function AddEventPage() {
 
     const [exhibitorList, setExhibitorList] = useState([]);
 
-    // Add new states for event stamp
-    const [eventStampImagePreviewUrls, setEventStampImagePreviewUrls] = useState([]);
+    // Add new states for event stamps
+    const [newStamps, setNewStamps] = useState([]); // [{ name: string, image: File, preview: string }]
+    const [selectedStampIds, setSelectedStampIds] = useState([]); // Array of selected existing stamp IDs
+    const [availableStamps, setAvailableStamps] = useState([]); // List of all available stamps for selection
+    const [existingStamps, setExistingStamps] = useState([]); // Existing stamps associated with event (for edit mode)
 
     // Add floor plan preview state
     const [floorPlanPreview, setFloorPlanPreview] = useState(null);
@@ -131,6 +137,11 @@ function AddEventPage() {
     // Confirmation modal for speaker removal
     const [showSpeakerDeleteModal, setShowSpeakerDeleteModal] = useState(false);
     const [speakerToRemove, setSpeakerToRemove] = useState(null);
+
+    // Confirmation modal for stamp removal
+    const [showStampDeleteModal, setShowStampDeleteModal] = useState(false);
+    const [stampToDelete, setStampToDelete] = useState(null);
+    const [isDeletingStamp, setIsDeletingStamp] = useState(false);
 
     // Add loading states for dropdowns
     const [isLoadingSpeakers, setIsLoadingSpeakers] = useState(false);
@@ -432,29 +443,27 @@ function AddEventPage() {
                         }
                     }
 
-                    // Handle event stamps - Updated to match API response structure
+                    // Handle event stamps - Updated to match new API response structure
+                    // API returns: eventStamps: { description: "...", stamps: [{ id, name, image: "uploads/eventStamps/xxx.png" }] }
+                    let eventStampIdsData = [];
+                    let stampsData = [];
                     let eventStampDescription = '';
-                    let eventStampImagesData = [];
-                    let eventStampImagePreviewUrls = [];
 
                     if (editData.eventStamps) {
-                        // Handle event stamp description
-                        eventStampDescription = editData.eventStamps.description || '';
-
-                        // Handle event stamp images
-                        if (editData.eventStamps.images && Array.isArray(editData.eventStamps.images)) {
-                            eventStampImagesData = editData.eventStamps.images;
-                            eventStampImagePreviewUrls = editData.eventStamps.images.map((img) => {
-                                if (typeof img === 'string') {
-                                    if (img.startsWith('http')) {
-                                        return img;
-                                    }
-                                    return `${API_URL}/${img.replace(/\\/g, '/')}`;
-                                }
-                                return img;
-                            });
+                        if (Array.isArray(editData.eventStamps)) {
+                            // Old structure: array of stamps
+                            stampsData = editData.eventStamps;
+                            eventStampIdsData = editData.eventStamps.map(stamp => stamp.id).filter(Boolean);
+                        } else if (editData.eventStamps.stamps && Array.isArray(editData.eventStamps.stamps)) {
+                            // New structure: object with description and stamps
+                            stampsData = editData.eventStamps.stamps;
+                            eventStampIdsData = editData.eventStamps.stamps.map(stamp => stamp.id).filter(Boolean);
+                            eventStampDescription = editData.eventStamps.description || '';
                         }
                     }
+                    
+                    // Store existing stamps for display in edit mode
+                    setExistingStamps(stampsData || []);
 
                     const formDataToSet = {
                         name: editData.name || '',
@@ -481,8 +490,9 @@ function AddEventPage() {
                         backgroundImage: backgroundImageData,
                         exhibitorIds: exhibitorIds,
                         exhibitorDescription: exhibitorDescription,
-                        eventStampDescription: eventStampDescription,
-                        eventStampImages: eventStampImagesData,
+                        eventStampDescription: editData.eventStampDescription || '',
+                        eventStampIds: eventStampIdsData,
+                        newStamps: [],
                         enableLuckyDrawFeature: editData.enableLuckyDrawFeature || false
                     };
 
@@ -493,7 +503,9 @@ function AddEventPage() {
                     setImagePreviewUrls(previewUrls);
                     setDocumentPreviewUrls(documentPreviewUrls);
                     setDocumentNames(documentNamesData);
-                    setEventStampImagePreviewUrls(eventStampImagePreviewUrls);
+                    setSelectedStampIds(eventStampIdsData);
+                    setExistingStamps(stampsData || []);
+                    setNewStamps([]);
 
                     setFloorPlanPreview(floorPlanPreviewUrl);
                     setBackgroundImagePreview(backgroundImagePreviewUrl);
@@ -720,14 +732,17 @@ function AddEventPage() {
             exhibitorIds: [],
             exhibitorDescription: '',
             eventStampDescription: '',
-            eventStampImages: []
+            eventStampIds: [],
+            newStamps: []
         });
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
         setDocumentNames([]); // Add this
         setFloorPlanPreview(null);
+        setNewStamps([]);
+        setSelectedStampIds([]);
+        setExistingStamps([]);
         setBackgroundImagePreview(null);
-        setEventStampImagePreviewUrls([]);
     };
 
     // Handlers for dropdown open events
@@ -835,6 +850,13 @@ function AddEventPage() {
 
         const dataToSend = {
             ...formData,
+            eventStampIds: selectedStampIds,
+            newStamps: newStamps.map(stamp => ({ 
+                name: stamp.name, // Booth number
+                exhibitorId: stamp.exhibitorId,
+                image: stamp.image,
+                isVisited: false // Default false
+            })),
             documentNames: cleanedDocumentNames, // Use cleaned names
             startTime: formattedStartTime,
             endTime: formattedEndTime
@@ -865,14 +887,27 @@ function AddEventPage() {
             } else if (key === 'exhibitorDescription') {
                 formDataToSend.append('exhibitorDescription', dataToSend[key]);
             } else if (key === 'eventStampDescription') {
-                // Handle event stamp description
-                formDataToSend.append('eventStampDescription', dataToSend[key]);
-            } else if (key === 'eventStampImages') {
-                // Handle event stamp images
-                if (dataToSend[key] && Array.isArray(dataToSend[key])) {
-                    dataToSend[key].forEach((file) => {
-                        if (file instanceof File) {
-                            formDataToSend.append('eventStampImages', file);
+                formDataToSend.append('eventStampDescription', dataToSend[key] || '');
+            } else if (key === 'eventStampIds') {
+                // Handle existing stamp IDs to associate
+                if (dataToSend[key] && Array.isArray(dataToSend[key]) && dataToSend[key].length > 0) {
+                    formDataToSend.append('eventStampIds', JSON.stringify(dataToSend[key]));
+                }
+            } else if (key === 'newStamps') {
+                // Handle new stamps to create - send as JSON and images separately
+                if (dataToSend[key] && Array.isArray(dataToSend[key]) && dataToSend[key].length > 0) {
+                    // Send stamp data with name, exhibitorId, and isVisited
+                    const stampData = dataToSend[key].map(stamp => ({ 
+                        name: stamp.name, 
+                        exhibitorId: stamp.exhibitorId || null,
+                        isVisited: stamp.isVisited || false
+                    }));
+                    formDataToSend.append('newStamps', JSON.stringify(stampData));
+                    
+                    // Send stamp images as files
+                    dataToSend[key].forEach((stamp, index) => {
+                        if (stamp.image instanceof File) {
+                            formDataToSend.append('eventStampImages', stamp.image);
                         }
                     });
                 }
@@ -950,13 +985,9 @@ function AddEventPage() {
                 });
             }
 
-            // Handle existing event stamp images for edit mode
-            if (formData.eventStampImages && formData.eventStampImages.length > 0) {
-                formData.eventStampImages.forEach((image) => {
-                    if (typeof image === 'string') {
-                        formDataToSend.append('originalEventStampImages', image);
-                    }
-                });
+            // Handle existing stamp IDs for edit mode
+            if (selectedStampIds && selectedStampIds.length > 0) {
+                formDataToSend.append('eventStampIds', JSON.stringify(selectedStampIds));
             }
 
             // Handle existing background image for edit mode
@@ -1289,7 +1320,7 @@ function AddEventPage() {
 
     // Exhibitor handling
     const handleExhibitorSelect = (selectedOptions) => {
-        const selectedIds = selectedOptions.map((option) => option.value);
+        const selectedIds = selectedOptions ? selectedOptions.map((option) => option.value) : [];
         setFormData((prev) => ({
             ...prev,
             exhibitorIds: selectedIds
@@ -1297,14 +1328,6 @@ function AddEventPage() {
     };
 
     // Add new event stamp handling functions
-    const handleEventStampDescriptionChange = (e) => {
-        const { value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            eventStampDescription: value
-        }));
-    };
-
     const handleExhibitorDescriptionChange = (e) => {
         const { value } = e.target;
         setFormData((prev) => ({
@@ -1313,46 +1336,80 @@ function AddEventPage() {
         }));
     };
 
-    const handleEventStampImagesChange = (e) => {
-        const files = Array.from(e.target.files);
-
-        const newPreviewUrls = files.map((file) => URL.createObjectURL(file));
-
-        setFormData((prev) => ({
-            ...prev,
-            eventStampImages: [...prev.eventStampImages, ...files]
-        }));
-
-        setEventStampImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+    // Add new stamp
+    const handleAddNewStamp = () => {
+        setNewStamps((prev) => [...prev, { name: '', exhibitorId: '', image: null, preview: null }]);
     };
 
-    const handleRemoveEventStampImage = async (indexToRemove) => {
-        const imageToRemove = formData.eventStampImages[indexToRemove];
+    // Update stamp booth number (and exhibitorId)
+    const handleStampBoothChange = (index, exhibitorId, boothNumber) => {
+        setNewStamps((prev) => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], name: boothNumber, exhibitorId: exhibitorId };
+            return updated;
+        });
+    };
 
-        if (typeof imageToRemove === 'string' && id) {
-            try {
-                const updatedImages = await dispatch(removeEventStampImage(id, imageToRemove));
-                if (updatedImages) {
-                    setFormData((prev) => ({
-                        ...prev,
-                        eventStampImages: updatedImages
-                    }));
+    // Update stamp image
+    const handleStampImageChange = (index, file) => {
+        if (file) {
+            const preview = URL.createObjectURL(file);
+            setNewStamps((prev) => {
+                const updated = [...prev];
+                updated[index] = { ...updated[index], image: file, preview };
+                return updated;
+            });
+        }
+    };
 
-                    const newPreviewUrls = updatedImages.map((img) =>
-                        img.startsWith('http') ? img : `${API_URL}/${img.replace(/\\/g, '/')}`
-                    );
-                    setEventStampImagePreviewUrls(newPreviewUrls);
-                }
-            } catch (error) {
-                // Error handling without console
+    // Remove new stamp
+    const handleRemoveNewStamp = (index) => {
+        setNewStamps((prev) => {
+            const updated = prev.filter((_, i) => i !== index);
+            // Revoke object URL to prevent memory leak
+            if (prev[index].preview) {
+                URL.revokeObjectURL(prev[index].preview);
             }
-        } else {
-            setFormData((prev) => ({
-                ...prev,
-                images: prev.images.filter((_, index) => index !== indexToRemove)
-            }));
+            return updated;
+        });
+    };
 
-            setImagePreviewUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+    // Remove existing stamp (for edit mode) - Show delete modal
+    const handleRemoveExistingStamp = (stampId) => {
+        const stamp = existingStamps.find(s => s.id === stampId);
+        setStampToDelete({ id: stampId, name: stamp?.name || 'this stamp' });
+        setShowStampDeleteModal(true);
+    };
+
+    // Confirm stamp deletion
+    const handleConfirmDeleteStamp = async () => {
+        if (!stampToDelete || isDeletingStamp) return;
+
+        setIsDeletingStamp(true);
+        try {
+            // Delete from backend
+            const deleted = await dispatch(deleteEventStamp(stampToDelete.id));
+            
+            if (deleted) {
+                // Remove from local state only after successful deletion
+                setSelectedStampIds((prev) => prev.filter(id => id !== stampToDelete.id));
+                setExistingStamps((prev) => prev.filter(stamp => stamp.id !== stampToDelete.id));
+                setShowStampDeleteModal(false);
+                setStampToDelete(null);
+            }
+        } catch (error) {
+            console.error('Error deleting stamp:', error);
+            toast.error('Failed to delete stamp. Please try again.');
+        } finally {
+            setIsDeletingStamp(false);
+        }
+    };
+
+    // Cancel stamp deletion
+    const handleCancelDeleteStamp = () => {
+        if (!isDeletingStamp) {
+            setShowStampDeleteModal(false);
+            setStampToDelete(null);
         }
     };
 
@@ -1992,271 +2049,378 @@ function AddEventPage() {
 
                                     <Col sm={12}>
                                         <div className="form-group" style={{ marginTop: '10px' }}>
-                                            <label htmlFor="eventStampDescription" style={{ 
+                                          
+                                            
+                                            {/* Event Stamp Description */}
+                                            <div className="form-group" style={{ marginBottom: '20px' }}>
+                                                <label htmlFor="eventStampDescription" style={{ 
+                                                    display: 'block', 
+                                                    marginBottom: '10px', 
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '500',
+                                                    color: '#4680ff'
+                                                }}>
+                                                    Event Stamp Description (Optional)
+                                                </label>
+                                                <SettingsEditor
+                                                    data={formData.eventStampDescription || ''}
+                                                    onChange={(event, editor) => {
+                                                        setFormData((prev) => ({
+                                                            ...prev,
+                                                            eventStampDescription: editor.getData()
+                                                        }));
+                                                    }}
+                                                    placeholder="Enter event stamp description..."
+                                                />
+                                            </div>
+
+                                              <label style={{ 
                                                 display: 'block', 
                                                 marginBottom: '10px', 
                                                 fontSize: '0.875rem',
                                                 fontWeight: '500',
                                                 color: '#4680ff'
                                             }}>
-                                                Event Stamp Description (Optional)
+                                                Event Stamps (Optional)
                                             </label>
                                             <hr style={{ margin: '10px 0 15px 0', borderTop: '1px solid #dee2e6' }} />
-                                            <SettingsEditor
-                                                data={formData.eventStampDescription || ''}
-                                                onChange={(event, editor) => {
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        eventStampDescription: editor.getData()
-                                                    }));
-                                                }}
-                                                placeholder="Enter event stamp description..."
-                                            />
-                                        </div>
-                                    </Col>
-
-                                    <Col sm={12}>
-                                        <div className="form-group fill">
-                                            <Badge bg="info">
-                                                <span>Event Stamp Images (Optional) </span> {formData.eventStampImages.length}/5
-                                            </Badge>
-
-                                            {/* Drag and Drop Zone for Event Stamp Images */}
-                                            <div
-                                                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mt-2"
-                                                onDragOver={handleDragOver}
-                                                onDrop={(e) => {
-                                                    e.preventDefault();
-                                                    const files = Array.from(e.dataTransfer.files);
-                                                    const validFiles = files.filter((file) => {
-                                                        const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                                                        const isValidType = allowedImageTypes.includes(file.type);
-                                                        const isValidSize = file.size <= 50 * 1024 * 1024;
-
-                                                        if (!isValidType) {
-                                                            alert(
-                                                                `${file.name} is not a valid image file. Allowed types: JPEG, JPG, PNG, GIF.`
-                                                            );
-                                                        }
-                                                        if (!isValidSize) {
-                                                            alert(`${file.name} is too large. Maximum size is 50MB.`);
-                                                        }
-
-                                                        return isValidType && isValidSize;
-                                                    });
-
-                                                    const newPreviewUrls = validFiles.map((file) => URL.createObjectURL(file));
-
-                                                    setFormData((prev) => ({
-                                                        ...prev,
-                                                        eventStampImages: [...prev.eventStampImages, ...validFiles]
-                                                    }));
-
-                                                    setEventStampImagePreviewUrls((prev) => [...prev, ...newPreviewUrls]);
-                                                }}
-                                                style={{
-                                                    border: '2px dashed #ccc',
-                                                    borderRadius: '8px',
-                                                    padding: '20px',
-                                                    textAlign: 'center',
-                                                    backgroundColor: '#f9f9f9',
-                                                    marginBottom: '10px',
-                                                    minHeight: '120px',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center'
-                                                }}
+                                            
+                                            {/* Add New Stamp Button */}
+                                            <Button
+                                                variant="outline-primary"
+                                                onClick={handleAddNewStamp}
+                                                style={{ marginBottom: '15px' }}
                                             >
-                                                <div className="mb-3">
-                                                    <i className="fas fa-stamp fa-3x text-muted"></i>
-                                                </div>
-                                                <p
-                                                    className="text-muted mb-2"
-                                                    style={{
-                                                        fontSize: '14px',
-                                                        lineHeight: '1.4',
-                                                        maxWidth: '100%',
-                                                        wordWrap: 'break-word'
-                                                    }}
-                                                >
-                                                    Drag and drop event stamp images here, or click to select files
-                                                </p>
-                                                <p
-                                                    className="text-muted small"
-                                                    style={{
-                                                        fontSize: '12px',
-                                                        lineHeight: '1.3',
-                                                        maxWidth: '100%',
-                                                        wordWrap: 'break-word'
-                                                    }}
-                                                >
-                                                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Max 5 images.
-                                                </p>
-                                                <input
-                                                    type="file"
-                                                    className="form-control"
-                                                    name="eventStampImages"
-                                                    onChange={handleEventStampImagesChange}
-                                                    accept="image/*"
-                                                    multiple
-                                                    style={{ display: 'none' }}
-                                                    id="eventStampImageInput"
-                                                />
-                                                <Button
-                                                    variant="outline-primary"
-                                                    onClick={() => document.getElementById('eventStampImageInput').click()}
-                                                    style={{ marginTop: '10px' }}
-                                                >
-                                                    Choose Event Stamp Images
-                                                </Button>
-                                            </div>
+                                                <i style={{marginRight: '10px'}} className="fas fa-plus me-2"></i>
+                                                Add New Stamp
+                                            </Button>
 
-                                            {/* Event Stamp Image Preview Grid */}
-                                            {formData.eventStampImages && formData.eventStampImages.length > 0 && (
-                                                <div className="mt-3">
-                                                    <h6
-                                                        style={{
-                                                            fontSize: '16px',
-                                                            fontWeight: '600',
-                                                            marginBottom: '15px',
-                                                            color: '#333'
-                                                        }}
-                                                    >
-                                                        Selected Event Stamp Images ({formData.eventStampImages.length})
+                                            {/* New Stamps List */}
+                                            {newStamps.length > 0 && (
+                                                <div style={{ marginTop: '15px' }}>
+                                                    <h6 style={{ marginBottom: '15px', fontSize: '14px', fontWeight: '600' }}>
+                                                        New Stamps to Create ({newStamps.length})
+                                                    </h6>
+                                                    {newStamps.map((stamp, index) => (
+                                                        <div
+                                                            key={index}
+                                                            style={{
+                                                                border: '1px solid #dee2e6',
+                                                                borderRadius: '8px',
+                                                                padding: '15px',
+                                                                marginBottom: '15px',
+                                                                backgroundColor: '#f8f9fa'
+                                                            }}
+                                                        >
+                                                            <Row>
+                                                                <Col sm={12} md={4}>
+                                                                    <div className="form-group">
+                                                                        <label style={{ fontSize: '12px', fontWeight: '500', marginBottom: '5px' }}>
+                                                                            Booth Number * (Searchable)
+                                                                        </label>
+                                                                        <Select
+                                                                            key={`stamp-booth-${index}-${formData.exhibitorIds?.join(',') || 'none'}`}
+                                                                            isSearchable
+                                                                            isClearable
+                                                                            placeholder="Search and select booth number..."
+                                                                            options={(() => {
+                                                                                // Get selected exhibitor IDs from formData
+                                                                                const selectedExhibitorIds = formData.exhibitorIds || [];
+                                                                                
+                                                                                // Get exhibitor IDs that already have stamps (from existingStamps and newStamps)
+                                                                                const exhibitorsWithStamps = new Set();
+                                                                                
+                                                                                // Add exhibitor IDs from existing stamps
+                                                                                existingStamps.forEach(stamp => {
+                                                                                    if (stamp.exhibitorId) {
+                                                                                        exhibitorsWithStamps.add(String(stamp.exhibitorId));
+                                                                                    }
+                                                                                });
+                                                                                
+                                                                                // Add exhibitor IDs from other new stamps (excluding current index)
+                                                                                newStamps.forEach((stamp, idx) => {
+                                                                                    if (idx !== index && stamp.exhibitorId) {
+                                                                                        exhibitorsWithStamps.add(String(stamp.exhibitorId));
+                                                                                    }
+                                                                                });
+                                                                                
+                                                                                // Filter to show only selected exhibitors (if any selected)
+                                                                                // If no exhibitors selected, show all exhibitors with booth numbers
+                                                                                // Exclude exhibitors that already have stamps
+                                                                                let exhibitorsToShow = [];
+                                                                                
+                                                                                if (selectedExhibitorIds.length > 0) {
+                                                                                    // Convert all IDs to strings for comparison (handle both string and number IDs)
+                                                                                    const selectedIdsAsStrings = selectedExhibitorIds.map(id => String(id));
+                                                                                    
+                                                                                    exhibitorsToShow = exhibitorList.filter(ex => {
+                                                                                        if (!ex || !ex.id) return false;
+                                                                                        
+                                                                                        const exId = String(ex.id);
+                                                                                        const hasBoothNumber = ex.boothNumber && String(ex.boothNumber).trim() !== '';
+                                                                                        const isSelected = selectedIdsAsStrings.includes(exId);
+                                                                                        const alreadyHasStamp = exhibitorsWithStamps.has(exId);
+                                                                                        
+                                                                                        return isSelected && hasBoothNumber && !alreadyHasStamp;
+                                                                                    });
+                                                                                } else {
+                                                                                    // Show all exhibitors with booth numbers if none selected
+                                                                                    exhibitorsToShow = exhibitorList.filter(ex => {
+                                                                                        if (!ex || !ex.id) return false;
+                                                                                        const exId = String(ex.id);
+                                                                                        const hasBoothNumber = ex.boothNumber && String(ex.boothNumber).trim() !== '';
+                                                                                        const alreadyHasStamp = exhibitorsWithStamps.has(exId);
+                                                                                        return hasBoothNumber && !alreadyHasStamp;
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                const options = exhibitorsToShow.map((exhibitor) => ({
+                                                                                    value: exhibitor.id,
+                                                                                    label: `${exhibitor.boothNumber} - ${exhibitor.companyName}`,
+                                                                                    boothNumber: exhibitor.boothNumber,
+                                                                                    companyName: exhibitor.companyName
+                                                                                }));
+                                                                                
+                                                                                return options;
+                                                                            })()}
+                                                                            value={stamp.exhibitorId ? {
+                                                                                value: stamp.exhibitorId,
+                                                                                label: `${stamp.name} - ${exhibitorList.find(ex => ex.id === stamp.exhibitorId)?.companyName || ''}`
+                                                                            } : null}
+                                                                            onChange={(selectedOption) => {
+                                                                                if (selectedOption) {
+                                                                                    handleStampBoothChange(
+                                                                                        index, 
+                                                                                        selectedOption.value, 
+                                                                                        selectedOption.boothNumber || selectedOption.companyName
+                                                                                    );
+                                                                                } else {
+                                                                                    // Clear selection
+                                                                                    setNewStamps((prev) => {
+                                                                                        const updated = [...prev];
+                                                                                        updated[index] = { ...updated[index], name: '', exhibitorId: '' };
+                                                                                        return updated;
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            styles={{
+                                                                                control: (provided) => ({
+                                                                                    ...provided,
+                                                                                    minHeight: '38px',
+                                                                                    fontSize: '14px'
+                                                                                }),
+                                                                                menu: (provided) => ({
+                                                                                    ...provided,
+                                                                                    zIndex: 9999
+                                                                                })
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </Col>
+                                                                <Col sm={12} md={6}>
+                                                                    <div className="form-group">
+                                                                        <label style={{ fontSize: '12px', fontWeight: '500', marginBottom: '5px' }}>
+                                                                            Stamp Image
+                                                                        </label>
+                                                                        <input
+                                                                            type="file"
+                                                                            className="form-control"
+                                                                            accept="image/*"
+                                                                            onChange={(e) => {
+                                                                                if (e.target.files && e.target.files[0]) {
+                                                                                    handleStampImageChange(index, e.target.files[0]);
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </Col>
+                                                                <Col sm={12} md={2}>
+                                                                    <div className="form-group">
+                                                                        <label style={{ fontSize: '12px', fontWeight: '500', marginBottom: '5px' }}>
+                                                                            &nbsp;
+                                                                        </label>
+                                                                        <Button
+                                                                            variant="danger"
+                                                                            size="sm"
+                                                                            onClick={() => handleRemoveNewStamp(index)}
+                                                                            style={{ width: '100%' }}
+                                                                        >
+                                                                            <i className="fas fa-trash"></i> Remove
+                                                                        </Button>
+                                                                    </div>
+                                                                </Col>
+                                                            </Row>
+                                                            {stamp.preview && (
+                                                                <div style={{ marginTop: '10px' }}>
+                                                                    <img
+                                                                        src={stamp.preview}
+                                                                        alt="Preview"
+                                                                        style={{
+                                                                            maxWidth: '150px',
+                                                                            maxHeight: '150px',
+                                                                            borderRadius: '4px',
+                                                                            border: '1px solid #dee2e6'
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Display Existing Stamps (Edit Mode) */}
+                                            {id && existingStamps.length > 0 && (
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <h6 style={{ marginBottom: '15px', fontSize: '14px', fontWeight: '600' }}>
+                                                        Existing Stamps ({existingStamps.length})
                                                     </h6>
                                                     <div
                                                         style={{
                                                             display: 'grid',
-                                                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
                                                             gap: '15px',
                                                             marginTop: '10px'
                                                         }}
                                                     >
-                                                        {formData.eventStampImages.map((image, index) => {
-                                                            let imageSrc = '';
-                                                            let isExistingImage = false;
-
-                                                            if (typeof image === 'string') {
-                                                                isExistingImage = true;
-                                                                if (image.startsWith('http')) {
-                                                                    imageSrc = image;
+                                                        {existingStamps.map((stamp) => {
+                                                            console.log('🖼️ AddEventPage - Rendering existing stamp:', {
+                                                                stampId: stamp.id,
+                                                                stampName: stamp.name,
+                                                                stampImage: stamp.image,
+                                                                fullStamp: stamp
+                                                            });
+                                                            
+                                                            let imageSrc = null;
+                                                            if (stamp.image) {
+                                                                if (stamp.image.startsWith('http')) {
+                                                                    imageSrc = stamp.image;
+                                                                    console.log('✅ AddEventPage - Using full URL:', imageSrc);
                                                                 } else {
-                                                                    imageSrc = `${API_URL}/${image.replace(/\\/g, '/')}`;
+                                                                    // Normalize path: remove leading/trailing slashes and backslashes
+                                                                    let normalizedPath = stamp.image.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+                                                                    
+                                                                    // Backend stores paths as "uploads/eventStamps/xxx.png"
+                                                                    // Backend serves static files from "uploads" folder with prefix "/uploads/"
+                                                                    // So "uploads/eventStamps/xxx.png" should be accessed as "/uploads/eventStamps/xxx.png"
+                                                                    // We don't need to remove the "uploads/" prefix, just use it as is
+                                                                    
+                                                                    // Ensure API_URL doesn't have trailing slash
+                                                                    const baseUrl = API_URL.replace(/\/+$/, '');
+                                                                    imageSrc = `${baseUrl}/${normalizedPath}`;
+                                                                    console.log('🔧 AddEventPage - Generated URL:', {
+                                                                        original: stamp.image,
+                                                                        normalized: normalizedPath,
+                                                                        baseUrl: baseUrl,
+                                                                        finalUrl: imageSrc,
+                                                                        expectedPath: `Should be accessible at: ${imageSrc}`
+                                                                    });
                                                                 }
-                                                            } else if (image instanceof File) {
-                                                                imageSrc = eventStampImagePreviewUrls[index] || URL.createObjectURL(image);
                                                             } else {
-                                                                imageSrc = eventStampImagePreviewUrls[index] || '';
+                                                                console.log('⚠️ AddEventPage - No image for stamp:', stamp.id);
                                                             }
-
+                                                            
+                                                            // Get booth number from stamp (name field contains booth number)
+                                                            const boothNumber = stamp.boothNumber || stamp.name || 'N/A';
+                                                            
                                                             return (
                                                                 <div
-                                                                    key={index}
+                                                                    key={stamp.id}
                                                                     style={{
                                                                         position: 'relative',
+                                                                        border: '1px solid #dee2e6',
                                                                         borderRadius: '8px',
                                                                         overflow: 'hidden',
-                                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                                                        transition: 'transform 0.2s ease',
-                                                                        cursor: 'pointer'
+                                                                        backgroundColor: '#f8f9fa'
                                                                     }}
-                                                                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
-                                                                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                                                                 >
-                                                                    <img
-                                                                        src={imageSrc}
-                                                                        alt={`Event Stamp ${index + 1}`}
-                                                                        style={{
+                                                                    {imageSrc ? (
+                                                                        <>
+                                                                            <img
+                                                                                src={imageSrc}
+                                                                                alt={boothNumber || 'Stamp'}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    height: '120px',
+                                                                                    objectFit: 'cover'
+                                                                                }}
+                                                                                onLoad={() => {
+                                                                                    console.log('✅ Image loaded successfully:', imageSrc);
+                                                                                }}
+                                                                                onError={(e) => {
+                                                                                console.error('❌ Image failed to load:', {
+                                                                                    imageSrc,
+                                                                                    stampId: stamp.id,
+                                                                                    stampName: stamp.name,
+                                                                                    error: e
+                                                                                });
+                                                                                e.target.style.display = 'none';
+                                                                            }}
+                                                                            />
+                                                                            <div style={{
+                                                                                position: 'absolute',
+                                                                                bottom: 0,
+                                                                                left: 0,
+                                                                                right: 0,
+                                                                                padding: '8px',
+                                                                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                                                                color: 'white',
+                                                                                textAlign: 'center'
+                                                                            }}>
+                                                                                <div style={{ fontSize: '12px', fontWeight: '600' }}>
+                                                                                    Booth: {boothNumber}
+                                                                                </div>
+                                                                            </div>
+                                                                        </>
+                                                                    ) : (
+                                                                        <div style={{
                                                                             width: '100%',
-                                                                            height: '140px',
-                                                                            objectFit: 'cover',
-                                                                            display: 'block'
-                                                                        }}
-                                                                        onError={(e) => {
-                                                                            console.error('Image failed to load:', imageSrc);
-                                                                            e.target.style.display = 'none';
-                                                                        }}
-                                                                    />
-
-                                                                    {/* Image Controls */}
-                                                                    <div
-                                                                        style={{
-                                                                            position: 'absolute',
-                                                                            top: '8px',
-                                                                            right: '8px',
+                                                                            height: '120px',
                                                                             display: 'flex',
-                                                                            gap: '4px'
-                                                                        }}
-                                                                    >
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="danger"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleRemoveEventStampImage(index);
-                                                                            }}
-                                                                            style={{
-                                                                                padding: '4px 8px',
-                                                                                fontSize: '12px',
-                                                                                borderRadius: '50%',
-                                                                                width: '28px',
-                                                                                height: '28px',
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                justifyContent: 'center'
-                                                                            }}
-                                                                        >
-                                                                            ×
-                                                                        </Button>
-                                                                    </div>
-
-                                                                    {/* Image Info */}
-                                                                    <div
+                                                                            flexDirection: 'column',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            backgroundColor: '#e9ecef',
+                                                                            padding: '10px'
+                                                                        }}>
+                                                                            <i className="fas fa-image fa-2x text-muted mb-2"></i>
+                                                                            <div style={{ fontSize: '12px', fontWeight: '600', textAlign: 'center', color: '#6c757d' }}>
+                                                                                Booth: {boothNumber}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    <Button
+                                                                        variant="danger"
+                                                                        size="sm"
+                                                                        onClick={() => handleRemoveExistingStamp(stamp.id)}
                                                                         style={{
                                                                             position: 'absolute',
-                                                                            bottom: '0',
-                                                                            left: '0',
-                                                                            right: '0',
-                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
-                                                                            color: 'white',
-                                                                            padding: '6px 8px',
-                                                                            fontSize: '11px',
-                                                                            textAlign: 'center',
-                                                                            whiteSpace: 'nowrap',
-                                                                            overflow: 'hidden',
-                                                                            textOverflow: 'ellipsis'
+                                                                            top: '5px',
+                                                                            right: '5px',
+                                                                            padding: '2px 6px',
+                                                                            fontSize: '10px',
+                                                                            borderRadius: '50%',
+                                                                            width: '24px',
+                                                                            height: '24px',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center'
                                                                         }}
                                                                     >
-                                                                        {isExistingImage
-                                                                            ? 'Existing'
-                                                                            : `${(image.size / 1024 / 1024).toFixed(1)}MB`}
-                                                                    </div>
-
-                                                                    {/* Image Index Badge */}
-                                                                    <div
-                                                                        style={{
-                                                                            position: 'absolute',
-                                                                            top: '8px',
-                                                                            left: '8px',
-                                                                            backgroundColor: 'rgba(0,0,0,0.8)',
-                                                                            color: 'white',
-                                                                            padding: '4px 8px',
-                                                                            borderRadius: '12px',
-                                                                            fontSize: '11px',
-                                                                            fontWeight: 'bold',
-                                                                            minWidth: '20px',
-                                                                            textAlign: 'center'
-                                                                        }}
-                                                                    >
-                                                                        {index + 1}
-                                                                    </div>
+                                                                        ×
+                                                                    </Button>
                                                                 </div>
                                                             );
                                                         })}
                                                     </div>
                                                 </div>
                                             )}
+                                            
+                                            <div style={{ marginTop: '15px' }}>
+                                                <Badge bg="info">
+                                                    <span>New Stamps: {newStamps.length} | Existing: {existingStamps.length}</span>
+                                                </Badge>
+                                            </div>
                                         </div>
                                     </Col>
 
@@ -3006,6 +3170,24 @@ function AddEventPage() {
                         <br />
                         <span className="text-muted" style={{ fontSize: '0.9em' }}>
                             <strong>Note:</strong> This speaker will be removed from all programme sessions and engagements. The sessions and engagements will remain, but without this speaker.
+                        </span>
+                    </>
+                }
+            />
+
+            <DeleteConfirmationModal
+                show={showStampDeleteModal}
+                onHide={handleCancelDeleteStamp}
+                onConfirm={handleConfirmDeleteStamp}
+                isLoading={isDeletingStamp}
+                title="Delete Event Stamp"
+                message={
+                    <>
+                        Are you sure you want to delete this event stamp?
+                        <br />
+                        <br />
+                        <span className="text-danger" style={{ fontSize: '0.85em' }}>
+                        <strong>Note:</strong> This action cannot be undone and will also delete the associated image file.
                         </span>
                     </>
                 }

@@ -66,7 +66,7 @@ export class FileUploadUtils {
             destinationPath = './uploads/event/floorPlan';
             break;
           case 'eventStampImages':
-            destinationPath = './uploads/eventStamps/images';
+            destinationPath = './uploads/eventStamps';
             break;
           case 'backgroundImage':
             destinationPath = './uploads/event/background';
@@ -170,7 +170,7 @@ export class FileUploadUtils {
     }
 
     if (files.eventStampImages && files.eventStampImages.length > 0) {
-      result.eventStampImages = files.eventStampImages.map(file => `uploads/eventStamps/images/${file.filename}`);
+      result.eventStampImages = files.eventStampImages.map(file => `uploads/eventStamps/${file.filename}`);
     }
 
     if (files.backgroundImage && files.backgroundImage.length > 0) {
@@ -222,7 +222,7 @@ export class FileUploadUtils {
       case 'floorPlan':
         return './uploads/event/floorPlan';
       case 'eventStampImages':
-        return './uploads/eventStamps/images';
+        return './uploads/eventStamps';
       case 'backgroundImage':
         return './uploads/event/background';
       default:

@@ -17,6 +17,10 @@ import { EventService } from '../event/event.service';
 import { UserEntity, UserRole } from '../user/users.entity';
 import { Event } from '../event/event.entity';
 import { ExhibitorUtils } from '../utils/exhibitor.utils';
+import { ExcelExportUtils } from '../utils/excel-export.utils';
+import { EventStamp } from '../event/event-stamp.entity';
+import { EventStampEvent } from '../event/event-stamp-event.entity';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class ExhibitorService {
@@ -35,6 +39,10 @@ export class ExhibitorService {
     private eventRepository: Repository<Event>,
     @InjectRepository(BoothBanner)
     private boothBannerRepository: Repository<BoothBanner>,
+    @InjectRepository(EventStamp)
+    private eventStampRepository: Repository<EventStamp>,
+    @InjectRepository(EventStampEvent)
+    private eventStampEventRepository: Repository<EventStampEvent>,
     private readonly errorHandler: ErrorHandlerService,
     @Inject(forwardRef(() => EventService))
     private eventService: EventService,
@@ -104,6 +112,125 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Exhibitor creation');
+    }
+  }
+
+  /**
+   * Auto-create stamp for exhibitor when created
+   * Creates a stamp for each event the exhibitor is associated with (if stamp feature is enabled)
+   * Can also be called when an exhibitor is associated with an event after creation
+   */
+  async autoCreateStampForExhibitor(exhibitor: Exhibitor | string, eventId?: string): Promise<void> {
+    try {
+      // Get exhibitor if ID is provided
+      let exhibitorEntity: Exhibitor | null;
+      if (typeof exhibitor === 'string') {
+        exhibitorEntity = await this.exhibitorRepository.findOne({
+          where: { id: exhibitor },
+        });
+        if (!exhibitorEntity) {
+          return;
+        }
+      } else {
+        exhibitorEntity = exhibitor;
+      }
+
+      // Get EventExhibitor repository
+      const { EventExhibitor } = await import('../event/event.entity');
+      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+
+      // Find events this exhibitor is associated with
+      let eventExhibitors: any[];
+      if (eventId) {
+        // If specific event ID is provided, only check that event
+        const eventExhibitor = await eventExhibitorRepository.findOne({
+          where: { exhibitorId: exhibitorEntity.id, eventId },
+          relations: ['event'],
+        });
+        eventExhibitors = eventExhibitor ? [eventExhibitor] : [];
+      } else {
+        // Find all events this exhibitor is associated with
+        eventExhibitors = await eventExhibitorRepository.find({
+          where: { exhibitorId: exhibitorEntity.id },
+          relations: ['event'],
+        });
+      }
+
+      if (!eventExhibitors || eventExhibitors.length === 0) {
+        // Exhibitor not associated with any events yet, skip stamp creation
+        return;
+      }
+
+      // Process each event
+      for (const eventExhibitor of eventExhibitors) {
+        if (!eventExhibitor.event) {
+          continue;
+        }
+
+        const event = eventExhibitor.event;
+
+        // Check if stamp feature is enabled for this event
+        // Stamp feature is enabled if tabVisibility.stamps is not explicitly false
+        const isStampFeatureEnabled = event.tabVisibility?.stamps !== false;
+
+        if (!isStampFeatureEnabled) {
+          continue;
+        }
+
+        // Check if stamp already exists for this exhibitor and event
+        // We'll use boothNumber as the name, so check if a stamp with that name already exists
+        const stampName = exhibitorEntity.boothNumber || exhibitorEntity.companyName || 'Exhibitor Stamp';
+        
+        // Check if stamp with this name already exists for this event
+        const existingStamps = await this.eventStampEventRepository.find({
+          where: { eventId: event.id },
+          relations: ['eventStamp'],
+        });
+
+        const existingStamp = existingStamps.find(
+          (ese) => ese.eventStamp.name === stampName
+        );
+
+        if (existingStamp) {
+          // Stamp already exists, skip
+          continue;
+        }
+
+        // Determine stamp image: use logo if available, otherwise use default from existing stamps
+        let stampImage: string | undefined = exhibitorEntity.logo;
+
+        if (!stampImage) {
+          // Find an existing stamp from this event to use as default
+          const eventStamps = existingStamps
+            .map((ese) => ese.eventStamp)
+            .filter((stamp) => stamp.image);
+
+          if (eventStamps.length > 0) {
+            // Use the first existing stamp's image as default
+            stampImage = eventStamps[0].image;
+          }
+        }
+
+        // Create the stamp
+        const newStamp = this.eventStampRepository.create({
+          name: stampName,
+          image: stampImage,
+        });
+
+        const savedStamp = await this.eventStampRepository.save(newStamp);
+
+        // Associate stamp with the event
+        const stampEvent = this.eventStampEventRepository.create({
+          eventId: event.id,
+          eventStampId: savedStamp.id,
+        });
+
+        await this.eventStampEventRepository.save(stampEvent);
+      }
+    } catch (error) {
+      // Log error but don't throw - we don't want to fail exhibitor creation if stamp creation fails
+      console.error('Error in autoCreateStampForExhibitor:', error);
+      throw error;
     }
   }
 
@@ -418,8 +545,31 @@ export class ExhibitorService {
       // Note: boothBanner cleanup is handled in updateExhibitorBoothBanner method
       await ExhibitorFileUtils.cleanupRemovedFiles(existingExhibitor, exhibitorDto, this.errorHandler);
       
+      // Check if logo is being added or changed
+      const oldLogo = existingExhibitor.logo || '';
+      const newLogo = exhibitorDto.logo || '';
+      const logoIsChanged = oldLogo.trim() !== newLogo.trim() && newLogo.trim() !== '';
+      
       Object.assign(existingExhibitor, exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(existingExhibitor);
+      
+      // If logo is being added or changed, update all stamps for this exhibitor
+      if (logoIsChanged && exhibitorDto.logo) {
+        try {
+          if (oldLogo.trim() === '') {
+            console.log(`🔄 [EXHIBITOR UPDATE] Logo added for exhibitor ${id}, updating stamps...`);
+          } else {
+            console.log(`🔄 [EXHIBITOR UPDATE] Logo changed for exhibitor ${id}, updating stamps...`);
+            console.log(`   [EXHIBITOR UPDATE] Old logo: ${oldLogo}`);
+            console.log(`   [EXHIBITOR UPDATE] New logo: ${exhibitorDto.logo}`);
+          }
+          await this.updateStampsWithLogo(id, exhibitorDto.logo);
+          console.log(`✅ [EXHIBITOR UPDATE] All stamps updated with new logo`);
+        } catch (stampUpdateError) {
+          // Log error but don't fail exhibitor update if stamp update fails
+          console.error(`❌ [EXHIBITOR UPDATE] Failed to update stamps with logo:`, stampUpdateError);
+        }
+      }
 
       // Update booth banners if provided - adds new banners to existing ones
       if (boothBannersToSave !== undefined) {
@@ -484,6 +634,37 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Exhibitor update');
+    }
+  }
+
+  /**
+   * Update all stamps for an exhibitor with their logo
+   * Called when logo is added to an exhibitor that previously didn't have one
+   */
+  private async updateStampsWithLogo(exhibitorId: string, logoPath: string): Promise<void> {
+    try {
+      const { EventStamp } = await import('../event/event-stamp.entity');
+      const eventStampRepository = this.exhibitorRepository.manager.getRepository(EventStamp);
+      
+      // Find ALL stamps for this exhibitor (not just ones without images)
+      // We want to update ALL stamps when logo changes
+      const allStamps = await eventStampRepository.find({
+        where: { exhibitorId: exhibitorId },
+      });
+      
+      if (allStamps.length > 0) {
+         // Update ALL stamps with the new logo (regardless of current image)
+        await eventStampRepository.update(
+          { exhibitorId: exhibitorId },
+          { image: logoPath }
+        );
+        
+         } else {
+        console.log(`ℹ️ [STAMP UPDATE] No stamps found for exhibitor ${exhibitorId}`);
+       }
+    } catch (error) {
+      console.error(`❌ [STAMP UPDATE] Error updating stamps with logo:`, error);
+      throw error;
     }
   }
 
@@ -1487,10 +1668,38 @@ export class ExhibitorService {
         };
       }).sort((a, b) => b.count - a.count); // Sort by count descending for display
 
-      // Get total stamps issued for this event
-      const stampsIssued = await exhibitorStampRepository.count({
-        where: { eventId: eventId },
-      });
+      // Get exhibitor-specific stamp issues count (new system - UserStampVisit)
+      // Count how many stamps this exhibitor has issued (assigned to attendees)
+      let stampsIssued = 0;
+      if (userStaffRecord.exhibitorId) {
+        const { EventStamp } = await import('../event/event-stamp.entity');
+        const { EventStampEvent } = await import('../event/event-stamp-event.entity');
+        const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+        
+        const eventStampRepository = this.exhibitorRepository.manager.getRepository(EventStamp);
+        const eventStampEventRepository = this.exhibitorRepository.manager.getRepository(EventStampEvent);
+        const userStampVisitRepository = this.exhibitorRepository.manager.getRepository(UserStampVisit);
+
+        // Find stamp for this exhibitor in this event
+        const eventStamps = await eventStampEventRepository.find({
+          where: { eventId: eventId },
+          relations: ['eventStamp'],
+        });
+
+        const exhibitorStamp = eventStamps.find(
+          (ese) => ese.eventStamp.exhibitorId === userStaffRecord.exhibitorId
+        );
+
+        if (exhibitorStamp && exhibitorStamp.eventStamp) {
+          // Count how many times this stamp has been assigned (isVisited = true)
+          stampsIssued = await userStampVisitRepository.count({
+            where: {
+              stampId: exhibitorStamp.eventStamp.id,
+              isVisited: true,
+            },
+          });
+        }
+      }
 
       // Get total number of registered attendees for percentage calculation
       // Formula: (Total Leads / Total Registered Attendees) * 100
@@ -1578,7 +1787,7 @@ export class ExhibitorService {
         leadsCollected: {
           totalLeadsCount,
           leadsCollectedPercentage,
-          stampsIssued,
+          stampsIssued, // Stamps issued by this exhibitor (new system - UserStampVisit)
           leadsByStaff: leadsByStaffData,
         },
         boothProfileStatistics: {
@@ -1595,6 +1804,54 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Event report statistics retrieval');
+    }
+  }
+
+
+  /**
+   * Export event statistics to Excel format (legacy method - kept for compatibility)
+   */
+  async exportEventStatisticsToExcel(eventId: string, userId: string): Promise<ExcelJS.Workbook> {
+    try {
+      // Get statistics data
+      const statistics = await this.getEventReportStatistics(eventId, userId);
+      return ExcelExportUtils.createStatisticsExcel(statistics);
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Event statistics Excel export');
+      throw error;
+    }
+  }
+
+  /**
+   * Stream ZIP file with Statistics and Lead Collection Excel files to response
+   */
+  async streamExcelZipToResponse(
+    eventId: string,
+    userId: string,
+    response: any,
+    zipFileName: string,
+  ): Promise<void> {
+    try {
+      // Get statistics data
+      const statistics = await this.getEventReportStatistics(eventId, userId);
+
+      // Use utility to stream ZIP file
+      await ExcelExportUtils.streamExcelZipToResponse(statistics, response, zipFileName);
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Excel ZIP file streaming');
+      throw error;
     }
   }
 
@@ -2858,6 +3115,132 @@ export class ExhibitorService {
         throw error;
       }
       this.errorHandler.handleDatabaseError(error, 'Get exhibitor ratings');
+    }
+  }
+
+  /**
+   * Assign stamp to an attendee
+   * When exhibitor assigns stamp to an attendee, marks isVisited = true for the stamp in the attendee's registered event
+   * @param eventId Event ID
+   * @param attendeeId Attendee (User) ID
+   * @param exhibitorUserId Logged-in exhibitor user ID
+   * @returns Success status and updated stamp info
+   */
+  async assignStampToAttendee(
+    eventId: string,
+    attendeeId: string,
+    exhibitorUserId: string,
+  ): Promise<{ success: boolean; message: string; data: { stampId?: string; eventId: string; attendeeId: string } }> {
+    try {
+      // Get exhibitor ID from logged-in user
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      
+      // Find current exhibitor association for logged-in user
+      const currentEventStaff = await eventStaffRepository.findOne({
+        where: {
+          userId: exhibitorUserId,
+          isCurrent: true,
+        },
+      });
+
+      if (!currentEventStaff || !currentEventStaff.exhibitorId) {
+        throw new ForbiddenException('You must be associated with an exhibitor to assign stamps');
+      }
+
+      const exhibitorId = currentEventStaff.exhibitorId;
+      console.log(`🔄 [STAMP ASSIGN] Exhibitor ${exhibitorId} assigning stamp to attendee ${attendeeId} for event ${eventId}`);
+
+      // Check if attendee is registered for this event
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      
+      const registration = await registerEventRepository.findOne({
+        where: {
+          userId: attendeeId,
+          eventId: eventId,
+          isRegister: true,
+        },
+      });
+
+      if (!registration) {
+        return {
+          success: false,
+          message: 'Attendee is not registered for this event',
+          data: { eventId, attendeeId },
+        };
+      }
+
+      console.log(`✅ [STAMP ASSIGN] Attendee ${attendeeId} is registered for event ${eventId}`);
+
+      // Get EventStamp repository
+      const { EventStamp } = await import('../event/event-stamp.entity');
+      const { EventStampEvent } = await import('../event/event-stamp-event.entity');
+      const eventStampRepository = this.exhibitorRepository.manager.getRepository(EventStamp);
+      const eventStampEventRepository = this.exhibitorRepository.manager.getRepository(EventStampEvent);
+
+      // Find stamp for this exhibitor in this event
+      const eventStamps = await eventStampEventRepository.find({
+        where: { eventId: eventId },
+        relations: ['eventStamp'],
+      });
+
+      // Find stamp with matching exhibitorId
+      const exhibitorStamp = eventStamps.find(
+        (ese) => ese.eventStamp.exhibitorId === exhibitorId
+      );
+
+      if (!exhibitorStamp || !exhibitorStamp.eventStamp) {
+        return {
+          success: false,
+          message: 'No stamp found for this exhibitor in this event',
+          data: { eventId, attendeeId },
+        };
+      }
+
+      // Create or update user-specific stamp visit record
+      const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+      const userStampVisitRepository = this.exhibitorRepository.manager.getRepository(UserStampVisit);
+      
+      // Check if visit record already exists
+      let visitRecord = await userStampVisitRepository.findOne({
+        where: {
+          userId: attendeeId,
+          stampId: exhibitorStamp.eventStamp.id,
+        },
+      });
+
+      if (visitRecord) {
+        // Update existing record
+        visitRecord.isVisited = true;
+        await userStampVisitRepository.save(visitRecord);
+      } else {
+        // Create new visit record
+        visitRecord = userStampVisitRepository.create({
+          userId: attendeeId,
+          stampId: exhibitorStamp.eventStamp.id,
+          isVisited: true,
+        });
+        await userStampVisitRepository.save(visitRecord);
+      }
+
+      console.log(`✅ [STAMP ASSIGN] Successfully assigned stamp ${exhibitorStamp.eventStamp.id} to attendee ${attendeeId} for event ${eventId}`);
+
+      return {
+        success: true,
+        message: 'Stamp assigned successfully',
+        data: {
+          stampId: exhibitorStamp.eventStamp.id,
+          eventId: eventId,
+          attendeeId: attendeeId,
+        },
+      };
+    } catch (error) {
+      console.error(`❌ [STAMP ASSIGN] Error assigning stamp to attendee:`, error);
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Stamp assignment to attendee');
     }
   }
 }

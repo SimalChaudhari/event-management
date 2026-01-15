@@ -48,6 +48,8 @@ import {
 import { QnaUtils } from '../utils/qna.utils';
 import { FilterService } from '../service/filter.service';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { EventStampService } from './event-stamp.service';
+import { EventStampEvent } from './event-stamp-event.entity';
 
 @Injectable()
 export class EventService {
@@ -96,11 +98,14 @@ export class EventService {
     private feedbackRepository: Repository<Feedback>,
     @InjectRepository(ExhibitorRating)
     private exhibitorRatingRepository: Repository<ExhibitorRating>,
+    @InjectRepository(EventStampEvent)
+    private eventStampEventRepository: Repository<EventStampEvent>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
     private readonly qnaUtils: QnaUtils,
     private readonly filterService: FilterService,
+    private readonly eventStampService: EventStampService,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -235,6 +240,25 @@ export class EventService {
             }
           }),
         );
+      }
+
+      // Handle event stamps - create new stamps and associate existing ones
+      const allStampIds: string[] = [];
+      
+      // Create new stamps if provided
+      if (eventDto.newStamps && eventDto.newStamps.length > 0) {
+        const newStamps = await this.eventStampService.createMultiple(eventDto.newStamps);
+        allStampIds.push(...newStamps.map(stamp => stamp.id));
+      }
+      
+      // Add existing stamp IDs
+      if (eventDto.eventStampIds && eventDto.eventStampIds.length > 0) {
+        allStampIds.push(...eventDto.eventStampIds);
+      }
+      
+      // Associate stamps to event
+      if (allStampIds.length > 0) {
+        await this.eventStampService.associateStampsToEvent(savedEvent.id, allStampIds);
       }
 
       return savedEvent;
@@ -591,12 +615,13 @@ export class EventService {
           const speakers = EventSpeakerUtils.buildSpeakerSchedule(event);
 
 
+          // Get event stamps from new structure
+          const eventStamps = await this.eventStampService.getStampsByEventId(event.id);
+
           const {
             eventSpeakers,
             category,
             eventExhibitors,
-            eventStampDescription,
-            eventStampImages,
             documents, // Remove original documents
             documentNames, // Remove original documentNames
             ...eventData
@@ -628,6 +653,9 @@ export class EventService {
 
           const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
           
+          // Extract eventStampDescription from event directly
+          const eventStampDescription = event.eventStampDescription;
+          
 
           // Format programme tracks with basic speaker info using utility
           const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
@@ -641,8 +669,13 @@ export class EventService {
             color: getEventColor(event.type),
             documents: formattedDocuments,
             eventStamps: {
-              description: event.eventStampDescription,
-              images: event.eventStampImages,
+              description: eventStampDescription || '',
+              stamps: eventStamps.map(stamp => ({
+                id: stamp.id,
+                boothNumber: stamp.name, // name field contains booth number
+                exhibitorId: stamp.exhibitorId || null,
+                image: stamp.image,
+              })),
             },
             attendanceCount: attendanceCount,
             surveyDetails: surveyDetails,
@@ -994,10 +1027,11 @@ export class EventService {
         }));
       }
 
+      // Get event stamps from new structure
+      const eventStamps = await this.eventStampService.getStampsByEventId(id);
+
       const {
         exhibitorDescription,
-        eventStampDescription,
-        eventStampImages,
         surveys,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
@@ -1054,9 +1088,15 @@ export class EventService {
         categories: category?.map((ec) => ec.category) || [],
         documents: formattedDocuments, // New formatted documents
         eventStamps: {
-          description: event.eventStampDescription,
-          images: event.eventStampImages,
+          description: eventData.eventStampDescription || '',
+          stamps: eventStamps.map(stamp => ({
+            id: stamp.id,
+            boothNumber: stamp.name, // name field contains booth number
+            exhibitorId: stamp.exhibitorId || null,
+            image: stamp.image,
+          })),
         },
+       
         exhibitors: {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: exhibitorsWithBoothCodes,
@@ -1133,11 +1173,95 @@ export class EventService {
       // Coordinate validations
       this.validateCoordinates(eventDto);
 
-      Object.assign(event, eventDto);
+      // Remove stamp-related fields from eventDto before assigning
+      const { eventStampIds, newStamps, ...eventDtoWithoutStamps } = eventDto;
+      
+      Object.assign(event, eventDtoWithoutStamps);
       const updatedEvent = await this.eventRepository.save(event);
 
       // Update associations if provided
       await this.updateEventAssociations(id, eventDto);
+
+      // Handle event stamps - create new stamps and associate existing ones
+      // Only process if stamps are explicitly provided (not undefined)
+      const hasStampUpdates = eventStampIds !== undefined || newStamps !== undefined;
+      
+      if (hasStampUpdates) {
+        const allStampIds: string[] = [];
+        
+        // Create new stamps if provided
+        if (newStamps && Array.isArray(newStamps) && newStamps.length > 0) {
+          try {
+            // Filter out stamps without names
+            const validStamps = newStamps.filter(stamp => stamp && stamp.name && stamp.name.trim().length > 0);
+            if (validStamps.length > 0) {
+              const createdStamps = await this.eventStampService.createMultiple(validStamps);
+              allStampIds.push(...createdStamps.map(stamp => stamp.id));
+            }
+          } catch (error: any) {
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            throw new ValidationException('Failed to create new event stamps: ' + errorMessage);
+          }
+        }
+        
+        // Validate and add existing stamp IDs
+        if (eventStampIds && Array.isArray(eventStampIds) && eventStampIds.length > 0) {
+          // Flatten the array in case of nested arrays and filter out invalid IDs
+          const flattenedIds: any[] = eventStampIds.flat(Infinity);
+          const validIds: string[] = [];
+          
+          for (const id of flattenedIds) {
+            // Handle if ID is a stringified array or object
+            if (typeof id === 'string') {
+              // Try to parse if it looks like JSON
+              try {
+                const parsed = JSON.parse(id);
+                // If parsed result is an array, add each element
+                if (Array.isArray(parsed)) {
+                  validIds.push(...parsed.map((item: any) => String(item).trim()).filter((item: string) => item.length > 0));
+                } else {
+                  // If it's a valid UUID string, add it
+                  const trimmed = id.trim();
+                  if (trimmed.length > 0) {
+                    validIds.push(trimmed);
+                  }
+                }
+              } catch {
+                // Not JSON, add as is if valid
+                const trimmed = id.trim();
+                if (trimmed.length > 0) {
+                  validIds.push(trimmed);
+                }
+              }
+            } else if (typeof id === 'string' && id.trim().length > 0) {
+              // If it's already a valid string, add it
+              validIds.push(id.trim());
+            }
+          }
+          
+          // Remove duplicates and filter to valid UUIDs (36 chars)
+          const uniqueIds = [...new Set(validIds)].filter(id => id.length === 36);
+          
+          // Validate that all stamp IDs exist
+          for (const stampId of uniqueIds) {
+            try {
+              const trimmedId = String(stampId).trim();
+              await this.eventStampService.findOne(trimmedId);
+              allStampIds.push(trimmedId);
+            } catch (error: any) {
+              // Only throw if it's a NotFoundException, otherwise log and continue
+              if (error?.name === 'NotFoundException' || error?.constructor?.name === 'NotFoundException') {
+                throw new ValidationException(`Event stamp with ID "${stampId}" not found`);
+              }
+              // Log other errors but don't fail the update
+              console.error(`Error validating event stamp ID ${stampId}:`, error);
+            }
+          }
+        }
+        
+        // Associate stamps to event (this will replace existing associations)
+        await this.eventStampService.associateStampsToEvent(id, allStampIds);
+      }
 
       return updatedEvent;
     } catch (error) {
@@ -1211,7 +1335,7 @@ export class EventService {
       // 14. Programme tracks are deleted automatically via cascade (which includes engagements)
 
       // Delete associated files
-      this.deleteEventFiles(event);
+      await this.deleteEventFiles(event);
 
       // Finally, delete the event itself
       await this.eventRepository.remove(event);
@@ -1301,25 +1425,6 @@ export class EventService {
     }
   }
 
-  async updateEventStampImages(
-    id: string,
-    eventStampImages: string[],
-  ): Promise<Partial<Event>> {
-    try {
-      const event = await this.eventRepository.findOne({ where: { id } });
-      if (!event) {
-        throw new ResourceNotFoundException('Event', id);
-      }
-
-      event.eventStampImages = eventStampImages;
-      return await this.eventRepository.save(event);
-    } catch (error) {
-      if (error instanceof ResourceNotFoundException) {
-        throw error;
-      }
-      throw this.errorHandler.handleDatabaseError(error, 'Event stamp images update');
-    }
-  }
 
   async updateEventFloorPlan(
     id: string,
@@ -1831,7 +1936,7 @@ export class EventService {
     return EmailUtils.formatDateForEmail(date);
   }
 
-  private deleteEventFiles(event: Event) {
+  private async deleteEventFiles(event: Event) {
     try {
       // Delete multiple images if they exist
       if (event.images && event.images.length > 0) {
@@ -1869,15 +1974,8 @@ export class EventService {
         }
       }
 
-      // Delete event stamp images if they exist
-      if (event.eventStampImages && event.eventStampImages.length > 0) {
-        event.eventStampImages.forEach((imagePath) => {
-          const filePath = path.resolve(imagePath);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        });
-      }
+      // Delete event stamp associations (stamps themselves are not deleted, only associations)
+      await this.eventStampEventRepository.delete({ eventId: event.id });
     } catch (fileError) {
       this.errorHandler.logError(fileError, 'Event file deletion', event.id);
       // Continue with event deletion even if file deletion fails

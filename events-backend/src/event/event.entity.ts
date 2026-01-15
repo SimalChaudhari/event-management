@@ -21,6 +21,7 @@ import { EventBooth } from './event-booth.entity';
 import { EventStaff } from './event-staff.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
+import { EventStampEvent } from './event-stamp-event.entity';
 
 export enum EventType {
   Physical = 'Physical',
@@ -66,6 +67,9 @@ export class Event {
 
   @Column({ type: 'varchar', nullable: true })
   exhibitorDescription?: string;
+
+  @Column({ type: 'text', nullable: true })
+  eventStampDescription?: string;
 
   @Column({ type: 'varchar', nullable: true })
   venue?: string;
@@ -139,17 +143,13 @@ export class Event {
   })
   surveys!: Survey[];
 
-  // Event Stamp relationship
-  @Column({ type: 'text', nullable: true })
-  eventStampDescription?: string;
-
-
   @Column({ type: 'boolean', default: false })
   enableLuckyDrawFeature!: boolean;
 
+  // Event Stamp relationship - many-to-many through EventStampEvent
+  @OneToMany(() => EventStampEvent, (eventStampEvent) => eventStampEvent.event)
+  eventStampEvents!: EventStampEvent[];
 
-  @Column('simple-array', { nullable: true })
-  eventStampImages?: string[];
   // Exhibitor relationship
   @OneToMany(() => EventExhibitor, (eventExhibitor) => eventExhibitor.event)
   eventExhibitors!: EventExhibitor[];

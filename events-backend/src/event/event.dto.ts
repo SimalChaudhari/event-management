@@ -8,8 +8,12 @@ import {
   Matches,
   Validate,
   IsUUID,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
 import { Column } from 'typeorm';
+import { Type } from 'class-transformer';
+import { CreateEventStampDto } from './event-stamp.dto';
 
 // Custom validator for time format
 class IsTimeFormat {
@@ -74,6 +78,10 @@ export class EventDto {
 
   @IsOptional()
   @IsString()
+  eventStampDescription?: string;
+
+  @IsOptional()
+  @IsString()
   venue?: string;
 
   @IsOptional()
@@ -123,17 +131,21 @@ export class EventDto {
   @IsString()
   backgroundImage?: string;
 
-    // Event Stamp fields
-    @IsOptional()
-    @IsString()
-    eventStampDescription?: string;
-  
-    @IsOptional()
-    eventStampImages?: string[];
+  // Event Stamp fields - use stamp IDs instead of images
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  eventStampIds?: string[]; // Array of existing stamp IDs to associate
 
-    @IsOptional()
-    @Column('simple-array', { nullable: true })
-    documents?: string[];
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateEventStampDto)
+  newStamps?: CreateEventStampDto[]; // New stamps to create during event creation
+
+  @IsOptional()
+  @Column('simple-array', { nullable: true })
+  documents?: string[];
   
     // Add this new field for document names
     @IsOptional()
@@ -161,7 +173,6 @@ export class EventDto {
 
   originalImages: any;
   originalDocuments: any;
-  originalEventStampImages: any;
   originalFloorPlan: any;
   originalDocumentNames: any; // Add this line
   originalBackgroundImage: any;

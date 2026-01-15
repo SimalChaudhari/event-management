@@ -27,12 +27,14 @@ import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { EventModule } from '../event/event.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem, EventStaff, ExhibitorRating]), UtilsModule,
         EngagementModule,
         CheckoutModule,
+        EventModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

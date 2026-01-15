@@ -77,8 +77,33 @@ export class EventController {
         eventDto.images = fileProcessing.processedFiles.images;
       }
 
+      // Parse JSON strings from FormData for stamps
+      if (eventDto.eventStampIds && typeof eventDto.eventStampIds === 'string') {
+        try {
+          eventDto.eventStampIds = JSON.parse(eventDto.eventStampIds);
+        } catch (e) {
+          eventDto.eventStampIds = [];
+        }
+      }
+
+      if (eventDto.newStamps && typeof eventDto.newStamps === 'string') {
+        try {
+          eventDto.newStamps = JSON.parse(eventDto.newStamps);
+        } catch (e) {
+          eventDto.newStamps = [];
+        }
+      }
+
+      // Handle new stamps creation - process stamp images if provided
       if (fileProcessing.processedFiles?.eventStampImages && fileProcessing.processedFiles.eventStampImages.length > 0) {
-        eventDto.eventStampImages = fileProcessing.processedFiles.eventStampImages;
+        // If newStamps array is provided, add image paths to each stamp
+        if (eventDto.newStamps && Array.isArray(eventDto.newStamps)) {
+          // Match images to stamps by index (assuming same order)
+          eventDto.newStamps = eventDto.newStamps.map((stamp, index) => ({
+            ...stamp,
+            image: fileProcessing.processedFiles.eventStampImages[index] || stamp.image,
+          }));
+        }
       }
 
       if (fileProcessing.processedFiles?.documents && fileProcessing.processedFiles.documents.length > 0) {
@@ -457,37 +482,70 @@ export class EventController {
         eventDto.floorPlan = eventDto.originalFloorPlan;
       }
 
-      // Handle event stamp images - combine existing and new images
-      const allEventStampImages = [];
-      
-      // Add existing event stamp images from originalEventStampImages field
-      if (eventDto.originalEventStampImages) {
-        const originalEventStampImages = Array.isArray(eventDto.originalEventStampImages) 
-          ? eventDto.originalEventStampImages 
-          : [eventDto.originalEventStampImages];
-        allEventStampImages.push(...originalEventStampImages);
+      // Parse JSON strings from FormData for stamps
+      if (eventDto.eventStampIds !== undefined) {
+        let stampIdsValue: string | string[] | any = eventDto.eventStampIds;
+        
+        if (typeof stampIdsValue === 'string') {
+          const stampIdsStr: string = stampIdsValue;
+          try {
+            const parsed = JSON.parse(stampIdsStr);
+            // Ensure it's an array
+            stampIdsValue = Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            // If parsing fails, try to treat as comma-separated string
+            if (stampIdsStr.includes(',')) {
+              stampIdsValue = stampIdsStr.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+            } else {
+              // Single ID or empty
+              stampIdsValue = stampIdsStr.trim().length > 0 ? [stampIdsStr.trim()] : [];
+            }
+          }
+        } else if (!Array.isArray(stampIdsValue)) {
+          // If it's not a string and not an array, convert to array
+          stampIdsValue = [];
+        }
+        // Ensure all IDs are strings and filter out empty values
+        if (Array.isArray(stampIdsValue)) {
+          eventDto.eventStampIds = stampIdsValue
+            .map((id: any) => String(id).trim())
+            .filter((id: string) => id.length > 0);
+        } else {
+          eventDto.eventStampIds = [];
+        }
       }
-      
-             // Add new uploaded event stamp images
-       if (files.eventStampImages && files.eventStampImages.length > 0) {
-         // Validate new event stamp images before processing
-         const eventStampValidation = FileUploadUtils.validateUploadedFiles({ eventStampImages: files.eventStampImages });
-         if (!eventStampValidation.isValid) {
-           // Clean up invalid event stamp images immediately
-           FileUploadUtils.cleanupUploadedFiles({ eventStampImages: files.eventStampImages });
-           throw new BadRequestException(`Event stamp image validation failed: ${eventStampValidation.errors.join(', ')}`);
-         }
-         
-         const newEventStampImages = files.eventStampImages.map(
-           (img) => `uploads/eventStamps/images/${img.filename}`,
-         );
-         allEventStampImages.push(...newEventStampImages);
-       }
-       
-       // Set the combined event stamp images
-       if (allEventStampImages.length > 0) {
-         eventDto.eventStampImages = allEventStampImages;
-       }
+
+      if (eventDto.newStamps && typeof eventDto.newStamps === 'string') {
+        try {
+          eventDto.newStamps = JSON.parse(eventDto.newStamps);
+        } catch (e) {
+          // If parsing fails, treat as empty array
+          eventDto.newStamps = [];
+        }
+      }
+
+      // Handle new stamps creation - process stamp images if provided
+      if (files.eventStampImages && files.eventStampImages.length > 0) {
+        // Validate new event stamp images before processing
+        const eventStampValidation = FileUploadUtils.validateUploadedFiles({ eventStampImages: files.eventStampImages });
+        if (!eventStampValidation.isValid) {
+          // Clean up invalid event stamp images immediately
+          FileUploadUtils.cleanupUploadedFiles({ eventStampImages: files.eventStampImages });
+          throw new BadRequestException(`Event stamp image validation failed: ${eventStampValidation.errors.join(', ')}`);
+        }
+        
+        // If newStamps array is provided, add image paths to each stamp
+        if (eventDto.newStamps && Array.isArray(eventDto.newStamps)) {
+          // Match images to stamps by index (assuming same order)
+          const newEventStampImages = files.eventStampImages.map(
+            (img) => `uploads/eventStamps/${img.filename}`,
+          );
+          eventDto.newStamps = eventDto.newStamps.map((stamp, index) => ({
+            ...stamp,
+            image: newEventStampImages[index] || stamp.image,
+          }));
+        }
+      }
 
        // Handle background image - single image only
        if (files.backgroundImage && files.backgroundImage.length > 0) {
@@ -672,36 +730,35 @@ export class EventController {
     }
   }
 
-    // Remove individual event stamp image
-    @Delete('event-stamps/images/:id')
+    // Remove event stamp association (not the stamp itself, just the association)
+    @Delete('event-stamps/:eventId/:stampId')
     @Roles(UserRole.Admin)
-    async removeEventStampImage(
-      @Param('id') id: string,
-      @Body() body: { imagePath: string },
+    async removeEventStampAssociation(
+      @Param('eventId') eventId: string,
+      @Param('stampId') stampId: string,
       @Res() response: Response,
       @Request() req: any,
     ) {
       try {
-        const event = await this.eventService.getEventEntityById(id);
-        const { imagePath } = body;
-
-        if (!event.eventStampImages || !event.eventStampImages.includes(imagePath)) {
-          throw new ResourceNotFoundException('Event stamp image', 'in this event');
+        const event = await this.eventService.getEventEntityById(eventId);
+        if (!event) {
+          throw new ResourceNotFoundException('Event', eventId);
         }
 
-        // Remove image from filesystem
-        const fullPath = path.join(__dirname, '..', '..', imagePath);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
+        // Get current stamps for this event
+        const eventStampService = this.eventService['eventStampService'];
+        const currentStamps = await eventStampService.getStampsByEventId(eventId);
+        const updatedStampIds = currentStamps
+          .filter(stamp => stamp.id !== stampId)
+          .map(stamp => stamp.id);
 
-        const updatedEventStampImages = event.eventStampImages.filter(img => img !== imagePath);
-        await this.eventService.updateEventStampImages(id, updatedEventStampImages);
+        // Update associations
+        await eventStampService.associateStampsToEvent(eventId, updatedStampIds);
 
         const successResponse: SuccessResponse = {
           success: true,
-          message: 'Event stamp image removed successfully',
-          data: { eventStampImages: updatedEventStampImages },
+          message: 'Event stamp association removed successfully',
+          data: { eventStampIds: updatedStampIds },
           metadata: {
             timestamp: new Date().toISOString(),
           },
@@ -709,7 +766,7 @@ export class EventController {
 
         return response.status(HttpStatus.OK).json(successResponse);
       } catch (error) {
-        this.errorHandler.logError(error, 'Event stamp image removal', req.user?.id);
+        this.errorHandler.logError(error, 'Event stamp association removal', req.user?.id);
         throw error;
       }
     }

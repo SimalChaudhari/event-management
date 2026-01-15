@@ -15,10 +15,13 @@ import { ErrorHandlerService } from 'utils/services/error-handler.service';
 import { EmailService } from '../service/email.service';
 import { AuthModule } from '../auth/auth.module';
 import { FilterModule } from '../service/filter.module';
+import { EventStamp } from '../event/event-stamp.entity';
+import { EventStampEvent } from '../event/event-stamp-event.entity';
+import { Exhibitor } from '../exhibitor/exhibitor.entity';
 
 @Module({
     imports: [
-      TypeOrmModule.forFeature([UserEntity, AddressEntity, SpeakerProfile, Event]),
+      TypeOrmModule.forFeature([UserEntity, AddressEntity, SpeakerProfile, Event, EventStamp, EventStampEvent, Exhibitor]),
       JwtModule.register({
         secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
         signOptions: { }, // Set your token expiration

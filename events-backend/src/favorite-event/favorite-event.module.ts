@@ -13,11 +13,13 @@ import { Engagement } from '../engagement/engagement.entity';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { UtilsModule } from 'utils/utils.module';
+import { EventModule } from '../event/event.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FavoriteEvent, Event, UserEntity,
      RegisterEvent, EventAgenda, Engagement, EventStaff, ExhibitorRating]),
      UtilsModule,
+     EventModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration

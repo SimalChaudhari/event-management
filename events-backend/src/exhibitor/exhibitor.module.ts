@@ -13,10 +13,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { EventModule } from '../event/event.module';
 import { UserEntity } from '../user/users.entity';
 import { Event } from '../event/event.entity';
+import { EventStamp } from '../event/event-stamp.entity';
+import { EventStampEvent } from '../event/event-stamp-event.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Exhibitor, ExhibitorLead, ExhibitorView, ExhibitorRating, BoothBanner, UserEntity, Event]),
+        TypeOrmModule.forFeature([Exhibitor, ExhibitorLead, ExhibitorView, ExhibitorRating, BoothBanner, UserEntity, Event, EventStamp, EventStampEvent]),
         JwtModule.register({
             secret: process.env.JWT_SECRET,
             signOptions: { },

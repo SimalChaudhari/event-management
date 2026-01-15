@@ -42,7 +42,15 @@ async function bootstrap() {
     app.useGlobalFilters(new GlobalExceptionFilter());
     // app.useGlobalPipes(new ValidationPipe());
 
-    app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
+    // Serve static files from uploads directory
+    const uploadsPath = join(__dirname, '..', 'uploads');
+    // Check if uploads directory exists
+    if (!fs.existsSync(uploadsPath)) {
+      console.warn(`⚠️ Uploads directory does not exist: ${uploadsPath}`);
+      fs.mkdirSync(uploadsPath, { recursive: true });
+    }
+    
+    app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
 
     app.enableCors({
       origin: '*', // ✅ change to your real frontend

@@ -3,10 +3,15 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventService } from './event.service';
 import { EventController } from './event.controller';
+import { EventStampService } from './event-stamp.service';
+import { EventStampController } from './event-stamp.controller';
 import { Event, EventExhibitor } from './event.entity';
 import { EventBooth } from './event-booth.entity';
 import { EventStaff } from './event-staff.entity';
 import { EventAgenda } from '../agenda/agenda.entity';
+import { EventStamp } from './event-stamp.entity';
+import { EventStampEvent } from './event-stamp-event.entity';
+import { UserStampVisit } from './user-stamp-visit.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EventCategory, EventSpeaker } from './event-speaker.entity';
 import { UserEntity } from '../user/users.entity';
@@ -68,6 +73,9 @@ import { FilterModule } from '../service/filter.module';
         ProgrammeSession,
         ProgrammeTrack,
         ExhibitorRating,
+        EventStamp,
+        EventStampEvent,
+        UserStampVisit,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({
@@ -79,8 +87,8 @@ import { FilterModule } from '../service/filter.module';
       ProgrammeModule,
       FilterModule, // Import FilterModule for pagination
     ],
-    providers: [EventService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
-    controllers: [EventController],
-    exports: [EventService],
+    providers: [EventService, EventStampService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
+    controllers: [EventController, EventStampController],
+    exports: [EventService, EventStampService],
 })
 export class EventModule {}

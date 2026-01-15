@@ -16,6 +16,8 @@ import { AgendaUtils } from '../utils/agenda.utils';
 import { Engagement } from '../engagement/engagement.entity';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { EventStampService } from '../event/event-stamp.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 @Injectable()
 export class FavoriteEventService {
@@ -40,6 +42,8 @@ export class FavoriteEventService {
     private exhibitorRatingRepository: Repository<ExhibitorRating>,
 
     private readonly surveyUtils: SurveyUtils,
+    @Inject(forwardRef(() => EventStampService))
+    private readonly eventStampService: EventStampService,
   ) {}
 
   // Private helper method for formatting documents
@@ -213,16 +217,18 @@ export class FavoriteEventService {
           registerEventId = registration?.id || null;
         }
 
+        // Get event stamps from new structure
+        const eventStamps = await this.eventStampService.getStampsByEventId(favorite.eventId);
+
         const {
           eventSpeakers,
           documents,
           exhibitorDescription,
           documentNames,
-          eventStampDescription,
-          eventStampImages,
           category,
           eventExhibitors,
           programmeTracks,
+          eventStampDescription,
           ...eventData
         } = favorite.event;
 
@@ -252,8 +258,13 @@ export class FavoriteEventService {
             programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
             engagements: engagements,
             eventStamps: {
-              description: favorite.event.eventStampDescription,
-              images: favorite.event.eventStampImages,
+              description: eventStampDescription || '',
+              stamps: eventStamps.map(stamp => ({
+                id: stamp.id,
+                boothNumber: stamp.name, // name field contains booth number
+                exhibitorId: stamp.exhibitorId || null,
+                image: stamp.image,
+              })),
             },
             exhibitorsData: {
               exhibitorDescription: exhibitorDescription || '',

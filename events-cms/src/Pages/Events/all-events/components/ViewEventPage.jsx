@@ -92,25 +92,74 @@ const ViewEventPage = () => {
     });
     const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
 
+    // Get image source - defined before useEffect to avoid hoisting issues
+    const getImageSrc = (image) => {
+        
+        if (!image) {
+            console.log('⚠️ getImageSrc - No image provided');
+            return '';
+        }
+        
+        if (typeof image === 'string') {
+            if (image.startsWith('http')) {
+                console.log('✅ getImageSrc - Already a full URL:', image);
+                return image;
+            } else {
+                // Normalize path: remove leading/trailing slashes and backslashes
+                let normalizedPath = image.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+                
+                // Backend stores paths as "uploads/eventStamps/xxx.png"
+                // Backend serves static files from "uploads" folder with prefix "/uploads/"
+                // So "uploads/eventStamps/xxx.png" should be accessed as "/uploads/eventStamps/xxx.png"
+                // We don't need to remove the "uploads/" prefix, just use it as is
+                
+                // Ensure API_URL doesn't have trailing slash
+                const baseUrl = API_URL.replace(/\/+$/, '');
+                const finalUrl = `${baseUrl}/${normalizedPath}`;
+              
+                return finalUrl;
+            }
+        }
+        
+        return '';
+    };
+
     useEffect(() => {
         dispatch(eventById(id)).then((res) => {
-            setEventData(res?.data);
+            const eventData = res?.data;
+            setEventData(eventData);
+            
+            // Debug: Log each stamp's image path
+            if (eventData?.eventStamps && Array.isArray(eventData.eventStamps)) {
+                console.log('📋 ViewEventPage - Processing eventStamps array:', {
+                    count: eventData.eventStamps.length,
+                    stamps: eventData.eventStamps
+                });
+                
+                eventData.eventStamps.forEach((stamp, idx) => {
+                    const generatedUrl = stamp.image ? getImageSrc(stamp.image) : 'NO IMAGE';
+                   
+                });
+            } else {
+               console.log('📋 ViewEventPage - No event stamps found');
+            }
+
 
             // Initialize tab visibility settings from event data
-            if (res?.data?.tabVisibility) {
+            if (eventData?.tabVisibility) {
                 setTabVisibilitySettings({
-                    speakers: res.data.tabVisibility.speakers !== false,
-                    documents: res.data.tabVisibility.documents !== false,
-                    floorplan: res.data.tabVisibility.floorplan !== false,
-                    gallery: res.data.tabVisibility.gallery !== false,
-                    stamps: res.data.tabVisibility.stamps !== false,
-                    survey: res.data.tabVisibility.survey !== false,
-                    exhibitors: res.data.tabVisibility.exhibitors !== false,
-                    categories: res.data.tabVisibility.categories !== false,
-                    agenda: res.data.tabVisibility.agenda !== false,
-                    programme: res.data.tabVisibility.programme !== false,
-                    engagement: res.data.tabVisibility.engagement !== false,
-                    adminInfo: res.data.tabVisibility.adminInfo !== false
+                    speakers: eventData.tabVisibility.speakers !== false,
+                    documents: eventData.tabVisibility.documents !== false,
+                    floorplan: eventData.tabVisibility.floorplan !== false,
+                    gallery: eventData.tabVisibility.gallery !== false,
+                    stamps: eventData.tabVisibility.stamps !== false,
+                    survey: eventData.tabVisibility.survey !== false,
+                    exhibitors: eventData.tabVisibility.exhibitors !== false,
+                    categories: eventData.tabVisibility.categories !== false,
+                    agenda: eventData.tabVisibility.agenda !== false,
+                    programme: eventData.tabVisibility.programme !== false,
+                    engagement: eventData.tabVisibility.engagement !== false,
+                    adminInfo: eventData.tabVisibility.adminInfo !== false
                 });
             }
 
@@ -235,18 +284,6 @@ const ViewEventPage = () => {
         );
     };
 
-    // Get image source
-    const getImageSrc = (image) => {
-        if (typeof image === 'string') {
-            if (image.startsWith('http')) {
-                return image;
-            } else {
-                return `${API_URL}/${image.replace(/\\/g, '/')}`;
-            }
-        }
-        return '';
-    };
-
     // Navigation functions for event images modal
     const goToPreviousEventImage = () => {
         setCurrentEventImageIndex((prevIndex) => (prevIndex === 0 ? eventImages.length - 1 : prevIndex - 1));
@@ -291,9 +328,24 @@ const ViewEventPage = () => {
 
     // Handle stamp image click
     const handleStampImageClick = (index) => {
-        setStampImages(eventData.eventStamps.images);
-        setCurrentStampImageIndex(index);
-        setShowStampImageModal(true);
+        // Handle both new structure { description, stamps: [...] } and old structure (array)
+        let stamps = [];
+        if (eventData.eventStamps) {
+            if (Array.isArray(eventData.eventStamps)) {
+                stamps = eventData.eventStamps;
+            } else if (eventData.eventStamps.stamps && Array.isArray(eventData.eventStamps.stamps)) {
+                stamps = eventData.eventStamps.stamps;
+            }
+        }
+        
+        if (stamps.length > 0) {
+            const stampImages = stamps
+                .map(stamp => stamp.image)
+                .filter(Boolean);
+            setStampImages(stampImages);
+            setCurrentStampImageIndex(index);
+            setShowStampImageModal(true);
+        }
     };
 
     // 12-hour AM/PM format helper
@@ -353,7 +405,13 @@ const ViewEventPage = () => {
             case 'floorplan':
                 return eventData.floorPlan && eventData.floorPlan.length > 0;
             case 'stamps':
-                return eventData.eventStamps && eventData.eventStamps.length > 0;
+                // Handle both new structure { description, stamps: [...] } and old structure (array)
+                if (Array.isArray(eventData.eventStamps)) {
+                    return eventData.eventStamps && eventData.eventStamps.length > 0;
+                } else if (eventData.eventStamps && eventData.eventStamps.stamps) {
+                    return eventData.eventStamps.stamps && eventData.eventStamps.stamps.length > 0;
+                }
+                return false;
             case 'categories':
                 return eventData.categories && eventData.categories.length > 0;
             case 'agenda':

@@ -75,9 +75,12 @@ export class TabVisibilityFilterUtil {
     // Remove event stamps if stamps tab is disabled
     if (event.tabVisibility.stamps === false) {
       console.log('🚫 Removing stamps for event:', event.id);
-      filteredEvent.eventStamps = null;
-      filteredEvent.eventStampImages = [];
-      filteredEvent.eventStampDescription = null;
+      // Handle both new structure { description, stamps: [...] } and old structure (array)
+      if (Array.isArray(filteredEvent.eventStamps)) {
+        filteredEvent.eventStamps = [];
+      } else if (filteredEvent.eventStamps && typeof filteredEvent.eventStamps === 'object') {
+        filteredEvent.eventStamps = { description: '', stamps: [] };
+      }
     }
 
     // Remove documents if documents tab is disabled

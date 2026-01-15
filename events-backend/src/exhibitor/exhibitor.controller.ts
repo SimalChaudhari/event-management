@@ -1597,6 +1597,47 @@ export class ExhibitorController {
   }
 
   /**
+   * Download event statistics as Excel file
+   * Exports: event statistics, leads by staff, views over time
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('report/event/statistics/:eventId/download')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async downloadEventStatisticsExcel(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      // Get event name for filename - sanitize for filename
+      const statistics = await this.exhibitorService.getEventReportStatistics(eventId, userId);
+      const eventName = statistics.event.name
+        .replace(/[^a-z0-9]/gi, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .toLowerCase() || 'event';
+      const dateStr = new Date().toISOString().split('T')[0];
+      const zipFileName = `event_reports_${eventName}_${dateStr}.zip`;
+
+      // Create ZIP file and stream to response
+      await this.exhibitorService.streamExcelZipToResponse(eventId, userId, response, zipFileName);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event statistics Excel download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Scan attendee QR code to collect lead
    * Exhibitor scans attendee's QR code to collect their contact details as a lead
    * Access: Admin and Exhibitor users only
@@ -1700,6 +1741,62 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Manual lead creation', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Assign stamp to an attendee (GET - Parameters in URL)
+   * When exhibitor assigns stamp to an attendee, marks isVisited = true for the stamp in the attendee's registered event
+   * URL format: /api/exhibitors/assign-stamp/:attendeeId?eventId=xxx
+   * Access: Admin and Exhibitor users only
+   * Exhibitor ID is automatically determined from the logged-in user's current association
+   */
+  @Get('assign-stamp/:attendeeId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async assignStamp(
+    @Param('attendeeId', ParseUUIDPipe) attendeeId: string,
+    @Query('eventId') eventId: string | undefined,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const exhibitorUserId = req.user?.id;
+
+      if (!exhibitorUserId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!attendeeId) {
+        throw new BadRequestException('Missing required field: attendeeId');
+      }
+
+      if (!eventId) {
+        throw new BadRequestException('Missing required field: eventId');
+      }
+
+      const result = await this.exhibitorService.assignStampToAttendee(
+        eventId,
+        attendeeId,
+        exhibitorUserId,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success as any,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Stamp assignment', req.user?.id);
       throw error;
     }
   }

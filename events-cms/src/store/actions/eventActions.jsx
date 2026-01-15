@@ -442,6 +442,24 @@ export const eventGetStamp = () => async (dispatch) => {
     }
 };
 
+export const deleteEventStamp = (stampId) => async (dispatch) => {
+    try {
+        setEventLoading(dispatch, true);
+        const response = await axiosInstance.delete(`/event-stamps/${stampId}`);
+        if (response && response.status >= 200 && response.status < 300) {
+            toast.success('Event stamp deleted successfully!');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message || 'Failed to delete event stamp';
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        setEventLoading(dispatch, false);
+    }
+};
+
 export const removeEventStampImage = (eventId, imagePath) => async (dispatch) => {
     try {
         const response = await axiosInstance.delete(`/events/event-stamps/images/${eventId}`, {

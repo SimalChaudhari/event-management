@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, MoreThanOrEqual, In } from 'typeorm';
 import { RegisterEvent } from './registerEvent.entity';
 import {
   CreateRegisterEventDto,
@@ -36,6 +36,8 @@ import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { CheckoutUtils } from '../utils/checkout.utils';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { EventStampService } from '../event/event-stamp.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -92,6 +94,8 @@ export class RegisterEventService {
     private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
+    @Inject(forwardRef(() => EventStampService))
+    private readonly eventStampService: EventStampService,
   ) {}
 
   async createRegisterEvent(
@@ -514,16 +518,36 @@ export class RegisterEventService {
               ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
               : [];
 
+            // Get event stamps from new structure
+            const eventStamps = registerEvent.eventId 
+              ? await this.eventStampService.getStampsByEventId(registerEvent.eventId)
+              : [];
+
+            // Get user-specific stamp visits for this user
+            const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+            const userStampVisitRepository = this.registerEventRepository.manager.getRepository(UserStampVisit);
+            
+            const userStampVisits = await userStampVisitRepository.find({
+              where: {
+                userId: userId,
+                isVisited: true,
+              },
+            });
+
+            // Create a map of stampId -> isVisited for quick lookup
+            const stampVisitMap = new Map(
+              userStampVisits.map(visit => [visit.stampId, visit.isVisited])
+            );
+
             const {
               eventSpeakers,
               category,
               eventExhibitors,
               exhibitorDescription,
-              eventStampDescription,
               documents,
               documentNames,
-              eventStampImages,
               programmeTracks,
+              eventStampDescription,
               ...restEvent
             } = registerEvent.event || {};
 
@@ -538,8 +562,14 @@ export class RegisterEventService {
               engagements: engagements,
               programmeTracks: formattedProgrammeTracks,
               eventStamps: {
-                description: registerEvent.event?.eventStampDescription,
-                images: registerEvent.event?.eventStampImages,
+                description: eventStampDescription || '',
+                stamps: eventStamps.map(stamp => ({
+                  id: stamp.id,
+                  boothNumber: stamp.name, // name field contains booth number
+                  exhibitorId: stamp.exhibitorId || null,
+                  image: stamp.image,
+                  isVisited: stampVisitMap.get(stamp.id) || false, // Check user-specific visit status
+                })),
               },
               exhibitorsData: {
                 exhibitorDescription: exhibitorDescription || '',
@@ -906,17 +936,42 @@ export class RegisterEventService {
         ? await this.engagementService.getEngagementsByEvent(registerEvent.eventId) 
         : [];
 
+      // Get event stamps from new structure
+      const eventStamps = registerEvent.eventId 
+        ? await this.eventStampService.getStampsByEventId(registerEvent.eventId)
+        : [];
+
+      // Get user-specific stamp visits for this user (only for stamps in this event)
+      const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+      const userStampVisitRepository = this.registerEventRepository.manager.getRepository(UserStampVisit);
+      
+      // Optimize: Only query visits for stamps that belong to this event
+      const eventStampIds = eventStamps.map(stamp => stamp.id);
+      const userStampVisits = eventStampIds.length > 0
+        ? await userStampVisitRepository.find({
+            where: {
+              userId: userId,
+              stampId: eventStampIds.length === 1 ? eventStampIds[0] : In(eventStampIds),
+            },
+          })
+        : [];
+
+      // Create a map of stampId -> isVisited for quick lookup
+      // Include all records (both true and false) to properly track visit status
+      const stampVisitMap = new Map(
+        userStampVisits.map(visit => [visit.stampId, visit.isVisited])
+      );
+
       // Clean up event object
       const {
         eventSpeakers,
         category,
         eventExhibitors,
         exhibitorDescription,
-        eventStampDescription,
-        eventStampImages,
         documents, // Remove original documents
         documentNames, // Remove original documentNames
         programmeTracks,
+        eventStampDescription,
         ...restEvent
       } = registerEvent.event || {};
 
@@ -931,8 +986,15 @@ export class RegisterEventService {
         programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
         engagements: engagements,
         eventStamps: {
-          description: registerEvent.event?.eventStampDescription,
-          images: registerEvent.event?.eventStampImages,
+          description: eventStampDescription || '',
+          stamps: eventStamps.map(stamp => ({
+            id: stamp.id,
+            name: stamp.name,
+            boothNumber: stamp.name, // name field contains booth number
+            exhibitorId: stamp.exhibitorId || null,
+            image: stamp.image,
+            isVisited: stampVisitMap.get(stamp.id) || false, // Check user-specific visit status
+          })),
         },
         exhibitorsData: {
           exhibitorDescription: exhibitorDescription || '',

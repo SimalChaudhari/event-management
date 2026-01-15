@@ -27,7 +27,7 @@ const MainCard = (props) => {
     let cardClass = [];
     if (data.isOption) {
         cardHeaderRight = (<div className="card-header-right">
-                <Dropdown alignRight={true} className="btn-group card-option">
+                <Dropdown align="end" className="btn-group card-option">
                     <Dropdown.Toggle id="dropdown-basic" className="btn-icon">
                         <i className="feather icon-more-horizontal"/>
                     </Dropdown.Toggle>

@@ -54,14 +54,14 @@ const NavRight = (props) => {
                     <Dropdown 
                     drop={!props.rtlLayout ? 'left' : 'right'}
                      className="dropdown" 
-                     alignRight={!props.rtlLayout}
+                     align={!props.rtlLayout ? 'end' : 'start'}
                      show={showDropdown}
                      onToggle={(isOpen) => setShowDropdown(isOpen)}
                      >
                         <Dropdown.Toggle variant={'link'} id="dropdown-basic">
                             <i className="icon feather icon-user" />
                         </Dropdown.Toggle>
-                        <Dropdown.Menu alignRight className="profile-notification">
+                        <Dropdown.Menu align="end" className="profile-notification">
                             <div className="pro-head bg-dark">
                                 <img src={profilePicPath} className="img-radius" alt="User Profile" />
                                 <span>{fullName}</span>
