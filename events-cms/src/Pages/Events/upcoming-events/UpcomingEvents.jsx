@@ -10,6 +10,7 @@ import { eventDelete } from '../../../store/actions/eventActions';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
+import ImageViewModal from '../../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import FilterComponent from '../../../components/common/FilterComponent';
@@ -25,7 +26,7 @@ import { EVENT_FILTER_LIST, UPCOMING_EVENT_LIST, EVENT_LOADING } from '../../../
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
-function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, restoreTablePage, ajaxParams = {}, dispatch = null) {
+function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, restoreTablePage, ajaxParams = {}, dispatch = null, handleImageClick = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
 
@@ -33,7 +34,12 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
     const columns = [
         {
             data: 'name',
+            orderable: true,
             render: function (data, type, row) {
+                // Return raw name value for sorting
+                if (type === 'sort' || type === 'type') {
+                    return row.name || '';
+                }
                 const imageUrl = DUMMY_PATH;
                 const eventDate = new Date(row.startDate);
                 const today = new Date();
@@ -60,9 +66,17 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
                     statusText = `in ${daysUntilEvent} days`;
                 }
 
+                // Return formatted HTML for display
+                const eventImageUrl = row.images ? `${API_URL}/${row.images[0]}` : imageUrl;
                 return `
                     <div class="d-inline-block align-middle">
-                        <img src="${row.image ? `${API_URL}/${row.image}` : imageUrl}" alt="user" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                        <span class="event-image-clickable" data-image-url="${eventImageUrl}" title="Click to view image">
+                            <img src="${eventImageUrl}" alt="event" class="img-radius align-top m-r-15" 
+                                 style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s; cursor: pointer;" 
+                                 onerror="this.src='${imageUrl}';"
+                                 onmouseover="this.style.opacity='0.8'"
+                                 onmouseout="this.style.opacity='1'">
+                        </span>
                         <div class="d-inline-block">
                             <p class="m-b-0">
                                 <h6>${row.name}</h6>
@@ -197,6 +211,15 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
                 $('#addUpcomingEventBtn').on('click', handleAdd);
             }
 
+            // Add event listener for clickable event image
+            $(tableZero + ' tbody').off('click', '.event-image-clickable').on('click', '.event-image-clickable', function (e) {
+                e.stopPropagation(); // Prevent event bubbling
+                const imageUrl = $(this).data('image-url');
+                if (imageUrl && handleImageClick) {
+                    handleImageClick(imageUrl);
+                }
+            });
+
             // Add event listeners for action buttons
             $(tableZero + ' tbody').off('click', '.view-btn').on('click', '.view-btn', function () {
                 const table = $(tableZero).DataTable();
@@ -261,6 +284,8 @@ const UpcomingEvents = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
     const tableRef = useRef(null);
 
     // Transform filter events data to match FilterComponent format
@@ -360,7 +385,9 @@ const UpcomingEvents = () => {
     const destroyTable = useCallback(() => {
         if (tableRef.current) {
             tableRef.current.off('page.dt');
-            $('#data-table-zero').off('click', '.delete-btn');
+            const tableSelector = '#data-table-zero';
+            $(tableSelector + ' tbody').off('click', '.event-image-clickable');
+            $(tableSelector).off('click', '.delete-btn');
             tableRef.current.destroy();
             tableRef.current = null;
             setCurrentTable(null);
@@ -378,6 +405,13 @@ const UpcomingEvents = () => {
 
     const handleQA = useCallback((data) => {
         // Handle Q&A navigation if needed
+    }, []);
+
+    const handleImageClick = useCallback((imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
     }, []);
 
     const initializeTable = useCallback(() => {
@@ -399,14 +433,14 @@ const UpcomingEvents = () => {
                 return params;
             };
             
-            const table = upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, restoreTablePage, ajaxParams, dispatch);
+            const table = upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, restoreTablePage, ajaxParams, dispatch, handleImageClick);
             tableRef.current = table;
             setCurrentTable(table);
         } catch (error) {
             // Error initializing upcoming events table
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleQA]);
+    }, [destroyTable, handleAdd, handleEdit, handleDelete, handleView, handleQA, handleImageClick]);
 
     // Track previous URL to detect filter changes vs pagination changes
     const prevUrlRef = useRef(location.search);
@@ -495,6 +529,16 @@ const UpcomingEvents = () => {
                 onConfirm={handleConfirmDelete}
                 isLoading={isDeleting}
             />
+
+            {/* Event Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Event Image"
+                downloadFileName={`event-image-${Date.now()}.jpg`}
+            />
+
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">

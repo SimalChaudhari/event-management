@@ -1807,6 +1807,560 @@ export class ExhibitorService {
     }
   }
 
+  /**
+   * Get events list with total attendees for reports (Admin only)
+   * Returns simplified list of events with attendee counts
+   */
+  async getEventsListForReports(
+    filters?: {
+      page?: number;
+      limit?: number;
+      keyword?: string;
+      eventId?: string;
+      startDate?: string;
+      endDate?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    try {
+      const { Event } = await import('../event/event.entity');
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const { EventExhibitor } = await import('../event/event.entity');
+
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const keyword = filters?.keyword;
+      const eventId = filters?.eventId;
+      const startDate = filters?.startDate;
+      const endDate = filters?.endDate;
+      const sortBy = filters?.sortBy || 'startDate';
+      const sortOrder = filters?.sortOrder || 'DESC';
+
+      // Build query
+      const queryBuilder = eventRepository.createQueryBuilder('event');
+
+      // Track if we've added a WHERE clause
+      let hasWhereClause = false;
+
+      // Apply eventId filter (exact match)
+      if (eventId) {
+        queryBuilder.where('event.id = :eventId', { eventId });
+        hasWhereClause = true;
+      }
+
+      // Apply date range filters
+      if (startDate) {
+        if (hasWhereClause) {
+          queryBuilder.andWhere('event.startDate >= :startDate', { startDate });
+        } else {
+          queryBuilder.where('event.startDate >= :startDate', { startDate });
+          hasWhereClause = true;
+        }
+      }
+
+      if (endDate) {
+        if (hasWhereClause) {
+          queryBuilder.andWhere('event.endDate <= :endDate', { endDate });
+        } else {
+          queryBuilder.where('event.endDate <= :endDate', { endDate });
+          hasWhereClause = true;
+        }
+      }
+
+      // Apply keyword search
+      if (keyword) {
+        if (hasWhereClause) {
+          queryBuilder.andWhere(
+            '(LOWER(event.name) LIKE :keyword OR LOWER(event.location) LIKE :keyword)',
+            { keyword: `%${keyword.toLowerCase()}%` },
+          );
+        } else {
+          queryBuilder.where(
+            '(LOWER(event.name) LIKE :keyword OR LOWER(event.location) LIKE :keyword)',
+            { keyword: `%${keyword.toLowerCase()}%` },
+          );
+          hasWhereClause = true;
+        }
+      }
+
+      // Apply sorting - default: recent dates first (DESC = newest to oldest)
+      if (sortBy === 'name') {
+        queryBuilder.orderBy('event.name', sortOrder);
+      } else if (sortBy === 'startDate') {
+        // Sort by startDate - DESC means recent dates first (newest to oldest)
+        queryBuilder.orderBy('event.startDate', sortOrder || 'DESC');
+      } else if (sortBy === 'totalAttendees') {
+        // Will sort after getting data, but still order by date DESC for recent first
+        queryBuilder.orderBy('event.startDate', 'DESC');
+      } else {
+        // Default: sort by startDate DESC (recent dates first)
+        queryBuilder.orderBy('event.startDate', sortOrder || 'DESC');
+      }
+
+      // Get total count
+      const total = await queryBuilder.getCount();
+
+      // Apply pagination
+      let events: any[];
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        events = await queryBuilder.skip(skip).take(limit).getMany();
+      } else {
+        events = await queryBuilder.getMany();
+      }
+
+      // Get event IDs
+      const eventIds = events.map(e => e.id);
+
+      // Get total attendees for each event
+      const allRegistrations = await registerEventRepository.find({
+        where: eventIds.map(id => ({
+          eventId: id,
+          type: 'Attendee',
+          isRegister: true,
+        })),
+      });
+
+      // Get exhibitor counts for each event
+      const allEventExhibitors = await eventExhibitorRepository.find({
+        where: eventIds.map(id => ({ eventId: id })),
+        relations: ['exhibitor'],
+      });
+
+      // Build response data
+      const eventsData = events.map(event => {
+        const totalAttendees = allRegistrations.filter(
+          reg => reg.eventId === event.id
+        ).length;
+
+        const exhibitorCount = allEventExhibitors.filter(
+          ee => ee.eventId === event.id && ee.exhibitor?.isActive
+        ).length;
+
+        return {
+          id: event.id,
+          name: event.name,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          images: event.images || [], // Include images array
+          totalAttendees,
+          exhibitorCount,
+        };
+      });
+
+      // Sort by totalAttendees if needed
+      if (sortBy === 'totalAttendees') {
+        eventsData.sort((a, b) => {
+          if (sortOrder === 'ASC') {
+            return a.totalAttendees - b.totalAttendees;
+          } else {
+            return b.totalAttendees - a.totalAttendees;
+          }
+        });
+      }
+
+      // Return with pagination
+      if (hasPagination) {
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+
+        return {
+          data: eventsData,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+        };
+      } else {
+        return {
+          data: eventsData,
+        };
+      }
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'Events list for reports retrieval');
+      return { data: [] };
+    }
+  }
+
+  /**
+   * Get all exhibitor reports with their associated events (Admin only)
+   * Returns list of all exhibitors with their events and report statistics
+   */
+  async getAllExhibitorReports(
+    exhibitorId?: string,
+    eventId?: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+    },
+  ): Promise<{
+    data: any[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    try {
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const { Event } = await import('../event/event.entity');
+      const { EventExhibitor } = await import('../event/event.entity');
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+      const { EventStamp } = await import('../event/event-stamp.entity');
+      const { EventStampEvent } = await import('../event/event-stamp-event.entity');
+
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      const userStampVisitRepository = this.exhibitorRepository.manager.getRepository(UserStampVisit);
+      const eventStampRepository = this.exhibitorRepository.manager.getRepository(EventStamp);
+      const eventStampEventRepository = this.exhibitorRepository.manager.getRepository(EventStampEvent);
+
+      // Build query to get exhibitor-event associations
+      const queryBuilder = eventExhibitorRepository
+        .createQueryBuilder('eventExhibitor')
+        .leftJoinAndSelect('eventExhibitor.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('eventExhibitor.event', 'event')
+        .where('exhibitor.isActive = :isActive', { isActive: true });
+
+      // Apply filters
+      if (exhibitorId) {
+        queryBuilder.andWhere('exhibitor.id = :exhibitorId', { exhibitorId });
+      }
+      if (eventId) {
+        queryBuilder.andWhere('event.id = :eventId', { eventId });
+      }
+
+      const eventExhibitors = await queryBuilder.getMany();
+
+      // If no associations found, return empty result with pagination
+      if (!eventExhibitors || eventExhibitors.length === 0) {
+        const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+        if (hasPagination) {
+          return {
+            data: [],
+            pagination: {
+              page: filters?.page || 1,
+              limit: filters?.limit || 10,
+              total: 0,
+              totalPages: 0,
+              hasNext: false,
+              hasPrev: false,
+            },
+          };
+        } else {
+          return { data: [] };
+        }
+      }
+
+      // Get all unique exhibitor IDs and event IDs
+      const exhibitorIds = [...new Set(eventExhibitors.map(ee => ee.exhibitorId).filter(Boolean))];
+      const eventIds = [...new Set(eventExhibitors.map(ee => ee.eventId).filter(Boolean))];
+
+      // Get all EventStaff records for these exhibitors and events
+      let allEventStaff: any[] = [];
+      if (exhibitorIds.length > 0 && eventIds.length > 0) {
+        const eventStaffQuery = eventStaffRepository
+          .createQueryBuilder('eventStaff')
+          .leftJoinAndSelect('eventStaff.user', 'user')
+          .where('eventStaff.exhibitorId IN (:...exhibitorIds)', { exhibitorIds })
+          .andWhere('eventStaff.eventId IN (:...eventIds)', { eventIds });
+        
+        allEventStaff = await eventStaffQuery.getMany();
+      }
+
+      // Get all stamps for these events
+      let eventStamps: any[] = [];
+      if (eventIds.length > 0) {
+        eventStamps = await eventStampEventRepository.find({
+          where: eventIds.map(id => ({ eventId: id })),
+          relations: ['eventStamp'],
+        });
+      }
+
+      // Get all leads for these events with attendee and scanner relations
+      let allLeads: any[] = [];
+      if (eventIds.length > 0) {
+        allLeads = await this.exhibitorLeadRepository.find({
+          where: eventIds.map(id => ({ eventId: id, isActive: true })),
+          relations: ['attendee', 'scanner', 'exhibitor'],
+        });
+      }
+
+      // Get all views for these events
+      let allViews: any[] = [];
+      if (eventIds.length > 0) {
+        allViews = await this.exhibitorViewRepository.find({
+          where: eventIds.map(id => ({ eventId: id, isActive: true })),
+        });
+      }
+
+      // Get all ratings for these events
+      let allRatings: any[] = [];
+      if (eventIds.length > 0) {
+        allRatings = await this.exhibitorRatingRepository.find({
+          where: eventIds.map(id => ({ eventId: id, isActive: true })),
+        });
+      }
+
+      // Get total attendees for each event
+      let allRegistrations: any[] = [];
+      if (eventIds.length > 0) {
+        allRegistrations = await registerEventRepository.find({
+          where: eventIds.map(id => ({ 
+            eventId: id, 
+            type: 'Attendee', 
+            isRegister: true 
+          })),
+        });
+      }
+
+      // Build reports array
+      const reports: any[] = [];
+
+      for (const eventExhibitor of eventExhibitors) {
+        const currentEventId = eventExhibitor.eventId;
+        const currentExhibitorId = eventExhibitor.exhibitorId;
+
+        if (!currentEventId || !currentExhibitorId) continue;
+
+        // Get event details
+        const event = eventExhibitor.event;
+        if (!event) continue;
+
+        // Get exhibitor details
+        const exhibitor = eventExhibitor.exhibitor;
+        if (!exhibitor) continue;
+
+        // Get leads for this exhibitor in this event
+        const exhibitorLeads = allLeads.filter(
+          lead => lead.eventId === currentEventId && lead.exhibitorId === currentExhibitorId
+        );
+        const totalLeadsCount = exhibitorLeads.length;
+
+        // Format attendee details - ONLY for attendees scanned by THIS exhibitor
+        // Note: totalAttendees is the total registered attendees for the EVENT (used for percentage calculation)
+        // But attendees list only contains attendees scanned by THIS exhibitor
+        const attendeeDetails = exhibitorLeads.map(lead => ({
+          id: lead.id,
+          attendee: {
+            id: lead.attendeeId,
+            firstName: lead.attendee?.firstName || '',
+            lastName: lead.attendee?.lastName || '',
+            email: lead.attendee?.email || '',
+            mobile: lead.attendee?.mobile || '',
+            company: lead.attendee?.company || '',
+            designation: lead.attendee?.designation || '',
+            profilePicture: lead.attendee?.profilePicture || null,
+          },
+          scanner: {
+            id: lead.scannedBy,
+            firstName: lead.scanner?.firstName || '',
+            lastName: lead.scanner?.lastName || '',
+            email: lead.scanner?.email || '',
+          },
+          notes: lead.notes || null,
+          collectedAt: lead.createdAt,
+        }));
+
+        // Get leads by staff
+        const leadsByStaffMap = new Map<string, number>();
+        exhibitorLeads.forEach(lead => {
+          if (lead.scannedBy) {
+            leadsByStaffMap.set(lead.scannedBy, (leadsByStaffMap.get(lead.scannedBy) || 0) + 1);
+          }
+        });
+
+        // Get staff members for this exhibitor in this event
+        const eventStaff = allEventStaff.filter(
+          es => es.exhibitorId === currentExhibitorId && es.eventId === currentEventId
+        );
+
+        const leadsByStaffData = Array.from(leadsByStaffMap.entries()).map(([staffId, count]) => {
+          const staff = eventStaff.find(s => s.userId === staffId);
+          return {
+            staffId,
+            staffName: staff?.user?.firstName && staff?.user?.lastName
+              ? `${staff.user.firstName} ${staff.user.lastName}`
+              : `Staff ${staffId.substring(0, 8)}`,
+            count,
+          };
+        }).sort((a, b) => b.count - a.count);
+
+        // Get total attendees for this event
+        const totalAttendees = allRegistrations.filter(
+          reg => reg.eventId === currentEventId
+        ).length;
+
+        // Calculate leads percentage
+        const leadsCollectedPercentage = totalAttendees > 0
+          ? parseFloat(((totalLeadsCount / totalAttendees) * 100).toFixed(1))
+          : 0;
+
+        // Get stamps issued for this exhibitor in this event
+        const exhibitorStamp = eventStamps.find(
+          ese => ese.eventId === currentEventId && ese.eventStamp?.exhibitorId === currentExhibitorId
+        );
+
+        let stampsIssued = 0;
+        if (exhibitorStamp && exhibitorStamp.eventStamp) {
+          stampsIssued = await userStampVisitRepository.count({
+            where: {
+              stampId: exhibitorStamp.eventStamp.id,
+              isVisited: true,
+            },
+          });
+        }
+
+        // Get views for this exhibitor in this event
+        const exhibitorViews = allViews.filter(
+          view => view.eventId === currentEventId && view.exhibitorId === currentExhibitorId
+        );
+        const totalViewCount = exhibitorViews.length;
+
+        // Get ratings for this exhibitor in this event
+        const exhibitorRatings = allRatings.filter(
+          rating => rating.eventId === currentEventId && rating.exhibitorId === currentExhibitorId
+        );
+        let ratingScore = 0;
+        if (exhibitorRatings.length > 0) {
+          const totalRating = exhibitorRatings.reduce((sum, r) => sum + parseFloat(String(r.rating)), 0);
+          ratingScore = parseFloat((totalRating / exhibitorRatings.length).toFixed(1));
+        }
+
+        reports.push({
+          exhibitor: {
+            id: exhibitor.id,
+            companyName: exhibitor.companyName,
+            email: exhibitor.email,
+            mobile: exhibitor.mobile,
+            boothNumber: exhibitor.boothNumber,
+            logo: exhibitor.logo,
+          },
+          event: {
+            id: event.id,
+            name: event.name,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            location: event.location,
+          },
+          report: {
+            totalLeadsCount,
+            leadsCollectedPercentage,
+            stampsIssued,
+            totalViewCount,
+            ratingScore,
+            leadsByStaff: leadsByStaffData,
+            totalAttendees,
+            attendees: attendeeDetails, // Add attendee details
+          },
+        });
+      }
+
+      // Apply pagination if provided
+      const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const sortBy = filters?.sortBy || 'exhibitor.companyName';
+      const sortOrder = filters?.sortOrder || 'ASC';
+
+      // Sort reports
+      if (sortBy === 'exhibitor.companyName') {
+        reports.sort((a, b) => {
+          const nameA = a.exhibitor?.companyName || '';
+          const nameB = b.exhibitor?.companyName || '';
+          return sortOrder === 'ASC' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        });
+      } else if (sortBy === 'event.name') {
+        reports.sort((a, b) => {
+          const nameA = a.event?.name || '';
+          const nameB = b.event?.name || '';
+          return sortOrder === 'ASC' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        });
+      } else if (sortBy === 'report.totalLeadsCount') {
+        reports.sort((a, b) => {
+          const countA = a.report?.totalLeadsCount || 0;
+          const countB = b.report?.totalLeadsCount || 0;
+          return sortOrder === 'ASC' ? countA - countB : countB - countA;
+        });
+      }
+
+      const total = reports.length;
+
+      // Apply pagination
+      let paginatedReports = reports;
+      if (hasPagination) {
+        const skip = (page - 1) * limit;
+        paginatedReports = reports.slice(skip, skip + limit);
+      }
+
+      // Return with pagination
+      if (hasPagination) {
+        const totalPages = Math.ceil(total / limit);
+        const hasNext = page < totalPages;
+        const hasPrev = page > 1;
+
+        return {
+          data: paginatedReports,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNext,
+            hasPrev,
+          },
+        };
+      } else {
+        return {
+          data: paginatedReports,
+        };
+      }
+    } catch (error) {
+      this.errorHandler.handleDatabaseError(error, 'All exhibitor reports retrieval');
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
+    }
+  }
+
 
   /**
    * Export event statistics to Excel format (legacy method - kept for compatibility)
@@ -1855,219 +2409,7 @@ export class ExhibitorService {
     }
   }
 
-  /**
-   * Scan attendee QR code and collect lead for exhibitor
-   * @param qrCodeId QR code identifier (user ID) - actual user ID
-   * @param eventId Event ID where the lead is being collected
-   * @param exhibitorId Exhibitor ID who is collecting the lead
-   * @param scannedBy User ID of the exhibitor staff member who scanned
-   * @param notes Optional notes about the lead
-   * @returns Lead information with attendee contact details
-   */
-  async scanAttendeeQRCodeForLead(
-    qrCodeId: string,
-    eventId: string,
-    exhibitorId: string,
-    scannedBy: string,
-    notes?: string,
-  ): Promise<any> {
-    try {
-      // QR code ID is the actual user ID
-      const userId = qrCodeId;
 
-      // Get attendee (user) data
-      const attendee = await this.userRepository.findOne({
-        where: { id: userId },
-      });
-
-      if (!attendee) {
-        throw new ResourceNotFoundException('Attendee', userId);
-      }
-
-      // Check if the user being scanned is an exhibitor - exhibitors cannot be scanned as leads
-      if (attendee.role === UserRole.Exhibitor) {
-        throw new BadRequestException('Exhibitors cannot be scanned as leads. Only attendees can be scanned.');
-      }
-
-      // Verify event exists
-      const event = await this.eventRepository.findOne({
-        where: { id: eventId },
-      });
-
-      if (!event) {
-        throw new ResourceNotFoundException('Event', eventId);
-      }
-
-      // Check if attendee is registered for this event
-      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
-      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
-      
-      const registration = await registerEventRepository.findOne({
-        where: {
-          userId: userId,
-          eventId: eventId,
-          isRegister: true,
-        },
-      });
-
-      if (!registration) {
-        throw new BadRequestException('Attendee is not registered for this event');
-      }
-
-      // Verify exhibitor exists
-      const exhibitor = await this.exhibitorRepository.findOne({
-        where: { id: exhibitorId },
-      });
-
-      if (!exhibitor) {
-        throw new ResourceNotFoundException('Exhibitor', exhibitorId);
-      }
-
-      // Check if exhibitor is associated with this event
-      const { EventExhibitor } = await import('../event/event.entity');
-      const { EventBooth } = await import('../event/event-booth.entity');
-      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
-      const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
-
-      // Check via EventExhibitor table
-      const eventExhibitor = await eventExhibitorRepository.findOne({
-        where: {
-          eventId: eventId,
-          exhibitorId: exhibitorId,
-        },
-      });
-
-      // Check via EventBooth table
-      const eventBooth = await eventBoothRepository.findOne({
-        where: {
-          eventId: eventId,
-          exhibitorId: exhibitorId,
-        },
-      });
-
-      if (!eventExhibitor && !eventBooth) {
-        throw new ForbiddenException('Exhibitor is not associated with this event');
-      }
-
-      // Verify scanner (exhibitor staff) exists
-      const scanner = await this.userRepository.findOne({
-        where: { id: scannedBy },
-      });
-
-      if (!scanner) {
-        throw new ResourceNotFoundException('Scanner', scannedBy);
-      }
-
-      // Verify scanner is staff member for this exhibitor at this event
-      const { EventStaff } = await import('../event/event-staff.entity');
-      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
-
-      const staffRecord = await eventStaffRepository.findOne({
-        where: {
-          userId: scannedBy,
-          exhibitorId: exhibitorId,
-          eventId: eventId,
-        },
-      });
-
-      if (!staffRecord) {
-        throw new ForbiddenException('You do not have permission to collect leads for this exhibitor at this event');
-      }
-
-      // Check if lead already exists for this exhibitor-attendee-event combination
-      const existingLead = await this.exhibitorLeadRepository.findOne({
-        where: {
-          exhibitorId: exhibitorId,
-          attendeeId: userId,
-          eventId: eventId,
-        },
-      });
-
-      if (existingLead) {
-        // Return existing lead information
-        return {
-          success: true,
-          message: 'Lead already collected for this attendee',
-          data: {
-            lead: {
-              id: existingLead.id,
-              collectedAt: existingLead.createdAt,
-            },
-            attendee: {
-              id: attendee.id,
-              firstName: attendee.firstName,
-              lastName: attendee.lastName,
-              email: attendee.email,
-              mobile: attendee.mobile,
-              company: attendee.company,
-              designation: attendee.designation,
-              profilePicture: attendee.profilePicture,
-            },
-            event: {
-              id: event.id,
-              name: event.name,
-            },
-            exhibitor: {
-              id: exhibitor.id,
-              companyName: exhibitor.companyName,
-            },
-            isNewLead: false,
-          },
-        };
-      }
-
-      // Create new lead
-      const lead = this.exhibitorLeadRepository.create({
-        exhibitorId: exhibitorId,
-        attendeeId: userId,
-        eventId: eventId,
-        scannedBy: scannedBy,
-        notes: notes || undefined,
-      });
-
-      const savedLead = await this.exhibitorLeadRepository.save(lead);
-
-      return {
-        success: true,
-        message: 'Lead collected successfully',
-        data: {
-          lead: {
-            id: savedLead.id,
-            collectedAt: savedLead.createdAt,
-          },
-          attendee: {
-            id: attendee.id,
-            firstName: attendee.firstName,
-            lastName: attendee.lastName,
-            email: attendee.email,
-            mobile: attendee.mobile,
-            company: attendee.company,
-            designation: attendee.designation,
-            profilePicture: attendee.profilePicture,
-          },
-          event: {
-            id: event.id,
-            name: event.name,
-          },
-          exhibitor: {
-            id: exhibitor.id,
-            companyName: exhibitor.companyName,
-          },
-          isNewLead: true,
-        },
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof ForbiddenException
-      ) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Attendee QR code scanning for lead collection');
-    }
-  }
 
   /**
    * Get current event ID for a user from their current association
@@ -2422,7 +2764,9 @@ export class ExhibitorService {
       if (attendeeSortFields.includes(sortBy)) {
         queryBuilder.orderBy(`attendee.${sortBy}`, sortOrder);
       } else {
-        queryBuilder.orderBy(`lead.${sortBy}`, sortOrder);
+        // Map collectedAt to createdAt for database query (collectedAt is mapped from createdAt in response)
+        const dbSortField = sortBy === 'collectedAt' ? 'createdAt' : sortBy;
+        queryBuilder.orderBy(`lead.${dbSortField}`, sortOrder);
       }
 
       // Pagination

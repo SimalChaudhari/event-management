@@ -9,10 +9,14 @@ import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { UserEntity } from 'user/users.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { OrderItemEntity } from 'order/event.item.entity';
+import { Exhibitor } from '../exhibitor/exhibitor.entity';
+import { EventExhibitor } from '../event/event.entity';
+import { EventBooth } from '../event/event-booth.entity';
+import { ExhibitorLead } from '../exhibitor/exhibitor-lead.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, Event, Order, RegisterEvent,OrderItemEntity]),
+    TypeOrmModule.forFeature([UserEntity, Event, Order, RegisterEvent, OrderItemEntity, Exhibitor, EventExhibitor, EventBooth, ExhibitorLead]),
     JwtModule.register({
         secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
         signOptions: { }, // Set your token expiration

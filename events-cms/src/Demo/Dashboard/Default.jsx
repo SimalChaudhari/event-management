@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, ProgressBar, Badge, Alert, Table, Button, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
+import Chart from 'react-apexcharts';
 import dashboardService from '../../services/dashboardService';
 
 const Default = () => {
@@ -10,6 +11,7 @@ const Default = () => {
     const [recentActivities, setRecentActivities] = useState([]);
     const [topEvents, setTopEvents] = useState([]);
     const [systemHealth, setSystemHealth] = useState(null);
+    const [performanceData, setPerformanceData] = useState(null);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -53,17 +55,19 @@ const Default = () => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [stats, activities, topEvents, health] = await Promise.all([
+            const [stats, activities, topEvents, health, performance] = await Promise.all([
                 dashboardService.getDashboardStats(),
                 dashboardService.getRecentActivities(),
                 dashboardService.getTopEvents(),
                 dashboardService.getSystemHealth(),
+                dashboardService.getPerformanceData(),
             ]);
 
             setDashboardData(stats.data);
             setRecentActivities(activities.data);
             setTopEvents(topEvents.data || []);
             setSystemHealth(health.data);
+            setPerformanceData(performance.data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
             toast.error('Failed to load dashboard data');
@@ -373,6 +377,89 @@ const Default = () => {
                     </Card>
                 </Col>
             </Row>
+
+            {/* Performance Graphs */}
+            {performanceData && (
+                <Row className="mt-4">
+                    <Col lg={6} md={12} className="mb-4">
+                        <Card style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
+                            <Card.Body>
+                                <h6 className="mb-3">
+                                    <i className="feather icon-bar-chart-2 mr-2"></i>
+                                    User Registrations (Last 6 Months)
+                                </h6>
+                                {performanceData.users?.registrationsByMonth && performanceData.users.registrationsByMonth.length > 0 ? (
+                                    <Chart
+                                        options={{
+                                            chart: {
+                                                type: 'line',
+                                                toolbar: { show: false },
+                                            },
+                                            xaxis: {
+                                                categories: performanceData.users.registrationsByMonth.map(item => {
+                                                    const [year, month] = item.month.split('-');
+                                                    return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                                }),
+                                            },
+                                            colors: ['#667eea'],
+                                            stroke: { curve: 'smooth', width: 3 },
+                                            markers: { size: 5 },
+                                        }}
+                                        series={[{
+                                            name: 'New Users',
+                                            data: performanceData.users.registrationsByMonth.map(item => item.count),
+                                        }]}
+                                        type="line"
+                                        height={300}
+                                    />
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <p className="text-muted">No data available</p>
+                                    </div>
+                                )}
+                            </Card.Body>
+                        </Card>
+                    </Col>
+
+                    <Col lg={6} md={12} className="mb-4">
+                        <Card style={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.08)'}}>
+                            <Card.Body>
+                                <h6 className="mb-3">
+                                    <i className="feather icon-trending-up mr-2"></i>
+                                    Exhibitor Leads (Last 6 Months)
+                                </h6>
+                                {performanceData.leads?.byMonth && performanceData.leads.byMonth.length > 0 ? (
+                                    <Chart
+                                        options={{
+                                            chart: {
+                                                type: 'bar',
+                                                toolbar: { show: false },
+                                            },
+                                            xaxis: {
+                                                categories: performanceData.leads.byMonth.map(item => {
+                                                    const [year, month] = item.month.split('-');
+                                                    return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                                }),
+                                            },
+                                            colors: ['#11998e'],
+                                        }}
+                                        series={[{
+                                            name: 'Leads',
+                                            data: performanceData.leads.byMonth.map(item => item.count),
+                                        }]}
+                                        type="bar"
+                                        height={300}
+                                    />
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <p className="text-muted">No data available</p>
+                                    </div>
+                                )}
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+            )}
 
             {/* Additional Features */}
             <Row className="mt-4">

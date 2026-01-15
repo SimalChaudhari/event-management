@@ -87,4 +87,23 @@ export class DashboardController {
       });
     }
   }
+
+  @Get('performance')
+  @Roles(UserRole.Admin)
+  async getPerformanceData(@Res() response: Response) {
+    try {
+      const performanceData = await this.dashboardService.getPerformanceData();
+      return response.status(200).json({
+        success: true,
+        message: 'Performance data retrieved successfully',
+        data: performanceData,
+      });
+    } catch (error:any) {
+      return response.status(500).json({
+        success: false,
+        message: 'Failed to retrieve performance data',
+        error: error.message,
+      });
+    }
+  }
 } 

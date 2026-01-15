@@ -10,6 +10,7 @@ import * as $ from 'jquery';
 import { exhibitorList, deleteExhibitor } from '../../store/actions/exhibitorsActions';
 import { useNavigate } from 'react-router-dom';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import ImageViewModal from '../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
 import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils';
 import { EXHIBITOR_PATHS } from '../../utils/constants';
@@ -30,6 +31,8 @@ const Exhibitors = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
     const tableRef = useRef(null);
 
     // Use pagination persistence hook
@@ -84,6 +87,13 @@ const Exhibitors = () => {
         }
     };
 
+    const handleImageClick = useCallback((imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
+    }, []);
+
     useEffect(() => {
         const columns = [
             {
@@ -112,9 +122,13 @@ const Exhibitors = () => {
 
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${logoUrl}" alt="company logo" class="img-radius align-top m-r-15" 
-                                 style="width:50px; height:50px; object-fit:cover;" 
-                                 onerror="this.src='${DUMMY_PATH}';">
+                            <span class="exhibitor-image-clickable" data-image-url="${logoUrl}" title="Click to view image">
+                                <img src="${logoUrl}" alt="company logo" class="img-radius align-top m-r-15" 
+                                     style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s; cursor: pointer;" 
+                                     onerror="this.src='${DUMMY_PATH}';"
+                                     onmouseover="this.style.opacity='0.8'"
+                                     onmouseout="this.style.opacity='1'">
+                            </span>
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.companyName || 'N/A'}</h6>
                                 <p class="m-b-5 text-muted">Booth: ${row.boothNumber || 'N/A'}</p>
@@ -215,6 +229,15 @@ const Exhibitors = () => {
                     $('#addExhibitorBtn').on('click', handleAddExhibitor);
                 }
 
+                // Add event listener for clickable exhibitor image
+                $(settings.nTable).off('click', '.exhibitor-image-clickable').on('click', '.exhibitor-image-clickable', function (e) {
+                    e.stopPropagation(); // Prevent event bubbling
+                    const imageUrl = $(this).data('image-url');
+                    if (imageUrl && handleImageClick) {
+                        handleImageClick(imageUrl);
+                    }
+                });
+
                 // Attach event listeners for actions
                 $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
@@ -241,11 +264,13 @@ const Exhibitors = () => {
 
         return () => {
             if (tableRef.current) {
+                const tableSelector = '#exhibitor-data-table';
+                $(tableSelector).off('click', '.exhibitor-image-clickable');
                 tableRef.current.destroy();
                 tableRef.current = null;
             }
         };
-    }, []); // Only run once on mount
+    }, [handleImageClick]); // Include handleImageClick in dependencies
 
 
     return (
@@ -258,6 +283,15 @@ const Exhibitors = () => {
                 isLoading={isDeleting}
                 title="Delete Exhibitor"
                 message="Are you sure you want to delete this exhibitor? This action cannot be undone."
+            />
+
+            {/* Exhibitor Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Exhibitor Logo"
+                downloadFileName={`exhibitor-logo-${Date.now()}.jpg`}
             />
             
             <Row>

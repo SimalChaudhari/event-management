@@ -115,6 +115,16 @@ const breadcrumbNavigation = {
                         { id: 'edit-push-notification', title: 'Edit Push Notification', type: 'item', url: '/push-notifications/edit/:id' },
                         { id: 'view-push-notification', title: 'View Push Notification', type: 'item', url: '/push-notifications/view/:id' }
                     ]
+                },
+                {
+                    id: 'reports-dynamic',
+                    title: 'Reports',
+                    type: 'collapse',
+                    children: [
+                        { id: 'reports-list', title: 'Reports', type: 'item', url: '/reports' },
+                        { id: 'view-event-report', title: 'View Event Report', type: 'item', url: '/reports/view/:eventId' },
+                        { id: 'view-exhibitor-attendees', title: 'View Exhibitor Attendees', type: 'item', url: '/reports/view-attendees/:eventId/:exhibitorId' }
+                    ]
                 }
             ]
         }

@@ -95,7 +95,9 @@ export const SETTINGS_PATHS = {
 export const TRANSACTION_PATHS = {
     ORDER_LIST: '/order',
     WITHDRAWAL_REQUEST: '/withrawal',
-    REPORTS: '/reports'
+    REPORTS: '/reports',
+    VIEW_EVENT_REPORT: '/reports/view',
+    VIEW_EXHIBITOR_ATTENDEES: '/reports/view-attendees'
 };
 
 export const SURVEY_PATHS = {

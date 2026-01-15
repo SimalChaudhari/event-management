@@ -77,7 +77,9 @@ const MediaManagerComponents = {
 const transactionComponents = {
     OrderList: React.lazy(() => import('./Pages/Orders/OrderView.jsx')),
     WithdrawalRequest: React.lazy(() => import('./Pages/Withrawal/WithrawalRequest.jsx')),
-    Reports: React.lazy(() => import('./Pages/Reports/Reports.jsx'))
+    Reports: React.lazy(() => import('./Pages/Reports/Reports.jsx')),
+    ViewEventReport: React.lazy(() => import('./Pages/Reports/ViewEventReportPage.jsx')),
+    ViewExhibitorAttendees: React.lazy(() => import('./Pages/Reports/ViewExhibitorAttendeesPage.jsx'))
 };
 
 /**
@@ -511,6 +513,18 @@ const transactionRoutes = [
         exact: true,
         name: 'Reports',
         component: transactionComponents.Reports
+    },
+    {
+        path: `${TRANSACTION_PATHS.VIEW_EVENT_REPORT}/:eventId`,
+        exact: true,
+        name: 'View Event Report',
+        component: transactionComponents.ViewEventReport
+    },
+    {
+        path: `${TRANSACTION_PATHS.VIEW_EXHIBITOR_ATTENDEES}/:eventId/:exhibitorId`,
+        exact: true,
+        name: 'View Exhibitor Attendees',
+        component: transactionComponents.ViewExhibitorAttendees
     }
 ];
 

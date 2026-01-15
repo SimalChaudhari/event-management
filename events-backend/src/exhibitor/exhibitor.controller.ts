@@ -1556,6 +1556,108 @@ export class ExhibitorController {
   }
 
   /**
+   * Get all exhibitor reports with their associated events (Admin only)
+   * Returns list of all exhibitors with their events and report statistics
+   * Access: Admin only
+   */
+  @Get('report/all-exhibitor-reports')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async getAllExhibitorReports(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query('exhibitorId') exhibitorId?: string,
+    @Query('eventId') eventId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    try {
+      const filters = {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        sortBy: sortBy || undefined,
+        sortOrder: sortOrder || undefined,
+      };
+
+      const result = await this.exhibitorService.getAllExhibitorReports(
+        exhibitorId,
+        eventId,
+        filters,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Exhibitor reports retrieved successfully',
+        data: result.data,
+        metadata: {
+          ...(result.pagination || {}),
+          total: result.pagination?.total || result.data?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'All exhibitor reports retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get events list with total attendees for reports (Admin only)
+   * Returns simplified list of events with attendee counts
+   * Access: Admin only
+   */
+  @Get('report/events-list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async getEventsListForReports(
+    @Res() response: Response,
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('keyword') keyword?: string,
+    @Query('eventId') eventId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    try {
+      const filters = {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        keyword: keyword || undefined,
+        eventId: eventId || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        sortBy: sortBy || 'startDate',
+        sortOrder: sortOrder || 'DESC', // DESC means recent dates first (newest to oldest)
+      };
+
+      const result = await this.exhibitorService.getEventsListForReports(filters);
+
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Events list retrieved successfully',
+        data: result.data,
+        metadata: {
+          ...(result.pagination || {}),
+          total: result.pagination?.total || result.data?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Events list for reports retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
    * Get event statistics for report
    * Shows: event name, likes, monthly views, downloads, total leads
    * Access: Admin and Exhibitor users only
@@ -1633,58 +1735,6 @@ export class ExhibitorController {
       await this.exhibitorService.streamExcelZipToResponse(eventId, userId, response, zipFileName);
     } catch (error) {
       this.errorHandler.logError(error, 'Event statistics Excel download', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Scan attendee QR code to collect lead
-   * Exhibitor scans attendee's QR code to collect their contact details as a lead
-   * Access: Admin and Exhibitor users only
-   */
-  @Post('scan-attendee-qr')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin, UserRole.Exhibitor)
-  async scanAttendeeQRCode(
-    @Body() body: { qrCodeId: string; eventId: string; exhibitorId: string; notes?: string },
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const { qrCodeId, eventId, exhibitorId, notes } = body;
-      const scannedBy = req.user?.id;
-
-      if (!scannedBy) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User not authenticated',
-        });
-      }
-
-      if (!qrCodeId || !eventId || !exhibitorId) {
-        throw new BadRequestException('Missing required fields: qrCodeId, eventId, exhibitorId');
-      }
-
-      const result = await this.exhibitorService.scanAttendeeQRCodeForLead(
-        qrCodeId,
-        eventId,
-        exhibitorId,
-        scannedBy,
-        notes,
-      );
-
-      const successResponse: SuccessResponse = {
-        success: result.success,
-        message: result.message,
-        data: result.data,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Attendee QR code scanning for lead collection', req.user?.id);
       throw error;
     }
   }
@@ -1797,73 +1847,6 @@ export class ExhibitorController {
       return response.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Stamp assignment', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Scan QR code and automatically create lead (GET - Parameters in URL)
-   * When exhibitor scans attendee QR code, automatically creates a lead
-   * URL format: /api/exhibitors/qr-code/scan/:attendeeId?eventId=xxx&notes=xxx
-   * If eventId not provided, uses current association event
-   * Access: Admin and Exhibitor users only
-   */
-  @Get('qr-code/scan/:attendeeId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.Admin, UserRole.Exhibitor)
-  async scanQRCodeForLead(
-    @Param('attendeeId', ParseUUIDPipe) attendeeId: string,
-    @Query('eventId') eventId: string | undefined,
-    @Query('notes') notes: string | undefined,
-    @Res() response: Response,
-    @Request() req: any,
-  ) {
-    try {
-      const scannedBy = req.user?.id;
-
-      if (!scannedBy) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User not authenticated',
-        });
-      }
-
-      if (!attendeeId) {
-        throw new BadRequestException('Missing required field: attendeeId');
-      }
-
-      // If eventId is not provided, try to get it from user's current association
-      let finalEventId: string = eventId || '';
-      if (!finalEventId) {
-        const currentEventId = await this.exhibitorService.getCurrentEventIdForUser(scannedBy);
-        
-        if (!currentEventId) {
-          throw new BadRequestException('eventId is required. Please provide eventId as query parameter or ensure you have a current event association.');
-        }
-        
-        finalEventId = currentEventId;
-      }
-
-      // Automatically create lead
-      const result = await this.exhibitorService.createManualLead(
-        finalEventId,
-        attendeeId,
-        scannedBy,
-        notes,
-      );
-
-      const successResponse: SuccessResponse = {
-        success: result.success,
-        message: result.message,
-        data: result.data,
-        metadata: {
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      return response.status(HttpStatus.OK).json(successResponse);
-    } catch (error) {
-      this.errorHandler.logError(error, 'QR code scan for lead creation', req.user?.id);
       throw error;
     }
   }

@@ -20,6 +20,7 @@ import NoDataFound from '../../components/NoDataFound';
 import { formatPhoneDisplay } from '../../utils/phoneFormatter';
 import EventStaffComponent from '../../components/events/EventStaffComponent';
 import DeleteConfirmationModal from '../../components/modal/DeleteConfirmationModal';
+import ImageViewModal from '../../components/modal/ImageViewModal';
 import { ExpandableDescription } from '../../components/ExpandableDescription';
 
 const ViewExhibitorPage = () => {
@@ -745,9 +746,9 @@ const ViewExhibitorPage = () => {
         );
     };
 
-    // Render image modal for zoom functionality
-    const renderImageModal = () => {
-        if (!currentImages || currentImages.length === 0) return null;
+    // Get current image source and title for modal
+    const getCurrentImageData = () => {
+        if (!currentImages || currentImages.length === 0) return { imageSrc: '', imageTitle: '' };
 
         const currentImage = currentImages[currentImageIndex];
         let imageSrc = '';
@@ -770,155 +771,7 @@ const ViewExhibitorPage = () => {
             imageTitle = `Booth Banner ${currentImageIndex + 1}`;
         }
 
-        return (
-            <Modal
-                show={showImageModal}
-                onHide={() => setShowImageModal(false)}
-                size="xl"
-                centered
-                style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-            >
-                <Modal.Body>
-                    {/* Close button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => setShowImageModal(false)}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            right: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-times"></i>
-                    </Button>
-
-                    {/* Download button */}
-                    <Button
-                        variant="light"
-                        size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = imageSrc;
-                            link.download = `${currentImageType}-${currentImageIndex + 1}.jpg`;
-                            link.click();
-                        }}
-                        style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            zIndex: 1000,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            border: 'none',
-                            color: 'white'
-                        }}
-                    >
-                        <i className="fas fa-download"></i>
-                    </Button>
-
-                    {/* Navigation arrows */}
-                    {currentImages.length > 1 && (
-                        <>
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToPreviousImage}
-                                style={{
-                                    position: 'fixed',
-                                    left: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-left"></i>
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="lg"
-                                onClick={goToNextImage}
-                                style={{
-                                    position: 'fixed',
-                                    right: '20px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    borderRadius: '50%',
-                                    width: '50px',
-                                    height: '50px',
-                                    zIndex: 1000,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    border: 'none',
-                                    color: 'white'
-                                }}
-                            >
-                                <i className="fas fa-chevron-right"></i>
-                            </Button>
-                        </>
-                    )}
-
-                    {/* Image counter */}
-                    <div
-                        style={{
-                            position: 'fixed',
-                            bottom: '20px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            padding: '8px 16px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            zIndex: 1000
-                        }}
-                    >
-                        {currentImageIndex + 1} / {currentImages.length}
-                    </div>
-
-                    {/* Image container */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            minHeight: '90vh',
-                            padding: '60px 80px 80px 80px'
-                        }}
-                    >
-                        <img
-                            src={imageSrc}
-                            alt={imageTitle}
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '100%',
-                                objectFit: 'contain',
-                                borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
-        );
+        return { imageSrc, imageTitle };
     };
 
     return (
@@ -2228,7 +2081,86 @@ const ViewExhibitorPage = () => {
             </div>
 
             {/* Image Zoom Modal */}
-            {renderImageModal()}
+            {showImageModal && currentImages && currentImages.length > 0 && (() => {
+                const { imageSrc, imageTitle } = getCurrentImageData();
+                return (
+                    <>
+                        <ImageViewModal
+                            show={showImageModal}
+                            onHide={() => setShowImageModal(false)}
+                            imageSrc={imageSrc}
+                            imageAlt={imageTitle}
+                            downloadFileName={`${currentImageType}-${currentImageIndex + 1}.jpg`}
+                            showDownload={true}
+                        />
+                        {/* Navigation arrows - overlay on modal */}
+                        {currentImages.length > 1 && (
+                            <>
+                                <Button
+                                    variant="light"
+                                    size="lg"
+                                    onClick={goToPreviousImage}
+                                    style={{
+                                        position: 'fixed',
+                                        left: '20px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        borderRadius: '50%',
+                                        width: '50px',
+                                        height: '50px',
+                                        zIndex: 1051,
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        border: 'none',
+                                        color: 'white'
+                                    }}
+                                >
+                                    <i className="fas fa-chevron-left"></i>
+                                </Button>
+
+                                <Button
+                                    variant="light"
+                                    size="lg"
+                                    onClick={goToNextImage}
+                                    style={{
+                                        position: 'fixed',
+                                        right: '20px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        borderRadius: '50%',
+                                        width: '50px',
+                                        height: '50px',
+                                        zIndex: 1051,
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        border: 'none',
+                                        color: 'white'
+                                    }}
+                                >
+                                    <i className="fas fa-chevron-right"></i>
+                                </Button>
+
+                                {/* Image counter */}
+                                <div
+                                    style={{
+                                        position: 'fixed',
+                                        bottom: '20px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        color: 'white',
+                                        padding: '8px 16px',
+                                        borderRadius: '20px',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        zIndex: 1051
+                                    }}
+                                >
+                                    {currentImageIndex + 1} / {currentImages.length}
+                                </div>
+                            </>
+                        )}
+                    </>
+                );
+            })()}
 
             {/* Confirmation Modal */}
             <DeleteConfirmationModal

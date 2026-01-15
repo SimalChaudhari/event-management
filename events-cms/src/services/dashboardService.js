@@ -77,6 +77,17 @@ class DashboardService {
             throw error;
         }
     }
+
+    // Get performance data (exhibitor, booth, company, user)
+    async getPerformanceData() {
+        try {
+            const response = await axiosInstance.get('/dashboard/performance');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching performance data:', error);
+            throw error;
+        }
+    }
 }
 
 export default new DashboardService();
