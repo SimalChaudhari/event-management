@@ -1862,6 +1862,7 @@ export class ExhibitorController {
   @Post('view-count/:exhibitorId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor, UserRole.User)
+  
   async trackExhibitorView(
     @Param('exhibitorId', ParseUUIDPipe) exhibitorId: string,
     @Query('eventId') eventId: string | undefined,
