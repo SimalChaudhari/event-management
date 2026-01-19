@@ -23,12 +23,12 @@ const setLoading = (dispatch, loading) => {
 export const exhibitorList = (filters = {}) => async (dispatch) => {
     try {
         setLoading(dispatch, true);
-        
+
         // Build URL with query parameters
         const url = buildUrlWithParams('/exhibitors', filters);
-        
+
         const response = await axiosInstance.get(url);
-        
+
         dispatch({
             type: EXHIBITOR_LIST,
             payload: {
@@ -36,7 +36,7 @@ export const exhibitorList = (filters = {}) => async (dispatch) => {
                 pagination: response.data?.metadata || {}
             }
         });
-        
+
         return {
             success: true,
             data: response.data?.data || [],
@@ -81,27 +81,27 @@ export const createExhibitor = (data) => async (dispatch) => {
         const response = await axiosInstance.post('/exhibitors/create', data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Exhibitor created successfully!');
-            
+
             // Get the created exhibitor data from response or fetch full details
             let createdExhibitor = response.data?.data;
-            
+
             // If response doesn't have full exhibitor details, fetch it
             if (createdExhibitor?.id) {
                 const exhibitorId = createdExhibitor.id;
                 const exhibitorResponse = await axiosInstance.get(`/exhibitors/${exhibitorId}`);
                 createdExhibitor = exhibitorResponse.data?.data || exhibitorResponse.data;
             }
-            
+
             // Update Redux store directly with the new exhibitor
             if (createdExhibitor?.id) {
                 dispatch({
                     type: CREATE_EXHIBITOR,
                     payload: createdExhibitor
                 });
-                
+
                 return true;
             }
-            
+
             return true;
         }
         return false;
@@ -119,27 +119,27 @@ export const updateExhibitor = (id, data) => async (dispatch) => {
         const response = await axiosInstance.put(`/exhibitors/update/${id}`, data);
         if (response && response.status >= 200 && response.status < 300) {
             toast.success(response.data.message || 'Exhibitor updated successfully!');
-            
+
             // Get the updated exhibitor data from response
             let updatedExhibitor = response.data?.data;
-            
+
             // Only fetch full exhibitor details if response doesn't have exhibitor data at all
             if (!updatedExhibitor || !updatedExhibitor.id) {
                 // Only fetch if we don't have basic exhibitor data
                 const exhibitorResponse = await axiosInstance.get(`/exhibitors/${id}`);
                 updatedExhibitor = exhibitorResponse.data?.data || exhibitorResponse.data;
             }
-            
+
             // Update Redux store directly with the updated exhibitor
             if (updatedExhibitor?.id) {
                 dispatch({
                     type: UPDATE_EXHIBITOR,
                     payload: updatedExhibitor
                 });
-                
+
                 return true;
             }
-            
+
             return true;
         }
         return false;
@@ -436,6 +436,54 @@ export const deleteAllExhibitorBoothBanners = (exhibitorId) => async (dispatch) 
         return false;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete all booth banners';
+        toast.error(errorMessage);
+        return false;
+    }
+};
+
+// Export exhibitor scanner leads to Excel
+export const exportExhibitorLeadsToExcel = async (exhibitorId, eventId) => {
+    try {
+        if (!exhibitorId || !eventId) {
+            toast.error('Missing exhibitor or event information');
+            return false;
+        }
+
+        const response = await axiosInstance.get('/exhibitors/leads/export', {
+            params: {
+                exhibitorId: exhibitorId,
+                eventId: eventId,
+            },
+            responseType: 'blob',
+        });
+
+        // Create blob and trigger download
+        const blob = new Blob([response.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Get filename from Content-Disposition header or use default
+        const contentDisposition = response.headers['content-disposition'];
+        let fileName = `scanner_leads_${exhibitorId}_${eventId}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        if (contentDisposition) {
+            const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
+            if (fileNameMatch) {
+                fileName = fileNameMatch[1];
+            }
+        }
+
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return true;
+    } catch (error) {
+        console.error('Export error:', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to export leads';
         toast.error(errorMessage);
         return false;
     }

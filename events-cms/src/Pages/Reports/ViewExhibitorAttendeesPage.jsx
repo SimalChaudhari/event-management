@@ -9,6 +9,7 @@ import { formatDateTimeForTable } from '../../components/dateTime/dateTimeUtils'
 import usePersistedTablePage from '../../hooks/usePersistedTablePage';
 import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
 import { TRANSACTION_PATHS, EXHIBITOR_PATHS, USER_PATHS } from '../../utils/constants';
+import { exportExhibitorLeadsToExcel } from '../../store/actions/exhibitorsActions';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -49,6 +50,10 @@ const ViewExhibitorAttendeesPage = () => {
         },
         [navigate]
     );
+
+    const handleExportToExcel = useCallback(async () => {
+        await exportExhibitorLeadsToExcel(exhibitorId, eventId);
+    }, [exhibitorId, eventId]);
 
     const destroyTable = useCallback(() => {
         if (tableRef.current) {
@@ -246,24 +251,37 @@ const ViewExhibitorAttendeesPage = () => {
                                         </span>
                                     )}
                                 </div>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => navigate(-1)}
-                                    className="d-flex align-items-center"
-                                    style={{ flexShrink: 0, marginTop: '0', alignSelf: 'flex-start' }}
-                                >
-                                    <i className="fas fa-arrow-left"></i>
-                                    <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>
-                                        Back
-                                    </span>
-                                </Button>
+                                <div className="d-flex align-items-center" style={{ gap: '12px', flexShrink: 0 }}>
+                                    <Button
+                                        variant="success"
+                                        onClick={handleExportToExcel}
+                                        className="d-flex align-items-center"
+                                        style={{ marginTop: '0' }}
+                                    >
+                                        <i className="fas fa-file-excel"></i>
+                                        <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>
+                                            Export to Excel
+                                        </span>
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => navigate(-1)}
+                                        className="d-flex align-items-center"
+                                        style={{ marginTop: '0' }}
+                                    >
+                                        <i className="fas fa-arrow-left"></i>
+                                        <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>
+                                            Back
+                                        </span>
+                                    </Button>
+                                </div>
                             </div>
                         </Card.Body>
                     </Card>
                 </Col>
             </Row>
 
-            {/* Attendees Table */}
+            {/* Attendees Table */} 
             <Row>
                 <Col sm={12} className="btn-page">
                     <Card className="event-list">

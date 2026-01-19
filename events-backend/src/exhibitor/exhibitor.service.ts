@@ -2855,6 +2855,481 @@ export class ExhibitorService {
   }
 
   /**
+   * Export exhibitor leads to Excel
+   * Exports all scanner leads for a specific exhibitor and event
+   * @param exhibitorId Exhibitor ID
+   * @param eventId Event ID
+   * @param userId User ID making the request (for permission check)
+   * @param userRole User role (for permission check)
+   * @returns Excel workbook with all leads
+   */
+  async exportExhibitorLeadsToExcel(
+    exhibitorId: string | undefined,
+    eventId: string | undefined,
+    userId: string,
+    userRole: string,
+  ): Promise<ExcelJS.Workbook> {
+    try {
+      let exhibitorIds: string[] = [];
+
+      // Permission check: Exhibitor users can only access their own company's leads
+      if (userRole === 'exhibitor') {
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+
+        const staffRecords = eventId
+          ? await eventStaffRepository.find({
+              where: {
+                userId: userId,
+                eventId: eventId,
+              },
+              select: ['exhibitorId'],
+            })
+          : await eventStaffRepository.find({
+              where: {
+                userId: userId,
+              },
+              select: ['exhibitorId'],
+            });
+
+        if (!staffRecords || staffRecords.length === 0) {
+          throw new ForbiddenException('You do not have permission to export leads');
+        }
+
+        exhibitorIds = [...new Set(staffRecords.map((record) => record.exhibitorId))];
+      }
+
+      // Build query to get all leads (no pagination)
+      const queryBuilder = this.exhibitorLeadRepository
+        .createQueryBuilder('lead')
+        .leftJoinAndSelect('lead.attendee', 'attendee')
+        .leftJoinAndSelect('lead.event', 'event')
+        .leftJoinAndSelect('lead.exhibitor', 'exhibitor')
+        .leftJoinAndSelect('lead.scanner', 'scanner')
+        .where('lead.isActive = :isActive', { isActive: true });
+
+      // Apply filters
+      if (exhibitorId) {
+        queryBuilder.andWhere('lead.exhibitorId = :exhibitorId', { exhibitorId });
+      } else if (userRole === 'exhibitor' && exhibitorIds.length > 0) {
+        queryBuilder.andWhere('lead.exhibitorId IN (:...exhibitorIds)', { exhibitorIds });
+      }
+
+      if (eventId) {
+        queryBuilder.andWhere('lead.eventId = :eventId', { eventId });
+      }
+
+      // Get all leads (no pagination)
+      const allLeads = await queryBuilder.orderBy('lead.createdAt', 'DESC').getMany();
+
+      // Format leads based on user role
+      const formattedLeads = allLeads.map((lead) => {
+        if (userRole === UserRole.Exhibitor) {
+          return {
+            id: lead.id,
+            attendee: {
+              id: lead.attendeeId,
+              firstName: lead.attendee?.firstName,
+              lastName: lead.attendee?.lastName,
+              email: lead.attendee?.email,
+              mobile: lead.attendee?.mobile,
+              company: lead.attendee?.company,
+              designation: lead.attendee?.designation,
+            },
+            scanner: {
+              id: lead.scannedBy,
+              firstName: lead.scanner?.firstName,
+              lastName: lead.scanner?.lastName,
+              email: lead.scanner?.email,
+            },
+            notes: lead.notes,
+            collectedAt: lead.createdAt,
+          };
+        } else {
+          return {
+            id: lead.id,
+            attendee: {
+              id: lead.attendeeId,
+              firstName: lead.attendee?.firstName,
+              lastName: lead.attendee?.lastName,
+              email: lead.attendee?.email,
+              mobile: lead.attendee?.mobile,
+              company: lead.attendee?.company,
+              designation: lead.attendee?.designation,
+            },
+            event: {
+              id: lead.eventId,
+              name: lead.event?.name,
+            },
+            exhibitor: {
+              id: lead.exhibitorId,
+              companyName: lead.exhibitor?.companyName,
+            },
+            scanner: {
+              id: lead.scannedBy,
+              firstName: lead.scanner?.firstName,
+              lastName: lead.scanner?.lastName,
+              email: lead.scanner?.email,
+            },
+            notes: lead.notes,
+            collectedAt: lead.createdAt,
+          };
+        }
+      });
+
+      const leads = formattedLeads;
+      const exhibitor = exhibitorId
+        ? await this.exhibitorRepository.findOne({
+            where: { id: exhibitorId },
+          })
+        : null;
+      
+      // Get event name from first lead if available (for admin role), or query event if needed
+      let eventName = 'N/A';
+      if (leads.length > 0 && leads[0].event?.name) {
+        eventName = leads[0].event.name;
+      } else if (eventId) {
+        try {
+          const { Event } = await import('../event/event.entity');
+          const eventRepository = this.exhibitorRepository.manager.getRepository(Event);
+          const event = await eventRepository.findOne({ where: { id: eventId }, select: ['name'] });
+          if (event) {
+            eventName = event.name;
+          }
+        } catch (error) {
+          // If event not found, use default
+          eventName = 'N/A';
+        }
+      }
+
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Event Management System';
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      // Create worksheet
+      const worksheet = workbook.addWorksheet('Scanner Leads');
+
+      // Add summary info at the top first (if exhibitor info available)
+      if (exhibitor) {
+        worksheet.addRow(['Company:', exhibitor.companyName || 'N/A', '', '', '', '', '', '', '', '']);
+        worksheet.addRow(['Event:', eventName, '', '', '', '', '', '', '', '']);
+        worksheet.addRow(['Total Leads:', leads.length, '', '', '', '', '', '', '', '']);
+        worksheet.addRow([]); // Empty row
+      }
+
+      // Add header row (only once, after summary if available)
+      const headerRowNumber = exhibitor ? 5 : 1;
+      const headerRow = worksheet.addRow([
+        'S.No',
+        'Attendee Name',
+        'Email',
+        'Mobile',
+        'Company',
+        'Designation',
+        'Scanned By',
+        'Scanner Email',
+        'Scanned Date',
+        'Notes',
+      ]);
+
+      // Style header row
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4472C4' },
+      };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      // Add data rows
+      leads.forEach((lead: any, index: number) => {
+        const attendeeName = `${lead.attendee?.firstName || ''} ${lead.attendee?.lastName || ''}`.trim() || 'N/A';
+        const scannerName = lead.scanner
+          ? `${lead.scanner.firstName || ''} ${lead.scanner.lastName || ''}`.trim()
+          : 'N/A';
+        const scannedDate = lead.collectedAt
+          ? new Date(lead.collectedAt).toLocaleString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'N/A';
+
+        worksheet.addRow([
+          index + 1,
+          attendeeName,
+          lead.attendee?.email || 'N/A',
+          lead.attendee?.mobile || 'N/A',
+          lead.attendee?.company || 'N/A',
+          lead.attendee?.designation || 'N/A',
+          scannerName,
+          lead.scanner?.email || 'N/A',
+          scannedDate,
+          lead.notes || 'N/A',
+        ]);
+      });
+
+      // Style summary rows (if exhibitor info available)
+      if (exhibitor) {
+        for (let i = 1; i <= 3; i++) {
+          const row = worksheet.getRow(i);
+          row.getCell(1).font = { bold: true };
+          row.getCell(2).font = { bold: true };
+        }
+      }
+
+      // Set column widths
+      worksheet.getColumn(1).width = 8; // S.No
+      worksheet.getColumn(2).width = 25; // Attendee Name
+      worksheet.getColumn(3).width = 30; // Email
+      worksheet.getColumn(4).width = 15; // Mobile
+      worksheet.getColumn(5).width = 25; // Company
+      worksheet.getColumn(6).width = 20; // Designation
+      worksheet.getColumn(7).width = 20; // Scanned By
+      worksheet.getColumn(8).width = 30; // Scanner Email
+      worksheet.getColumn(9).width = 20; // Scanned Date
+      worksheet.getColumn(10).width = 30; // Notes
+
+      // Add auto filter (starting from header row)
+      const dataEndRow = exhibitor ? leads.length + 5 : leads.length + 1;
+      worksheet.autoFilter = {
+        from: { row: headerRowNumber, column: 1 },
+        to: { row: dataEndRow, column: 10 },
+      };
+
+      return workbook;
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleDatabaseError(error, 'Exhibitor leads Excel export');
+    }
+  }
+
+
+    /**
+   * Scan attendee QR code and collect lead for exhibitor
+   * @param qrCodeId QR code identifier (user ID) - actual user ID
+   * @param eventId Event ID where the lead is being collected
+   * @param exhibitorId Exhibitor ID who is collecting the lead
+   * @param scannedBy User ID of the exhibitor staff member who scanned
+   * @param notes Optional notes about the lead
+   * @returns Lead information with attendee contact details
+   */
+    async scanAttendeeQRCodeForLead(
+      qrCodeId: string,
+      eventId: string,
+      exhibitorId: string,
+      scannedBy: string,
+      notes?: string,
+    ): Promise<any> {
+      try {
+        // QR code ID is the actual user ID
+        const userId = qrCodeId;
+  
+        // Get attendee (user) data
+        const attendee = await this.userRepository.findOne({
+          where: { id: userId },
+        });
+  
+        if (!attendee) {
+          throw new ResourceNotFoundException('Attendee', userId);
+        }
+  
+        // Check if the user being scanned is an exhibitor - exhibitors cannot be scanned as leads
+        if (attendee.role === UserRole.Exhibitor) {
+          throw new BadRequestException('Exhibitors cannot be scanned as leads. Only attendees can be scanned.');
+        }
+  
+        // Verify event exists
+        const event = await this.eventRepository.findOne({
+          where: { id: eventId },
+        });
+  
+        if (!event) {
+          throw new ResourceNotFoundException('Event', eventId);
+        }
+  
+        // Check if attendee is registered for this event
+        const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+        const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+        
+        const registration = await registerEventRepository.findOne({
+          where: {
+            userId: userId,
+            eventId: eventId,
+            isRegister: true,
+          },
+        });
+  
+        if (!registration) {
+          throw new BadRequestException('Attendee is not registered for this event');
+        }
+  
+        // Verify exhibitor exists
+        const exhibitor = await this.exhibitorRepository.findOne({
+          where: { id: exhibitorId },
+        });
+  
+        if (!exhibitor) {
+          throw new ResourceNotFoundException('Exhibitor', exhibitorId);
+        }
+  
+        // Check if exhibitor is associated with this event
+        const { EventExhibitor } = await import('../event/event.entity');
+        const { EventBooth } = await import('../event/event-booth.entity');
+        const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+        const eventBoothRepository = this.exhibitorRepository.manager.getRepository(EventBooth);
+  
+        // Check via EventExhibitor table
+        const eventExhibitor = await eventExhibitorRepository.findOne({
+          where: {
+            eventId: eventId,
+            exhibitorId: exhibitorId,
+          },
+        });
+  
+        // Check via EventBooth table
+        const eventBooth = await eventBoothRepository.findOne({
+          where: {
+            eventId: eventId,
+            exhibitorId: exhibitorId,
+          },
+        });
+  
+        if (!eventExhibitor && !eventBooth) {
+          throw new ForbiddenException('Exhibitor is not associated with this event');
+        }
+  
+        // Verify scanner (exhibitor staff) exists
+        const scanner = await this.userRepository.findOne({
+          where: { id: scannedBy },
+        });
+  
+        if (!scanner) {
+          throw new ResourceNotFoundException('Scanner', scannedBy);
+        }
+  
+        // Verify scanner is staff member for this exhibitor at this event
+        const { EventStaff } = await import('../event/event-staff.entity');
+        const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+  
+        const staffRecord = await eventStaffRepository.findOne({
+          where: {
+            userId: scannedBy,
+            exhibitorId: exhibitorId,
+            eventId: eventId,
+          },
+        });
+  
+        if (!staffRecord) {
+          throw new ForbiddenException('You do not have permission to collect leads for this exhibitor at this event');
+        }
+  
+        // Check if lead already exists for this exhibitor-attendee-event combination
+        const existingLead = await this.exhibitorLeadRepository.findOne({
+          where: {
+            exhibitorId: exhibitorId,
+            attendeeId: userId,
+            eventId: eventId,
+          },
+        });
+  
+        if (existingLead) {
+          // Return existing lead information
+          return {
+            success: true,
+            message: 'Lead already collected for this attendee',
+            data: {
+              lead: {
+                id: existingLead.id,
+                collectedAt: existingLead.createdAt,
+              },
+              attendee: {
+                id: attendee.id,
+                firstName: attendee.firstName,
+                lastName: attendee.lastName,
+                email: attendee.email,
+                mobile: attendee.mobile,
+                company: attendee.company,
+                designation: attendee.designation,
+                profilePicture: attendee.profilePicture,
+              },
+              event: {
+                id: event.id,
+                name: event.name,
+              },
+              exhibitor: {
+                id: exhibitor.id,
+                companyName: exhibitor.companyName,
+              },
+              isNewLead: false,
+            },
+          };
+        }
+  
+        // Create new lead
+        const lead = this.exhibitorLeadRepository.create({
+          exhibitorId: exhibitorId,
+          attendeeId: userId,
+          eventId: eventId,
+          scannedBy: scannedBy,
+          notes: notes || undefined,
+        });
+  
+        const savedLead = await this.exhibitorLeadRepository.save(lead);
+  
+        return {
+          success: true,
+          message: 'Lead collected successfully',
+          data: {
+            lead: {
+              id: savedLead.id,
+              collectedAt: savedLead.createdAt,
+            },
+            attendee: {
+              id: attendee.id,
+              firstName: attendee.firstName,
+              lastName: attendee.lastName,
+              email: attendee.email,
+              mobile: attendee.mobile,
+              company: attendee.company,
+              designation: attendee.designation,
+              profilePicture: attendee.profilePicture,
+            },
+            event: {
+              id: event.id,
+              name: event.name,
+            },
+            exhibitor: {
+              id: exhibitor.id,
+              companyName: exhibitor.companyName,
+            },
+            isNewLead: true,
+          },
+        };
+      } catch (error) {
+        if (
+          error instanceof ResourceNotFoundException ||
+          error instanceof ConflictException ||
+          error instanceof BadRequestException ||
+          error instanceof ForbiddenException
+        ) {
+          throw error;
+        }
+        this.errorHandler.handleDatabaseError(error, 'Attendee QR code scanning for lead collection');
+      }
+    }
+
+    
+  /**
    * Get lead by ID
    * Exhibitor users can only view leads from their own company
    * Admin users can view any lead

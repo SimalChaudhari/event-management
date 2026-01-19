@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button, Form, Alert, Spinner, Image, Modal } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import { getLogo, updateLogo, deleteLogo, clearLogoError } from '../../../store/actions/settingsActions';
-import { API_URL } from '../../../configs/env';
+import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import ImageViewModal from '../../../components/modal/ImageViewModal';
 
 const LogoManagement = () => {
     const dispatch = useDispatch();
@@ -12,6 +13,8 @@ const LogoManagement = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [hyperlink, setHyperlink] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
 
     useEffect(() => {
         dispatch(getLogo());
@@ -95,6 +98,13 @@ const LogoManagement = () => {
 
     const handleClearError = () => {
         dispatch(clearLogoError());
+    };
+
+    const handleImageClick = () => {
+        if (previewUrl && previewUrl !== DUMMY_PATH) {
+            setSelectedImageUrl(previewUrl);
+            setShowImageModal(true);
+        }
     };
 
     if (logoLoading) {
@@ -181,9 +191,15 @@ const LogoManagement = () => {
                                                         style={{ 
                                                             maxWidth: '300px', 
                                                             maxHeight: '200px',
-                                                            objectFit: 'contain'
+                                                            objectFit: 'contain',
+                                                            cursor: 'pointer',
+                                                            transition: 'opacity 0.2s'
                                                         }}
                                                         className="img-thumbnail mb-3"
+                                                        onClick={handleImageClick}
+                                                        onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                                                        onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                                                        title="Click to view full size"
                                                     />
                                                     {/* Only show delete button if there's an actual uploaded logo, not just a preview */}
                                                     {logo && logo.imageUrl && (
@@ -251,6 +267,15 @@ const LogoManagement = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* Logo Image Modal */}
+            <ImageViewModal
+                show={showImageModal}
+                onHide={() => setShowImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Logo Image"
+                downloadFileName={`logo-${Date.now()}.jpg`}
+            />
         </div>
     );
 };

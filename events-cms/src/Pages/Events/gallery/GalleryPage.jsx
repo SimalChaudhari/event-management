@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -15,6 +15,8 @@ import useTableNavigation from '../../../hooks/useTableNavigation';
 import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
 import axiosInstance from '../../../configs/axiosInstance';
 import { GALLERY_LOADING } from '../../../store/constants/actionTypes';
+import { DUMMY_PATH, DUMMY_PATH_GALLERY } from '../../../configs/env';
+import ImageViewModal from '../../../components/modal/ImageViewModal';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -23,6 +25,8 @@ const GalleryPage = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const tableRef = useRef(null);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState('');
 
     // Use pagination persistence hook
     const { restoreTablePage } = usePersistedTablePage();
@@ -34,15 +38,37 @@ const GalleryPage = () => {
         viewPath: EVENT_PATHS.VIEW_GALLERY,
     });
 
+    const handleImageClick = useCallback((imageUrl) => {
+        if (imageUrl && imageUrl !== DUMMY_PATH) {
+            setSelectedImageUrl(imageUrl);
+            setShowProfileImageModal(true);
+        }
+    }, []);
+
     useEffect(() => {
         const columns = [
             {
                 data: 'title',
                 title: 'Gallery Name',
                 render: function (data, type, row) {
-                    const imageUrl = row.galleryImages && row.galleryImages.length > 0 
-                        ? `${process.env.REACT_APP_API_URL}/${row.galleryImages[0]}`
-                        : '/assets/images/gallery-placeholder.png';
+                    const placeholderUrl = DUMMY_PATH_GALLERY;
+                    let imageUrl = placeholderUrl;
+                    let isDummyImage = true;
+                    
+                    // Check if gallery has images
+                    if (row.galleryImages && row.galleryImages.length > 0) {
+                        const firstImage = row.galleryImages[0];
+                        // Check if image is not a dummy path - check for dummy URLs
+                        if (firstImage && 
+                            firstImage.trim() !== '' &&
+                            !firstImage.includes('freepik.com') && 
+                            !firstImage.includes('dreamstime.com') &&
+                            !firstImage.includes('dummy') && 
+                            !firstImage.includes('placeholder')) {
+                            imageUrl = `${process.env.REACT_APP_API_URL}/${firstImage}`;
+                            isDummyImage = false;
+                        }
+                    }
                     
                     const eventName = row.event?.name || 'Unknown Event';
                     
@@ -50,9 +76,29 @@ const GalleryPage = () => {
                         return row.title || '';
                     }
                     
+                    // If no real image available, show dummy/placeholder image (not clickable)
+                    if (isDummyImage) {
+                        return `
+                            <div class="d-inline-block align-middle">
+                                <img src="${placeholderUrl}" alt="gallery" class="img-radius align-top m-r-15" 
+                                     style="width:50px; height:50px; object-fit:cover;" />
+                                <div class="d-inline-block">
+                                    <h6 class="m-b-0">${row.title || 'N/A'}</h6>
+                                    <p class="text-muted m-b-0">${eventName}</p>
+                                </div>
+                            </div>   
+                        `;
+                    }
+                    
                     return `
                         <div class="d-inline-block align-middle">
-                            <img src="${imageUrl}" alt="gallery" class="img-radius align-top m-r-15" style="width:50px; height:50px; object-fit:cover;" />
+                            <span class="event-image-clickable" data-image-url="${imageUrl}" title="Click to view image">
+                                <img src="${imageUrl}" alt="gallery" class="img-radius align-top m-r-15" 
+                                     style="width:50px; height:50px; object-fit:cover; transition: opacity 0.2s; cursor: pointer;" 
+                                     onerror="this.onerror=null; this.src='${placeholderUrl}';"
+                                     onmouseover="this.style.opacity='0.8'"
+                                     onmouseout="this.style.opacity='1'">
+                            </span>
                             <div class="d-inline-block">
                                 <h6 class="m-b-0">${row.title || 'N/A'}</h6>
                                 <p class="text-muted m-b-0">${eventName}</p>
@@ -122,8 +168,19 @@ const GalleryPage = () => {
             },
             restoreTablePage: restoreTablePage,
             initCompleteCallback: function (settings, json, api) {
+                const $table = $(settings.nTable);
+                
+                // Add event listener for clickable gallery image
+                $table.find('tbody').off('click', '.event-image-clickable').on('click', '.event-image-clickable', function (e) {
+                    e.stopPropagation(); // Prevent event bubbling
+                    const imageUrl = $(this).data('image-url');
+                    if (imageUrl && handleImageClick) {
+                        handleImageClick(imageUrl);
+                    }
+                });
+
                 // Attach event listeners for actions
-                $(settings.nTable).off('click', '.view-btn').on('click', '.view-btn', function () {
+                $table.off('click', '.view-btn').on('click', '.view-btn', function () {
                     const rowData = api.row($(this).closest('tr')).data();
                     if (rowData && rowData.id) {
                         handleView(rowData);
@@ -138,27 +195,38 @@ const GalleryPage = () => {
                 tableRef.current = null;
             }
         };
-    }, []); // Only run once on mount
+    }, []); // Only run once on mount - handleImageClick is stable from useCallback
 
     return (
-        <Row>
-            <Col sm={12} className="btn-page">
-                <Card className="gallery-list">
-                    <Card.Body>
-                        <Table striped hover responsive id="data-table-zero">
-                            <thead>
-                                <tr>
-                                    <th>Gallery Name</th>                                     
-                                    <th>Images</th>
-                                    <th>Created Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                        </Table>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+        <>
+            {/* Gallery Image Modal */}
+            <ImageViewModal
+                show={showProfileImageModal}
+                onHide={() => setShowProfileImageModal(false)}
+                imageSrc={selectedImageUrl}
+                imageAlt="Gallery Image"
+                downloadFileName={`gallery-image-${Date.now()}.jpg`}
+            />
+
+            <Row>
+                <Col sm={12} className="btn-page">
+                    <Card className="gallery-list">
+                        <Card.Body>
+                            <Table striped hover responsive id="data-table-zero">
+                                <thead>
+                                    <tr>
+                                        <th>Gallery Name</th>                                     
+                                        <th>Images</th>
+                                        <th>Created Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                            </Table>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </>
     );
 };
 

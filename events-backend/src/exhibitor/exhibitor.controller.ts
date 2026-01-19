@@ -1739,6 +1739,54 @@ export class ExhibitorController {
     }
   }
 
+  
+  @Post('scan-attendee-qr')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async scanAttendeeQRCode(
+    @Body() body: { qrCodeId: string; eventId: string; exhibitorId: string; notes?: string },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const { qrCodeId, eventId, exhibitorId, notes } = body;
+      const scannedBy = req.user?.id;
+
+      if (!scannedBy) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!qrCodeId || !eventId || !exhibitorId) {
+        throw new BadRequestException('Missing required fields: qrCodeId, eventId, exhibitorId');
+      }
+
+      const result = await this.exhibitorService.scanAttendeeQRCodeForLead(
+        qrCodeId,
+        eventId,
+        exhibitorId,
+        scannedBy,
+        notes,
+      );
+
+      const successResponse: SuccessResponse = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Attendee QR code scanning for lead collection', req.user?.id);
+      throw error;
+    }
+  }
+
   /**
    * Manually create a lead entry (POST with body)
    * Allows exhibitor to manually enter attendee by user ID as a lead
@@ -1979,7 +2027,7 @@ export class ExhibitorController {
    * Admin and Exhibitor can see all ratings
    * Regular users can only see their own rating
    * Access: All authenticated users
-   */
+   */ 
   @Get('rating/:exhibitorId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin, UserRole.Exhibitor, UserRole.User)
@@ -2028,6 +2076,81 @@ export class ExhibitorController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Get exhibitor ratings', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Export exhibitor scanner leads to Excel
+   * Exports all leads for a specific exhibitor and event
+   * Access: Admin and Exhibitor users only
+   */
+  @Get('leads/export')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin, UserRole.Exhibitor)
+  async exportExhibitorLeadsToExcel(
+    @Query('exhibitorId') exhibitorId: string | undefined,
+    @Query('eventId') eventId: string | undefined,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId) {
+        return response.status(HttpStatus.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+      }
+
+      if (!exhibitorId) {
+        throw new BadRequestException('Missing required field: exhibitorId');
+      }
+
+      if (!eventId) {
+        throw new BadRequestException('Missing required field: eventId');
+      }
+
+      // Get exhibitor info for filename
+      let companyName = 'exhibitor';
+      try {
+        const exhibitor = await this.exhibitorService.getExhibitorById(exhibitorId);
+        const name = exhibitor?.companyName || exhibitor?.data?.companyName || exhibitor?.companyName || 'exhibitor';
+        companyName = name
+          .replace(/[^a-z0-9]/gi, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_|_$/g, '')
+          .toLowerCase();
+      } catch (error) {
+        // If exhibitor not found, use default name
+        companyName = 'exhibitor';
+      }
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      const fileName = `scanner_leads_${companyName}_${dateStr}.xlsx`;
+
+      // Generate Excel workbook
+      const workbook = await this.exhibitorService.exportExhibitorLeadsToExcel(
+        exhibitorId,
+        eventId,
+        userId,
+        userRole,
+      );
+
+      // Set response headers for Excel file download
+      response.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Write workbook to response
+      await workbook.xlsx.write(response);
+      response.end();
+    } catch (error) {
+      this.errorHandler.logError(error, 'Exhibitor leads Excel export', req.user?.id);
       throw error;
     }
   }

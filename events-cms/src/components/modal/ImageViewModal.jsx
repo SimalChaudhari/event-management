@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 
 /**
@@ -30,6 +30,27 @@ const ImageViewModal = ({
         link.click();
     };
 
+    // Add CSS to ensure modal dialog fits viewport
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.textContent = `
+            .image-modal-dialog {
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+                margin: auto !important;
+            }
+            .image-modal-dialog .modal-content {
+                max-height: 100vh !important;
+                overflow: hidden !important;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
+
     if (!imageSrc) return null;
 
     return (
@@ -39,13 +60,18 @@ const ImageViewModal = ({
             size="xl"
             centered
             style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+            dialogClassName="image-modal-dialog"
         >
             <Modal.Body
                 style={{
                     padding: 0,
                     backgroundColor: 'transparent',
                     position: 'relative',
-                    minHeight: '90vh'
+                    height: '100%',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
                 }}
             >
                 {/* Close Button */}
@@ -54,9 +80,9 @@ const ImageViewModal = ({
                     size="sm"
                     onClick={onHide}
                     style={{
-                        position: 'fixed',
-                        top: '20px',
-                        right: '20px',
+                        position: 'absolute',
+                        top: '15px',
+                        right: '15px',
                         borderRadius: '50%',
                         width: '40px',
                         height: '40px',
@@ -76,9 +102,9 @@ const ImageViewModal = ({
                         size="sm"
                         onClick={handleDownload}
                         style={{
-                            position: 'fixed',
-                            top: '20px',
-                            left: '20px',
+                            position: 'absolute',
+                            top: '15px',
+                            left: '15px',
                             borderRadius: '50%',
                             width: '40px',
                             height: '40px',
@@ -98,8 +124,10 @@ const ImageViewModal = ({
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        minHeight: '90vh',
-                        padding: '60px 80px 80px 80px'
+                        width: '100%',
+                        height: '100%',
+                        padding: '20px 20px 20px 20px',
+                        boxSizing: 'border-box'
                     }}
                 >
                     <img
@@ -108,6 +136,8 @@ const ImageViewModal = ({
                         style={{
                             maxWidth: '100%',
                             maxHeight: '100%',
+                            width: 'auto',
+                            height: 'auto',
                             objectFit: 'contain',
                             borderRadius: '8px'
                         }}
