@@ -1729,10 +1729,10 @@ export class ExhibitorController {
         .replace(/^_|_$/g, '')
         .toLowerCase() || 'event';
       const dateStr = new Date().toISOString().split('T')[0];
-      const zipFileName = `event_reports_${eventName}_${dateStr}.zip`;
+      const excelFileName = `event_reports_${eventName}_${dateStr}.xlsx`;
 
-      // Create ZIP file and stream to response
-      await this.exhibitorService.streamExcelZipToResponse(eventId, userId, response, zipFileName);
+      // Create single Excel file with multiple sheets and stream to response
+      await this.exhibitorService.streamSingleExcelToResponse(eventId, userId, response, excelFileName);
     } catch (error) {
       this.errorHandler.logError(error, 'Event statistics Excel download', req.user?.id);
       throw error;

@@ -1,310 +1,230 @@
 import * as ExcelJS from 'exceljs';
-import * as archiver from 'archiver';
 import { Response } from 'express';
 import { ResourceNotFoundException } from './exceptions/custom-exceptions';
 import { ForbiddenException } from '@nestjs/common';
 
 /**
  * Excel Export Utility
- * Handles creation of Excel workbooks and ZIP files for event statistics
+ * Handles creation of Excel workbooks for event statistics
  */
 export class ExcelExportUtils {
+
   /**
-   * Create Statistics Excel Workbook
-   * Contains: Event Summary + Views Over Time (Booth Statistics)
+   * Create single Excel workbook with multiple sheets
+   * Contains: Lead Collection, Overview, and Views Over Time
    */
-  static createStatisticsExcel(statistics: any): ExcelJS.Workbook {
-    // Create a new workbook
+  static createSingleExcelWorkbook(
+    statistics: any,
+    leadsData: any[],
+    stampIssuedMap: { [attendeeId: string]: boolean },
+    totalAttendees: number,
+  ): ExcelJS.Workbook {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Event Management System';
     workbook.created = new Date();
     workbook.modified = new Date();
 
-    // Single Sheet with Event Summary and Booth Statistics only
-    const dataSheet = workbook.addWorksheet('Statistics');
-      
-    // Section 1: Event Summary
-    dataSheet.addRow(['EVENT SUMMARY', '', '', '']);
-    dataSheet.addRow(['Event Name', statistics.event.name, '', '']);
-    dataSheet.addRow(['Total Leads Collected', statistics.leadsCollected.totalLeadsCount, '', '']);
-    dataSheet.addRow(['Leads Collected Percentage', `${statistics.leadsCollected.leadsCollectedPercentage}%`, '', '']);
-    dataSheet.addRow(['Stamps Issued', statistics.leadsCollected.stampsIssued, '', '']);
-    dataSheet.addRow(['Total Views', statistics.boothProfileStatistics.totalViewCount, '', '']);
-    dataSheet.addRow(['Average Rating', statistics.boothProfileStatistics.ratingScore, '', '']);
+    // Sheet 1: Lead Collection
+    const leadSheet = workbook.addWorksheet('Lead Collection');
     
-    // Add spacing
-    dataSheet.addRow({});
-    dataSheet.addRow({});
+    // Lead Collection Headers
+    leadSheet.addRow([
+      'Name',
+      'Company',
+      'Position',
+      'Mobile Number',
+      'Email address',
+      'Industry',
+      'LinkedIn Account',
+      'Notes',
+      'Booth Staff',
+      'Stamp Issued',
+    ]);
 
-    // Section 2: Views Over Time (Booth Statistics)
-    dataSheet.addRow(['', '', '', '', '']);
-    dataSheet.addRow(['', '', '', '', '']);
-    const viewsHeaderRow = dataSheet.rowCount;
-    dataSheet.addRow(['VIEWS OVER TIME (BOOTH STATISTICS)', '', '', '', '']);
-    const tableHeaderRow = dataSheet.rowCount + 1;
-    dataSheet.addRow(['SNo', 'Date (ISO)', 'Date (Formatted)', 'View Count (Daily)', '']);
+    // Style header row
+    const leadHeaderRow = leadSheet.getRow(1);
+    leadHeaderRow.font = { bold: true, size: 12 };
+    leadHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+    leadHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    leadHeaderRow.font = { ...leadHeaderRow.font, color: { argb: 'FFFFFFFF' } };
 
-    const viewDataRows: Array<{ sno: number; dateISO: string; date: string; count: number }> = [];
-    let serialNumber = 1;
+    // Add lead data rows
+    leadsData.forEach((lead) => {
+      const attendee = lead.attendee || {};
+      const scanner = lead.scanner || {};
+      const fullName = `${attendee.firstName || ''} ${attendee.lastName || ''}`.trim() || 'N/A';
+      const boothStaff = scanner.firstName && scanner.lastName
+        ? `${scanner.firstName} ${scanner.lastName}`
+        : 'N/A';
+      const stampIssued = stampIssuedMap[lead.attendeeId] ? 'Yes' : 'No';
 
-    statistics.boothProfileStatistics.viewCountOverTime.forEach((view: { date: string; count: number }) => {
-      const date = new Date(view.date);
-      const rowData = {
-        sno: serialNumber++,
-        dateISO: view.date, // Original ISO date string
-        date: date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-        count: view.count,
-      };
-      viewDataRows.push(rowData);
-      dataSheet.addRow([
-        rowData.sno,
-        rowData.dateISO,
-        rowData.date,
-        rowData.count,
-        '',
+      leadSheet.addRow([
+        fullName,
+        attendee.company || 'N/A',
+        attendee.designation || 'N/A',
+        attendee.mobile || 'N/A',
+        attendee.email || 'N/A',
+        attendee.industry || 'N/A',
+        attendee.linkedinProfile || 'N/A',
+        lead.notes || 'N/A',
+        boothStaff,
+        stampIssued,
       ]);
     });
 
-    // Add total row for views
-    if (viewDataRows.length > 0) {
-      const viewsTotalRow = dataSheet.rowCount + 1;
-      dataSheet.addRow([
+    // Set column widths for Lead Collection
+    leadSheet.getColumn(1).width = 25; // Name
+    leadSheet.getColumn(2).width = 30; // Company
+    leadSheet.getColumn(3).width = 25; // Position
+    leadSheet.getColumn(4).width = 18; // Mobile Number
+    leadSheet.getColumn(5).width = 30; // Email address
+    leadSheet.getColumn(6).width = 30; // Industry
+    leadSheet.getColumn(7).width = 35; // LinkedIn Account
+    leadSheet.getColumn(8).width = 30; // Notes
+    leadSheet.getColumn(9).width = 20; // Booth Staff
+    leadSheet.getColumn(10).width = 15; // Stamp Issued
+
+    // Add auto filter
+    if (leadsData.length > 0) {
+      leadSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: leadsData.length + 1, column: 10 },
+      };
+    }
+
+    // Sheet 2: Overview
+    const overviewSheet = workbook.addWorksheet('Overview');
+    
+    // Overview Headers
+    overviewSheet.addRow([
+      'Event Title',
+      'Total leads count',
+      'Leads collected/ number of attendees',
+      'Stamps issued',
+      'Total view count',
+      'Average Rating score',
+    ]);
+
+    // Style header row
+    const overviewHeaderRow = overviewSheet.getRow(1);
+    overviewHeaderRow.font = { bold: true, size: 12 };
+    overviewHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+    overviewHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    overviewHeaderRow.font = { ...overviewHeaderRow.font, color: { argb: 'FFFFFFFF' } };
+
+    // Format leads collected percentage (already calculated in statistics)
+    const leadsCollectedPercentage = `${statistics.leadsCollected.leadsCollectedPercentage}%`;
+
+    // Add overview data row
+    overviewSheet.addRow([
+      statistics.event.name,
+      statistics.leadsCollected.totalLeadsCount,
+      leadsCollectedPercentage,
+      statistics.leadsCollected.stampsIssued,
+      statistics.boothProfileStatistics.totalViewCount,
+      statistics.boothProfileStatistics.ratingScore || 0,
+    ]);
+
+    // Set column widths for Overview
+    overviewSheet.getColumn(1).width = 40; // Event Title
+    overviewSheet.getColumn(2).width = 20; // Total leads count
+    overviewSheet.getColumn(3).width = 35; // Leads collected/ number of attendees
+    overviewSheet.getColumn(4).width = 18; // Stamps issued
+    overviewSheet.getColumn(5).width = 20; // Total view count
+    overviewSheet.getColumn(6).width = 22; // Average Rating score
+
+    // Sheet 3: Views Over Time (optional - keeping for completeness)
+    const viewsSheet = workbook.addWorksheet('Views Over Time');
+    
+    viewsSheet.addRow(['SNo', 'Date (ISO)', 'Date (Formatted)', 'View Count (Daily)']);
+
+    // Style header row
+    const viewsHeaderRow = viewsSheet.getRow(1);
+    viewsHeaderRow.font = { bold: true, size: 12 };
+    viewsHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+    viewsHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    viewsHeaderRow.font = { ...viewsHeaderRow.font, color: { argb: 'FFFFFFFF' } };
+
+    // Add views data
+    let serialNumber = 1;
+    statistics.boothProfileStatistics.viewCountOverTime.forEach((view: { date: string; count: number }) => {
+      const date = new Date(view.date);
+      viewsSheet.addRow([
+        serialNumber++,
+        view.date,
+        date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        view.count,
+      ]);
+    });
+
+    // Add total row
+    if (statistics.boothProfileStatistics.viewCountOverTime.length > 0) {
+      viewsSheet.addRow([
         '',
         '',
         'TOTAL',
         statistics.boothProfileStatistics.totalViewCount,
-        '',
       ]);
-
-      // Style views section header (blue background, white bold text)
-      const viewsSectionHeader = dataSheet.getRow(viewsHeaderRow);
-      viewsSectionHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-      viewsSectionHeader.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
-      // Merge cells for section header (A{viewsHeaderRow}:E{viewsHeaderRow})
-      dataSheet.mergeCells(`A${viewsHeaderRow}:E${viewsHeaderRow}`);
-
-      // Style views table header (grey background, bold text)
-      const tableHeader = dataSheet.getRow(tableHeaderRow);
-      tableHeader.font = { bold: true };
-      tableHeader.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' },
-      };
-
-      // Style views total row (grey background, bold text)
-      const totalRow = dataSheet.getRow(viewsTotalRow);
+      const totalRow = viewsSheet.getRow(viewsSheet.rowCount);
       totalRow.font = { bold: true };
       totalRow.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FFE0E0E0' },
       };
+    }
 
-      // Add auto filter to the table (from table header row to last data row)
-      const filterStartRow = tableHeaderRow;
-      const filterEndRow = viewsTotalRow - 1; // Before total row
-      dataSheet.autoFilter = {
-        from: { row: filterStartRow, column: 1 },
-        to: { row: filterEndRow, column: 4 },
+    // Set column widths for Views Over Time
+    viewsSheet.getColumn(1).width = 10; // SNo
+    viewsSheet.getColumn(2).width = 30; // Date (ISO)
+    viewsSheet.getColumn(3).width = 25; // Date (Formatted)
+    viewsSheet.getColumn(4).width = 20; // View Count
+
+    // Add auto filter for views
+    if (statistics.boothProfileStatistics.viewCountOverTime.length > 0) {
+      viewsSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: statistics.boothProfileStatistics.viewCountOverTime.length + 1, column: 4 },
       };
     }
-
-    // Style event summary section header (row 1) - blue background, white bold text
-    const eventSummaryHeader = dataSheet.getRow(1);
-    eventSummaryHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    eventSummaryHeader.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4472C4' },
-    };
-    // Merge cells for section header (A1:E1)
-    dataSheet.mergeCells('A1:E1');
-
-    // Make all data rows in Event Summary bold for labels
-    for (let i = 2; i <= 7; i++) {
-      const row = dataSheet.getRow(i);
-      const labelCell = row.getCell(1);
-      labelCell.font = { bold: true };
-    }
-
-    // Set column widths
-    dataSheet.getColumn(1).width = 40; // Event Summary Labels / SNo
-    dataSheet.getColumn(2).width = 30; // Event Summary Values / Date ISO
-    dataSheet.getColumn(3).width = 25; // Date Formatted
-    dataSheet.getColumn(4).width = 20; // View Count
-    dataSheet.getColumn(5).width = 10; // Empty column
 
     return workbook;
   }
 
   /**
-   * Create Lead Collection Excel Workbook
-   * Contains: Event Summary + Staff ID, Staff Name, Leads Collected
+   * Stream single Excel file with multiple sheets to response
    */
-  static createLeadCollectionExcel(statistics: any): ExcelJS.Workbook {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Event Management System';
-    workbook.created = new Date();
-    workbook.modified = new Date();
-
-    const leadSheet = workbook.addWorksheet('Lead Collection');
-    
-    // Section 1: Event Summary
-    leadSheet.addRow(['EVENT SUMMARY', '', '', '']);
-    leadSheet.addRow(['Event Name', statistics.event.name, '', '']);
-    leadSheet.addRow(['Total Leads Collected', statistics.leadsCollected.totalLeadsCount, '', '']);
-    leadSheet.addRow(['Leads Collected Percentage', `${statistics.leadsCollected.leadsCollectedPercentage}%`, '', '']);
-    leadSheet.addRow(['Stamps Issued', statistics.leadsCollected.stampsIssued, '', '']);
-    leadSheet.addRow(['Total Views', statistics.boothProfileStatistics.totalViewCount, '', '']);
-    leadSheet.addRow(['Average Rating', statistics.boothProfileStatistics.ratingScore, '', '']);
-    
-    // Add spacing
-    leadSheet.addRow({});
-    leadSheet.addRow({});
-
-    // Section 2: Lead Collection Table
-    const leadCollectionHeaderRow = leadSheet.rowCount;
-    leadSheet.addRow(['LEAD COLLECTION', '', '', '']);
-    const tableHeaderRow = leadSheet.rowCount + 1;
-    leadSheet.addRow(['SNo', 'Staff ID', 'Staff Name', 'Leads Collected']);
-    
-    // Add data rows
-    const dataStartRow = tableHeaderRow + 1;
-    let leadSerialNumber = 1;
-    statistics.leadsCollected.leadsByStaff.forEach((staff: { staffId: string; staffName: string; count: number }) => {
-      leadSheet.addRow([
-        leadSerialNumber++,
-        staff.staffId,
-        staff.staffName,
-        staff.count,
-      ]);
-    });
-
-    // Add total row
-    const totalRow = leadSheet.rowCount + 1;
-    leadSheet.addRow([
-      '',
-      '',
-      'TOTAL',
-      statistics.leadsCollected.totalLeadsCount,
-    ]);
-
-    // Style Event Summary section header (row 1) - blue background, white bold text
-    const eventSummaryHeader = leadSheet.getRow(1);
-    eventSummaryHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    eventSummaryHeader.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4472C4' },
-    };
-    // Merge cells for section header
-    leadSheet.mergeCells('A1:D1');
-
-    // Make all data rows in Event Summary bold for labels
-    for (let i = 2; i <= 7; i++) {
-      const row = leadSheet.getRow(i);
-      const labelCell = row.getCell(1);
-      labelCell.font = { bold: true };
-    }
-
-    // Style Lead Collection section header - blue background, white bold text
-    const leadSectionHeader = leadSheet.getRow(leadCollectionHeaderRow);
-    leadSectionHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    leadSectionHeader.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4472C4' },
-    };
-    // Merge cells for section header
-    leadSheet.mergeCells(`A${leadCollectionHeaderRow}:D${leadCollectionHeaderRow}`);
-
-    // Style table header (grey background, bold text)
-    const tableHeader = leadSheet.getRow(tableHeaderRow);
-    tableHeader.font = { bold: true };
-    tableHeader.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' },
-    };
-
-    // Style total row (grey background, bold text)
-    const total = leadSheet.getRow(totalRow);
-    total.font = { bold: true };
-    total.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' },
-    };
-
-    // Add auto filter to the table (from table header row to last data row, before total)
-    const filterEndRow = totalRow - 1;
-    if (filterEndRow >= dataStartRow) {
-      leadSheet.autoFilter = {
-        from: { row: tableHeaderRow, column: 1 },
-        to: { row: filterEndRow, column: 4 },
-      };
-    }
-
-    // Set column widths
-    leadSheet.getColumn(1).width = 35; // Event Summary Labels / SNo
-    leadSheet.getColumn(2).width = 40; // Event Summary Values / Staff ID
-    leadSheet.getColumn(3).width = 30; // Staff Name
-    leadSheet.getColumn(4).width = 20; // Leads Collected
-
-    return workbook;
-  }
-
-  /**
-   * Stream ZIP file with Statistics and Lead Collection Excel files to response
-   */
-  static async streamExcelZipToResponse(
+  static async streamSingleExcelToResponse(
     statistics: any,
+    leadsData: any[],
+    stampIssuedMap: { [attendeeId: string]: boolean },
+    totalAttendees: number,
     response: Response,
-    zipFileName: string,
+    excelFileName: string,
   ): Promise<void> {
     try {
-      // Create both Excel workbooks
-      const statisticsWorkbook = this.createStatisticsExcel(statistics);
-      const leadCollectionWorkbook = this.createLeadCollectionExcel(statistics);
+      // Create single workbook with multiple sheets
+      const workbook = this.createSingleExcelWorkbook(statistics, leadsData, stampIssuedMap, totalAttendees);
 
-      // Convert workbooks to buffers
-      const statisticsBuffer = await statisticsWorkbook.xlsx.writeBuffer();
-      const leadCollectionBuffer = await leadCollectionWorkbook.xlsx.writeBuffer();
+      // Set response headers
+      response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      response.setHeader('Content-Disposition', `attachment; filename="${excelFileName}"`);
 
-      // Use require for archiver (same as flyer download)
-      const archiverLib = require('archiver');
-      const archive = archiverLib('zip', {
-        zlib: { level: 9 }, // Maximum compression
-      });
-
-      // Set response attachment (same as flyer download)
-      response.attachment(zipFileName);
-
-      // Handle archive errors
-      archive.on('error', (err: Error) => {
-        console.error('Archive error:', err);
-        if (!response.headersSent) {
-          response.status(500).json({
-            success: false,
-            message: 'Error creating ZIP file',
-          });
-        }
-      });
-
-      // Pipe archive to response
-      archive.pipe(response);
-
-      // Add Excel files to ZIP
-      archive.append(Buffer.from(statisticsBuffer), { name: 'Statistics.xlsx' });
-      archive.append(Buffer.from(leadCollectionBuffer), { name: 'Lead_Collection.xlsx' });
-
-      // Finalize the archive (this will trigger the download)
-      await archive.finalize();
+      // Write workbook to response
+      await workbook.xlsx.write(response);
+      response.end();
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -315,4 +235,5 @@ export class ExcelExportUtils {
       throw error;
     }
   }
+
 }

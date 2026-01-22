@@ -2363,40 +2363,150 @@ export class ExhibitorService {
 
 
   /**
-   * Export event statistics to Excel format (legacy method - kept for compatibility)
+   * Stream single Excel file with multiple sheets to response
    */
-  async exportEventStatisticsToExcel(eventId: string, userId: string): Promise<ExcelJS.Workbook> {
-    try {
-      // Get statistics data
-      const statistics = await this.getEventReportStatistics(eventId, userId);
-      return ExcelExportUtils.createStatisticsExcel(statistics);
-    } catch (error) {
-      if (
-        error instanceof ResourceNotFoundException ||
-        error instanceof ForbiddenException
-      ) {
-        throw error;
-      }
-      this.errorHandler.handleDatabaseError(error, 'Event statistics Excel export');
-      throw error;
-    }
-  }
-
-  /**
-   * Stream ZIP file with Statistics and Lead Collection Excel files to response
-   */
-  async streamExcelZipToResponse(
+  async streamSingleExcelToResponse(
     eventId: string,
     userId: string,
     response: any,
-    zipFileName: string,
+    excelFileName: string,
   ): Promise<void> {
     try {
       // Get statistics data
       const statistics = await this.getEventReportStatistics(eventId, userId);
 
-      // Use utility to stream ZIP file
-      await ExcelExportUtils.streamExcelZipToResponse(statistics, response, zipFileName);
+      // Get user role for permission check
+      const { EventStaff } = await import('../event/event-staff.entity');
+      const eventStaffRepository = this.exhibitorRepository.manager.getRepository(EventStaff);
+      const userStaffRecord = await eventStaffRepository.findOne({
+        where: {
+          eventId: eventId,
+          userId: userId,
+        },
+      });
+
+      if (!userStaffRecord) {
+        throw new ForbiddenException('You do not have permission to view statistics for this event');
+      }
+
+      // Get all leads for this event (without pagination)
+      let exhibitorIds: string[] = [];
+      const userRole = 'exhibitor'; // Since we're in exhibitor service, assume exhibitor role
+
+      // Get all exhibitor IDs where this user is a staff member
+      const staffRecords = await eventStaffRepository.find({
+        where: {
+          userId: userId,
+          eventId: eventId,
+        },
+        select: ['exhibitorId'],
+      });
+
+      if (staffRecords && staffRecords.length > 0) {
+        exhibitorIds = [...new Set(staffRecords.map(record => record.exhibitorId))];
+      }
+
+      // Build query to get all leads
+      const queryBuilder = this.exhibitorLeadRepository
+        .createQueryBuilder('lead')
+        .leftJoinAndSelect('lead.attendee', 'attendee')
+        .leftJoinAndSelect('lead.scanner', 'scanner')
+        .where('lead.isActive = :isActive', { isActive: true })
+        .andWhere('lead.eventId = :eventId', { eventId });
+
+      // Filter by exhibitor(s) if user is exhibitor
+      if (exhibitorIds.length > 0) {
+        queryBuilder.andWhere('lead.exhibitorId IN (:...exhibitorIds)', { exhibitorIds });
+      }
+
+      // Order by creation date
+      queryBuilder.orderBy('lead.createdAt', 'DESC');
+
+      // Get all leads (no pagination)
+      const leads = await queryBuilder.getMany();
+
+      // Format leads data
+      const leadsData = leads.map((lead) => ({
+        id: lead.id,
+        attendeeId: lead.attendeeId,
+        attendee: {
+          id: lead.attendeeId,
+          firstName: lead.attendee?.firstName,
+          lastName: lead.attendee?.lastName,
+          email: lead.attendee?.email,
+          mobile: lead.attendee?.mobile,
+          company: lead.attendee?.company,
+          designation: lead.attendee?.designation,
+          industry: lead.attendee?.industry,
+          linkedinProfile: lead.attendee?.linkedinProfile,
+        },
+        scanner: {
+          id: lead.scannedBy,
+          firstName: lead.scanner?.firstName,
+          lastName: lead.scanner?.lastName,
+        },
+        notes: lead.notes,
+      }));
+
+      // Get stamp issued information for each attendee
+      // Find the exhibitor's stamp for this event
+      const { EventStamp } = await import('../event/event-stamp.entity');
+      const { EventStampEvent } = await import('../event/event-stamp-event.entity');
+      const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+      
+      const eventStampRepository = this.exhibitorRepository.manager.getRepository(EventStamp);
+      const eventStampEventRepository = this.exhibitorRepository.manager.getRepository(EventStampEvent);
+      const userStampVisitRepository = this.exhibitorRepository.manager.getRepository(UserStampVisit);
+
+      const stampIssuedMap: { [attendeeId: string]: boolean } = {};
+
+      // Get exhibitor's stamp for this event
+      if (userStaffRecord.exhibitorId) {
+        const eventStamps = await eventStampEventRepository.find({
+          where: { eventId: eventId },
+          relations: ['eventStamp'],
+        });
+
+        const exhibitorStamp = eventStamps.find(
+          (ese) => ese.eventStamp.exhibitorId === userStaffRecord.exhibitorId
+        );
+
+        if (exhibitorStamp && exhibitorStamp.eventStamp) {
+          // Get all stamp visits for this stamp
+          const stampVisits = await userStampVisitRepository.find({
+            where: {
+              stampId: exhibitorStamp.eventStamp.id,
+              isVisited: true,
+            },
+          });
+
+          // Create map of attendees who have stamps
+          stampVisits.forEach((visit) => {
+            stampIssuedMap[visit.userId] = true;
+          });
+        }
+      }
+
+      // Get total attendees count for the ratio calculation
+      const { RegisterEvent } = await import('../registerEvent/registerEvent.entity');
+      const registerEventRepository = this.exhibitorRepository.manager.getRepository(RegisterEvent);
+      const totalAttendees = await registerEventRepository.count({
+        where: {
+          eventId: eventId,
+          type: 'Attendee',
+          isRegister: true,
+        },
+      });
+
+      // Use utility to stream single Excel file
+      await ExcelExportUtils.streamSingleExcelToResponse(
+        statistics,
+        leadsData,
+        stampIssuedMap,
+        totalAttendees,
+        response,
+        excelFileName,
+      );
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -2404,10 +2514,11 @@ export class ExhibitorService {
       ) {
         throw error;
       }
-      this.errorHandler.handleDatabaseError(error, 'Excel ZIP file streaming');
+      this.errorHandler.handleDatabaseError(error, 'Excel file streaming');
       throw error;
     }
   }
+
 
 
 

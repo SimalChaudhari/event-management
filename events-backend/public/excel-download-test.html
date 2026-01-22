@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZIP Download Test - Event Reports</title>
+    <title>Excel Download Test - Event Reports</title>
     <style>
         * {
             margin: 0;
@@ -155,12 +155,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>📦 ZIP Download Test</h1>
-        <p class="subtitle">Download Event Statistics & Lead Collection Reports (ZIP File)</p>
+        <h1>📊 Excel Download Test</h1>
+        <p class="subtitle">Download Event Statistics & Lead Collection Reports (Excel File)</p>
         
         <div class="info-box">
             <p><strong>Endpoint:</strong> <code>GET /api/exhibitors/report/event/statistics/:eventId/download</code></p>
-            <p><strong>Download:</strong> ZIP file containing 2 Excel files (Statistics.xlsx & Lead_Collection.xlsx)</p>
+            <p><strong>Download:</strong> Single Excel file (.xlsx) with 3 sheets: Lead Collection, Overview, Views Over Time</p>
             <p><strong>Note:</strong> You need to be authenticated (Admin or Exhibitor role)</p>
             <p><strong>Tip:</strong> Open browser DevTools → Network tab to see the request</p>
         </div>
@@ -188,7 +188,7 @@
             </div>
             
             <button type="submit" class="btn" id="downloadBtn">
-                📦 Download ZIP File
+                📊 Download Excel File
             </button>
         </form>
         
@@ -242,15 +242,15 @@
             }
 
             downloadBtn.disabled = true;
-            downloadBtn.textContent = '⏳ Downloading ZIP...';
-            showStatus('Downloading ZIP file with Excel reports...', 'info');
+            downloadBtn.textContent = '⏳ Downloading Excel...';
+            showStatus('Downloading Excel file with reports...', 'info');
 
             try {
                 const apiBaseUrl = getApiBaseUrl();
                 const url = `${apiBaseUrl}/api/exhibitors/report/event/statistics/${eventId}/download`;
                 
                 const headers = {
-                    'Accept': 'application/zip, application/x-zip-compressed, application/octet-stream',
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream',
                 };
 
                 // Add token to headers if provided
@@ -287,11 +287,10 @@
                 // Get the blob from response
                 const blob = await response.blob();
                 
-                // Check if it's a ZIP file
-                if (blob.type !== 'application/zip' && 
-                    blob.type !== 'application/x-zip-compressed' &&
+                // Check if it's an Excel file
+                if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && 
                     blob.type !== 'application/octet-stream') {
-                    showStatus(`Warning: Expected ZIP file but got ${blob.type}`, 'error');
+                    showStatus(`Warning: Expected Excel file but got ${blob.type}`, 'error');
                 }
 
                 // Create download link
@@ -301,7 +300,7 @@
                 
                 // Get filename from Content-Disposition header or use default
                 const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `event_reports_${eventId}_${new Date().toISOString().split('T')[0]}.zip`;
+                let filename = `event_reports_${eventId}_${new Date().toISOString().split('T')[0]}.xlsx`;
                 
                 if (contentDisposition) {
                     // Try to get filename from filename* (UTF-8 encoded)
@@ -317,9 +316,9 @@
                     }
                 }
                 
-                // Ensure filename has .zip extension
-                if (!filename.toLowerCase().endsWith('.zip')) {
-                    filename = filename.replace(/\.[^.]*$/, '') + '.zip';
+                // Ensure filename has .xlsx extension
+                if (!filename.toLowerCase().endsWith('.xlsx')) {
+                    filename = filename.replace(/\.[^.]*$/, '') + '.xlsx';
                 }
                 
                 // Remove any invalid characters from filename
@@ -331,15 +330,15 @@
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url_blob);
 
-                showStatus(`✅ ZIP file downloaded successfully: ${filename} (Contains: Statistics.xlsx & Lead_Collection.xlsx)`, 'success');
+                showStatus(`✅ Excel file downloaded successfully: ${filename} (Contains: Lead Collection, Overview, Views Over Time sheets)`, 'success');
                 downloadBtn.disabled = false;
-                downloadBtn.textContent = '📦 Download ZIP File';
+                downloadBtn.textContent = '📊 Download Excel File';
 
             } catch (error) {
                 console.error('Download error:', error);
                 showStatus(`Error: ${error.message}`, 'error');
                 downloadBtn.disabled = false;
-                downloadBtn.textContent = '📦 Download ZIP File';
+                downloadBtn.textContent = '📊 Download Excel File';
             }
         });
 
