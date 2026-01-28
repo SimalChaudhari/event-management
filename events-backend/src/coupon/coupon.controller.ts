@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto, ApplyCouponDto } from './coupon.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -19,8 +19,9 @@ export class CouponController {
 
   @Get()
   // @Roles(UserRole.Admin)
-  async getAllCoupons() {
-    return this.couponService.getAllCoupons();
+  async getAllCoupons(@Query('eventId') eventId?: string, @Request() req?: any) {
+    const isAdmin = req?.user?.role === UserRole.Admin;
+    return this.couponService.getAllCoupons(eventId, isAdmin);
   }
 
   @Get(':id')

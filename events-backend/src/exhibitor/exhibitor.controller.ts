@@ -25,6 +25,7 @@ import path from 'path';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { promisify } from 'util';
 import { ExhibitorService } from './exhibitor.service';
 import { ExhibitorDto } from './exhibitor.dto';
@@ -1701,6 +1702,7 @@ export class ExhibitorController {
   /**
    * Download event statistics as Excel file
    * Exports: event statistics, leads by staff, views over time
+   * Returns: file information (filename, url, type) for download
    * Access: Admin and Exhibitor users only
    */
   @Get('report/event/statistics/:eventId/download')
@@ -1708,31 +1710,85 @@ export class ExhibitorController {
   @Roles(UserRole.Admin, UserRole.Exhibitor)
   async downloadEventStatisticsExcel(
     @Param('eventId') eventId: string,
-    @Res() response: Response,
     @Request() req: any,
   ) {
     try {
       const userId = req.user?.id;
 
       if (!userId) {
-        return response.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User not authenticated',
-        });
+        throw new ForbiddenException('User not authenticated');
       }
 
-      // Get event name for filename - sanitize for filename
+      // Get statistics data
       const statistics = await this.exhibitorService.getEventReportStatistics(eventId, userId);
-      const eventName = statistics.event.name
-        .replace(/[^a-z0-9]/gi, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '')
-        .toLowerCase() || 'event';
-      const dateStr = new Date().toISOString().split('T')[0];
-      const excelFileName = `event_reports_${eventName}_${dateStr}.xlsx`;
+      
+      // Create hash of key statistics to detect changes
+      const hashData = {
+        totalLeads: statistics.leadsCollected.totalLeadsCount,
+        stampsIssued: statistics.leadsCollected.stampsIssued,
+        totalViews: statistics.boothProfileStatistics.totalViewCount,
+        ratingScore: statistics.boothProfileStatistics.ratingScore,
+        eventId: eventId,
+        userId: userId,
+      };
+      const dataHash = crypto.createHash('md5').update(JSON.stringify(hashData)).digest('hex').substring(0, 8);
+      
+      // Create deterministic filename based on eventId, userId, and data hash
+      const excelFileName = `event_report_${eventId.substring(0, 8)}_${userId.substring(0, 8)}_${dataHash}.xlsx`;
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'exhibitor', 'reports');
+      const filePath = path.join(uploadsDir, excelFileName);
+      const relativePath = `uploads/exhibitor/reports/${excelFileName}`;
 
-      // Create single Excel file with multiple sheets and stream to response
-      await this.exhibitorService.streamSingleExcelToResponse(eventId, userId, response, excelFileName);
+      // Check if file exists with same hash (same data)
+      if (fs.existsSync(filePath)) {
+        // File exists with same hash - return existing file
+        return {
+          success: true,
+          message: 'Excel file already exists',
+          data: {
+            filename: excelFileName,
+            url: `/${relativePath}`,
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        };
+      }
+
+      // File doesn't exist or data changed - delete old files for this event+user and generate new
+      const filePattern = `event_report_${eventId.substring(0, 8)}_${userId.substring(0, 8)}_`;
+      try {
+        // Ensure directory exists
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        } else {
+          // Delete old files with same event+user pattern but different hash
+          const files = fs.readdirSync(uploadsDir);
+          files.forEach((file) => {
+            if (file.startsWith(filePattern) && file.endsWith('.xlsx')) {
+              const oldFilePath = path.join(uploadsDir, file);
+              try {
+                fs.unlinkSync(oldFilePath);
+              } catch (err) {
+                // Ignore errors when deleting old files
+              }
+            }
+          });
+        }
+      } catch (err) {
+        // Ignore errors, directory will be created by service method
+      }
+
+      // Generate new file
+      const fileInfo = await this.exhibitorService.generateEventStatisticsExcelFile(
+        eventId,
+        userId,
+        excelFileName,
+      );
+
+      return {
+        success: true,
+        message: 'Excel file generated successfully',
+        data: fileInfo,
+      };
     } catch (error) {
       this.errorHandler.logError(error, 'Event statistics Excel download', req.user?.id);
       throw error;

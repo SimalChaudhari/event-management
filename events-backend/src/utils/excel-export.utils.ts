@@ -2,6 +2,8 @@ import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import { ResourceNotFoundException } from './exceptions/custom-exceptions';
 import { ForbiddenException } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Excel Export Utility
@@ -225,6 +227,48 @@ export class ExcelExportUtils {
       // Write workbook to response
       await workbook.xlsx.write(response);
       response.end();
+    } catch (error) {
+      if (
+        error instanceof ResourceNotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Save single Excel file with multiple sheets to disk
+   * Returns the file path relative to uploads directory
+   */
+  static async saveSingleExcelToFile(
+    statistics: any,
+    leadsData: any[],
+    stampIssuedMap: { [attendeeId: string]: boolean },
+    totalAttendees: number,
+    excelFileName: string,
+  ): Promise<string> {
+    try {
+      // Create single workbook with multiple sheets
+      const workbook = this.createSingleExcelWorkbook(statistics, leadsData, stampIssuedMap, totalAttendees);
+
+      // Define upload directory for reports
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'exhibitor', 'reports');
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Full file path
+      const filePath = path.join(uploadsDir, excelFileName);
+
+      // Write workbook to file
+      await workbook.xlsx.writeFile(filePath);
+
+      // Return relative path from uploads directory
+      return `uploads/exhibitor/reports/${excelFileName}`;
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||

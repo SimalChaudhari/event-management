@@ -48,5 +48,6 @@ import { FilterModule } from '../service/filter.module';
   ],
     providers: [CartService,SurveyService,ErrorHandlerService,EmailService],
     controllers: [CartController],
+    exports: [CartService], // Export CartService so CheckoutModule can use it
 })
 export class CartModule {}

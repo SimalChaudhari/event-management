@@ -191,7 +191,7 @@ export class CartService {
             discount,
             finalAmount,
             couponApplied: {
-                code: couponCode,
+                name: couponCode, // couponCode variable contains the voucher name
                 discount: discount,
                 type: coupon.discountType,
                 couponId: coupon.id,
@@ -208,8 +208,8 @@ export class CartService {
         });
 
         if (userPreference && userPreference.appliedCoupon) {
-            // Get coupon by code to get couponId
-            const coupon = await this.couponService.getCouponByCode(userPreference.appliedCoupon);
+            // Get coupon by name to get couponId
+            const coupon = await this.couponService.getCouponByName(userPreference.appliedCoupon);
             
             if (coupon) {
                 await this.couponService.recordCouponUsage(userId, coupon.id, orderId);

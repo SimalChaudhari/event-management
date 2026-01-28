@@ -3,14 +3,14 @@ import { IsBoolean, IsDate, IsNotEmpty, IsNumber, IsOptional, IsString } from "c
 export class ApplyCouponDto {
     @IsNotEmpty()
     @IsString()
-    code!: string;
+    name!: string; // Voucher name
   }
 
 export class CreateCouponDto {
   
   @IsNotEmpty()
   @IsString()
-  code!: string;
+  name!: string; // Voucher name
   
   @IsNotEmpty()
   @IsBoolean()
@@ -35,5 +35,13 @@ export class CreateCouponDto {
 
   @IsOptional()
   @IsDate()
-  expiryDate?: Date;
+  validFrom?: Date; // Voucher valid from date
+
+  @IsOptional()
+  @IsDate()
+  validTo?: Date; // Voucher valid to date
+
+  @IsOptional()
+  @IsString()
+  eventId?: string; // Event ID - optional, null means global coupon
 }

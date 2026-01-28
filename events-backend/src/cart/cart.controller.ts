@@ -1,5 +1,5 @@
 // src/controllers/cart.controller.ts
-import { Controller, Post, Get, Put, Delete, Body, Param, Res, UseGuards, Request, forwardRef, Inject } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, Res, UseGuards, Request, forwardRef, Inject } from '@nestjs/common';
 import { Response } from 'express';
 import { CartService } from './cart.service';
 import { CartDto } from './cart.dto';
@@ -18,8 +18,180 @@ export class CartController {
         private readonly eventService: EventService, // Inject EventService
         private readonly checkoutService: CheckoutService, // Inject CheckoutService
     ) {}
-    @Post('')
-    async addToCart(@Body() cartDto: CartDto, @Res() response: Response, @Request() req: any) {
+    
+    @Post('create-checkout')
+    async createCheckout(
+        @Body() body: { 
+            selectedCartIds: string[],
+            couponId?: string  // Optional - can be null or empty
+        },
+        @Request() req: any,
+        @Res() response: Response
+    ) {
+        try {
+            const userId = req.user.id;
+            const role = req.user.role;
+
+            if (role !== 'user') {
+                return response.status(403).json({
+                    success: false,
+                    message: 'Access denied. Only users can create checkout sessions.',
+                });
+            }
+
+            if (!body.selectedCartIds || body.selectedCartIds.length === 0) {
+                return response.status(400).json({
+                    success: false,
+                    message: 'Please select at least one item for checkout.',
+                });
+            }
+
+            // Get selected cart items with full details
+            let result = await this.cartService.getCartItemsByIds(userId, body.selectedCartIds);
+            
+            if (result.totalCount === 0) {
+                return response.status(400).json({
+                    success: false,
+                    message: 'No valid cart items found for checkout.',
+                });
+            }
+
+            // Apply coupon if provided (optional)
+            if (body.couponId && body.couponId.trim() !== '') {
+                try {
+                    // Get coupon by ID first, then apply using the code
+                    const couponService = this.cartService['couponService']; // Access coupon service
+                    const coupon = await couponService.getCouponById(body.couponId);
+                    
+                    const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, coupon.name);
+                    // Update result with coupon data
+                    result = {
+                        ...result,
+                        discount: couponResult.discount,
+                        finalAmount: couponResult.finalAmount,
+                        couponApplied: couponResult.couponApplied as any
+                    };
+                } catch (error: any) {
+                    return response.status(400).json({
+                        success: false,
+                        message: error.message || 'Invalid coupon ID',
+                        error: error.message
+                    });
+                }
+            }
+
+            // Convert cart items to checkout format - store only IDs for storage
+            // But we still need to pass full data to checkout service for validation
+            const checkoutItems = result.items.map(item => ({
+                eventId: item.eventId,
+                price: item.price,
+                eventName: item.eventName
+            }));
+
+            // Prepare minimal cart data (only IDs) for storage after checkout creation
+            const cartIdsMinimal = result.items.map(item => ({
+                cartId: item.cartId,
+                eventId: item.eventId
+            }));
+
+            // Calculate total amount (with or without coupon)
+            const totalAmount = result.totalAmount;
+            const discount = result.discount || 0;
+            const finalAmount = totalAmount - discount;
+
+            // Create checkout DTO
+            let couponCodeForCheckout = undefined;
+            if (body.couponId && body.couponId.trim() !== '') {
+                // Get coupon name from coupon ID
+                const couponService = this.cartService['couponService'];
+                const coupon = await couponService.getCouponById(body.couponId);
+                couponCodeForCheckout = coupon.name; // couponCode variable stores the voucher name
+            }
+
+            const checkoutDto: CreateCheckoutDto = {
+                cartItems: checkoutItems,
+                totalAmount: finalAmount,
+                discount: discount, // ✅ Include the discount amount
+                couponCode: couponCodeForCheckout,
+                useSelectedItemsOnly: true,
+            };
+
+            // Create checkout session
+            const checkout = await this.checkoutService.createCheckout(userId, checkoutDto);
+
+            // Update checkout to store only IDs (minimal data) instead of full cart item data
+            await this.checkoutService.updateCheckoutCartItems(checkout.checkoutId, cartIdsMinimal);
+
+            // Determine success message based on coupon application
+            const successMessage = body.couponId && body.couponId.trim() !== '' 
+                ? 'Checkout session created successfully with coupon applied'
+                : 'Checkout session created successfully';
+
+            // Prepare response data based on whether coupon is applied
+            // Return only IDs (minimal data) in response
+            const responseData: any = {
+                checkoutId: checkout.checkoutId,
+                status: checkout.status,
+                totalAmount: body.couponId && body.couponId.trim() !== '' 
+                    ? finalAmount  // Show discounted amount when coupon applied
+                    : totalAmount, // Show original amount when no coupon
+                cartItems: cartIdsMinimal, // Only IDs (minimal data)
+                itemCount: cartIdsMinimal.length,
+                user: checkout.user,
+                createdAt: checkout.createdAt,
+                // Payment URLs and methods will be available in the checkout session
+                paymentMethods: {
+                    inAppPayment: true,
+                    savedPaymentMethods: true,
+                    cardValidation: true
+                }
+            };
+
+            // Add coupon-related fields only if coupon is applied
+            if (body.couponId && body.couponId.trim() !== '') {
+                responseData.couponCode = checkout.couponCode;
+                responseData.coupon = checkout.coupon;
+                responseData.couponApplied = result.couponApplied || null;
+                responseData.discount = discount;
+                responseData.originalTotal = totalAmount;
+                
+                // Price breakdown with discount
+                responseData.priceBreakdown = {
+                    subtotal: totalAmount, // Original total
+                    discount: discount, // Discount applied
+                    total: finalAmount, // Final amount after discount
+                    currency: 'USD',
+                    gstInclusive: true
+                };
+            } else {
+                // Price breakdown without discount
+                responseData.priceBreakdown = {
+                    subtotal: totalAmount, // Same as total when no discount
+                    discount: 0, // No discount
+                    total: totalAmount, // Same as subtotal
+                    currency: 'USD',
+                    gstInclusive: true
+                };
+            }
+
+            return response.status(201).json({
+                success: true,
+                message: successMessage,
+                data: responseData
+            });
+
+        } catch (error: any) {
+            console.error('❌ Create checkout failed:', error);
+            return response.status(400).json({
+                success: false,
+                message: error.message || 'Failed to create checkout session',
+                error: error.message
+            });
+        }
+    }
+
+    @Post(':eventId')
+    async addToCart(@Param('eventId') eventId: string, @Res() response: Response, @Request() req: any) {
         const userId = req.user.id; // Extract user ID from the request
         const role = req.user.role; // Extract user role from the request
 
@@ -30,14 +202,12 @@ export class CartController {
             });
         }
 
-        if (!cartDto.eventId) {
+        if (!eventId) {
             return response.status(400).json({
                 success: false,
                 message: 'Event ID is required.',
             });
         }
-
-        const eventId = cartDto.eventId;
 
         const eventExists = await this.eventService.getEventById(eventId);
         if (!eventExists) {
@@ -54,18 +224,9 @@ export class CartController {
                 message: 'Cart entry already exists for this event.',
             });
         }
-    
 
-        // Ensure eventId is provided in the request body
-        if (!cartDto.eventId) {
-            return response.status(400).json({
-                success: false,
-                message: 'Event ID is required.',
-            });
-        }
-
-        // Create the cartDto with userId and eventId
-         await this.cartService.addToCart({ ...cartDto, userId });
+        // Create the cartDto with userId and eventId from params
+        await this.cartService.addToCart({ eventId, userId });
         return response.status(201).json({
             success: true,
             message: 'Item added to cart successfully'
@@ -165,177 +326,6 @@ export class CartController {
         const userId = req.user.id;
         const result = await this.cartService.deleteCart(id, userId);
         return response.status(200).json(result);
-    }
-
-    @Post('create-checkout')
-    async createCheckout(
-        @Body() body: { 
-            selectedCartIds: string[],
-            couponId?: string  // Optional - can be null or empty
-        },
-        @Request() req: any,
-        @Res() response: Response
-    ) {
-        try {
-            const userId = req.user.id;
-            const role = req.user.role;
-
-            if (role !== 'user') {
-                return response.status(403).json({
-                    success: false,
-                    message: 'Access denied. Only users can create checkout sessions.',
-                });
-            }
-
-            if (!body.selectedCartIds || body.selectedCartIds.length === 0) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Please select at least one item for checkout.',
-                });
-            }
-
-            // Get selected cart items with full details
-            let result = await this.cartService.getCartItemsByIds(userId, body.selectedCartIds);
-            
-            if (result.totalCount === 0) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'No valid cart items found for checkout.',
-                });
-            }
-
-            // Apply coupon if provided (optional)
-            if (body.couponId && body.couponId.trim() !== '') {
-                try {
-                    // Get coupon by ID first, then apply using the code
-                    const couponService = this.cartService['couponService']; // Access coupon service
-                    const coupon = await couponService.getCouponById(body.couponId);
-                    
-                    const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, coupon.code);
-                    // Update result with coupon data
-                    result = {
-                        ...result,
-                        discount: couponResult.discount,
-                        finalAmount: couponResult.finalAmount,
-                        couponApplied: couponResult.couponApplied as any
-                    };
-                } catch (error: any) {
-                    return response.status(400).json({
-                        success: false,
-                        message: error.message || 'Invalid coupon ID',
-                        error: error.message
-                    });
-                }
-            }
-
-            // Convert cart items to checkout format - store only IDs for storage
-            // But we still need to pass full data to checkout service for validation
-            const checkoutItems = result.items.map(item => ({
-                eventId: item.eventId,
-                price: item.price,
-                eventName: item.eventName
-            }));
-
-            // Prepare minimal cart data (only IDs) for storage after checkout creation
-            const cartIdsMinimal = result.items.map(item => ({
-                cartId: item.cartId,
-                eventId: item.eventId
-            }));
-
-            // Calculate total amount (with or without coupon)
-            const totalAmount = result.totalAmount;
-            const discount = result.discount || 0;
-            const finalAmount = totalAmount - discount;
-
-            // Create checkout DTO
-            let couponCodeForCheckout = undefined;
-            if (body.couponId && body.couponId.trim() !== '') {
-                // Get coupon code from coupon ID
-                const couponService = this.cartService['couponService'];
-                const coupon = await couponService.getCouponById(body.couponId);
-                couponCodeForCheckout = coupon.code;
-            }
-
-            const checkoutDto: CreateCheckoutDto = {
-                cartItems: checkoutItems,
-                totalAmount: finalAmount,
-                discount: discount, // ✅ Include the discount amount
-                couponCode: couponCodeForCheckout,
-                useSelectedItemsOnly: true,
-            };
-
-            // Create checkout session
-            const checkout = await this.checkoutService.createCheckout(userId, checkoutDto);
-
-            // Update checkout to store only IDs (minimal data) instead of full cart item data
-            await this.checkoutService.updateCheckoutCartItems(checkout.checkoutId, cartIdsMinimal);
-
-            // Determine success message based on coupon application
-            const successMessage = body.couponId && body.couponId.trim() !== '' 
-                ? 'Checkout session created successfully with coupon applied'
-                : 'Checkout session created successfully';
-
-            // Prepare response data based on whether coupon is applied
-            // Return only IDs (minimal data) in response
-            const responseData: any = {
-                checkoutId: checkout.checkoutId,
-                status: checkout.status,
-                totalAmount: body.couponId && body.couponId.trim() !== '' 
-                    ? finalAmount  // Show discounted amount when coupon applied
-                    : totalAmount, // Show original amount when no coupon
-                cartItems: cartIdsMinimal, // Only IDs (minimal data)
-                itemCount: cartIdsMinimal.length,
-                user: checkout.user,
-                createdAt: checkout.createdAt,
-                // Payment URLs and methods will be available in the checkout session
-                paymentMethods: {
-                    inAppPayment: true,
-                    savedPaymentMethods: true,
-                    cardValidation: true
-                }
-            };
-
-            // Add coupon-related fields only if coupon is applied
-            if (body.couponId && body.couponId.trim() !== '') {
-                responseData.couponCode = checkout.couponCode;
-                responseData.coupon = checkout.coupon;
-                responseData.couponApplied = result.couponApplied || null;
-                responseData.discount = discount;
-                responseData.originalTotal = totalAmount;
-                
-                // Price breakdown with discount
-                responseData.priceBreakdown = {
-                    subtotal: totalAmount, // Original total
-                    discount: discount, // Discount applied
-                    total: finalAmount, // Final amount after discount
-                    currency: 'USD',
-                    gstInclusive: true
-                };
-            } else {
-                // Price breakdown without discount
-                responseData.priceBreakdown = {
-                    subtotal: totalAmount, // Same as total when no discount
-                    discount: 0, // No discount
-                    total: totalAmount, // Same as subtotal
-                    currency: 'USD',
-                    gstInclusive: true
-                };
-            }
-
-            return response.status(201).json({
-                success: true,
-                message: successMessage,
-                data: responseData
-            });
-
-        } catch (error: any) {
-            console.error('❌ Create checkout failed:', error);
-            return response.status(400).json({
-                success: false,
-                message: error.message || 'Failed to create checkout session',
-                error: error.message
-            });
-        }
     }
 
     @Get('get-checkout/:checkoutId')
@@ -492,14 +482,15 @@ export class CartController {
             if (checkout.couponCode) {
                 try {
                     const couponService = this.cartService['couponService'];
-                    const coupon = await couponService.getCouponByCode(checkout.couponCode);
+                    const coupon = await couponService.getCouponByName(checkout.couponCode);
                     couponDetails = {
                         id: coupon.id,
-                        code: coupon.code,
+                        name: coupon.name,
                         discountValue: coupon.discountValue,
                         discountType: coupon.discountType,
                         actualValue: coupon.actualValue,
-                        expiryDate: coupon.expiryDate
+                        validFrom: coupon.validFrom,
+                        validTo: coupon.validTo
                     };
                 } catch (error: any) {
                     console.log('⚠️ Could not fetch coupon details:', error.message);
@@ -645,7 +636,7 @@ export class CartController {
             const result = await this.checkoutService.applyCouponToCheckout(
                 checkoutId,
                 userId,
-                coupon.code
+                coupon.name
             );
 
             return response.status(200).json({

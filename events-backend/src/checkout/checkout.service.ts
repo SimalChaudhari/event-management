@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, MoreThanOrEqual } from 'typeorm';
@@ -21,6 +23,7 @@ import { OrderItemEntity } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { CouponService } from 'coupon/coupon.service';
 import { PaymentMethodService } from './payment-method.service';
+import { CartService } from 'cart/cart.service';
 import {
   CreateCheckoutDto,
   CheckoutStatus,
@@ -30,6 +33,7 @@ import {
   InAppPaymentWithSavedMethodDto,
 } from './checkout.dto';
 import { OrderStatus, PaymentMethod } from 'order/order.dto';
+import { buildGstBreakdown } from '../utils/gst.utils';
 
 @Injectable()
 export class CheckoutService {
@@ -53,6 +57,8 @@ export class CheckoutService {
     private couponService: CouponService,
     private wooShPayService: WooShPayService,
     private paymentMethodService: PaymentMethodService,
+    @Inject(forwardRef(() => CartService))
+    private cartService: CartService,
   ) {}
 
   private async generateUniqueCheckoutId(): Promise<string> {
@@ -88,12 +94,12 @@ export class CheckoutService {
       cartItemsToProcess = dto.cartItems;
     }
 
-    // Validate cart items and calculate total
+    // Validate cart items and calculate total; build itemsForGst for gstBreakdown (same shape as GET session)
     let calculatedTotal = 0;
     const validatedCartItems: CartItemDto[] = [];
+    const itemsForGst: Array<{ cartId: string; eventId: string; eventName: string; price: number; startDate?: Date | string | null }> = [];
 
     for (const item of cartItemsToProcess) {
-      // Verify event exists
       const event = await this.eventRepository.findOne({
         where: { id: item.eventId },
       });
@@ -101,7 +107,6 @@ export class CheckoutService {
         throw new NotFoundException(`Event with ID ${item.eventId} not found`);
       }
 
-      // Verify item is in user's cart
       const cartItem = await this.cartRepository.findOne({
         where: { userId, eventId: item.eventId },
       });
@@ -111,7 +116,6 @@ export class CheckoutService {
         );
       }
 
-      // Validate price
       if (Number(item.price) !== Number(event.price)) {
         throw new BadRequestException(`Price mismatch for event ${event.name}`);
       }
@@ -121,6 +125,13 @@ export class CheckoutService {
         eventId: item.eventId,
         price: Number(event.price),
         eventName: event.name,
+      });
+      itemsForGst.push({
+        cartId: cartItem.id,
+        eventId: item.eventId,
+        eventName: event.name,
+        price: Number(event.price),
+        startDate: event.startDate ?? null,
       });
     }
 
@@ -148,6 +159,20 @@ export class CheckoutService {
 
     const finalAmount = calculatedTotal - discount;
 
+    // Build couponApplied for gstBreakdown (same shape as GET session)
+    let couponApplied: any = null;
+    if (couponData) {
+      couponApplied = {
+        name: couponData.name,
+        discount,
+        type: couponData.discountType,
+        couponId: couponData.id,
+        actualValue: couponData.actualValue,
+        discountValue: couponData.discountValue,
+      };
+    }
+    const gstBreakdown = buildGstBreakdown(itemsForGst, calculatedTotal, discount, couponApplied);
+
     console.log('🔍 Debug - Amount validation:', {
       calculatedTotal,
       discount,
@@ -168,13 +193,31 @@ export class CheckoutService {
     const existingCheckout = await this.findExistingPendingCheckout(userId, validatedCartItems, discount, dto.couponCode);
     if (existingCheckout) {
       console.log('🔄 Found existing pending checkout, returning existing one:', existingCheckout.checkoutId);
-      // Convert checkoutCartItems to cartItems format for response
       const existingCartItems = existingCheckout.checkoutCartItems?.map(item => ({
         eventId: item.eventId,
-        price: 0, // Will be fetched from event if needed
-        eventName: '' // Will be fetched from event if needed
+        price: 0,
+        eventName: ''
       })) || validatedCartItems;
-      
+      let existingCouponApplied: any = null;
+      if (existingCheckout.couponCode) {
+        try {
+          const coupon = await this.couponService.getCouponByName(existingCheckout.couponCode);
+          existingCouponApplied = {
+            name: coupon.name,
+            discount: Number(existingCheckout.discount || 0),
+            type: coupon.discountType,
+            couponId: coupon.id,
+            actualValue: coupon.actualValue,
+            discountValue: coupon.discountValue,
+          };
+        } catch (_) {}
+      }
+      const existingGstBreakdown = buildGstBreakdown(
+        itemsForGst,
+        Number(existingCheckout.totalAmount),
+        Number(existingCheckout.discount || 0),
+        existingCouponApplied,
+      );
       return {
         id: existingCheckout.id,
         checkoutId: existingCheckout.checkoutId,
@@ -184,6 +227,7 @@ export class CheckoutService {
         couponCode: existingCheckout.couponCode,
         promoCode: existingCheckout.promoCode,
         cartItems: existingCartItems,
+        gstBreakdown: existingGstBreakdown,
         user: {
           id: user.id,
           firstName: user.firstName,
@@ -192,7 +236,7 @@ export class CheckoutService {
           mobile: user.mobile,
         },
         createdAt: existingCheckout.createdAt,
-        isExisting: true, // Flag to indicate this is an existing checkout
+        isExisting: true,
       };
     }
 
@@ -234,14 +278,15 @@ export class CheckoutService {
     let couponDetails = null;
     if (savedCheckout.couponCode) {
       try {
-        const coupon = await this.couponService.getCouponByCode(savedCheckout.couponCode);
+        const coupon = await this.couponService.getCouponByName(savedCheckout.couponCode);
         couponDetails = {
           id: coupon.id,
-          code: coupon.code,
+          name: coupon.name,
           discountValue: coupon.discountValue,
           discountType: coupon.discountType,
           actualValue: coupon.actualValue,
-          expiryDate: coupon.expiryDate
+          validFrom: coupon.validFrom,
+          validTo: coupon.validTo
         };
       } catch (error: any) {
         console.log('⚠️ Could not fetch coupon details:', error.message);
@@ -255,8 +300,9 @@ export class CheckoutService {
       totalAmount: savedCheckout.totalAmount,
       discount: savedCheckout.discount,
       couponCode: savedCheckout.couponCode,
-      coupon: couponDetails, // Add coupon details with ID
+      coupon: couponDetails,
       cartItems: validatedCartItems,
+      gstBreakdown,
       user: {
         id: user.id,
         firstName: user.firstName,
@@ -431,7 +477,7 @@ export class CheckoutService {
 
       // Record coupon usage if applicable
       if (checkout.couponCode) {
-        const coupon = await this.couponService.getCouponByCode(
+        const coupon = await this.couponService.getCouponByName(
           checkout.couponCode,
         );
         if (coupon) {
@@ -457,23 +503,55 @@ export class CheckoutService {
       throw new NotFoundException('Checkout session not found');
     }
 
-    // Get cart items from CheckoutCartItem table (IDs only)
-    // If relation is empty, try direct query as fallback
     let cartItemsFromDb = checkout.checkoutCartItems || [];
-    
     if (!cartItemsFromDb || cartItemsFromDb.length === 0) {
-      console.log('⚠️ CheckoutCartItems relation is empty, trying direct query...');
-      // Fallback: Direct query from checkout_cart_items table
       cartItemsFromDb = await this.checkoutCartItemRepository.find({
         where: { checkoutId: checkout.checkoutId },
       });
-      console.log('🔍 Direct query result:', cartItemsFromDb.length, 'items');
     }
 
     const cartItems = cartItemsFromDb.map(item => ({
       cartId: item.cartId,
       eventId: item.eventId,
     }));
+
+    const cartIds = cartItemsFromDb.map(item => item.cartId);
+    const totalAmount = Number(checkout.totalAmount) || 0;
+    const discount = Number(checkout.discount) || 0;
+
+    let couponApplied: any = null;
+    if (checkout.couponCode && checkout.couponCode.trim() !== '') {
+      try {
+        const coupon = await this.couponService.getCouponByName(checkout.couponCode);
+        if (coupon) {
+          couponApplied = {
+            name: checkout.couponCode,
+            discount,
+            type: coupon.discountType,
+            couponId: coupon.id,
+            actualValue: coupon.actualValue,
+            discountValue: coupon.discountValue,
+          };
+        }
+      } catch (_) {}
+    }
+
+    let gstBreakdown = buildGstBreakdown([], totalAmount, discount, couponApplied);
+    if (cartIds.length > 0) {
+      try {
+        const cartData = await this.cartService.getCartItemsByIds(userId, cartIds);
+        const itemsWithPrice = (cartData.items || []).map((item: any) => ({
+          cartId: item.cartId,
+          eventId: item.eventId,
+          eventName: item.eventName || '',
+          price: Number(item.price) || 0,
+          startDate: item.startDate ?? null,
+        }));
+        gstBreakdown = buildGstBreakdown(itemsWithPrice, totalAmount, discount, couponApplied);
+      } catch (_) {
+        // keep default gstBreakdown if cart fetch fails
+      }
+    }
 
     return {
       id: checkout.id,
@@ -485,10 +563,11 @@ export class CheckoutService {
       paymentGateway: checkout.paymentGateway,
       paymentMethod: checkout.paymentMethod,
       transactionId: checkout.transactionId,
-      cartItems: cartItems, // IDs only from CheckoutCartItem table
+      cartItems,
       isCompleted: checkout.isCompleted,
       createdAt: checkout.createdAt,
       completedAt: checkout.completedAt,
+      gstBreakdown,
     };
   }
 
@@ -587,7 +666,7 @@ export class CheckoutService {
       couponCode: couponCode,
       coupon: {
         id: couponResult.coupon.id,
-        code: couponResult.coupon.code,
+        name: couponResult.coupon.name,
         discountValue: couponResult.coupon.discountValue,
         discountType: couponResult.coupon.discountType,
         actualValue: couponResult.coupon.actualValue,

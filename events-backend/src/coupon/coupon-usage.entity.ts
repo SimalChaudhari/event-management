@@ -18,6 +18,6 @@ export class CouponUsage {
   @CreateDateColumn()
   usedAt!: Date;
 
-  @ManyToOne(() => Coupon, (coupon) => coupon.usages)
+  @ManyToOne(() => Coupon, (coupon) => coupon.usages, { onDelete: 'CASCADE' })
   coupon!: Coupon;
 }

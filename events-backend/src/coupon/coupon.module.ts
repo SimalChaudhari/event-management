@@ -4,11 +4,12 @@ import { CouponController } from './coupon.controller';
 import { CouponService } from './coupon.service';
 import { Coupon } from './coupon.entity';
 import { CouponUsage } from './coupon-usage.entity';
+import { Event } from '../event/event.entity';
 import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Coupon, CouponUsage]),
+    TypeOrmModule.forFeature([Coupon, CouponUsage, Event]),
     JwtModule.register({
         secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
         signOptions: {},  // Set token expiration

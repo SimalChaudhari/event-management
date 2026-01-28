@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
@@ -21,9 +21,11 @@ import { Coupon } from 'coupon/coupon.entity';
 import { CouponUsage } from 'coupon/coupon-usage.entity';
 import { CouponService } from 'coupon/coupon.service';
 import { JwtModule } from '@nestjs/jwt';
+import { CartModule } from 'cart/cart.module';
 
 @Module({
     imports: [
+        forwardRef(() => CartModule),
         TypeOrmModule.forFeature([
             Checkout,
             CheckoutCartItem,
