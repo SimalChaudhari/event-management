@@ -33,13 +33,13 @@ export class CheckoutWebhookController {
         try {
             // Enhanced logging for debugging
              console.log('🎉 Real-time payment processing');
-            // Temporarily skip signature verification due to WooShPay signature format issues
             const signature = req.headers['wooshpay-signature'] as string;
-            if (signature && process.env.NODE_ENV === 'production') {
+            const isProduction = process.env.NODE_ENV === 'production';
+
+            if (isProduction) {
                 const payload = JSON.stringify(webhookData);
-                
                 try {
-                    if (!this.wooShPayService.verifyWebhookSignature(payload, signature)) {
+                    if (!signature || !this.wooShPayService.verifyWebhookSignature(payload, signature)) {
                         console.error('❌ Webhook signature verification failed');
                         return response.status(HttpStatus.UNAUTHORIZED).json({
                             success: false,
@@ -48,7 +48,11 @@ export class CheckoutWebhookController {
                     }
                     console.log('✅ Webhook signature verified successfully');
                 } catch (error: any) {
-                    console.log('⚠️ Signature verification failed, but continuing in development mode:', error.message);
+                    console.error('❌ Webhook signature verification error:', error?.message);
+                    return response.status(HttpStatus.UNAUTHORIZED).json({
+                        success: false,
+                        message: 'Webhook signature verification failed',
+                    });
                 }
             } else {
                 console.log('⚠️ Skipping signature verification (development mode)');
@@ -96,13 +100,13 @@ export class CheckoutWebhookController {
         console.log('🧪 Test webhook received:', testData);
         
         try {
-            // Simulate a successful payment webhook
+            // Simulate checkout session completed webhook (Checkout Session flow)
             const mockWebhookData = {
-                type: 'payment_intent.succeeded',
+                type: 'checkout.session.completed',
                 data: {
                     object: {
-                        id: testData.paymentIntentId || 'pi_test_1234567890',
-                        status: 'succeeded',
+                        id: testData.sessionId || 'cs_test_1234567890',
+                        status: 'complete',
                         metadata: {
                             checkout_id: testData.checkoutId
                         }

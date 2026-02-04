@@ -158,6 +158,10 @@ export class UserEntity {
   @Column({ default: true })
   isActive!: boolean; // User account active status
 
+  /** WooShPay customer ID (cus_xxx) for checkout session flow */
+  @Column({ type: 'varchar', nullable: true })
+  wooshpayCustomerId?: string;
+
   // Speaker-specific fields - now in separate SpeakerProfile entity
   // companyName, position, description moved to speaker_profiles table
 

@@ -6,7 +6,7 @@ import { CartDto } from './cart.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { EventService } from 'event/event.service';
 import { CheckoutService } from 'checkout/checkout.service';
-import { CreateCheckoutDto, InAppPaymentDto } from 'checkout/checkout.dto';
+import { CreateCheckoutDto } from 'checkout/checkout.dto';
 
 
 @Controller('api/carts')
@@ -121,6 +121,14 @@ export class CartController {
 
             // Update checkout to store only IDs (minimal data) instead of full cart item data
             await this.checkoutService.updateCheckoutCartItems(checkout.checkoutId, cartIdsMinimal);
+
+            // Automatically create WooShPay customer if not already created (so "Process now" works without extra call)
+            try {
+                await this.checkoutService.getOrCreateWooShPayCustomer(userId);
+            } catch (err: any) {
+                console.warn('WooShPay customer create/skip on create-checkout:', err?.message);
+                // Still return success; customer will be created when user clicks "Process now" if needed
+            }
 
             // Determine success message based on coupon application
             const successMessage = body.couponId && body.couponId.trim() !== '' 
@@ -655,112 +663,4 @@ export class CartController {
         }
     }
 
-    @Post('process-payment')
-    async processFinalPayment(
-        @Body() body: { 
-            checkoutId: string, // Use checkout ID instead of cart IDs
-            paymentMethodId?: string, // For saved card payment
-            cvc?: string, // For saved card payment
-            // For new card payment
-            cardNumber?: string,
-            expMonth?: number,
-            expYear?: number,
-            cardCvc?: string,
-            cardholderName?: string,
-            billingEmail?: string,
-            billingPhone?: string,
-            savePaymentMethod?: boolean,
-            // Other options
-            notes?: string
-        },
-        @Request() req: any,
-        @Res() response: Response
-    ) {
-        try {
-            const userId = req.user.id;
-            const role = req.user.role;
-
-            if (role !== 'user') {
-                return response.status(403).json({
-                    success: false,
-                    message: 'Access denied. Only users can process payments.',
-                });
-            }
-
-            if (!body.checkoutId) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Checkout ID is required for payment processing.',
-                });
-            }
-
-            // Validate payment method selection
-            const hasSavedCardPayment = body.paymentMethodId && body.cvc;
-            const hasNewCardPayment = body.cardNumber && body.expMonth && body.expYear && body.cardCvc;
-
-            if (!hasSavedCardPayment && !hasNewCardPayment) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Please select a payment method or provide new card details.',
-                });
-            }
-
-            let paymentResult;
-
-            if (hasSavedCardPayment) {
-                // Process payment with saved method
-                const paymentDto = {
-                    checkoutId: body.checkoutId,
-                    paymentMethodId: body.paymentMethodId!,
-                    cvc: body.cvc!,
-                    notes: body.notes
-                };
-
-                paymentResult = await this.checkoutService.processInAppPaymentWithSavedMethod(userId, paymentDto);
-            } else {
-                // Process payment with new card
-                const paymentDto: InAppPaymentDto = {
-                    checkoutId: body.checkoutId,
-                    cardNumber: body.cardNumber!,
-                    expMonth: body.expMonth!,
-                    expYear: body.expYear!,
-                    cvc: body.cardCvc!,
-                    cardholderName: body.cardholderName,
-                    billingEmail: body.billingEmail,
-                    billingPhone: body.billingPhone,
-                    savePaymentMethod: body.savePaymentMethod || false
-                };
-
-                paymentResult = await this.checkoutService.processInAppPaymentWithCard(userId, paymentDto);
-            }
-
-            return response.status(200).json({
-                success: true,
-                message: 'Payment processed successfully',
-                data: {
-                    checkoutId: body.checkoutId,
-                    transactionId: paymentResult.transactionId,
-                    status: paymentResult.status,
-                    isCompleted: paymentResult.isCompleted,
-                    requiresAction: paymentResult.requiresAction,
-                    nextAction: paymentResult.nextAction,
-                    paymentMethod: paymentResult.paymentMethod,
-                    amount: paymentResult.amount,
-                    currency: paymentResult.currency,
-                    message: paymentResult.message,
-                    paymentType: hasSavedCardPayment ? 'saved_card' : 'new_card'
-                }
-            });
-
-        } catch (error: any) {
-            console.error('❌ Process payment failed:', error);
-            return response.status(400).json({
-                success: false,
-                message: error.message || 'Failed to process payment',
-                error: error.message
-            });
-        }
-    }
-
-    
 }

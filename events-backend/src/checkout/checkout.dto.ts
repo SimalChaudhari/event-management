@@ -90,126 +90,35 @@ export class CheckoutResponseDto {
     message?: string;
 }
 
-export class InAppPaymentDto {
-    @IsOptional()
-    @IsString()
-    checkoutId?: string; // Made optional - only needed for actual payment
+/** Optional body for get-or-create WooShPay customer (all fields optional) */
+export class WooShPayCustomerDto {
+  @IsOptional()
+  name?: string;
 
-    @IsNotEmpty()
-    @IsString()
-    cardNumber!: string;
+  @IsOptional()
+  phone?: string;
 
-    @IsNotEmpty()
-    @IsNumber()
-    expMonth!: number;
+  @IsOptional()
+  address?: {
+    city?: string;
+    country?: string;
+    line1?: string;
+    line2?: string;
+    postal_code?: string;
+    state?: string;
+  };
 
-    @IsNotEmpty()
-    @IsNumber()
-    expYear!: number;
-
-    @IsNotEmpty()
-    @IsString()
-    cvc!: string;
-
-    @IsOptional()
-    @IsString()
-    cardholderName?: string;
-
-    @IsOptional()
-    @IsString()
-    billingEmail?: string;
-
-    @IsOptional()
-    @IsString()
-    billingPhone?: string;
-
-    @IsOptional()
-    @IsString()
-    nickname?: string; // User-defined name for the card
-
-    @IsOptional()
-    @IsBoolean()
-    savePaymentMethod?: boolean = true; // Default: Save card (since we're creating cards)
-
-    @IsOptional()
-    @IsBoolean()
-    setAsDefault?: boolean = true; // Default: Set as default card
+  @IsOptional()
+  shipping?: {
+    address?: { city?: string; country?: string; line1?: string; line2?: string; postal_code?: string; state?: string };
+    name?: string;
+    phone?: string;
+  };
 }
 
-export class CreateCardDto {
-  @IsNotEmpty()
-  @IsString()
-  cardNumber!: string;
-
-  @IsNotEmpty()
-  @IsNumber()
-  expMonth!: number;
-
-  @IsNotEmpty()
-  @IsNumber()
-  expYear!: number;
-
-  @IsNotEmpty()
-  @IsString()
-  cvc!: string;
-
-  @IsOptional()
-  @IsString()
-  cardholderName?: string;
-
-  @IsOptional()
-  @IsString()
-  billingEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  billingPhone?: string;
-
-  @IsOptional()
-  @IsString()
-  nickname?: string; // User-defined name for the card
-
-  @IsOptional()
-  @IsBoolean()
-  setAsDefault?: boolean = true; // Default: Set as default card
-}
-
-export class UpdateCardDto {
-  @IsOptional()
-  @IsString()
-  cardholderName?: string;
-
-  @IsOptional()
-  @IsString()
-  billingEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  billingPhone?: string;
-
-  @IsOptional()
-  @IsString()
-  nickname?: string; // User-defined name for the card
-
-  @IsOptional()
-  @IsBoolean()
-  setAsDefault?: boolean; // Set as default card
-}
-
-export class InAppPaymentWithSavedMethodDto {
+/** Body for creating WooShPay checkout session. successUrl, cancelUrl, currency are set by backend from env. */
+export class CreateWooShPaySessionDto {
   @IsNotEmpty()
   @IsString()
   checkoutId!: string;
-
-  @IsNotEmpty()
-  @IsString()
-  paymentMethodId!: string;
-
-  @IsNotEmpty()
-  @IsString()
-  cvc!: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
 }

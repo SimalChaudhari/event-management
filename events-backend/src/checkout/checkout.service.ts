@@ -11,7 +11,6 @@ import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
 import { CheckoutCartItem } from './checkout-cart-item.entity';
-import { validateCard, detectCardTypeRealtime } from '../utils/card-validation.utils';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import { CheckoutResponseUtils } from '../utils/checkout-response.utils';
 import { CheckoutUtils } from '../utils/checkout.utils';
@@ -22,15 +21,12 @@ import { Order } from 'order/order.entity';
 import { OrderItemEntity } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { CouponService } from 'coupon/coupon.service';
-import { PaymentMethodService } from './payment-method.service';
 import { CartService } from 'cart/cart.service';
 import {
   CreateCheckoutDto,
   CheckoutStatus,
   PaymentGateway,
   CartItemDto,
-  InAppPaymentDto,
-  InAppPaymentWithSavedMethodDto,
 } from './checkout.dto';
 import { OrderStatus, PaymentMethod } from 'order/order.dto';
 import { buildGstBreakdown } from '../utils/gst.utils';
@@ -56,7 +52,6 @@ export class CheckoutService {
     private registerEventRepository: Repository<RegisterEvent>,
     private couponService: CouponService,
     private wooShPayService: WooShPayService,
-    private paymentMethodService: PaymentMethodService,
     @Inject(forwardRef(() => CartService))
     private cartService: CartService,
   ) {}
@@ -408,6 +403,10 @@ export class CheckoutService {
     return JSON.stringify(eventIds1) === JSON.stringify(eventIds2);
   }
 
+  /**
+   * Create order from completed checkout. Called only when payment succeeds (webhook: checkout.session.completed or payment_link.paid).
+   * Cart items for this checkout are removed here – never on checkout create.
+   */
   private async createOrderFromCheckout(checkout: Checkout): Promise<any> {
     return await this.orderRepository.manager.transaction(async (manager) => {
       // Generate order number
@@ -467,7 +466,7 @@ export class CheckoutService {
           });
           await manager.save(RegisterEvent, registerEvent);
 
-          // Remove from cart
+          // Remove from cart only when payment has successfully completed (this method is called only from webhook: checkout.session.completed / payment_link.paid)
           await manager.delete(Cart, {
             userId: checkout.user.id,
             eventId: event.id,
@@ -569,6 +568,184 @@ export class CheckoutService {
       completedAt: checkout.completedAt,
       gstBreakdown,
     };
+  }
+
+  /**
+   * Get or create WooShPay customer for checkout session flow.
+   * When user is on checkout page, call this first. If user has wooshpayCustomerId in DB, return it; else create customer via WooShPay and save to DB.
+   */
+  async getOrCreateWooShPayCustomer(
+    userId: string,
+    dto?: {
+      address?: { city?: string; country?: string; line1?: string; line2?: string; postal_code?: string; state?: string };
+      shipping?: { address?: { city?: string; country?: string; line1?: string; line2?: string; postal_code?: string; state?: string }; name?: string; phone?: string };
+      name?: string;
+      phone?: string;
+    },
+  ): Promise<{ customerId: string }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.wooshpayCustomerId) {
+      return { customerId: user.wooshpayCustomerId };
+    }
+
+    const customerPayload: Record<string, any> = {
+      email: user.email,
+      name: dto?.name ?? (((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || undefined),
+      phone: dto?.phone ?? user.mobile ?? undefined,
+      address: dto?.address,
+      shipping: dto?.shipping,
+    };
+    Object.keys(customerPayload).forEach((k) => customerPayload[k] === undefined && delete customerPayload[k]);
+
+    const customer = await this.wooShPayService.createCustomer(customerPayload);
+    const customerId = customer?.id;
+    if (!customerId) {
+      throw new InternalServerErrorException('WooShPay customer creation did not return customer id');
+    }
+
+    user.wooshpayCustomerId = customerId;
+    await this.userRepository.save(user);
+
+    return { customerId };
+  }
+
+
+
+  /**
+   * Create WooShPay Checkout Session (redirect flow – uses /v1/checkout/sessions, NOT Payment Intent).
+   * When user clicks "Process now", call this with checkoutId; returns URL to redirect user to complete payment.
+   */
+  async createWooShPayCheckoutSession(
+    userId: string,
+    checkoutId: string,
+    successUrl: string,
+    cancelUrl: string,
+    currency: string = 'USD',
+  ): Promise<{ url: string; sessionId?: string }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { customerId } = await this.getOrCreateWooShPayCustomer(userId);
+
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId, user: { id: userId } },
+      relations: ['checkoutCartItems'],
+    });
+    if (!checkout) {
+      throw new NotFoundException('Checkout session not found');
+    }
+    if (checkout.isCompleted) {
+      throw new BadRequestException('Checkout is already completed');
+    }
+
+    const items = checkout.checkoutCartItems || [];
+    if (items.length === 0) {
+      throw new BadRequestException('No cart items in checkout');
+    }
+
+    const line_items: Array<{
+      price_data: { currency: string; unit_amount: number; product_data: { name: string; description?: string } };
+      quantity: number;
+    }> = [];
+
+    for (const item of items) {
+      const event = await this.eventRepository.findOne({ where: { id: item.eventId } });
+      if (!event) continue;
+      const price = Number(event.price ?? 0);
+      const unitAmountCents = Math.round(price * 100); // smallest unit (cents)
+      const eventName = (event.name && String(event.name).trim()) || `Event ${event.id}`;
+      const rawDesc = event.description ? String(event.description) : '';
+      const plainDesc = rawDesc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+      line_items.push({
+        price_data: {
+          currency,
+          unit_amount: unitAmountCents,
+          product_data: {
+            name: eventName,
+            description: plainDesc || eventName,
+          },
+        },
+        quantity: 1,
+      });
+    }
+
+    if (line_items.length === 0) {
+      throw new BadRequestException('No valid events found for checkout');
+    }
+
+    const sessionPayload: any = {
+      cancel_url: cancelUrl,
+      success_url: successUrl,
+      mode: 'payment',
+      customer: customerId,
+      line_items,
+      metadata: { checkout_id: checkoutId, user_id: userId },
+    };
+
+    const session = await this.wooShPayService.createCheckoutSession(sessionPayload);
+
+    const url = session?.url ?? session?.checkout_url ?? session?.session?.url;
+    if (!url) {
+      throw new InternalServerErrorException('WooShPay checkout session did not return a URL');
+    }
+
+    const sessionId = session?.id;
+    checkout.paymentUrl = url;
+    if (sessionId) checkout.wooshpaySessionId = sessionId;
+    await this.checkoutRepository.save(checkout);
+
+    return { url, sessionId };
+  }
+
+  /**
+   * Retrieve a WooShPay Checkout Session by session ID
+   */
+  async getWooShPaySession(sessionId: string): Promise<any> {
+    return await this.wooShPayService.getCheckoutSession(sessionId);
+  }
+
+  /**
+   * Retrieve WooShPay session by our checkoutId (uses stored wooshpaySessionId)
+   */
+  async getWooShPaySessionByCheckoutId(userId: string, checkoutId: string): Promise<any> {
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId, user: { id: userId } },
+    });
+    if (!checkout) throw new NotFoundException('Checkout not found');
+    if (!checkout.wooshpaySessionId) throw new BadRequestException('No WooShPay session for this checkout');
+    return await this.wooShPayService.getCheckoutSession(checkout.wooshpaySessionId);
+  }
+
+  /**
+   * Expire a WooShPay Checkout Session by session ID
+   */
+  async expireWooShPaySession(sessionId: string): Promise<any> {
+    return await this.wooShPayService.expireCheckoutSession(sessionId);
+  }
+
+  /**
+   * Expire WooShPay session by our checkoutId (uses stored wooshpaySessionId)
+   */
+  async expireWooShPaySessionByCheckoutId(userId: string, checkoutId: string): Promise<any> {
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId, user: { id: userId } },
+    });
+    if (!checkout) throw new NotFoundException('Checkout not found');
+    if (!checkout.wooshpaySessionId) throw new BadRequestException('No WooShPay session for this checkout');
+    return await this.wooShPayService.expireCheckoutSession(checkout.wooshpaySessionId);
+  }
+
+  /**
+   * List WooShPay Checkout Sessions (retrieve all with optional limit)
+   */
+  async listWooShPaySessions(params?: { limit?: number }): Promise<any> {
+    return await this.wooShPayService.listCheckoutSessions(params);
   }
 
   async getCheckoutByOrderId(orderId: string): Promise<any> {
@@ -761,7 +938,7 @@ export class CheckoutService {
 
     console.log('🔔 Processing webhook event:', {
       type: eventType,
-      paymentIntentId: eventData?.id,
+      objectId: eventData?.id,
       status: eventData?.status,
       checkoutId: eventData?.metadata?.checkout_id,
       timestamp: new Date().toISOString()
@@ -769,25 +946,8 @@ export class CheckoutService {
 
     try {
       switch (eventType) {
-        case 'payment_intent.succeeded':
-          console.log('✅ Payment intent succeeded, completing checkout...');
-          await this.completeCheckoutFromPaymentIntent(eventData);
-          break;
-        case 'payment_intent.requires_action':
-          // Ignore requires_action events - only log for debugging
-          console.log('🔐 3D Secure authentication in progress (ignoring event)');
-          break;
-        case 'payment_intent.payment_failed':
-          await this.handlePaymentIntentFailed(eventData);
-          break;
-        case 'payment_intent.canceled':
-          await this.handlePaymentIntentCancelled(eventData);
-          break;
-        case 'payment_intent.created':
-          // Ignore created events - only log for debugging
-          console.log('🆕 Payment intent created (ignoring event)');
-          break;
         case 'checkout.session.completed':
+          console.log('✅ Checkout session completed, completing checkout...');
           await this.completeCheckoutFromSession(eventData);
           break;
         case 'payment_link.paid':
@@ -816,114 +976,8 @@ export class CheckoutService {
 
 
   /**
-   * Complete checkout when payment intent succeeds
-   * Payment Intent successful checkout complete
-   */
-  private async completeCheckoutFromPaymentIntent(
-    paymentIntent: any,
-  ): Promise<void> {
-    let checkoutId = paymentIntent.metadata?.checkout_id;
-
-    // If no checkout_id in metadata, try to find by transaction ID or payment intent ID
-    if (!checkoutId) {
-      console.log('⚠️ No checkout_id found in payment intent metadata, searching by transaction ID...');
-      console.log(`🔍 Searching for: paymentIntentId=${paymentIntent.id}`);
-      
-      // First try to find by exact transaction ID match
-      let checkout = await this.checkoutRepository.findOne({
-        where: { transactionId: paymentIntent.id },
-        relations: ['user']
-      });
-      
-      // If not found, try to find by partial match (checkout session vs payment intent)
-      if (!checkout) {
-        console.log('🔍 Trying to find by partial transaction ID match...');
-        const allCheckouts = await this.checkoutRepository.find({
-          where: { status: CheckoutStatus.Processing },
-          relations: ['user']
-        });
-        
-        // Look for the most recent processing checkout (likely the one that just completed payment)
-        checkout = allCheckouts.sort((a, b) => 
-          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-        )[0];
-        
-        if (checkout) {
-          console.log(`✅ Found checkout by partial match: ${checkout.checkoutId} (${checkout.transactionId})`);
-        }
-      }
-      
-      if (checkout) {
-        checkoutId = checkout.checkoutId;
-        console.log(`✅ Found checkout by transaction ID: ${checkoutId}`);
-      } else {
-        console.log('❌ Could not find checkout by transaction ID either');
-        console.log('💡 Available processing checkouts:');
-        const processingCheckouts = await this.checkoutRepository.find({
-          where: { status: CheckoutStatus.Processing },
-          select: ['checkoutId', 'transactionId', 'createdAt']
-        });
-        console.log(processingCheckouts);
-        return;
-      }
-    }
-
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId },
-      relations: ['user', 'checkoutCartItems'],
-    });
-
-    if (!checkout) {
-      console.error(`❌ Checkout not found for ID: ${checkoutId}`);
-      return;
-    }
-
-    // Check if already completed to avoid duplicate processing
-    if (checkout.isCompleted && checkout.status === CheckoutStatus.Completed) {
-      console.log(`⚠️ Checkout ${checkoutId} is already completed, skipping duplicate webhook...`);
-      return;
-    }
-
-    console.log(`🔄 Completing checkout ${checkoutId} from webhook...`);
-    console.log(`📊 Current status: ${checkout.status}, isCompleted: ${checkout.isCompleted}, transactionId: ${checkout.transactionId}`);
-
-    // Complete the checkout
-    checkout.status = CheckoutStatus.Completed;
-    checkout.isCompleted = true;
-    checkout.completedAt = new Date();
-    
-    const savedCheckout = await this.checkoutRepository.save(checkout);
-    console.log(`✅ Checkout ${checkoutId} status updated to Completed`);
-    console.log(`📊 New status: ${savedCheckout.status}, isCompleted: ${savedCheckout.isCompleted}, completedAt: ${savedCheckout.completedAt}`);
-
-    // Create order and process items
-    await this.createOrderFromCheckout(checkout);
-
-    // Store payment method from WooShPay webhook (secure tokenization)
-    try {
-      const savedPaymentMethod = await this.paymentMethodService.extractAndStoreFromWebhook(
-        checkout.user.id,
-        { data: { object: paymentIntent } }
-      );
-      
-      if (savedPaymentMethod) {
-        console.log('💳 WooShPay payment method stored:', {
-          id: savedPaymentMethod.id,
-          displayName: savedPaymentMethod.getDisplayName(),
-          wooshpayToken: savedPaymentMethod.wooshpayPaymentMethodId,
-          isDefault: savedPaymentMethod.isDefault,
-        });
-      }
-    } catch (error: any) {
-      console.log('⚠️ Could not store payment method from webhook:', error.message);
-    }
-
-    console.log(`✅ Checkout completed for ID: ${checkoutId}`);
-  }
-
-  /**
-   * Complete checkout when session is completed
-   * Checkout Session complete checkout complete
+   * Complete checkout when session is completed (payment succeeded).
+   * Only then we create order and remove those items from cart.
    */
   private async completeCheckoutFromSession(session: any): Promise<void> {
     const checkoutId = session.metadata?.checkout_id;
@@ -949,15 +1003,15 @@ export class CheckoutService {
     checkout.completedAt = new Date();
     await this.checkoutRepository.save(checkout);
 
-    // Create order and process items
+    // Create order and remove cart items only after payment success
     await this.createOrderFromCheckout(checkout);
 
-    console.log(`✅ Checkout session completed for ID: ${checkoutId}`);
+    console.log(`✅ Checkout session completed for ID: ${checkoutId} (order created, cart items removed)`);
   }
 
   /**
-   * Complete checkout when payment link is paid
-   * Payment Link paid checkout complete
+   * Complete checkout when payment link is paid (payment succeeded).
+   * Only then we create order and remove those items from cart.
    */
   private async completeCheckoutFromPaymentLink(
     paymentLink: any,
@@ -985,70 +1039,10 @@ export class CheckoutService {
     checkout.completedAt = new Date();
     await this.checkoutRepository.save(checkout);
 
-    // Create order and process items
+    // Create order and remove cart items only after payment success
     await this.createOrderFromCheckout(checkout);
 
-    console.log(`✅ Payment link completed for ID: ${checkoutId}`);
-  }
-
-  /**
-   * Handle failed payment intent
-   * Payment Intent failed checkout failed status
-   */
-  private async handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
-    const checkoutId = paymentIntent.metadata?.checkout_id;
-
-    if (!checkoutId) {
-      console.log('No checkout_id found in payment intent metadata');
-      return;
-    }
-
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId },
-    });
-
-    if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
-      return;
-    }
-
-    // Update checkout with payment failure
-    checkout.status = CheckoutStatus.Failed;
-    checkout.paymentNotes = `Payment failed: ${paymentIntent.status}`;
-    await this.checkoutRepository.save(checkout);
-
-    console.log(`❌ Payment intent failed for checkout: ${checkoutId}`);
-  }
-
-  /**
-   * Handle cancelled payment intent
-   * Payment Intent cancelled checkout cancelled status
-   */
-  private async handlePaymentIntentCancelled(
-    paymentIntent: any,
-  ): Promise<void> {
-    const checkoutId = paymentIntent.metadata?.checkout_id;
-
-    if (!checkoutId) {
-      console.log('No checkout_id found in payment intent metadata');
-      return;
-    }
-
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId },
-    });
-
-    if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
-      return;
-    }
-
-    // Update checkout with cancellation
-    checkout.status = CheckoutStatus.Cancelled;
-    checkout.paymentNotes = `Payment cancelled: ${paymentIntent.status}`;
-    await this.checkoutRepository.save(checkout);
-
-    console.log(`🚫 Payment intent cancelled for checkout: ${checkoutId}`);
+    console.log(`✅ Payment link completed for ID: ${checkoutId} (order created, cart items removed)`);
   }
 
   /**
@@ -1140,442 +1134,6 @@ export class CheckoutService {
 
 
   /**
-   * Get user's saved payment methods for checkout page
-   */
-  async getUserSavedPaymentMethods(userId: string): Promise<any[]> {
-    try {
-      return await this.paymentMethodService.getUserPaymentMethods(userId);
-    } catch (error) {
-      console.log('⚠️ Could not get saved payment methods:', error);
-      return [];
-    }
-  }
-
-  // ============ IN-APP PAYMENT METHODS ============
-
-  /**
-   * Process in-app payment with card details (no external redirect)
-   * Perfect for popup/modal payments within the event page
-   */
-  async processInAppPaymentWithCard(userId: string, dto: InAppPaymentDto): Promise<any> {
-    console.log('💳 Processing in-app payment with card details');
-
-    // Find checkout session
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId: dto.checkoutId, user: { id: userId } },
-      relations: ['user', 'checkoutCartItems'],
-    });
-
-    if (!checkout) {
-      throw new NotFoundException('Checkout session not found');
-    }
-
-    if (checkout.status !== CheckoutStatus.Pending) {
-      throw new BadRequestException('Checkout session is not in pending status');
-    }
-
-    try {
-      // Validate card BEFORE changing checkout status
-      console.log('🔍 Validating card details...');
-      const cardValidation = validateCard(dto.cardNumber, dto.cvc);
-      
-      if (!cardValidation.isValid) {
-        console.log('❌ Card validation failed:', {
-          cardType: cardValidation.cardType.name,
-          luhnValid: cardValidation.isLuhnValid,
-          lengthValid: cardValidation.cardType.validLengths.includes(dto.cardNumber.replace(/\D/g, '').length),
-          cvvValid: dto.cvc ? cardValidation.cardType.cvvLength === dto.cvc.length : true
-        });
-        
-        // Generate detailed error message with suggestions
-        const errorDetails = this.generateCardValidationError(cardValidation, dto);
-        throw new BadRequestException(errorDetails);
-      }
-
-      // Only change checkout status to processing AFTER successful validation
-      checkout.status = CheckoutStatus.Processing;
-      checkout.paymentGateway = PaymentGateway.WooShPay;
-      checkout.paymentMethod = 'Credit Card';
-      await this.checkoutRepository.save(checkout);
-      
-      console.log('✅ Card validation successful:', {
-        cardType: cardValidation.cardType.name,
-        brand: cardValidation.cardType.type,
-        region: cardValidation.cardType.region,
-        country: cardValidation.cardType.country,
-        formattedNumber: cardValidation.formattedNumber
-      });
-
-      // Get event names from checkoutCartItems
-      const eventIds = checkout.checkoutCartItems?.map(item => item.eventId) || [];
-      const events = await Promise.all(
-        eventIds.map(eventId => this.eventRepository.findOne({ where: { id: eventId } }))
-      );
-      const eventNames = events.filter((e): e is Event => e !== null).map(e => e.name).join(', ');
-      // Process payment with WooShPay Direct API
-      const paymentResult = await this.wooShPayService.processInAppPaymentWithCard(
-        checkout.totalAmount,
-        'USD',
-        {
-          number: dto.cardNumber,
-          exp_month: dto.expMonth,
-          exp_year: dto.expYear,
-          cvc: dto.cvc,
-          name: dto.cardholderName || `${checkout.user.firstName} ${checkout.user.lastName}`,
-        },
-        {
-          email: dto.billingEmail || checkout.user.email,
-          name: dto.cardholderName || `${checkout.user.firstName} ${checkout.user.lastName}`,
-        },
-        {
-          checkout_id: checkout.checkoutId,
-          user_id: userId,
-          events: eventNames || eventIds.join(', '),
-          payment_type: 'in_app',
-        }
-      );
-
-      console.log('✅ In-app payment processed:', {
-        paymentIntentId: paymentResult.paymentIntent.id,
-        status: paymentResult.paymentIntent.status,
-        requiresAction: paymentResult.requiresAction,
-      });
-
-      // Update checkout with transaction details
-      checkout.transactionId = paymentResult.paymentIntent.id;
-      checkout.paymentNotes = 'In-app payment processed';
-
-      // If payment is successful, complete the checkout immediately
-      if (paymentResult.paymentIntent.status === 'succeeded') {
-        checkout.status = CheckoutStatus.Completed;
-        checkout.isCompleted = true;
-        checkout.completedAt = new Date();
-        await this.checkoutRepository.save(checkout);
-
-        // Create order and process items
-        await this.createOrderFromCheckout(checkout);
-
-        // Store payment method if requested
-        try {
-          const savedPaymentMethod = await this.paymentMethodService.storePaymentMethodFromWooShPay(
-            userId,
-            paymentResult.paymentMethod.id,
-            {
-              // Use detected card brand from validation instead of WooShPay's brand
-              brand: cardValidation.cardType.type,
-              last4: paymentResult.paymentMethod.card.last4,
-              exp_month: paymentResult.paymentMethod.card.exp_month,
-              exp_year: paymentResult.paymentMethod.card.exp_year,
-              country: paymentResult.paymentMethod.card.country,
-              funding: paymentResult.paymentMethod.card.funding,
-              fingerprint: paymentResult.paymentMethod.card.fingerprint,
-            },
-            paymentResult.paymentMethod.billing_details,
-            undefined, // customerId
-            dto.savePaymentMethod || false // shouldSave
-          );
-          
-          if (savedPaymentMethod) {
-            console.log('💳 Payment method saved for future use');
-          } else {
-            console.log('💳 Payment method not saved (user choice)');
-          }
-        } catch (error: any) {
-          console.log('⚠️ Could not save payment method:', error.message);
-        }
-
-        return {
-          success: true,
-          transactionId: paymentResult.paymentIntent.id,
-          status: 'completed',
-          isCompleted: true,
-          requiresAction: false,
-          nextAction: null,
-          paymentMethod: {
-            id: paymentResult.paymentMethod.id,
-            last4: paymentResult.paymentMethod.card.last4,
-            brand: paymentResult.paymentMethod.card.brand,
-          },
-          amount: checkout.totalAmount,
-          currency: 'USD',
-          message: 'Payment completed successfully!',
-        };
-      }
-
-      // If payment requires additional action (3D Secure, etc.)
-      if (paymentResult.requiresAction) {
-        await this.checkoutRepository.save(checkout);
-        return {
-          success: false,
-          transactionId: paymentResult.paymentIntent.id,
-          status: 'requires_action',
-          isCompleted: false,
-          requiresAction: true,
-          nextAction: paymentResult.nextAction,
-          paymentMethod: {
-            id: paymentResult.paymentMethod.id,
-            last4: paymentResult.paymentMethod.card.last4,
-            brand: paymentResult.paymentMethod.card.brand,
-          },
-          amount: checkout.totalAmount,
-          currency: 'USD',
-          message: 'Payment requires 3D Secure authentication. Complete authentication and webhook will handle completion.',
-          note: 'After 3D Secure completion, webhook will automatically complete the payment',
-        };
-      }
-
-      // If payment failed
-      checkout.status = CheckoutStatus.Failed;
-      checkout.paymentNotes = `Payment failed: ${paymentResult.paymentIntent.status}`;
-      await this.checkoutRepository.save(checkout);
-
-      throw new BadRequestException(`Payment failed: ${paymentResult.paymentIntent.status}`);
-
-    } catch (error: any) {
-      // Reset checkout status back to pending for retry
-      checkout.status = CheckoutStatus.Pending;
-      checkout.paymentNotes = error.message;
-      await this.checkoutRepository.save(checkout);
-
-      console.error('❌ In-app payment failed:', error);
-      
-      // If it's a validation error, throw BadRequestException
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      
-      // Use ErrorHandlerUtil for proper error handling
-      ErrorHandlerUtil.handleError(error, 'In-app payment failed');
-    }
-  }
-
-  /**
-   * Process in-app payment with saved payment method (1-click payment)
-   */
-  async processInAppPaymentWithSavedMethod(userId: string, dto: InAppPaymentWithSavedMethodDto): Promise<any> {
-    console.log('⚡ Processing in-app payment with saved method');
-
-    // Find checkout session
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId: dto.checkoutId, user: { id: userId } },
-      relations: ['user', 'checkoutCartItems'],
-    });
-
-    if (!checkout) {
-      throw new NotFoundException('Checkout session not found');
-    }
-
-    if (checkout.status !== CheckoutStatus.Pending) {
-      throw new BadRequestException('Checkout session is not in pending status');
-    }
-
-    // Verify saved payment method exists and belongs to user
-    const savedPaymentMethod = await this.paymentMethodService.getPaymentMethodById(userId, dto.paymentMethodId);
-    if (!savedPaymentMethod) {
-      throw new NotFoundException('Saved payment method not found');
-    }
-
-    if (savedPaymentMethod.isExpired()) {
-      throw new BadRequestException('Saved payment method has expired');
-    }
-
-    // Validate CVV BEFORE changing checkout status
-    console.log('🔍 Validating CVV for saved payment method...');
-    
-    if (dto.cvc && dto.cvc.length !== savedPaymentMethod.cvvLength) {
-      console.log('❌ CVV validation failed:', {
-        expectedLength: savedPaymentMethod.cvvLength,
-        providedLength: dto.cvc.length,
-        brand: savedPaymentMethod.brand
-      });
-      
-      const errorMessage = this.generateSavedCardCVVError(savedPaymentMethod, dto.cvc);
-      throw new BadRequestException(errorMessage);
-    }
-    
-    console.log('✅ CVV validation successful for saved payment method:', {
-      brand: savedPaymentMethod.brand,
-      cvvLength: savedPaymentMethod.cvvLength
-    });
-
-    // Only change checkout status to processing AFTER successful validation
-    checkout.status = CheckoutStatus.Processing;
-    checkout.paymentGateway = PaymentGateway.WooShPay;
-    checkout.paymentMethod = savedPaymentMethod.getDisplayName();
-    await this.checkoutRepository.save(checkout);
-
-    // Get event names from checkoutCartItems
-    const eventIds = checkout.checkoutCartItems?.map(item => item.eventId) || [];
-    const events = await Promise.all(
-      eventIds.map(eventId => this.eventRepository.findOne({ where: { id: eventId } }))
-    );
-    const eventNames = events.filter((e): e is Event => e !== null).map(e => e.name).join(', ');
-
-    try {
-      // Process payment with saved method
-      const paymentResult = await this.wooShPayService.processInAppPaymentWithSavedMethod(
-        checkout.totalAmount,
-        'USD',
-        savedPaymentMethod.wooshpayPaymentMethodId,
-        checkout.user.email,
-        {
-          checkout_id: checkout.checkoutId,
-          user_id: userId,
-          events: eventNames || eventIds.join(', '),
-          payment_type: 'in_app_saved',
-          saved_payment_method_id: dto.paymentMethodId,
-        }
-      );
-
-      console.log('✅ In-app payment with saved method processed:', {
-        paymentIntentId: paymentResult.paymentIntent.id,
-        status: paymentResult.paymentIntent.status,
-        requiresAction: paymentResult.requiresAction,
-      });
-
-      // Update checkout with transaction details FIRST (before checking status)
-      checkout.transactionId = paymentResult.paymentIntent.id;
-      checkout.paymentNotes = 'In-app payment with saved method processed';
-      
-      // Save transactionId immediately so webhook can find it
-      await this.checkoutRepository.save(checkout);
-      console.log('💾 Checkout transactionId saved:', checkout.transactionId);
-
-      // If payment is successful, complete the checkout immediately
-      if (paymentResult.paymentIntent.status === 'succeeded') {
-        console.log('✅ Payment succeeded immediately, completing checkout...');
-        checkout.status = CheckoutStatus.Completed;
-        checkout.isCompleted = true;
-        checkout.completedAt = new Date();
-        await this.checkoutRepository.save(checkout);
-        console.log('💾 Checkout status updated to Completed');
-
-        // Create order and process items
-        await this.createOrderFromCheckout(checkout);
-
-        // Update payment method usage tracking
-        savedPaymentMethod.usageCount += 1;
-        savedPaymentMethod.lastUsedAt = new Date();
-        await this.paymentMethodService['paymentMethodRepository'].save(savedPaymentMethod);
-
-        return {
-          success: true,
-          transactionId: paymentResult.paymentIntent.id,
-          status: 'completed',
-          isCompleted: true,
-          requiresAction: false,
-          nextAction: null,
-          paymentMethod: {
-            id: dto.paymentMethodId,
-            displayName: savedPaymentMethod.getDisplayName(),
-            last4: savedPaymentMethod.last4,
-            brand: savedPaymentMethod.brand,
-          },
-          amount: checkout.totalAmount,
-          currency: 'USD',
-          message: 'Payment completed instantly with saved method!',
-        };
-      }
-      
-      // If payment is processing or requires action, webhook will handle completion
-      if (paymentResult.paymentIntent.status === 'processing' || paymentResult.paymentIntent.status === 'requires_action') {
-        console.log('⏳ Payment is processing, webhook will complete checkout when payment succeeds');
-        console.log('📝 Checkout status:', checkout.status, 'TransactionId:', checkout.transactionId);
-      }
-
-      // If payment requires additional action
-      if (paymentResult.requiresAction) {
-        await this.checkoutRepository.save(checkout);
-        return {
-          success: false,
-          transactionId: paymentResult.paymentIntent.id,
-          status: 'requires_action',
-          isCompleted: false,
-          requiresAction: true,
-          nextAction: paymentResult.nextAction,
-          paymentMethod: {
-            id: dto.paymentMethodId,
-            displayName: savedPaymentMethod.getDisplayName(),
-            last4: savedPaymentMethod.last4,
-            brand: savedPaymentMethod.brand,
-          },
-          amount: checkout.totalAmount,
-          currency: 'USD',
-          message: 'Payment requires 3D Secure authentication. Complete authentication and webhook will handle completion.',
-          note: 'After 3D Secure completion, webhook will automatically complete the payment',
-        };
-      }
-
-      // If payment failed
-      checkout.status = CheckoutStatus.Failed;
-      checkout.paymentNotes = `Payment failed: ${paymentResult.paymentIntent.status}`;
-      await this.checkoutRepository.save(checkout);
-
-      throw new BadRequestException(`Payment failed: ${paymentResult.paymentIntent.status}`);
-
-    } catch (error: any) {
-      // Reset checkout status back to pending for retry
-      checkout.status = CheckoutStatus.Pending;
-      checkout.paymentNotes = error.message;
-      await this.checkoutRepository.save(checkout);
-
-      console.error('❌ In-app payment with saved method failed:', error);
-      
-      // If it's a validation error, throw BadRequestException
-      if (error instanceof BadRequestException) {
-      throw error;
-      }
-      
-      // Use ErrorHandlerUtil for proper error handling
-      ErrorHandlerUtil.handleError(error, 'In-app payment with saved method failed');
-    }
-  }
-
-
-  // Removed fallback system - using real webhook processing only
-
-  /**
-   * Generate simple card validation error message
-   */
-  private generateCardValidationError(cardValidation: any, dto: any): string {
-    const cardNumber = dto.cardNumber.replace(/\D/g, '');
-    const cardLength = cardNumber.length;
-
-    // Check Luhn algorithm
-    if (!cardValidation.isLuhnValid) {
-      return 'Invalid card number. Please check and try again.';
-    }
-
-    // Check card length
-    if (!cardValidation.cardType.validLengths.includes(cardLength)) {
-      return `Invalid ${cardValidation.cardType.name} card length. Please check your card number.`;
-    }
-
-    // Check CVV length
-    if (dto.cvc && dto.cvc.length !== cardValidation.cardType.cvvLength) {
-      return `Invalid CVV. ${cardValidation.cardType.name} cards require ${cardValidation.cardType.cvvLength}-digit CVV.`;
-    }
-
-    // Check if card type is unknown
-    if (cardValidation.cardType.type === 'unknown') {
-      return 'Unsupported card type. Please use Visa, Mastercard, or other supported cards.';
-    }
-
-    // Default error
-    return 'Invalid card details. Please check your card information.';
-  }
-
-  /**
-   * Generate simple CVV error for saved payment methods
-   */
-  private generateSavedCardCVVError(savedPaymentMethod: any, providedCVV: string): string {
-    const cardBrand = savedPaymentMethod.brand.toUpperCase();
-    const expectedLength = savedPaymentMethod.cvvLength;
-
-    return `Invalid CVV. Your ${cardBrand} card requires ${expectedLength}-digit CVV.`;
-  }
-
-  /**
    * Get all completed checkouts for a user
    * This method retrieves only completed payment data from the checkout table
    */
@@ -1596,11 +1154,8 @@ export class CheckoutService {
         return [];
       }
 
-      // Get payment methods for all checkouts
-      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(userId);
-      
-      // Format the response using utility function
-      return CheckoutResponseUtils.formatMultipleCheckoutsResponse(completedCheckouts, paymentMethods);
+      // Format the response using utility function (no saved card data)
+      return CheckoutResponseUtils.formatMultipleCheckoutsResponse(completedCheckouts, []);
     } catch (error: any) {
       console.error('❌ Error getting completed checkouts:', error);
       throw new InternalServerErrorException(
@@ -1629,12 +1184,8 @@ export class CheckoutService {
         throw new NotFoundException('Completed checkout not found or you are not authorized to view this checkout');
       }
 
-      // Get payment methods for this user
-      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(userId);
-      const recentPaymentMethod = paymentMethods.length > 0 ? paymentMethods[0] : null;
-
-      // Format the response using utility function (include details for single checkout)
-      return CheckoutResponseUtils.formatCheckoutResponse(checkout, recentPaymentMethod, true);
+      // Format the response using utility function (include details for single checkout; no saved card data)
+      return CheckoutResponseUtils.formatCheckoutResponse(checkout, null, true);
     } catch (error: any) {
       console.error('❌ Error getting checkout by ID:', error);
       

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
   Req,
   UseGuards,
@@ -15,19 +16,13 @@ import {
 import { Request, Response } from 'express';
 import { CheckoutService } from './checkout.service';
 import { WooShPayService } from './wooshpay.service';
-import { PaymentMethodService } from './payment-method.service';
-import {
-  validateCard,
-  detectCardTypeRealtime,
-} from '../utils/card-validation.utils';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import {
   CreateCheckoutDto,
   CheckoutStatus,
   PaymentGateway,
-  InAppPaymentDto,
-  InAppPaymentWithSavedMethodDto,
-  UpdateCardDto,
+  WooShPayCustomerDto,
+  CreateWooShPaySessionDto,
 } from './checkout.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
@@ -37,7 +32,6 @@ export class CheckoutController {
   constructor(
     private readonly checkoutService: CheckoutService,
     private readonly wooShPayService: WooShPayService,
-    private readonly paymentMethodService: PaymentMethodService,
   ) {}
 
   @Post('create')
@@ -64,6 +58,182 @@ export class CheckoutController {
     }
   }
 
+  /** Step 1: Get or create WooShPay customer (call when user clicks checkout). Customer ID is saved on user table (wooshpayCustomerId). */
+  @Post('wooshpay-customer')
+  @HttpCode(HttpStatus.OK)
+  async getOrCreateWooShPayCustomer(
+    @Req() req: Request,
+    @Body() dto: WooShPayCustomerDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const result = await this.checkoutService.getOrCreateWooShPayCustomer(userId, dto);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay customer ready',
+        data: result,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to get or create WooShPay customer',
+      });
+    }
+  }
+
+  /** Step 2: Create WooShPay Checkout Session. Call when user clicks "Process now". successUrl, cancelUrl, currency are set by backend from env. */
+  @Post('wooshpay-session')
+  @HttpCode(HttpStatus.OK)
+  async createWooShPaySession(
+    @Req() req: Request,
+    @Body() dto: CreateWooShPaySessionDto,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      // All URLs and currency from backend (env) – frontend only sends checkoutId
+      const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://example.com';
+      const successUrl = `${baseUrl}/payment/success`;
+      const cancelUrl = `${baseUrl}/payment/cancel`;
+      const currency = process.env.CHECKOUT_CURRENCY || 'USD';
+      const result = await this.checkoutService.createWooShPayCheckoutSession(
+        userId,
+        dto.checkoutId,
+        successUrl,
+        cancelUrl,
+        currency,
+      );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Checkout session created',
+        data: result,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to create checkout session',
+      });
+    }
+  }
+
+  /** Retrieve WooShPay Checkout Session by WooShPay session ID (GET /v1/checkout/sessions/{id}) */
+  @Get('wooshpay-session/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  async getWooShPaySession(
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const session = await this.checkoutService.getWooShPaySession(sessionId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay session retrieved',
+        data: session,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to retrieve WooShPay session',
+      });
+    }
+  }
+
+  /** Retrieve WooShPay session by our checkoutId */
+  @Get('wooshpay-session/checkout/:checkoutId')
+  @HttpCode(HttpStatus.OK)
+  async getWooShPaySessionByCheckoutId(
+    @Param('checkoutId') checkoutId: string,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const session = await this.checkoutService.getWooShPaySessionByCheckoutId(userId, checkoutId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay session retrieved',
+        data: session,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to retrieve WooShPay session',
+      });
+    }
+  }
+
+  /** Expire WooShPay Checkout Session by session ID (POST /v1/checkout/sessions/{id}/expire) */
+  @Post('wooshpay-session/:sessionId/expire')
+  @HttpCode(HttpStatus.OK)
+  async expireWooShPaySession(
+    @Param('sessionId') sessionId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.checkoutService.expireWooShPaySession(sessionId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay session expired',
+        data: result,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to expire WooShPay session',
+      });
+    }
+  }
+
+  /** Expire WooShPay session by our checkoutId */
+  @Post('wooshpay-session/checkout/:checkoutId/expire')
+  @HttpCode(HttpStatus.OK)
+  async expireWooShPaySessionByCheckoutId(
+    @Param('checkoutId') checkoutId: string,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const result = await this.checkoutService.expireWooShPaySessionByCheckoutId(userId, checkoutId);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay session expired',
+        data: result,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to expire WooShPay session',
+      });
+    }
+  }
+
+  /** List WooShPay Checkout Sessions (retrieve all, optional ?limit=) */
+  @Get('wooshpay-sessions')
+  @HttpCode(HttpStatus.OK)
+  async listWooShPaySessions(
+    @Req() req: Request,
+    @Res() response: Response,
+    @Query('limit') limit?: string,
+  ) {
+    try {
+      const params = limit != null ? { limit: parseInt(limit, 10) } : undefined;
+      const sessions = await this.checkoutService.listWooShPaySessions(params);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'WooShPay sessions retrieved',
+        data: sessions,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to list WooShPay sessions',
+      });
+    }
+  }
+
+
   @Get('session/:checkoutId')
   async getCheckoutSession(
     @Param('checkoutId') checkoutId: string,
@@ -81,42 +251,6 @@ export class CheckoutController {
         success: true,
         message: 'Checkout session retrieved successfully',
         data: checkout,
-      });
-    } catch (error: any) {
-      return response.status(HttpStatus.NOT_FOUND).json({
-        success: false,
-        message: error.message || 'Checkout session not found',
-      });
-    }
-  }
-
-  // Get checkout with saved payment methods
-  @Get('session/:checkoutId/with-payment-methods')
-  async getCheckoutWithPaymentMethods(
-    @Param('checkoutId') checkoutId: string,
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      const checkout = await this.checkoutService.getCheckoutById(
-        checkoutId,
-        userId,
-      );
-      const savedPaymentMethods =
-        await this.checkoutService.getUserSavedPaymentMethods(userId);
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Checkout session with payment methods retrieved successfully',
-        data: {
-          checkout: checkout,
-          savedPaymentMethods: savedPaymentMethods,
-          hasDefaultPaymentMethod: savedPaymentMethods.some(
-            (pm) => pm.isDefault,
-          ),
-          totalSavedCards: savedPaymentMethods.length,
-        },
       });
     } catch (error: any) {
       return response.status(HttpStatus.NOT_FOUND).json({
@@ -273,402 +407,4 @@ export class CheckoutController {
   }
 
   // Webhook endpoints moved to checkout-webhook.controller.ts (no JWT authentication)
-
-  // ============ IN-APP PAYMENT ENDPOINTS ============
-
-  /**
-   * Create and save a new payment method (card) without processing payment
-   * Perfect for adding cards to user's saved payment methods
-   */
-  @Post('in-app/create-card')
-  @HttpCode(HttpStatus.CREATED)
-  async createCard(
-    @Req() req: Request,
-    @Body() dto: InAppPaymentDto,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      console.log('💳 Creating new payment method for user:', userId);
-
-      // Create and save payment method using the PaymentMethodService
-      const result = await this.paymentMethodService.createAndSavePaymentMethod(
-        userId,
-        {
-          cardNumber: dto.cardNumber,
-          expMonth: dto.expMonth,
-          expYear: dto.expYear,
-          cvc: dto.cvc,
-          cardholderName: dto.cardholderName,
-          billingEmail: dto.billingEmail,
-          billingPhone: dto.billingPhone,
-          nickname: dto.nickname,
-          setAsDefault: dto.setAsDefault,
-        }
-      );
-
-      return response.status(HttpStatus.CREATED).json({
-        success: true,
-        message: result.message,
-        isDuplicate: result.isDuplicate,
-        data: {
-          id: result.paymentMethod.id,
-          displayName: result.paymentMethod.getDisplayName(),
-          maskedCardNumber: result.paymentMethod.getMaskedCardNumber(),
-          cardIcon: result.paymentMethod.getCardIcon(),
-          brand: result.paymentMethod.brand,
-          expiryDisplay: result.paymentMethod.getExpiryDisplay(),
-          isDefault: result.paymentMethod.isDefault,
-          isExpired: result.paymentMethod.isExpired(),
-        },
-      });
-    } catch (error: any) {
-      console.error('❌ Card creation failed:', error);
-      
-      // Use ErrorHandlerUtil to get proper status code and message
-      try {
-        ErrorHandlerUtil.handleError(error, 'Failed to create payment method');
-      } catch (handledError: any) {
-        return response.status(handledError.getStatus()).json({
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-        });
-      }
-    }
-  }
-
-  /**
-   * Update existing payment method (card) details
-   */
-  @Put('in-app/update-card/:paymentMethodId')
-  @HttpCode(HttpStatus.OK)
-  async updateCard(
-    @Param('paymentMethodId') paymentMethodId: string,
-    @Body() dto: UpdateCardDto,
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      console.log('💳 Updating payment method for user:', userId);
-
-      const paymentMethod = await this.paymentMethodService.updatePaymentMethod(
-        userId,
-        paymentMethodId,
-        dto
-      );
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Payment method updated successfully',
-        data: {
-          id: paymentMethod.id,
-          displayName: paymentMethod.getDisplayName(),
-          maskedCardNumber: paymentMethod.getMaskedCardNumber(),
-          cardIcon: paymentMethod.getCardIcon(),
-          brand: paymentMethod.brand,
-          expiryDisplay: paymentMethod.getExpiryDisplay(),
-          isDefault: paymentMethod.isDefault,
-          isExpired: paymentMethod.isExpired(),
-        },
-      });
-    } catch (error: any) {
-      console.error('❌ Card update failed:', error);
-      
-      try {
-        ErrorHandlerUtil.handleError(error, 'Failed to update payment method');
-      } catch (handledError: any) {
-        return response.status(handledError.getStatus()).json({
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-        });
-      }
-    }
-  }
-
-  /**
-   * Delete existing payment method (card)
-   */
-  @Delete('in-app/delete-card/:paymentMethodId')
-  @HttpCode(HttpStatus.OK)
-  async deleteCard(
-    @Param('paymentMethodId') paymentMethodId: string,
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      console.log('💳 Deleting payment method for user:', userId);
-
-      await this.paymentMethodService.deletePaymentMethod(userId, paymentMethodId);
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Payment method deleted successfully',
-      });
-    } catch (error: any) {
-      console.error('❌ Card deletion failed:', error);
-      
-      try {
-        ErrorHandlerUtil.handleError(error, 'Failed to delete payment method');
-      } catch (handledError: any) {
-        return response.status(handledError.getStatus()).json({
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-        });
-      }
-    }
-  }
-
-  /**
-   * Get payment method by ID
-   */
-  @Get('in-app/get-card/:paymentMethodId')
-  @HttpCode(HttpStatus.OK)
-  async getCardById(
-    @Param('paymentMethodId') paymentMethodId: string,
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      console.log('💳 Getting payment method for user:', userId);
-
-      const paymentMethod = await this.paymentMethodService.getPaymentMethodById(
-        userId,
-        paymentMethodId
-      );
-
-      if (!paymentMethod) {
-        return response.status(HttpStatus.NOT_FOUND).json({
-          success: false,
-          message: 'Payment method not found',
-        });
-      }
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Payment method retrieved successfully',
-        data: {
-          id: paymentMethod.id,
-          displayName: paymentMethod.getDisplayName(),
-          maskedCardNumber: paymentMethod.getMaskedCardNumber(),
-          cardIcon: paymentMethod.getCardIcon(),
-          brand: paymentMethod.brand,
-          expiryDisplay: paymentMethod.getExpiryDisplay(),
-          isDefault: paymentMethod.isDefault,
-          isExpired: paymentMethod.isExpired(),
-        },
-      });
-    } catch (error: any) {
-      console.error('❌ Get card failed:', error);
-      
-      try {
-        ErrorHandlerUtil.handleError(error, 'Failed to get payment method');
-      } catch (handledError: any) {
-        return response.status(handledError.getStatus()).json({
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-        });
-      }
-    }
-  }
-
-  /**
-   * Process payment with saved payment method (1-click payment in-app)
-   */
-  @Post('in-app/pay-with-saved-method')
-  @HttpCode(HttpStatus.OK)
-  async processInAppPaymentWithSavedMethod(
-    @Req() req: Request,
-    @Body() dto: InAppPaymentWithSavedMethodDto,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      console.log('⚡ Processing in-app payment with saved method');
-
-      const result =
-        await this.checkoutService.processInAppPaymentWithSavedMethod(
-          userId,
-          dto,
-        );
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: result.success
-          ? 'Payment completed instantly!'
-          : 'Payment requires additional authentication',
-        data: {
-          checkoutId: dto.checkoutId,
-          transactionId: result.transactionId,
-          status: result.status,
-          isCompleted: result.isCompleted,
-          requiresAction: result.requiresAction,
-          nextAction: result.nextAction,
-          paymentMethod: result.paymentMethod,
-          amount: result.amount,
-          currency: result.currency,
-        },
-      });
-    } catch (error: any) {
-      console.error('❌ In-app payment with saved method failed:', error);
-      
-      // Use ErrorHandlerUtil to get proper status code and message
-      try {
-        ErrorHandlerUtil.handleError(error, 'In-app payment with saved method failed');
-      } catch (handledError: any) {
-        return response.status(handledError.getStatus()).json({
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-        });
-      }
-    }
-  }
-
-  /**
-   * Get user's saved payment methods (RBI Compliant - no sensitive data)
-   */
-  @Get('saved-payment-methods')
-  @HttpCode(HttpStatus.OK)
-  async getSavedPaymentMethods(@Req() req: Request, @Res() response: Response) {
-    try {
-      const userId = req.user.id;
-      const paymentMethods =
-        await this.checkoutService.getUserSavedPaymentMethods(userId);
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Saved payment methods retrieved successfully',
-        data: {
-          paymentMethods: paymentMethods.map((pm) => ({
-            id: pm.id,
-            displayName: pm.displayName,
-            maskedCardNumber: pm.maskedCardNumber,
-            cardIcon: pm.cardIcon,
-            brand: pm.brand,
-            expiryDisplay: pm.expiryDisplay,
-            isDefault: pm.isDefault,
-            isExpired: pm.isExpired,
-          })),
-        },
-      });
-    } catch (error: any) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: error.message,
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * Get usage statistics for a specific payment method
-   */
-  @Get('payment-method/:paymentMethodId/usage-stats')
-  @HttpCode(HttpStatus.OK)
-  async getPaymentMethodUsageStats(
-    @Param('paymentMethodId') paymentMethodId: string,
-    @Req() req: Request,
-    @Res() response: Response,
-  ) {
-    try {
-      const userId = req.user.id;
-      const usageStats =
-        await this.paymentMethodService.getPaymentMethodUsageStats(
-          userId,
-          paymentMethodId,
-        );
-
-      return response.status(HttpStatus.OK).json({
-        success: true,
-        message: 'Payment method usage statistics retrieved successfully',
-        data: usageStats,
-      });
-    } catch (error: any) {
-      return response.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: error.message,
-        error: error.message,
-      });
-    }
-  }
-
-
-  /**
-   * Real-time card validation for payment forms
-   */
-  @Post('validate-card')
-  @HttpCode(HttpStatus.OK)
-  async validateCardDetails(
-    @Body()
-    dto: {
-      cardNumber: string;
-      cvv?: string;
-      expMonth?: number;
-      expYear?: number;
-    },
-  ) {
-    try {
-      const cardValidation = validateCard(dto.cardNumber, dto.cvv);
-
-      // Detect card type for additional info
-      const cardType = detectCardTypeRealtime(dto.cardNumber);
-
-      return {
-        success: true,
-        message: 'Card validation completed',
-        data: {
-          isValid: cardValidation.isValid,
-          cardType: {
-            type: cardValidation.cardType.type,
-            name: cardValidation.cardType.name,
-            logo: cardValidation.cardType.logo,
-            color: cardValidation.cardType.color,
-            region: cardValidation.cardType.region,
-            country: cardValidation.cardType.country,
-          },
-          validation: {
-            isLuhnValid: cardValidation.isLuhnValid,
-            isValidLength: cardValidation.cardType.validLengths.includes(
-              dto.cardNumber.replace(/\D/g, '').length,
-            ),
-            isValidCVV: dto.cvv
-              ? cardValidation.cardType.cvvLength === dto.cvv.length
-              : true,
-            cvvLength: cardValidation.cardType.cvvLength,
-            validLengths: cardValidation.cardType.validLengths,
-          },
-          formatted: {
-            cardNumber: cardValidation.formattedNumber,
-            maskedNumber: cardValidation.maskedNumber,
-          },
-          binInfo: {
-            bin: dto.cardNumber.substring(0, 6),
-            brand: cardValidation.cardType.name,
-          },
-        },
-      };
-    } catch (error: any) {
-      // Use ErrorHandlerUtil for proper error handling
-      try {
-        ErrorHandlerUtil.handleError(error, 'Card validation failed');
-      } catch (handledError: any) {
-        return {
-          success: false,
-          message: handledError.message,
-          error: handledError.message,
-          data: {
-            isValid: false,
-            cardType: { type: 'unknown', name: 'Unknown Card' },
-          },
-        };
-      }
-    }
-  }
 }

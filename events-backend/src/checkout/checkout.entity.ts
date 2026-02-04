@@ -44,6 +44,9 @@ export class Checkout {
     @Column({ type: 'varchar', nullable: true })
     paymentUrl?: string;
 
+    @Column({ type: 'varchar', nullable: true })
+    wooshpaySessionId?: string;
+
     @Column({ type: 'text', nullable: true })
     paymentNotes?: string;
 

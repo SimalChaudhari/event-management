@@ -14,32 +14,6 @@ export interface WooShPayConfig {
   webhookSecret?: string;
 }
 
-export interface PaymentIntentData {
-  amount: number;
-  currency: string;
-  merchant_order_id: string;
-  return_url?: string;
-  cancel_url?: string;
-  metadata: Record<string, any>;
-  confirm?: boolean;
-  payment_method?: string;
-  customer?: string;
-  description?: string;
-}
-
-export interface InAppPaymentData {
-  amount: number;
-  currency: string;
-  merchant_order_id: string;
-  payment_method: string;
-  customer_email: string;
-  customer_name?: string;
-  description?: string;
-  metadata: Record<string, any>;
-  save_payment_method?: boolean;
-  confirm?: boolean;
-}
-
 export interface PaymentLinkData {
   amount: number;
   currency: string;
@@ -55,10 +29,13 @@ export interface CheckoutSessionData {
   cancel_url: string;
   success_url: string;
   mode: 'payment';
+  customer?: string; // WooShPay customer ID (cus_xxx)
+  payment_method?: string; // WooShPay payment method ID (pm_xxx) – pre-fill saved card (if supported)
+  default_payment_method?: string; // Alternative param name some APIs use for pre-selecting card
   line_items: Array<{
     price_data: {
       currency: string;
-      unit_amount: number;
+      unit_amount: number; // in cents/smallest unit
       product_data: {
         name: string;
         description?: string;
@@ -66,6 +43,35 @@ export interface CheckoutSessionData {
     };
     quantity: number;
   }>;
+  metadata?: Record<string, any>;
+}
+
+/** WooShPay customer create payload - all fields optional except email recommended */
+export interface WooShPayCustomerData {
+  email?: string;
+  name?: string;
+  phone?: string;
+  description?: string;
+  address?: {
+    city?: string;
+    country?: string;
+    line1?: string;
+    line2?: string;
+    postal_code?: string;
+    state?: string;
+  };
+  shipping?: {
+    address?: {
+      city?: string;
+      country?: string;
+      line1?: string;
+      line2?: string;
+      postal_code?: string;
+      state?: string;
+    };
+    name?: string;
+    phone?: string;
+  };
   metadata?: Record<string, any>;
 }
 
@@ -182,56 +188,6 @@ export class WooShPayService {
   }
 
   /**
-   * Create PaymentIntent with WooShPay
-   */
-  async createPaymentIntent(data: PaymentIntentData): Promise<any> {
-    const config = this.getConfig();
-
-    this.logger.log('Creating PaymentIntent', {
-      amount: data.amount,
-      currency: data.currency,
-      merchant_order_id: data.merchant_order_id,
-      testMode: config.testMode,
-    });
-
-    // Ensure required URLs are provided
-    const paymentIntentData = {
-      ...data,
-      return_url: data.return_url || `${process.env.FRONTEND_URL || 'https://example.com'}/payment/success`,
-      cancel_url: data.cancel_url || `${process.env.FRONTEND_URL || 'https://example.com'}/payment/cancel`,
-    };
-
-    const paymentIntent = await this.makeApiRequest<any>(
-      'POST',
-      '/v1/payment_intents',
-      paymentIntentData,
-    );
-
-    // Log test card information in test mode
-    if (config.testMode) {
-      this.logger.log('🧪 TEST MODE - Available test cards:');
-      this.logger.log('✅ Success: 4111111111111111, Exp: 12/25, CVV: 123');
-      this.logger.log('❌ Decline: 4000000000000002, Exp: 12/25, CVV: 123');
-    }
-
-    return paymentIntent;
-  }
-
-
-
-  /**
-   * Retrieve PaymentIntent details
-   */
-  async getPaymentIntent(paymentIntentId: string): Promise<any> {
-    return await this.makeApiRequest<any>(
-      'GET',
-      `/v1/payment_intents/${paymentIntentId}`,
-    );
-  }
-
-
-
-  /**
    * Verify webhook signature for security
    */
   verifyWebhookSignature(payload: string, signature: string): boolean {
@@ -280,11 +236,8 @@ export class WooShPayService {
     });
 
     switch (eventType) {
-      case 'payment_intent.succeeded':
-        this.logger.log('Payment succeeded', { paymentIntentId: eventData.id });
-        break;
-      case 'payment_intent.payment_failed':
-        this.logger.log('Payment failed', { paymentIntentId: eventData.id });
+      case 'checkout.session.completed':
+        this.logger.log('Checkout session completed', { sessionId: eventData.id });
         break;
       case 'payment_link.paid':
         this.logger.log('Payment link paid', { paymentLinkId: eventData.id });
@@ -295,15 +248,15 @@ export class WooShPayService {
   }
 
   /**
-   * Create refund for a payment
+   * Create refund for a payment (paymentId from checkout session / payment)
    */
   async createRefund(
-    paymentIntentId: string,
+    paymentId: string,
     amount?: number,
     reason?: string,
   ): Promise<any> {
     const refundData: any = {
-      payment_intent: paymentIntentId,
+      payment_intent: paymentId,
     };
 
     if (amount) {
@@ -315,7 +268,7 @@ export class WooShPayService {
     }
 
     this.logger.log('Creating refund', {
-      paymentIntentId,
+      paymentId,
       amount,
       reason,
     });
@@ -466,21 +419,59 @@ export class WooShPayService {
   }
 
   /**
-   * Create Customer for Payment Method storage
+   * Create Customer for Payment Method storage / Checkout Session flow
+   * All fields optional; email recommended.
    */
-  async createCustomer(customerData: {
-    email: string;
-    name?: string;
-    phone?: string;
-    description?: string;
-    metadata?: Record<string, any>;
-  }): Promise<any> {
+  async createCustomer(customerData: WooShPayCustomerData): Promise<any> {
     this.logger.log('Creating WooShPay Customer', {
       email: customerData.email,
       name: customerData.name,
     });
 
     return await this.makeApiRequest<any>('POST', '/v1/customers', customerData);
+  }
+
+  /**
+   * Create Checkout Session (redirect flow) – NOT Payment Intent.
+   * POST https://apitest.wooshpay.com/v1/checkout/sessions
+   * Body: { cancel_url, success_url, mode: "payment", customer: "cus_xxx", line_items }
+   * Returns URL for user to complete payment on WooShPay hosted page.
+   */
+  async createCheckoutSession(data: CheckoutSessionData): Promise<any> {
+    this.logger.log('Creating WooShPay Checkout Session', {
+      mode: data.mode,
+      customer: data.customer,
+      lineItemsCount: data.line_items?.length ?? 0,
+      payment_method: data.payment_method ?? '(none)',
+      default_payment_method: data.default_payment_method ?? '(none)',
+    });
+
+    return await this.makeApiRequest<any>('POST', '/v1/checkout/sessions', data);
+  }
+
+  /**
+   * Retrieve a Checkout Session by ID
+   * GET /v1/checkout/sessions/{id}
+   */
+  async getCheckoutSession(sessionId: string): Promise<any> {
+    return await this.makeApiRequest<any>('GET', `/v1/checkout/sessions/${sessionId}`);
+  }
+
+  /**
+   * Expire a Checkout Session
+   * POST /v1/checkout/sessions/{id}/expire
+   */
+  async expireCheckoutSession(sessionId: string): Promise<any> {
+    return await this.makeApiRequest<any>('POST', `/v1/checkout/sessions/${sessionId}/expire`);
+  }
+
+  /**
+   * List Checkout Sessions (retrieve all with optional limit)
+   * GET /v1/checkout/sessions
+   */
+  async listCheckoutSessions(params?: { limit?: number }): Promise<any> {
+    const query = params?.limit != null ? `?limit=${params.limit}` : '';
+    return await this.makeApiRequest<any>('GET', `/v1/checkout/sessions${query}`);
   }
 
   /**
@@ -491,91 +482,7 @@ export class WooShPayService {
   }
 
   /**
-   * Create Payment Intent for In-App Payment (Direct API)
-   * This processes payment directly without external redirects
-   */
-  async createInAppPaymentIntent(data: InAppPaymentData): Promise<any> {
-    const config = this.getConfig();
-
-    this.logger.log('Creating In-App Payment Intent', {
-      amount: data.amount,
-      currency: data.currency,
-      merchant_order_id: data.merchant_order_id,
-      customer_email: data.customer_email,
-      testMode: config.testMode,
-    });
-
-    const paymentIntentData = {
-      amount: data.amount,
-      currency: data.currency,
-      merchant_order_id: data.merchant_order_id,
-      payment_method: data.payment_method,
-      confirm: true, // Confirm immediately for in-app payment
-      description: data.description || `Event Registration - ${data.merchant_order_id}`,
-      metadata: data.metadata,
-      customer_email: data.customer_email,
-      customer_name: data.customer_name,
-      save_payment_method: data.save_payment_method || false,
-      // Provide return URLs for in-app payments (required by WooShPay API)
-      return_url: `${process.env.FRONTEND_URL || 'https://example.com'}/payment/success`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://example.com'}/payment/cancel`,
-    };
-
-    const paymentIntent = await this.makeApiRequest<any>(
-      'POST',
-      '/v1/payment_intents',
-      paymentIntentData,
-    );
-
-    this.logger.log('In-App Payment Intent created successfully', {
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-    });
-
-    // Log test card information in test mode
-    if (config.testMode) {
-      this.logger.log('🧪 TEST MODE - Available test cards for in-app payment:');
-      this.logger.log('✅ Success: 4111111111111111, Exp: 12/25, CVV: 123');
-      this.logger.log('❌ Decline: 4000000000000002, Exp: 12/25, CVV: 123');
-      this.logger.log('🔐 3D Secure: 4000002500003155, Exp: 12/25, CVV: 123');
-    }
-
-    return paymentIntent;
-  }
-
-  /**
-   * Confirm Payment Intent (for handling 3D Secure or additional authentication)
-   */
-  async confirmPaymentIntent(paymentIntentId: string, paymentMethodId?: string): Promise<any> {
-    this.logger.log('Confirming Payment Intent', {
-      paymentIntentId,
-      paymentMethodId,
-    });
-
-    const confirmData: any = {};
-    if (paymentMethodId) {
-      confirmData.payment_method = paymentMethodId;
-    }
-
-    const paymentIntent = await this.makeApiRequest<any>(
-      'POST',
-      `/v1/payment_intents/${paymentIntentId}/confirm`,
-      confirmData,
-    );
-
-    this.logger.log('Payment Intent confirmed', {
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      requires_action: paymentIntent.status === 'requires_action',
-    });
-
-    return paymentIntent;
-  }
-
-  /**
-   * Create Payment Method with Card Details (for in-app payment)
+   * Create Payment Method with Card Details (for saving card – not Payment Intent)
    */
   async createPaymentMethodWithCard(cardData: {
     number: string;
@@ -620,98 +527,5 @@ export class WooShPayService {
     });
 
     return paymentMethod;
-  }
-
-  /**
-   * Process In-App Payment with Card Details (One-step payment)
-   */
-  async processInAppPaymentWithCard(
-    amount: number,
-    currency: string,
-    cardData: {
-      number: string;
-      exp_month: number;
-      exp_year: number;
-      cvc: string;
-      name?: string;
-    },
-    customerData: {
-      email: string;
-      name?: string;
-    },
-    metadata: Record<string, any> = {},
-  ): Promise<any> {
-    this.logger.log('Processing In-App Payment with Card', {
-      amount,
-      currency,
-      customer_email: customerData.email,
-    });
-
-    // Step 1: Create Payment Method
-    const paymentMethod = await this.createPaymentMethodWithCard({
-      ...cardData,
-      billing_details: {
-        name: customerData.name,
-        email: customerData.email,
-      },
-    });
-
-    // Step 2: Create and confirm Payment Intent
-    const paymentIntent = await this.createInAppPaymentIntent({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency,
-      merchant_order_id: metadata.checkout_id || `inapp_${Date.now()}`,
-      payment_method: paymentMethod.id,
-      customer_email: customerData.email,
-      customer_name: customerData.name,
-      description: `Event Registration - ${metadata.checkout_id || 'In-App Payment'}`,
-      metadata,
-      save_payment_method: true,
-      confirm: true,
-    });
-
-    return {
-      paymentIntent,
-      paymentMethod,
-      requiresAction: paymentIntent.status === 'requires_action',
-      nextAction: paymentIntent.next_action,
-      status: paymentIntent.status,
-    };
-  }
-
-  /**
-   * Process In-App Payment with Saved Payment Method
-   */
-  async processInAppPaymentWithSavedMethod(
-    amount: number,
-    currency: string,
-    paymentMethodId: string,
-    customerEmail: string,
-    metadata: Record<string, any> = {},
-  ): Promise<any> {
-    this.logger.log('Processing In-App Payment with Saved Method', {
-      amount,
-      currency,
-      paymentMethodId,
-      customer_email: customerEmail,
-    });
-
-    const paymentIntent = await this.createInAppPaymentIntent({
-      amount: Math.round(amount * 100), // Convert to cents
-      currency,
-      merchant_order_id: metadata.checkout_id || `inapp_${Date.now()}`,
-      payment_method: paymentMethodId,
-      customer_email: customerEmail,
-      description: `Event Registration - ${metadata.checkout_id || 'In-App Payment'}`,
-      metadata,
-      confirm: true,
-    });
-
-    return {
-      paymentIntent,
-      requiresAction: paymentIntent.status === 'requires_action',
-      nextAction: paymentIntent.next_action,
-      status: paymentIntent.status,
-    };
   }
 }
