@@ -35,8 +35,16 @@ async function bootstrap() {
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule, { httpsOptions });
 
-    // Increase payload limits to support large CSV uploads
-    app.use(json({ limit: '20mb' }));
+    // Store raw body for WooShPay webhook signature verification (must use exact bytes that were signed)
+    const jsonParser = json({
+      limit: '20mb',
+      verify: (req: any, _res, buf: Buffer, encoding?: string) => {
+        if (buf?.length && req.headers['wooshpay-signature']) {
+          req.rawBody = buf.toString((encoding as BufferEncoding) || 'utf8');
+        }
+      },
+    });
+    app.use(jsonParser);
     app.use(urlencoded({ extended: true, limit: '20mb' }));
 
     app.useGlobalFilters(new GlobalExceptionFilter());

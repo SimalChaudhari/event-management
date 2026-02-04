@@ -37,10 +37,12 @@ export class CheckoutWebhookController {
             const isProduction = process.env.NODE_ENV === 'production';
 
             if (isProduction) {
-                const payload = JSON.stringify(webhookData);
+                // Use raw body for verification; re-stringifying parsed JSON can change key order and break signature
+                const rawBody = (req as any).rawBody;
+                const payload = typeof rawBody === 'string' ? rawBody : JSON.stringify(webhookData);
                 try {
                     if (!signature || !this.wooShPayService.verifyWebhookSignature(payload, signature)) {
-                        console.error('❌ Webhook signature verification failed');
+                        console.error('❌ Webhook signature verification failed (use production webhook secret and ensure WooShPay sends to this URL)');
                         return response.status(HttpStatus.UNAUTHORIZED).json({
                             success: false,
                             message: 'Webhook signature verification failed',
