@@ -14,9 +14,11 @@ import { Cart } from 'cart/cart.entity';
 import { Coupon } from 'coupon/coupon.entity';
 import { CouponService } from 'coupon/coupon.service';
 import { CouponUsage } from 'coupon/coupon-usage.entity';
+import { Checkout } from '../checkout/checkout.entity';
+import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Order,UserEntity,Event,OrderItemEntity,RegisterEvent,Cart,Coupon,CouponUsage]),
+    imports: [TypeOrmModule.forFeature([Order, UserEntity, Event, OrderItemEntity, RegisterEvent, Cart, Coupon, CouponUsage, Checkout, CheckoutCartItem]),
     JwtModule.register({
         secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
         signOptions: {},  // Set token expiration

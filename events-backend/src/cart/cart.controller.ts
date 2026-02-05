@@ -64,13 +64,14 @@ export class CartController {
                     const coupon = await couponService.getCouponById(body.couponId);
                     
                     const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, coupon.name);
-                    // Update result with coupon data
+                    // Update result with coupon data (including discountPercentage for "10% off" display)
                     result = {
                         ...result,
                         discount: couponResult.discount,
                         finalAmount: couponResult.finalAmount,
+                        discountPercentage: couponResult.discountPercentage,
                         couponApplied: couponResult.couponApplied as any
-                    };
+                    } as any;
                 } catch (error: any) {
                     return response.status(400).json({
                         success: false,
@@ -155,19 +156,22 @@ export class CartController {
                 }
             };
 
-            // Add coupon-related fields only if coupon is applied
+            // Add coupon-related fields only if coupon is applied (discountPercentage for "10% off" display)
             if (body.couponId && body.couponId.trim() !== '') {
                 responseData.couponCode = checkout.couponCode;
                 responseData.coupon = checkout.coupon;
                 responseData.couponApplied = result.couponApplied || null;
                 responseData.discount = discount;
+                const discountPct = totalAmount > 0 ? Math.round((discount / totalAmount) * 10000) / 100 : 0;
+                responseData.discountPercentage = discountPct;
                 responseData.originalTotal = totalAmount;
-                
+
                 // Price breakdown with discount
                 responseData.priceBreakdown = {
-                    subtotal: totalAmount, // Original total
-                    discount: discount, // Discount applied
-                    total: finalAmount, // Final amount after discount
+                    subtotal: totalAmount,
+                    discount,
+                    discountPercentage: responseData.discountPercentage,
+                    total: finalAmount,
                     currency: 'USD',
                     gstInclusive: true
                 };
@@ -535,6 +539,7 @@ export class CartController {
             // Prepare response data
             const responseData: any = {
                 checkoutId: checkout.checkoutId,
+                orderId: checkout.orderId || null,
                 status: checkout.status,
                 totalAmount: actualFinalAmount, // Show final amount (with or without discount)
                 cartItems: fullCartItems, // Full cart item details
@@ -597,67 +602,6 @@ export class CartController {
             return response.status(400).json({
                 success: false,
                 message: error.message || 'Failed to retrieve checkout session',
-                error: error.message
-            });
-        }
-    }
-
-    @Post('apply-coupon/:checkoutId')
-    async applyCouponToCheckout(
-        @Param('checkoutId') checkoutId: string,
-        @Body() body: { 
-            couponId?: string  // Optional - can be null or empty
-        },
-        @Request() req: any,
-        @Res() response: Response
-    ) {
-        try {
-            const userId = req.user.id;
-            const role = req.user.role;
-
-            if (role !== 'user') {
-                return response.status(403).json({
-                    success: false,
-                    message: 'Access denied. Only users can apply coupons.',
-                });
-            }
-
-            if (!checkoutId) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Checkout ID is required.',
-                });
-            }
-
-            if (!body.couponId || body.couponId.trim() === '') {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Coupon ID is required.',
-                });
-            }
-
-            // Get coupon by ID first, then get the code
-            const couponService = this.cartService['couponService'];
-            const coupon = await couponService.getCouponById(body.couponId);
-
-            // Apply coupon to checkout
-            const result = await this.checkoutService.applyCouponToCheckout(
-                checkoutId,
-                userId,
-                coupon.name
-            );
-
-            return response.status(200).json({
-                success: true,
-                message: 'Coupon applied successfully',
-                data: result
-            });
-
-        } catch (error: any) {
-            console.error('❌ Apply coupon failed:', error);
-            return response.status(400).json({
-                success: false,
-                message: error.message || 'Failed to apply coupon',
                 error: error.message
             });
         }

@@ -23,6 +23,7 @@ import {
   PaymentGateway,
   WooShPayCustomerDto,
   CreateWooShPaySessionDto,
+  CreateRefundDto,
 } from './checkout.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 
@@ -95,7 +96,7 @@ export class CheckoutController {
       // All URLs and currency from backend (env) – frontend only sends checkoutId
       const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://example.com';
       const successUrl = `${baseUrl}/payment/success`;
-      const cancelUrl = `${baseUrl}/payment/cancel`;
+      const cancelUrl = `${baseUrl}/payment/cancel?checkout_id=${encodeURIComponent(dto.checkoutId)}`;
       const currency = process.env.CHECKOUT_CURRENCY || 'USD';
       const result = await this.checkoutService.createWooShPayCheckoutSession(
         userId,
@@ -311,6 +312,63 @@ export class CheckoutController {
       return response.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: error.message || 'Failed to retrieve checkout history',
+      });
+    }
+  }
+
+  /** Get refund status for an order (user can track refund). */
+  @Get('refund/status/:orderId')
+  @HttpCode(HttpStatus.OK)
+  async getRefundStatus(
+    @Param('orderId') orderId: string,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const refunds = await this.checkoutService.getRefundStatusForOrder(
+        orderId,
+        userId,
+      );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Refund status retrieved',
+        data: { orderId, refunds },
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to get refund status',
+      });
+    }
+  }
+
+  /** Refund an order paid via WooShPay. Body: { amount?: number (cents), reason?: string }. Omit amount for full refund. */
+  @Post('refund/:orderId')
+  @HttpCode(HttpStatus.OK)
+  async createRefund(
+    @Param('orderId') orderId: string,
+    @Body() dto: CreateRefundDto,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      const userId = req.user.id;
+      const result = await this.checkoutService.createRefundForOrder(
+        orderId,
+        userId,
+        dto.amount,
+        dto.reason,
+      );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Refund initiated successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      return response.status(error.getStatus?.() ?? HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: error.message || 'Failed to create refund',
       });
     }
   }

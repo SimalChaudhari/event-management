@@ -92,7 +92,7 @@ export class ErrorHandlerService {
 
         const constraintInfo = constraintMessages[constraintName as keyof typeof constraintMessages] || {
           resource: 'Resource',
-          relatedResource: 'Related Resource',
+          relatedResource: `Related Resource (constraint: ${constraintName}, table: ${tableName})`,
           action: 'delete'
         };
 

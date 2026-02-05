@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto, ApplyCouponDto } from './coupon.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -19,9 +19,9 @@ export class CouponController {
 
   @Get()
   // @Roles(UserRole.Admin)
-  async getAllCoupons(@Query('eventId') eventId?: string, @Request() req?: any) {
+  async getAllCoupons(@Request() req?: any) {
     const isAdmin = req?.user?.role === UserRole.Admin;
-    return this.couponService.getAllCoupons(eventId, isAdmin);
+    return this.couponService.getAllCoupons(isAdmin);
   }
 
   @Get(':id')
@@ -43,9 +43,22 @@ export class CouponController {
   }
 
   @Post('validate')
-  async validateCoupon(@Body() dto: ApplyCouponDto) {
-    // This endpoint can be used to validate coupon before applying
-    // You'll need to pass userId and orderAmount in the request
-    return { message: 'Coupon validation endpoint - implement as needed' };
+  async validateCoupon(@Body() dto: ApplyCouponDto, @Request() req: any) {
+    const userId = req?.user?.id;
+    if (!userId) {
+      return { valid: false, message: 'User not authenticated' };
+    }
+    const orderAmount = Number(dto.orderAmount ?? 0);
+    const result = await this.couponService.validateAndApplyCoupon(
+      dto.name,
+      userId,
+      orderAmount,
+    );
+    return {
+      valid: true,
+      discount: result.discount,
+      finalAmount: result.finalAmount,
+      coupon: result.coupon,
+    };
   }
 }

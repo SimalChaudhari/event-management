@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Coupon } from './coupon.entity';
 import { CouponUsage } from './coupon-usage.entity';
-import { Event } from '../event/event.entity';
 import { CreateCouponDto } from './coupon.dto';
+import { validateCouponDatesForCreate, validateCouponDateNotPast } from '../utils/coupon-validation.utils';
 
 @Injectable()
 export class CouponService {
@@ -13,8 +13,6 @@ export class CouponService {
     private couponRepo: Repository<Coupon>,
     @InjectRepository(CouponUsage)
     private couponUsageRepo: Repository<CouponUsage>,
-    @InjectRepository(Event)
-    private eventRepo: Repository<Event>,
   ) {}
 
   async createCoupon(dto: CreateCouponDto) {
@@ -27,23 +25,16 @@ export class CouponService {
       throw new BadRequestException('Voucher name already exists');
     }
 
-    // Validate date range: validFrom should be before validTo
-    if (dto.validFrom && dto.validTo && new Date(dto.validFrom) > new Date(dto.validTo)) {
-      throw new BadRequestException('validFrom date must be before validTo date');
-    }
+    const { validFrom: validFromDate, validTo: validToDate } = validateCouponDatesForCreate(
+      dto.validFrom,
+      dto.validTo,
+    );
 
-    // Sanitize eventId: empty string or invalid value causes FK violation. Use undefined for global coupon.
-    const couponData: Partial<Coupon> = { ...dto };
-    const eventId = couponData.eventId;
-    if (eventId === '' || eventId === undefined || eventId === null || (typeof eventId === 'string' && !eventId.trim())) {
-      couponData.eventId = undefined;
-    } else {
-      // Validate event exists when eventId is provided
-      const eventExists = await this.eventRepo.findOne({ where: { id: eventId } });
-      if (!eventExists) {
-        throw new BadRequestException(`Event not found for eventId: ${eventId}`);
-      }
-    }
+    const couponData: Partial<Coupon> = {
+      ...dto,
+      validFrom: validFromDate,
+      validTo: validToDate,
+    };
 
     const coupon = this.couponRepo.create(couponData);
     return this.couponRepo.save(coupon);
@@ -70,20 +61,8 @@ export class CouponService {
     };
   }
 
-  async getAllCoupons(eventId?: string, isAdmin = false) {
-    let coupons: Coupon[];
-    if (eventId) {
-      // Get coupons for specific event or global coupons (eventId is null)
-      coupons = await this.couponRepo.find({
-        where: [
-          { eventId: eventId },
-          { eventId: IsNull() } // Global coupons
-        ],
-        relations: ['event']
-      });
-    } else {
-      coupons = await this.couponRepo.find({ relations: ['event'] });
-    }
+  async getAllCoupons(isAdmin = false) {
+    const coupons = await this.couponRepo.find();
     // Admin sees full data; user sees only public fields
     if (isAdmin) {
       return coupons;
@@ -91,18 +70,8 @@ export class CouponService {
     return coupons.map((c) => this.toPublicCouponResponse(c));
   }
 
-  async getCouponsByEventId(eventId: string) {
-    return this.couponRepo.find({
-      where: { eventId },
-      relations: ['event']
-    });
-  }
-
   async getCouponById(id: string) {
-    const coupon = await this.couponRepo.findOne({ 
-      where: { id },
-      relations: ['event']
-    });
+    const coupon = await this.couponRepo.findOne({ where: { id } });
     if (!coupon) {
       throw new NotFoundException('Coupon not found');
     }
@@ -110,38 +79,37 @@ export class CouponService {
   }
 
   async getCouponByName(name: string) {
-    const coupon = await this.couponRepo.findOne({ 
-      where: { name },
-      relations: ['event']
-    });
+    const coupon = await this.couponRepo.findOne({ where: { name } });
     if (!coupon) {
       throw new NotFoundException('Voucher not found');
     }
     return coupon;
   }
 
-  async validateAndApplyCoupon(name: string, userId: string, orderAmount: number): Promise<any> {
+  async validateAndApplyCoupon(
+    name: string,
+    userId: string,
+    orderAmount: number,
+  ): Promise<any> {
     // 1. Check if voucher exists and is active
     const coupon = await this.couponRepo.findOne({ where: { name } });
     if (!coupon) throw new NotFoundException('Invalid voucher name');
     if (!coupon.isActive) throw new BadRequestException('Voucher is not active');
 
-    // 2. Check validity date range
+    // 2. Check validity date range (compare by calendar day in UTC to avoid timezone issues)
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // Set to start of day for date comparison
-    
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     if (coupon.validFrom) {
       const validFrom = new Date(coupon.validFrom);
-      validFrom.setHours(0, 0, 0, 0);
-      if (now < validFrom) {
+      const validFromDayUTC = Date.UTC(validFrom.getUTCFullYear(), validFrom.getUTCMonth(), validFrom.getUTCDate());
+      if (todayUTC < validFromDayUTC) {
         throw new BadRequestException('Voucher is not yet valid');
       }
     }
-    
     if (coupon.validTo) {
       const validTo = new Date(coupon.validTo);
-      validTo.setHours(0, 0, 0, 0);
-      if (now > validTo) {
+      const validToDayUTC = Date.UTC(validTo.getUTCFullYear(), validTo.getUTCMonth(), validTo.getUTCDate());
+      if (todayUTC > validToDayUTC) {
         throw new BadRequestException('Voucher has expired');
       }
     }
@@ -185,7 +153,19 @@ export class CouponService {
 
   async updateCoupon(id: string, dto: Partial<CreateCouponDto>) {
     const coupon = await this.getCouponById(id);
-    Object.assign(coupon, dto);
+    if (dto.validFrom !== undefined) {
+      coupon.validFrom = validateCouponDateNotPast(dto.validFrom, 'validFrom') ?? coupon.validFrom;
+    }
+    if (dto.validTo !== undefined) {
+      coupon.validTo = validateCouponDateNotPast(dto.validTo, 'validTo') ?? coupon.validTo;
+    }
+    const finalValidFrom = coupon.validFrom ? new Date(coupon.validFrom) : null;
+    const finalValidTo = coupon.validTo ? new Date(coupon.validTo) : null;
+    if (finalValidFrom && finalValidTo && finalValidFrom > finalValidTo) {
+      throw new BadRequestException('Valid from date and time must be before valid to date and time.');
+    }
+    const { validFrom: _vf, validTo: _vt, ...rest } = dto;
+    Object.assign(coupon, rest);
     return this.couponRepo.save(coupon);
   }
 

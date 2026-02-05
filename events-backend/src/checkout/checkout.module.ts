@@ -6,6 +6,7 @@ import { CheckoutWebhookController } from './checkout-webhook.controller';
 import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
 import { CheckoutCartItem } from './checkout-cart-item.entity';
+import { Refund } from './refund.entity';
 import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
 import { Cart } from 'cart/cart.entity';
@@ -24,6 +25,7 @@ import { CartModule } from 'cart/cart.module';
         TypeOrmModule.forFeature([
             Checkout,
             CheckoutCartItem,
+            Refund,
             UserEntity,
             Event,
             Cart,

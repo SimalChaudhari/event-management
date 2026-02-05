@@ -105,3 +105,16 @@ export class UpdateOrderItemStatusDto {
     @IsEnum(OrderNoStatus)
     status!: OrderNoStatus;
 }
+
+/** Query params for order list with pagination and filters */
+export interface OrderListQueryDto {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+    search?: string;
+    status?: OrderStatus;
+    dateFrom?: string; // ISO date YYYY-MM-DD
+    dateTo?: string;
+    userId?: string; // Filter by customer (user) id
+}

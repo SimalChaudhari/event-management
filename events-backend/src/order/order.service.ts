@@ -3,7 +3,7 @@ import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundE
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository } from 'typeorm';
 import { Order } from './order.entity';
-import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto, OrderStatus } from './order.dto';
+import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto, OrderStatus, OrderListQueryDto } from './order.dto';
 import { UserEntity } from 'user/users.entity'; // Ensure this import is correct
 import { OrderItemEntity } from './event.item.entity';
 import { Event } from 'event/event.entity';
@@ -11,61 +11,78 @@ import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { Cart } from 'cart/cart.entity';
 import { getEventColor } from 'utils/event-color.util';
 import { CouponService } from 'coupon/coupon.service';
+import { generateUniqueOrderNumber } from 'utils/order-number.utils';
 import { OrderNoStatus } from './order.dto';
 import { Not, IsNull } from 'typeorm';
-
+import { Checkout } from '../checkout/checkout.entity';
+import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
+import { CheckoutUtils } from '../utils/checkout.utils';
 
 @Injectable()
 export class OrderService {
     constructor(
         @InjectRepository(Order)
         private orderRepository: Repository<Order>,
-        @InjectRepository(UserEntity) // Inject the UserRepository
+        @InjectRepository(UserEntity)
         private userRepository: Repository<UserEntity>,
-
         @InjectRepository(Event)
         private eventRepository: Repository<Event>,
-
         @InjectRepository(Cart)
         private cartRepository: Repository<Cart>,
-
         @InjectRepository(OrderItemEntity)
         private readonly orderItemRepository: Repository<OrderItemEntity>,
         @InjectRepository(RegisterEvent)
         private readonly registerEventRepository: Repository<RegisterEvent>,
+        @InjectRepository(Checkout)
+        private readonly checkoutRepository: Repository<Checkout>,
+        @InjectRepository(CheckoutCartItem)
+        private readonly checkoutCartItemRepository: Repository<CheckoutCartItem>,
         private readonly couponService: CouponService,
-    
-
     ) {}
+
+    /** Event fields only needed in order responses (no speakers, categories, documents, etc.) */
+    private mapEventToMinimal(event: any): any {
+        if (!event) return null;
+        return {
+            id: event.id,
+            name: event.name,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            price: event.price,
+            currency: event.currency,
+            type: event.type,
+            location: event.location,
+            venue: event.venue,
+            color: getEventColor(event.type),
+        };
+    }
+
+    private async getCheckoutForOrder(orderId: string): Promise<any> {
+        try {
+            return await CheckoutUtils.getCheckoutByOrderId(
+                orderId,
+                this.orderRepository,
+                this.checkoutRepository,
+                this.checkoutCartItemRepository,
+            );
+        } catch {
+            return null;
+        }
+    }
 
     private async generateUniqueOrderNumber(): Promise<string> {
         try {
-            // Get the current year
-            const currentYear = new Date().getFullYear();
-
-            // Retrieve the highest order number for the current year
-            const lastOrder = await this.orderRepository.find({
-                where: { orderNo: Like(`${currentYear}%`) },
-                select: ['orderNo'],
-                order: { orderNo: 'DESC' },
-                take: 1,
+            return await generateUniqueOrderNumber(async (orderNo) => {
+                const existing = await this.orderRepository.findOne({
+                    where: { orderNo },
+                    select: ['id'],
+                });
+                return !!existing;
             });
-
-            let nextOrderNo: string;
-
-            if (lastOrder.length > 0) {
-                // Extract the numeric part of the last order number and increment it
-                const lastSequentialNumber = parseInt(lastOrder[0].orderNo.slice(5), 10); // Extract the numeric part after the year and hyphen
-                const nextSequentialNumber = lastSequentialNumber + 1;
-                nextOrderNo = `${currentYear}-${nextSequentialNumber.toString().padStart(4, '0')}`; // Pad to 4 digits
-            } else {
-                // If no orders exist for the current year, start with 0001
-                nextOrderNo = `${currentYear}-0001`;
+        } catch (error: any) {
+            if (error?.message?.includes('unique order number')) {
+                throw new InternalServerErrorException(error.message);
             }
-
-            // Return the formatted order number
-            return nextOrderNo;
-        } catch (error) {
             throw new InternalServerErrorException('Error generating unique order number');
         }
     }
@@ -203,96 +220,29 @@ export class OrderService {
       
     
 
-    async getOrderById(orderId: string, userId: string,role:string): Promise<any> {
+    async getOrderById(orderId: string, userId: string, role: string): Promise<any> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
-            relations: ['user', 'orderItems', 'orderItems.event', 
-                'orderItems.event.eventSpeakers.speaker',
-                'orderItems.event.category', // Add this
-                'orderItems.event.category.category', // Add this
-              ],
+            relations: ['user', 'orderItems', 'orderItems.event'],
         });
 
-
         if (!order) throw new NotFoundException('Order not found');
-    
-        // Only check permission if not admin
-    if (role !== 'admin' && order.user.id !== userId) {
-        throw new ForbiddenException('You are not allowed to view this order');
-    }
-    
-    const orderItems = order.orderItems.map(item => {
-        // Extract categories
-        const categories = item.event?.category?.map((ec) => ec.category) || [];
-        
-        // Extract speakers
-        const speakers = item.event?.eventSpeakers?.map((es) => es.speaker) || [];
-        
-        // Clean up event object
-        const { eventSpeakers, category, ...restEvent } = item.event || {};
-        
-        return {
+
+        if (role !== 'admin' && order.user.id !== userId) {
+            throw new ForbiddenException('You are not allowed to view this order');
+        }
+
+        const orderItems = (order.orderItems || []).map((item) => ({
             id: item.id,
-            event: {
-                ...restEvent,
-                color: getEventColor(item.event.type),
-                speakers,
-                categories, // Add categories here
-            },
+            event: this.mapEventToMinimal(item.event),
             status: item.status,
             invoiceNumber: item.invoiceNumber || null,
             createdAt: item.createdAt,
-        };
-    });
+        }));
 
-    return {
-        id: order.id,
-        orderNo: order.orderNo,
-        paymentMethod: order.paymentMethod,
-        price: Number(order.price),
-        status: order.status,
-        discount: Number(order.discount),
-        originalPrice: Number(order.originalPrice),
-        user: {
-            id: order.user.id,
-            firstName: order.user.firstName,
-            lastName: order.user.lastName,
-            mobile: order.user.mobile,
-            email: order.user.email,
-        },
-        orderItems,
-    };
-}
-    
-    async getAllOrders(userId: string,role:string): Promise<any[]> {
-        let orders;
+        const checkout = await this.getCheckoutForOrder(order.id);
 
-        if (role === 'admin') {
-            // 🧑‍💼 Admin can see all orders
-            orders = await this.orderRepository.find({
-                relations: ['user', 'orderItems', 'orderItems.event',
-                    'orderItems.event.eventSpeakers.speaker',
-                    'orderItems.event.category', // Add this
-                    'orderItems.event.category.category', // Add this
-                ],
-            });
-        } else {
-
-          orders = await this.orderRepository.find({
-            where: { user: { id: userId } },
-            relations: ['user', 'orderItems', 'orderItems.event',
-                'orderItems.event.eventSpeakers.speaker',
-                'orderItems.event.category', // Add this
-                'orderItems.event.category.category', // Add this
-            ],
-        });
-        }
-        if (!orders || orders.length === 0) {
-            throw new NotFoundException('No orders found');
-        }
-
-    
-        return orders.map(order => ({
+        return {
             id: order.id,
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
@@ -307,48 +257,259 @@ export class OrderService {
                 mobile: order.user.mobile,
                 email: order.user.email,
             },
-            orderItems: order.orderItems.map(item => {
-                // Extract categories
-                const categories = item.event?.category?.map((ec) => ec.category) || [];
-                
-                // Extract speakers
-                const speakers = item.event?.eventSpeakers?.map((es) => es.speaker) || [];
-                
-                // Clean up event object
-                const { eventSpeakers, category, ...restEvent } = item.event || {};
-                
-                return {
-                    id: item.id,
-                    event: {
-                        ...restEvent,
-                        color: getEventColor(item.event.type),
-                        speakers,
-                        categories, // Add categories here
-                    },
-                    status: item.status,
-                    invoiceNumber: item.invoiceNumber || null,
-                    createdAt: item.createdAt,
-                };
-            }),
-        }));
+            orderItems,
+            checkout,
+        };
     }
-    async deleteOrder(orderId: string, userId: string,role:string): Promise<void> {
+    
+    /** Map sortBy param to entity column */
+    private orderSortField(sortBy: string): string {
+        const allowed = { orderNo: 'orderNo', createdAt: 'createdAt', price: 'price', status: 'status' };
+        return allowed[sortBy as keyof typeof allowed] || 'createdAt';
+    }
+
+    async getAllOrdersWithPagination(
+        userId: string,
+        role: string,
+        filters: OrderListQueryDto = {},
+    ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }> {
+        const page = Math.max(1, Number(filters.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(filters.limit) || 10));
+        const sortBy = this.orderSortField(filters.sortBy || 'createdAt');
+        const sortOrder = (filters.sortOrder === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
+        const search = (filters.search || '').trim();
+        const status = filters.status;
+        const dateFrom = filters.dateFrom ? new Date(filters.dateFrom) : null;
+        const dateTo = filters.dateTo ? new Date(filters.dateTo + 'T23:59:59.999Z') : null;
+        const filterUserId = filters.userId?.trim();
+
+        const countQb = this.orderRepository
+            .createQueryBuilder('order')
+            .leftJoin('order.user', 'user')
+            .where('order.isDeleted = :isDeleted', { isDeleted: false });
+
+        if (role !== 'admin') {
+            countQb.andWhere('order.userId = :userId', { userId });
+        }
+        if (filterUserId) {
+            countQb.andWhere('order.userId = :filterUserId', { filterUserId });
+        }
+        if (search) {
+            countQb.andWhere(
+                '(order.orderNo ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
+                { search: `%${search}%` },
+            );
+        }
+        if (status) {
+            countQb.andWhere('order.status = :status', { status });
+        }
+        if (dateFrom) {
+            countQb.andWhere('order.createdAt >= :dateFrom', { dateFrom });
+        }
+        if (dateTo) {
+            countQb.andWhere('order.createdAt <= :dateTo', { dateTo });
+        }
+        const total = await countQb.getCount();
+
+        const qb = this.orderRepository
+            .createQueryBuilder('order')
+            .leftJoinAndSelect('order.user', 'user')
+            .leftJoinAndSelect('order.orderItems', 'orderItems')
+            .leftJoinAndSelect('orderItems.event', 'event')
+            .where('order.isDeleted = :isDeleted', { isDeleted: false });
+
+        if (role !== 'admin') {
+            qb.andWhere('order.userId = :userId', { userId });
+        }
+        if (filterUserId) {
+            qb.andWhere('order.userId = :filterUserId', { filterUserId });
+        }
+        if (search) {
+            qb.andWhere(
+                '(order.orderNo ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
+                { search: `%${search}%` },
+            );
+        }
+        if (status) {
+            qb.andWhere('order.status = :status', { status });
+        }
+        if (dateFrom) {
+            qb.andWhere('order.createdAt >= :dateFrom', { dateFrom });
+        }
+        if (dateTo) {
+            qb.andWhere('order.createdAt <= :dateTo', { dateTo });
+        }
+
+        qb.orderBy(`order.${sortBy}`, sortOrder);
+        const orders = await qb.skip((page - 1) * limit).take(limit).getMany();
+
+        const totalPages = Math.ceil(total / limit) || 1;
+        const data = orders.map((order) => this.mapOrderToResponse(order));
+        for (let i = 0; i < data.length; i++) {
+            data[i].checkout = await this.getCheckoutForOrder(orders[i].id);
+        }
+        return { data, total, page, limit, totalPages };
+    }
+
+    private mapOrderToResponse(order: Order): any {
+        return {
+            id: order.id,
+            orderNo: order.orderNo,
+            paymentMethod: order.paymentMethod,
+            price: Number(order.price),
+            status: order.status,
+            discount: Number(order.discount),
+            originalPrice: Number(order.originalPrice),
+            createdAt: order.createdAt,
+            user: {
+                id: order.user?.id,
+                firstName: order.user?.firstName,
+                lastName: order.user?.lastName,
+                mobile: order.user?.mobile,
+                email: order.user?.email,
+            },
+            orderItems: (order.orderItems || []).map((item) => ({
+                id: item.id,
+                event: this.mapEventToMinimal(item.event),
+                status: item.status,
+                invoiceNumber: item.invoiceNumber || null,
+                createdAt: item.createdAt,
+            })),
+        };
+    }
+
+    /**
+     * Get distinct customers (users who have orders) for dropdown filter.
+     * Supports search by name/email and pagination.
+     */
+    async getOrderCustomers(
+        userId: string,
+        role: string,
+        search: string,
+        page: number,
+        limit: number,
+    ): Promise<{ data: Array<{ id: string; firstName: string; lastName: string; email: string }>; total: number; page: number; limit: number; totalPages: number }> {
+        const subQb = this.orderRepository
+            .createQueryBuilder('order')
+            .select('order.userId')
+            .where('order.isDeleted = :isDeleted', { isDeleted: false })
+            .groupBy('order.userId');
+        if (role !== 'admin') {
+            subQb.andWhere('order.userId = :userId', { userId });
+        }
+        const qb = this.userRepository
+            .createQueryBuilder('user')
+            .where(`user.id IN (${subQb.getQuery()})`)
+            .setParameters(subQb.getParameters());
+        if (search && search.trim()) {
+            qb.andWhere(
+                '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
+                { search: `%${search.trim()}%` },
+            );
+        }
+        const total = await qb.getCount();
+        const users = await qb
+            .select(['user.id', 'user.firstName', 'user.lastName', 'user.email'])
+            .orderBy('user.firstName', 'ASC')
+            .addOrderBy('user.lastName', 'ASC')
+            .skip((page - 1) * limit)
+            .take(limit)
+            .getMany();
+        const totalPages = Math.ceil(total / limit) || 1;
+        return {
+            data: users.map((u) => ({ id: u.id, firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '' })),
+            total,
+            page,
+            limit,
+            totalPages,
+        };
+    }
+
+    async getAllOrders(userId: string, role: string): Promise<any[]> {
+        let orders;
+
+        if (role === 'admin') {
+            orders = await this.orderRepository.find({
+                relations: ['user', 'orderItems', 'orderItems.event'],
+                where: { isDeleted: false },
+            });
+        } else {
+            orders = await this.orderRepository.find({
+                where: { user: { id: userId }, isDeleted: false },
+                relations: ['user', 'orderItems', 'orderItems.event'],
+            });
+        }
+        if (!orders || orders.length === 0) {
+            throw new NotFoundException('No orders found');
+        }
+        const data = orders.map((order) => this.mapOrderToResponse(order));
+        for (let i = 0; i < data.length; i++) {
+            data[i].checkout = await this.getCheckoutForOrder(orders[i].id);
+        }
+        return data;
+    }
+
+    async deleteOrder(orderId: string, userId: string, role: string): Promise<void> {
         const order = await this.orderRepository.findOne({
             where: { id: orderId },
             relations: ['user'],
         });
-    
-        if (!order) throw new NotFoundException('Order not found');
-    
-     // Only check permission if not admin
-     if (role !== 'admin' && order.user.id !== userId) {
-        throw new ForbiddenException('You are not allowed to delete this order');
-    }
 
-    
+        if (!order) throw new NotFoundException('Order not found');
+
+        if (role !== 'admin' && order.user.id !== userId) {
+            throw new ForbiddenException('You are not allowed to delete this order');
+        }
+
+        // Force delete: unlink and remove dependents so the order can be deleted
+        // 1. Unlink registerEvents that reference this order (set orderId = null)
+        await this.registerEventRepository
+            .createQueryBuilder()
+            .update(RegisterEvent)
+            .set({ orderId: () => 'NULL' })
+            .where('orderId = :orderId', { orderId })
+            .execute();
+        // 2. Delete order items for this order
+        await this.orderItemRepository.delete({ order: { id: orderId } });
+        // 3. Delete the order
         await this.orderRepository.remove(order);
     }
-        
+
+    /**
+     * Delete all orders (admin only). Force-deletes: unlinks registerEvents, deletes order items, then deletes orders.
+     */
+    async deleteAllOrders(userId: string, role: string): Promise<{ deleted: number }> {
+        if (role !== 'admin') {
+            throw new ForbiddenException('Only admin can delete all orders');
+        }
+        const orders = await this.orderRepository.find({ where: { isDeleted: false }, select: ['id'] });
+        const count = orders.length;
+        if (count === 0) {
+            return { deleted: 0 };
+        }
+        const orderIds = orders.map((o) => o.id);
+        // 1. Unlink all registerEvents that reference any of these orders
+        await this.registerEventRepository
+            .createQueryBuilder()
+            .update(RegisterEvent)
+            .set({ orderId: () => 'NULL' })
+            .where('orderId IN (:...orderIds)', { orderIds })
+            .execute();
+        // 2. Delete all order items for these orders
+        await this.orderItemRepository
+            .createQueryBuilder()
+            .delete()
+            .where('orderId IN (:...orderIds)', { orderIds })
+            .execute();
+        // 3. Delete all orders
+        await this.orderRepository
+            .createQueryBuilder()
+            .delete()
+            .where('id IN (:...orderIds)', { orderIds })
+            .execute();
+        return { deleted: count };
+    }
+
     private async generateInvoiceNumber(): Promise<string> {
         try {
             const currentYear = new Date().getFullYear();

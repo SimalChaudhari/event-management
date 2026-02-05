@@ -47,6 +47,14 @@ export class Checkout {
     @Column({ type: 'varchar', nullable: true })
     wooshpaySessionId?: string;
 
+    /** WooShPay payment intent ID (pi_xxx) – used for refunds */
+    @Column({ type: 'varchar', nullable: true })
+    wooshpayPaymentIntentId?: string;
+
+    /** Order created from this checkout (set when payment completes) */
+    @Column({ type: 'uuid', nullable: true })
+    orderId?: string;
+
     @Column({ type: 'text', nullable: true })
     paymentNotes?: string;
 

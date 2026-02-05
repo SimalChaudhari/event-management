@@ -253,103 +253,6 @@ const ViewRegisterEventPage = () => {
                                                             )}
                                                         </Row>
                                                     </Col>
-
-                                                    {/* Order Details Section */}
-                                                    {eventData?.order && (
-                                                        <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                                                            <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
-                                                                fontSize: '16px', 
-                                                                fontWeight: '600', 
-                                                                color: '#000000',
-                                                                borderBottom: '2px solid #4680ff'
-                                                            }}>
-                                                                <i className="fas fa-receipt mr-2" style={{ color: '#4680ff' }}></i>
-                                                                Order Details
-                                                            </h5>
-                                                            <Row>
-                                                                <InfoField 
-                                                                    label="Order Number" 
-                                                                    value={eventData.order?.orderNo || 'N/A'}
-                                                                    icon="fas fa-hashtag"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Payment Status" 
-                                                                    value={
-                                                                        <Badge 
-                                                                            bg={
-                                                                                eventData.order?.status === 'Success'
-                                                                                    ? 'success'
-                                                                                    : eventData.order?.status === 'Withdraw'
-                                                                                    ? 'danger'
-                                                                                    : 'warning'
-                                                                            } 
-                                                                            style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
-                                                                        >
-                                                                            {eventData.order?.status || 'N/A'}
-                                                                        </Badge>
-                                                                    }
-                                                                    icon="fas fa-credit-card"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Amount Paid" 
-                                                                    value={
-                                                                        <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                            {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
-                                                                        </span>
-                                                                    }
-                                                                    icon="fas fa-dollar-sign"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Payment Method" 
-                                                                    value={eventData.order.paymentMethod || 'N/A'}
-                                                                    icon="fas fa-wallet"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Transaction Date" 
-                                                                    value={regDate}
-                                                                    icon="fas fa-calendar-check"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Receipt/Invoice" 
-                                                                    value={
-                                                                        <div>
-                                                                            {eventData.receiptUrl && (
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="outline-info"
-                                                                                    className="me-2"
-                                                                                    onClick={() => window.open(eventData.receiptUrl, '_blank')}
-                                                                                >
-                                                                                    <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
-                                                                                    Receipt
-                                                                                </Button>
-                                                                            )}
-                                                                            {eventData.invoiceUrl && (
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="outline-primary"
-                                                                                    onClick={() => window.open(eventData.invoiceUrl, '_blank')}
-                                                                                >
-                                                                                    <i className="fas fa-file-invoice" style={{ marginRight: '6px' }}></i>
-                                                                                    Invoice
-                                                                                </Button>
-                                                                            )}
-                                                                            {!eventData.receiptUrl && !eventData.invoiceUrl && (
-                                                                                <span className="text-muted">N/A</span>
-                                                                            )}
-                                                                        </div>
-                                                                    }
-                                                                    icon="fas fa-file-invoice"
-                                                                    colSize={6}
-                                                                />
-                                                            </Row>
-                                                        </Col>
-                                                    )}
                                                 </Row>
                                             </Card.Body>
                                         </Card>
@@ -417,103 +320,6 @@ const ViewRegisterEventPage = () => {
                                                     )}
                                                 </Row>
                                             </Col>
-
-                                            {/* Order Details Section */}
-                                            {eventData?.order && (
-                                                <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-                                                    <h5 className="mb-md-3 mb-3 pb-md-2 pb-2" style={{ 
-                                                        fontSize: '16px', 
-                                                        fontWeight: '600', 
-                                                        color: '#000000',
-                                                        borderBottom: '2px solid #4680ff'
-                                                    }}>
-                                                        <i className="fas fa-receipt mr-2" style={{ color: '#4680ff' }}></i>
-                                                        Order Details
-                                                    </h5>
-                                                    <Row>
-                                                        <InfoField 
-                                                            label="Order Number" 
-                                                            value={eventData.order?.orderNo || 'N/A'}
-                                                            icon="fas fa-hashtag"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Payment Status" 
-                                                            value={
-                                                                <Badge 
-                                                                    bg={
-                                                                        eventData.order?.status === 'Success'
-                                                                            ? 'success'
-                                                                            : eventData.order?.status === 'Withdraw'
-                                                                            ? 'danger'
-                                                                            : 'warning'
-                                                                    } 
-                                                                    style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
-                                                                >
-                                                                    {eventData.order?.status || 'N/A'}
-                                                                </Badge>
-                                                            }
-                                                            icon="fas fa-credit-card"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Amount Paid" 
-                                                            value={
-                                                                <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                    {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
-                                                                </span>
-                                                            }
-                                                            icon="fas fa-dollar-sign"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Payment Method" 
-                                                            value={eventData.order.paymentMethod || 'N/A'}
-                                                            icon="fas fa-wallet"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Transaction Date" 
-                                                            value={regDate}
-                                                            icon="fas fa-calendar-check"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Receipt/Invoice" 
-                                                            value={
-                                                                <div>
-                                                                    {eventData.receiptUrl && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline-info"
-                                                                            className="me-2"
-                                                                            onClick={() => window.open(eventData.receiptUrl, '_blank')}
-                                                                        >
-                                                                            <i className="fas fa-download" style={{ marginRight: '6px' }}></i>
-                                                                            Receipt
-                                                                        </Button>
-                                                                    )}
-                                                                    {eventData.invoiceUrl && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline-primary"
-                                                                            onClick={() => window.open(eventData.invoiceUrl, '_blank')}
-                                                                        >
-                                                                            <i className="fas fa-file-invoice" style={{ marginRight: '6px' }}></i>
-                                                                            Invoice
-                                                                        </Button>
-                                                                    )}
-                                                                    {!eventData.receiptUrl && !eventData.invoiceUrl && (
-                                                                        <span className="text-muted">N/A</span>
-                                                                    )}
-                                                                </div>
-                                                            }
-                                                            icon="fas fa-file-invoice"
-                                                            colSize={6}
-                                                        />
-                                                    </Row>
-                                                </Col>
-                                            )}
                                         </Row>
                                     </div>
                                 </div>
@@ -862,25 +668,42 @@ const ViewRegisterEventPage = () => {
                                                                     colSize={6}
                                                                 />
                                                                 <InfoField 
-                                                                    label="Total Amount" 
+                                                                    label="Order No" 
+                                                                    value={eventData.checkout?.orderNo || 'N/A'}
+                                                                    icon="fas fa-receipt"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Status" 
+                                                                    value={
+                                                                        <Badge 
+                                                                            bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
+                                                                            style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
+                                                                        >
+                                                                            {eventData.checkout?.orderStatus || eventData.checkout?.status || 'N/A'}
+                                                                        </Badge>
+                                                                    }
+                                                                    icon="fas fa-info-circle"
+                                                                    colSize={6}
+                                                                />
+                                                                <InfoField 
+                                                                    label="Amount (this event)" 
                                                                     value={
                                                                         <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                            {eventData.checkout?.totalAmount ? `$${parseFloat(eventData.checkout.totalAmount).toFixed(2)}` : 'N/A'}
+                                                                            {eventData.checkout?.thisEventAmountPaid != null ? `$${parseFloat(eventData.checkout.thisEventAmountPaid).toFixed(2)}` : eventData.checkout?.thisEventPrice != null ? `$${parseFloat(eventData.checkout.thisEventPrice).toFixed(2)}` : 'N/A'}
                                                                         </span>
                                                                     }
                                                                     icon="fas fa-dollar-sign"
                                                                     colSize={6}
                                                                 />
-                                                                <InfoField 
-                                                                    label="Discount" 
-                                                                    value={
-                                                                        <span style={{ color: '#ffc107', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                            {eventData.checkout?.discount ? `$${parseFloat(eventData.checkout.discount).toFixed(2)}` : '$0.00'}
-                                                                        </span>
-                                                                    }
-                                                                    icon="fas fa-tag"
-                                                                    colSize={6}
-                                                                />
+                                                                {eventData.checkout?.orderDiscountPercent != null && (
+                                                                    <InfoField 
+                                                                        label="Discount %" 
+                                                                        value={<span style={{ color: '#ffc107', fontWeight: '600' }}>{eventData.checkout.orderDiscountPercent}%</span>}
+                                                                        icon="fas fa-tag"
+                                                                        colSize={6}
+                                                                    />
+                                                                )}
                                                                 <InfoField 
                                                                     label="Coupon Code" 
                                                                     value={eventData.checkout?.couponCode || 'N/A'}
@@ -913,19 +736,6 @@ const ViewRegisterEventPage = () => {
                                                                     label="Transaction ID" 
                                                                     value={eventData.checkout?.transactionId || 'N/A'}
                                                                     icon="fas fa-receipt"
-                                                                    colSize={6}
-                                                                />
-                                                                <InfoField 
-                                                                    label="Status" 
-                                                                    value={
-                                                                        <Badge 
-                                                                            bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
-                                                                            style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
-                                                                        >
-                                                                            {eventData.checkout?.status || 'N/A'}
-                                                                        </Badge>
-                                                                    }
-                                                                    icon="fas fa-info-circle"
                                                                     colSize={6}
                                                                 />
                                                                 <InfoField 
@@ -1071,25 +881,42 @@ const ViewRegisterEventPage = () => {
                                                             colSize={6}
                                                         />
                                                         <InfoField 
-                                                            label="Total Amount" 
+                                                            label="Order No" 
+                                                            value={eventData.checkout?.orderNo || 'N/A'}
+                                                            icon="fas fa-receipt"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Status" 
+                                                            value={
+                                                                <Badge 
+                                                                    bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
+                                                                    style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
+                                                                >
+                                                                    {eventData.checkout?.orderStatus || eventData.checkout?.status || 'N/A'}
+                                                                </Badge>
+                                                            }
+                                                            icon="fas fa-info-circle"
+                                                            colSize={6}
+                                                        />
+                                                        <InfoField 
+                                                            label="Amount (this event)" 
                                                             value={
                                                                 <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                    {eventData.checkout?.totalAmount ? `$${parseFloat(eventData.checkout.totalAmount).toFixed(2)}` : 'N/A'}
+                                                                    {eventData.checkout?.thisEventAmountPaid != null ? `$${parseFloat(eventData.checkout.thisEventAmountPaid).toFixed(2)}` : eventData.checkout?.thisEventPrice != null ? `$${parseFloat(eventData.checkout.thisEventPrice).toFixed(2)}` : 'N/A'}
                                                                 </span>
                                                             }
                                                             icon="fas fa-dollar-sign"
                                                             colSize={6}
                                                         />
-                                                        <InfoField 
-                                                            label="Discount" 
-                                                            value={
-                                                                <span style={{ color: '#ffc107', fontWeight: 'bold', fontSize: '14px' }}>
-                                                                    {eventData.checkout?.discount ? `$${parseFloat(eventData.checkout.discount).toFixed(2)}` : '$0.00'}
-                                                                </span>
-                                                            }
-                                                            icon="fas fa-tag"
-                                                            colSize={6}
-                                                        />
+                                                        {eventData.checkout?.orderDiscountPercent != null && (
+                                                            <InfoField 
+                                                                label="Discount %" 
+                                                                value={<span style={{ color: '#ffc107', fontWeight: '600' }}>{eventData.checkout.orderDiscountPercent}%</span>}
+                                                                icon="fas fa-tag"
+                                                                colSize={6}
+                                                            />
+                                                        )}
                                                         <InfoField 
                                                             label="Coupon Code" 
                                                             value={eventData.checkout?.couponCode || 'N/A'}
@@ -1122,19 +949,6 @@ const ViewRegisterEventPage = () => {
                                                             label="Transaction ID" 
                                                             value={eventData.checkout?.transactionId || 'N/A'}
                                                             icon="fas fa-receipt"
-                                                            colSize={6}
-                                                        />
-                                                        <InfoField 
-                                                            label="Status" 
-                                                            value={
-                                                                <Badge 
-                                                                    bg={eventData.checkout?.status === 'Completed' ? 'success' : eventData.checkout?.status === 'Pending' ? 'warning' : 'danger'} 
-                                                                    style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '600' }}
-                                                                >
-                                                                    {eventData.checkout?.status || 'N/A'}
-                                                                </Badge>
-                                                            }
-                                                            icon="fas fa-info-circle"
                                                             colSize={6}
                                                         />
                                                         <InfoField 

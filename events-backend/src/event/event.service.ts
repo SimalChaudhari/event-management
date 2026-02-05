@@ -15,6 +15,8 @@ import path from 'path';
 import * as fs from 'fs';
 import { getEventColor } from 'utils/event-color.util';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { AdminInfo } from 'registerEvent/admin-info.entity';
+import { BillingDetail } from 'registerEvent/billing-detail.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from '../exhibitor/exhibitor.entity';
 import { Survey } from '../survey/survey.entity';
@@ -48,8 +50,20 @@ import {
 import { QnaUtils } from '../utils/qna.utils';
 import { FilterService } from '../service/filter.service';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { ExhibitorView } from '../exhibitor/exhibitor-view.entity';
+import { ExhibitorLead } from '../exhibitor/exhibitor-lead.entity';
 import { EventStampService } from './event-stamp.service';
 import { EventStampEvent } from './event-stamp-event.entity';
+import { SurveyQuestion, SurveyAnswer } from '../survey/qa.entity';
+import { Withdrawal } from '../withdrawal/withdrawal.entity';
+import { ModeratorEvent } from '../moderator/moderator-event.entity';
+import { QnaQuestion, QnaLike } from '../qna/qna.entity';
+import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from '../polling/polling.entity';
+import { ScheduledPushNotification } from '../scheduled-push-notification/scheduled-push-notification.entity';
+import { EventQRCode } from '../attendance/event-qr-code.entity';
+import { ContactExchange } from '../attendance/contact-exchange.entity';
+import { Coupon } from '../coupon/coupon.entity';
+import { EventNotification } from '../settings/event-notification.entity';
 
 @Injectable()
 export class EventService {
@@ -74,6 +88,10 @@ export class EventService {
     private exhibitorRepository: Repository<Exhibitor>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(AdminInfo)
+    private adminInfoRepository: Repository<AdminInfo>,
+    @InjectRepository(BillingDetail)
+    private billingDetailRepository: Repository<BillingDetail>,
     @InjectRepository(FavoriteEvent)
     private favoriteEventRepository: Repository<FavoriteEvent>,
     @InjectRepository(Survey)
@@ -96,10 +114,46 @@ export class EventService {
     private attendanceRepository: Repository<EventAttendance>,
     @InjectRepository(Feedback)
     private feedbackRepository: Repository<Feedback>,
+    @InjectRepository(EventNotification)
+    private eventNotificationRepository: Repository<EventNotification>,
     @InjectRepository(ExhibitorRating)
     private exhibitorRatingRepository: Repository<ExhibitorRating>,
+    @InjectRepository(ExhibitorView)
+    private exhibitorViewRepository: Repository<ExhibitorView>,
+    @InjectRepository(ExhibitorLead)
+    private exhibitorLeadRepository: Repository<ExhibitorLead>,
     @InjectRepository(EventStampEvent)
     private eventStampEventRepository: Repository<EventStampEvent>,
+    @InjectRepository(SurveyQuestion)
+    private surveyQuestionRepository: Repository<SurveyQuestion>,
+    @InjectRepository(SurveyAnswer)
+    private surveyAnswerRepository: Repository<SurveyAnswer>,
+    @InjectRepository(Withdrawal)
+    private withdrawalRepository: Repository<Withdrawal>,
+    @InjectRepository(ModeratorEvent)
+    private moderatorEventRepository: Repository<ModeratorEvent>,
+    @InjectRepository(QnaQuestion)
+    private qnaQuestionRepository: Repository<QnaQuestion>,
+    @InjectRepository(QnaLike)
+    private qnaLikeRepository: Repository<QnaLike>,
+    @InjectRepository(Poll)
+    private pollRepository: Repository<Poll>,
+    @InjectRepository(PollOption)
+    private pollOptionRepository: Repository<PollOption>,
+    @InjectRepository(PollVote)
+    private pollVoteRepository: Repository<PollVote>,
+    @InjectRepository(UserPollSession)
+    private userPollSessionRepository: Repository<UserPollSession>,
+    @InjectRepository(UserPollVote)
+    private userPollVoteRepository: Repository<UserPollVote>,
+    @InjectRepository(ScheduledPushNotification)
+    private scheduledPushNotificationRepository: Repository<ScheduledPushNotification>,
+    @InjectRepository(EventQRCode)
+    private eventQRCodeRepository: Repository<EventQRCode>,
+    @InjectRepository(ContactExchange)
+    private contactExchangeRepository: Repository<ContactExchange>,
+    @InjectRepository(Coupon)
+    private couponRepository: Repository<Coupon>,
     private readonly errorHandler: ErrorHandlerService,
     private readonly surveyUtils: SurveyUtils,
     private readonly emailService: EmailService,
@@ -1283,8 +1337,28 @@ export class EventService {
         throw new ResourceNotFoundException('Event', id);
       }
 
-      // Delete all associated data before deleting the event
-      // 1. Delete registered events (registrations)
+      // Delete all associated data before deleting the event (force delete: participants + linked data)
+      // 1. Get all register events for this event (participants)
+      const registerEventsForEvent = await this.registerEventRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const registerEventIds = registerEventsForEvent.map((r) => r.id);
+      if (registerEventIds.length > 0) {
+        // 2. Delete admin info linked to these registrations
+        await this.adminInfoRepository
+          .createQueryBuilder()
+          .delete()
+          .where('registerEventId IN (:...ids)', { ids: registerEventIds })
+          .execute();
+        // 3. Delete billing details linked to these registrations
+        await this.billingDetailRepository
+          .createQueryBuilder()
+          .delete()
+          .where('registerEventId IN (:...ids)', { ids: registerEventIds })
+          .execute();
+      }
+      // 4. Delete registered events (participants / registrations)
       await this.registerEventRepository.delete({ eventId: id });
 
       // 2. Delete favorite events (has CASCADE but explicit for clarity)
@@ -1304,7 +1378,7 @@ export class EventService {
 
       // 7. Delete event agendas
       await this.eventAgendaRepository.delete({ eventId: id });
-
+      
       // 8. Delete event booths
       await this.eventBoothRepository.delete({ eventId: id });
 
@@ -1331,8 +1405,120 @@ export class EventService {
         await this.orderItemRepository.remove(orderItems);
       }
 
-      // 13. Surveys are deleted automatically via cascade
-      // 14. Programme tracks are deleted automatically via cascade (which includes engagements)
+      // 13. Surveys and survey-related data (explicit delete; DB may not have CASCADE)
+      await this.surveyAnswerRepository
+        .createQueryBuilder()
+        .delete()
+        .where('eventId = :eventId', { eventId: id })
+        .execute();
+      const surveysForEvent = await this.surveyRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const surveyIds = surveysForEvent.map((s) => s.id);
+      if (surveyIds.length > 0) {
+        await this.surveyQuestionRepository
+          .createQueryBuilder()
+          .delete()
+          .where('surveyId IN (:...ids)', { ids: surveyIds })
+          .execute();
+      }
+      await this.surveyRepository.delete({ eventId: id });
+
+      // 14. Programme tracks and sessions (explicit delete)
+      const programmeTracksForEvent = await this.programmeTrackRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const trackIds = programmeTracksForEvent.map((t) => t.id);
+      if (trackIds.length > 0) {
+        await this.engagementRepository
+          .createQueryBuilder()
+          .delete()
+          .where('trackId IN (:...ids)', { ids: trackIds })
+          .execute();
+        await this.programmeSessionRepository
+          .createQueryBuilder()
+          .delete()
+          .where('trackId IN (:...ids)', { ids: trackIds })
+          .execute();
+      }
+      await this.programmeTrackRepository.delete({ eventId: id });
+
+      // 15. Moderator-event links
+      await this.moderatorEventRepository.delete({ eventId: id });
+
+      // 16. Q&A questions and likes
+      const qnaQuestionsForEvent = await this.qnaQuestionRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const qnaQuestionIds = qnaQuestionsForEvent.map((q) => q.id);
+      if (qnaQuestionIds.length > 0) {
+        await this.qnaLikeRepository
+          .createQueryBuilder()
+          .delete()
+          .where('questionId IN (:...ids)', { ids: qnaQuestionIds })
+          .execute();
+      }
+      await this.qnaQuestionRepository.delete({ eventId: id });
+
+      // 17. Polling: user sessions/votes then polls/options/votes
+      const pollSessionsForEvent = await this.userPollSessionRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const sessionIds = pollSessionsForEvent.map((s) => s.id);
+      if (sessionIds.length > 0) {
+        await this.userPollVoteRepository
+          .createQueryBuilder()
+          .delete()
+          .where('sessionId IN (:...ids)', { ids: sessionIds })
+          .execute();
+      }
+      await this.userPollSessionRepository.delete({ eventId: id });
+      const pollsForEvent = await this.pollRepository.find({
+        where: { eventId: id },
+        select: ['id'],
+      });
+      const pollIds = pollsForEvent.map((p) => p.id);
+      if (pollIds.length > 0) {
+        await this.pollVoteRepository
+          .createQueryBuilder()
+          .delete()
+          .where('pollId IN (:...ids)', { ids: pollIds })
+          .execute();
+        await this.pollOptionRepository
+          .createQueryBuilder()
+          .delete()
+          .where('pollId IN (:...ids)', { ids: pollIds })
+          .execute();
+      }
+      await this.pollRepository.delete({ eventId: id });
+
+      // 18. Scheduled push notifications and event notifications
+      await this.scheduledPushNotificationRepository
+        .createQueryBuilder()
+        .delete()
+        .where('eventId = :eventId', { eventId: id })
+        .execute();
+      await this.eventNotificationRepository.delete({ eventId: id });
+
+      // 19. Withdrawals (eventId from ManyToOne)
+      await this.withdrawalRepository
+        .createQueryBuilder()
+        .delete()
+        .where('eventId = :eventId', { eventId: id })
+        .execute();
+
+      // 20. Exhibitor ratings, views, leads
+      await this.exhibitorRatingRepository.delete({ eventId: id });
+      await this.exhibitorViewRepository.delete({ eventId: id });
+      await this.exhibitorLeadRepository.delete({ eventId: id });
+
+      // 21. Contact exchange and event QR codes
+      await this.contactExchangeRepository.delete({ eventId: id });
+      await this.eventQRCodeRepository.delete({ eventId: id });
 
       // Delete associated files
       await this.deleteEventFiles(event);

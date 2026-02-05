@@ -186,13 +186,23 @@ export class CartService {
 
         await this.userCartPreferenceRepository.save(userPreference);
 
+        const totalBeforeDiscount = cartData.totalAmount;
+        const discountPercentage =
+          coupon.discountType === 'percentage'
+            ? Number(coupon.discountValue)
+            : totalBeforeDiscount > 0
+              ? Math.round((discount / totalBeforeDiscount) * 10000) / 100
+              : 0;
+
         return {
             ...cartData,
             discount,
             finalAmount,
+            discountPercentage,
             couponApplied: {
-                name: couponCode, // couponCode variable contains the voucher name
-                discount: discount,
+                name: couponCode,
+                discount,
+                discountPercentage,
                 type: coupon.discountType,
                 couponId: coupon.id,
                 actualValue: coupon.actualValue,

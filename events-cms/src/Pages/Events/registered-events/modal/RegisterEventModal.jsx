@@ -722,8 +722,8 @@ function RegisterEventModal({ show, onHide, eventData }) {
                             </Tab.Container>
                         </div>
 
-                        {/* Order Info */}
-                        {eventData?.order && (
+                        {/* Order Info (from checkout) */}
+                        {eventData?.checkout && (
                             <div
                                 className="mb-3"
                                 style={{
@@ -740,7 +740,7 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                         <p className="mb-2">
                                             <strong>Order Number:</strong>
                                             <br />
-                                            {eventData.order?.orderNo || 'N/A'}
+                                            {eventData.checkout?.orderNo || 'N/A'}
                                         </p>
                                     </Col>
                                     <Col xs={6} md={4} className="text-start">
@@ -748,25 +748,27 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                             <strong>Payment Status:</strong>
                                             <br />
                                             <Badge 
-                                                bg={eventData.order?.status === 'Success' ? 'success' : 
-                                                    eventData.order?.status === 'Withdraw' ? 'danger' : 'warning'}
+                                                bg={(eventData.checkout?.orderStatus || eventData.checkout?.status) === 'Success' ? 'success' : 
+                                                    (eventData.checkout?.orderStatus || eventData.checkout?.status) === 'Withdraw' ? 'danger' : 'warning'}
                                             >
-                                                {eventData.order?.status || 'N/A'}
+                                                {eventData.checkout?.orderStatus || eventData.checkout?.status || 'N/A'}
                                             </Badge>
                                         </p>
                                     </Col>
                                     <Col xs={6} md={4} className="text-start">
                                         <p className="mb-2">
-                                            <strong>Amount Paid:</strong>
+                                            <strong>Amount (this event):</strong>
                                             <br />
-                                            {eventData.order.price || 'N/A'} {eventData.order.currency || ''}
+                                            {(eventData.checkout?.thisEventAmountPaid ?? eventData.checkout?.thisEventPrice ?? eventData.event?.price) != null
+                                                ? `$${parseFloat(eventData.checkout?.thisEventAmountPaid ?? eventData.checkout?.thisEventPrice ?? eventData.event?.price).toFixed(2)}`
+                                                : 'N/A'}
                                         </p>
                                     </Col>
                                     <Col xs={6} md={4} className="text-start mt-2">
                                         <p className="mb-2">
                                             <strong>Payment Method:</strong>
                                             <br />
-                                            {eventData.order.paymentMethod || 'N/A'}
+                                            {eventData.checkout?.paymentMethod || 'N/A'}
                                         </p>
                                     </Col>
                                     <Col xs={6} md={4} className="text-start">

@@ -21,6 +21,7 @@ export const EXHIBITOR_LOADING = 'EXHIBITOR_LOADING';
 export const BANNER_LOADING = 'BANNER_LOADING';
 export const GALLERY_LOADING = 'GALLERY_LOADING';
 export const CATEGORY_LOADING = 'CATEGORY_LOADING';
+export const COUPON_LOADING = 'COUPON_LOADING';
 export const SETTINGS_LOADING = 'SETTINGS_LOADING';
 export const WITHDRAW_LOADING = 'WITHDRAW_LOADING';
 export const LOGS_LOADING = 'LOGS_LOADING';
@@ -72,6 +73,13 @@ export const CATEGORY_LIST = 'CATEGORY_LIST';
 export const CREATE_CATEGORY = 'CREATE_CATEGORY';
 export const UPDATE_CATEGORY = 'UPDATE_CATEGORY';
 export const DELETE_CATEGORY = 'DELETE_CATEGORY';
+
+// Coupon Action Types
+export const COUPON_LIST = 'COUPON_LIST';
+export const COUPON_BY_ID = 'COUPON_BY_ID';
+export const CREATE_COUPON = 'CREATE_COUPON';
+export const UPDATE_COUPON = 'UPDATE_COUPON';
+export const DELETE_COUPON = 'DELETE_COUPON';
 
 // Country Action Types
 export const COUNTRY_LIST = 'COUNTRY_LIST';

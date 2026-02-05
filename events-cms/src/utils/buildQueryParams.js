@@ -74,6 +74,12 @@ export const buildQueryParams = (filters = {}, options = {}) => {
         if (filters.endDate) {
             params.append('endDate', filters.endDate);
         }
+        if (filters.dateFrom) {
+            params.append('dateFrom', filters.dateFrom);
+        }
+        if (filters.dateTo) {
+            params.append('dateTo', filters.dateTo);
+        }
         
         // Status filter (generic)
         if (filters.status && filters.status.trim() !== '') {
@@ -103,9 +109,9 @@ export const buildQueryParams = (filters = {}, options = {}) => {
             params.append('upcoming', filters.upcoming);
         }
         
-        // User-specific filters
-        if (filters.userId) {
-            params.append('userId', filters.userId);
+        // User-specific filters (e.g. filter orders by customer)
+        if (filters.userId && filters.userId.trim() !== '') {
+            params.append('userId', filters.userId.trim());
         }
         if (filters.userFilter && filters.userFilter.trim() !== '') {
             params.append('userFilter', filters.userFilter.trim());

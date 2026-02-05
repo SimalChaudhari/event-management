@@ -67,7 +67,10 @@ const eventComponents = {
 
 const MediaManagerComponents = {
     BannerManagement: React.lazy(() => import('./Pages/MediaManager/Banner/BannerManagement.jsx')),
-    LogoManagement: React.lazy(() => import('./Pages/Settings/Logo/LogoManagement.jsx'))
+    LogoManagement: React.lazy(() => import('./Pages/Settings/Logo/LogoManagement.jsx')),
+    CouponManagement: React.lazy(() => import('./Pages/MediaManager/Coupon/CouponManagement.jsx')),
+    AddCouponPage: React.lazy(() => import('./Pages/MediaManager/Coupon/AddCouponPage.jsx')),
+    ViewCouponPage: React.lazy(() => import('./Pages/MediaManager/Coupon/ViewCouponPage.jsx'))
 };
 
 /**
@@ -76,6 +79,7 @@ const MediaManagerComponents = {
  */
 const transactionComponents = {
     OrderList: React.lazy(() => import('./Pages/Orders/OrderView.jsx')),
+    ViewOrder: React.lazy(() => import('./Pages/Orders/ViewOrderPage.jsx')),
     WithdrawalRequest: React.lazy(() => import('./Pages/Withrawal/WithrawalRequest.jsx')),
     Reports: React.lazy(() => import('./Pages/Reports/Reports.jsx')),
     ViewEventReport: React.lazy(() => import('./Pages/Reports/ViewEventReportPage.jsx')),
@@ -488,6 +492,30 @@ const MediaManagerRoutes = [
         exact: true,
         name: 'Logo Management',
         component: MediaManagerComponents.LogoManagement
+    },
+    {
+        path: MEDIA_MANAGER_PATHS.COUPON_LIST,
+        exact: true,
+        name: 'Coupon Management',
+        component: MediaManagerComponents.CouponManagement
+    },
+    {
+        path: MEDIA_MANAGER_PATHS.ADD_COUPON,
+        exact: true,
+        name: 'Add Coupon',
+        component: MediaManagerComponents.AddCouponPage
+    },
+    {
+        path: `${MEDIA_MANAGER_PATHS.EDIT_COUPON}/:id`,
+        exact: true,
+        name: 'Edit Coupon',
+        component: MediaManagerComponents.AddCouponPage
+    },
+    {
+        path: `${MEDIA_MANAGER_PATHS.VIEW_COUPON}/:id`,
+        exact: true,
+        name: 'View Coupon',
+        component: MediaManagerComponents.ViewCouponPage
     }
 ];
 
@@ -499,8 +527,14 @@ const transactionRoutes = [
     {
         path: TRANSACTION_PATHS.ORDER_LIST,
         exact: true,
-        name: 'Order List',
+        name: 'Order History',
         component: transactionComponents.OrderList
+    },
+    {
+        path: `${TRANSACTION_PATHS.VIEW_ORDER}/:id`,
+        exact: true,
+        name: 'View Order',
+        component: transactionComponents.ViewOrder
     },
     {
         path: TRANSACTION_PATHS.WITHDRAWAL_REQUEST,

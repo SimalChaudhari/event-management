@@ -122,3 +122,14 @@ export class CreateWooShPaySessionDto {
   @IsString()
   checkoutId!: string;
 }
+
+/** Body for refund request. amount in cents (omit for full refund); reason optional. */
+export class CreateRefundDto {
+  @IsOptional()
+  @IsNumber()
+  amount?: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

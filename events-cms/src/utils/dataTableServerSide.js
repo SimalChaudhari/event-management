@@ -21,7 +21,8 @@ export const initializeServerSideDataTable = ({
     dispatch = null, // Redux dispatch for loading state
     loadingActionType = null, // Action type to dispatch for loading (e.g., 'EVENT_LOADING')
     rowReorder = null, // RowReorder configuration object
-    fetchAction = null // Redux action function to fetch data (e.g., getAllEngagements)
+    fetchAction = null, // Redux action function to fetch data (e.g., getAllEngagements)
+    searchParamName = 'keyword' // Backend param for search box (e.g. 'keyword' for events, 'search' for orders)
 }) => {
     const $ = window.$ || require('jquery');
     
@@ -120,10 +121,12 @@ export const initializeServerSideDataTable = ({
                 ...currentAjaxParams // Additional custom parameters (like eventName, startDate, endDate)
             };
             
-            // Only add search if it has a value
-            // Map DataTable search to backend keyword parameter
-            if (data.search?.value && data.search.value.trim() !== '') {
-                filters.keyword = data.search.value.trim();
+            // Only add search if it has a value (DataTable search box or filter-card value from ajaxParams)
+            const searchBoxValue = data.search?.value?.trim() || '';
+            const filterCardSearch = currentAjaxParams[searchParamName];
+            const searchValue = searchBoxValue || (typeof filterCardSearch === 'string' && filterCardSearch.trim() ? filterCardSearch.trim() : undefined);
+            if (searchValue) {
+                filters[searchParamName] = searchValue;
             }
             
             // Clean filters - remove null/undefined/empty/'all' values
@@ -144,7 +147,7 @@ export const initializeServerSideDataTable = ({
                         }
                     } else {
                         // For date filters, ensure they're strings
-                        if ((key === 'startDate' || key === 'endDate') && value) {
+                        if ((key === 'startDate' || key === 'endDate' || key === 'dateFrom' || key === 'dateTo') && value) {
                             cleanedFilters[key] = String(value);
                         } else if (key === 'eventName' && value) {
                             // For eventName, trim and ensure it's a string
@@ -232,19 +235,20 @@ export const initializeServerSideDataTable = ({
                         const json = response.data;
                         // Handle both 'data' and 'events' response formats for backward compatibility
                         const responseData = json.data || json.events || [];
-                        if (json.success && responseData) {
+                        // Support APIs that return total/page/limit at top level (e.g. orders) or in metadata
+                        const metadata = json.metadata || (json.total !== undefined ? { total: json.total, page: json.page, limit: json.limit } : {});
+                        const totalCount = metadata.total ?? responseData.length;
+                        if (json.success !== false && (responseData.length > 0 || totalCount >= 0)) {
                             // Call custom callback if provided - pass full response to access filter data
                             if (onDataLoaded) {
-                                onDataLoaded(responseData, json.metadata, json);
+                                onDataLoaded(responseData, metadata, json);
                             }
-                            
-                            // Return DataTables format
                             callback({
                                 draw: data.draw,
-                                recordsTotal: json.metadata?.total || responseData.length,
-                                recordsFiltered: json.metadata?.total || responseData.length,
+                                recordsTotal: totalCount,
+                                recordsFiltered: totalCount,
                                 data: responseData,
-                                metadata: json.metadata
+                                metadata
                             });
                         } else {
                             callback({
@@ -254,7 +258,6 @@ export const initializeServerSideDataTable = ({
                                 data: []
                             });
                         }
-                        // Hide loading state after successful response
                         if (dispatch && loadingActionType) {
                             dispatch({ type: loadingActionType, payload: false });
                         }

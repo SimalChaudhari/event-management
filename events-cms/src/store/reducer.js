@@ -8,6 +8,7 @@ import exhibitorReducer from './reducer/exhibitorReducer';
 import bannerReducer from './reducer/bannerReducer';
 import galleryReducer from './reducer/galleryReducer';
 import categoryReducer from './reducer/categoryReducer';
+import couponReducer from './reducer/couponReducer';
 import settingsReducer from './reducer/settingsReducer';
 import withdrawReducer from './reducer/withdrawReducer';
 import surveyReducer from './reducer/surveyReducer';
@@ -37,6 +38,7 @@ const reducer = combineReducers({
     banner: bannerReducer,
     gallery: galleryReducer,
     category: categoryReducer,
+    coupon: couponReducer,
     settings: settingsReducer,
     withdraw: withdrawReducer,
     survey: surveyReducer,

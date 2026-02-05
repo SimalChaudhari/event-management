@@ -179,10 +179,17 @@ export class WooShPayService {
         throw new BadRequestException(
           'WooShPay rate limit exceeded. Please wait 1 minute before retrying. For higher limits, complete KYC at https://dashboard.wooshpay.com',
         );
+      } else if (error.response?.status === 402) {
+        // Payment required / Refunds not enabled / Account limitation
+        const apiMessage = error.response?.data?.message || error.response?.data?.error;
+        const msg = apiMessage
+          ? `WooShPay: ${apiMessage}`
+          : 'Refunds are not available for this account. Complete KYC or check your WooShPay dashboard (https://dashboard.wooshpay.com) to enable refunds.';
+        throw new BadRequestException(msg);
       }
 
       throw new InternalServerErrorException(
-        `WooShPay API error: ${error.message}`,
+        `WooShPay API error: ${error.response?.data?.message || error.message}`,
       );
     }
   }
@@ -239,6 +246,18 @@ export class WooShPayService {
       case 'checkout.session.completed':
         this.logger.log('Checkout session completed', { sessionId: eventData.id });
         break;
+      case 'checkout.session.expired':
+        this.logger.log('Checkout session expired (user did not complete in time)', {
+          sessionId: eventData.id,
+          checkoutId: eventData.metadata?.checkout_id,
+        });
+        break;
+      case 'checkout.session.canceled':
+        this.logger.log('Checkout session canceled (user refused payment)', {
+          sessionId: eventData.id,
+          checkoutId: eventData.metadata?.checkout_id,
+        });
+        break;
       case 'payment_link.paid':
         this.logger.log('Payment link paid', { paymentLinkId: eventData.id });
         break;
@@ -274,6 +293,13 @@ export class WooShPayService {
     });
 
     return await this.makeApiRequest<any>('POST', '/v1/refunds', refundData);
+  }
+
+  /**
+   * Get refund details by ID (for user to track status)
+   */
+  async getRefund(refundId: string): Promise<any> {
+    return await this.makeApiRequest<any>('GET', `/v1/refunds/${refundId}`);
   }
 
   /**

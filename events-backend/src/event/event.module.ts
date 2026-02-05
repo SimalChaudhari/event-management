@@ -20,6 +20,8 @@ import { Cart } from 'cart/cart.entity';
 import { OrderModule } from 'order/order.module';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { AdminInfo } from 'registerEvent/admin-info.entity';
+import { BillingDetail } from 'registerEvent/billing-detail.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { Survey, SurveySession } from '../survey/survey.entity';
@@ -40,7 +42,18 @@ import { ProgrammeSession } from '../programme/programme-session.entity';
 import { ProgrammeTrack } from '../programme/programme-track.entity';
 import { Engagement } from '../engagement/engagement.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
+import { ExhibitorView } from '../exhibitor/exhibitor-view.entity';
+import { ExhibitorLead } from '../exhibitor/exhibitor-lead.entity';
 import { FilterModule } from '../service/filter.module';
+import { SurveyQuestion, SurveyAnswer } from '../survey/qa.entity';
+import { Withdrawal } from '../withdrawal/withdrawal.entity';
+import { ModeratorEvent } from '../moderator/moderator-event.entity';
+import { QnaQuestion, QnaLike } from '../qna/qna.entity';
+import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from '../polling/polling.entity';
+import { ScheduledPushNotification } from '../scheduled-push-notification/scheduled-push-notification.entity';
+import { EventQRCode } from '../attendance/event-qr-code.entity';
+import { ContactExchange } from '../attendance/contact-exchange.entity';
+import { Coupon } from '../coupon/coupon.entity';
 
 @Module({
     imports: [
@@ -52,6 +65,8 @@ import { FilterModule } from '../service/filter.module';
         Cart,
         Category,
         RegisterEvent,
+        AdminInfo,
+        BillingDetail,
         FavoriteEvent,
         EventExhibitor,
         EventBooth,
@@ -60,6 +75,8 @@ import { FilterModule } from '../service/filter.module';
         Exhibitor,
         Survey,
         SurveySession,
+        SurveyQuestion,
+        SurveyAnswer,
         EventNotification,
         Engagement,
         EventNotificationRead,
@@ -73,9 +90,24 @@ import { FilterModule } from '../service/filter.module';
         ProgrammeSession,
         ProgrammeTrack,
         ExhibitorRating,
+        ExhibitorView,
+        ExhibitorLead,
         EventStamp,
         EventStampEvent,
         UserStampVisit,
+        Withdrawal,
+        ModeratorEvent,
+        QnaQuestion,
+        QnaLike,
+        Poll,
+        PollOption,
+        PollVote,
+        UserPollSession,
+        UserPollVote,
+        ScheduledPushNotification,
+        EventQRCode,
+        ContactExchange,
+        Coupon,
       ]),
       UtilsModule, // Import Utils Module instead of individual services
       JwtModule.register({

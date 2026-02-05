@@ -79,7 +79,11 @@ export const EVENT_PATHS = {
 export const MEDIA_MANAGER_PATHS = {
     GALLERY: '/media-manager/gallery',
     BANNER_MANAGEMENT: '/media-manager/banner-management',
-    LOGO_MANAGEMENT: '/media-manager/logo-management'
+    LOGO_MANAGEMENT: '/media-manager/logo-management',
+    COUPON_LIST: '/media-manager/coupons',
+    ADD_COUPON: '/media-manager/coupons/add',
+    EDIT_COUPON: '/media-manager/coupons/edit',
+    VIEW_COUPON: '/media-manager/coupons/view'
 };
 
 export const SETTINGS_PATHS = {
@@ -94,6 +98,7 @@ export const SETTINGS_PATHS = {
 
 export const TRANSACTION_PATHS = {
     ORDER_LIST: '/order',
+    VIEW_ORDER: '/order/view',
     WITHDRAWAL_REQUEST: '/withrawal',
     REPORTS: '/reports',
     VIEW_EVENT_REPORT: '/reports/view',

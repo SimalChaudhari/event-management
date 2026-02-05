@@ -98,6 +98,51 @@ export class RegisterEventService {
     private readonly eventStampService: EventStampService,
   ) {}
 
+  /**
+   * For multi-event orders: attach this event's price, name, and discount-aware amounts
+   * so UI can show per-event price and (when discount applied) this event's share of paid amount.
+   * Loads order by orderId when not joined (we no longer join order on register event).
+   */
+  private async attachPaymentSummaryForEvent(checkoutData: any, registerEvent: RegisterEvent): Promise<any> {
+    let order: Order | undefined = registerEvent.order;
+    if (!order && registerEvent.orderId) {
+      order = (await this.orderRepository.findOne({ where: { id: registerEvent.orderId } })) ?? undefined;
+    }
+    const eventPrice = registerEvent.event?.price != null ? Number(registerEvent.event.price) : null;
+    const orderTotal = order?.price != null ? Number(order.price) : null;
+    const orderOriginalTotal = order?.originalPrice != null ? Number(order.originalPrice) : orderTotal;
+    const orderDiscount = order?.discount != null ? Number(order.discount) : 0;
+
+    // When discount applied: this event's share of the final paid amount (proportional)
+    let thisEventAmountPaid: number | null = eventPrice;
+    if (
+      eventPrice != null &&
+      orderTotal != null &&
+      orderOriginalTotal != null &&
+      orderOriginalTotal > 0 &&
+      orderDiscount > 0
+    ) {
+      thisEventAmountPaid = Math.round((eventPrice / orderOriginalTotal) * orderTotal * 100) / 100;
+    }
+
+    // Discount in percentage for UI to show "10% off"
+    const orderDiscountPercent =
+      orderOriginalTotal != null && orderOriginalTotal > 0 && orderDiscount > 0
+        ? Math.round((orderDiscount / orderOriginalTotal) * 10000) / 100
+        : null;
+
+    const { totalAmount: _ta, discount: _d, cartItems: _ci, ...restCheckout } = checkoutData || {};
+    return {
+      ...restCheckout,
+      orderNo: order?.orderNo ?? null,
+      orderStatus: order?.status ?? null,
+      thisEventPrice: eventPrice,
+      thisEventName: registerEvent.event?.name ?? null,
+      orderDiscountPercent,
+      thisEventAmountPaid,
+    };
+  }
+
   async createRegisterEvent(
     userId: string,
     createRegisterEventDto: CreateRegisterEventDto,
@@ -199,12 +244,11 @@ export class RegisterEventService {
 
       if (role === 'admin') {
         // Admin can see all register events
-        // Optimized: Only load basic details - event, order, and registration details
+        // Optimized: Only load basic details - event and registration details (order not joined; checkout has what we need)
         queryBuilder = this.registerEventRepository
           .createQueryBuilder('registerEvent')
           .leftJoinAndSelect('registerEvent.user', 'user')
           .leftJoinAndSelect('registerEvent.event', 'event')
-          .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails');
 
@@ -308,7 +352,6 @@ export class RegisterEventService {
           .leftJoinAndSelect('programmeSessions.speakers', 'programmeSessionSpeakers')
           .leftJoinAndSelect('programmeSessionSpeakers.speakerProfile', 'programmeSessionSpeakerProfile')
           .leftJoinAndSelect('programmeSessionSpeakers.addresses', 'programmeSessionSpeakerAddresses')
-          .leftJoinAndSelect('registerEvent.order', 'order')
           .leftJoinAndSelect('registerEvent.adminInfo', 'adminInfo')
           .leftJoinAndSelect('registerEvent.billingDetails', 'billingDetails')
           .where('user.id = :userId', { userId })
@@ -423,19 +466,19 @@ export class RegisterEventService {
               attendanceCount: attendanceCount,
             } : null;
 
-            // Fetch checkout data if order exists
+            // Fetch checkout data if order exists (use orderId; we no longer join order)
             let checkoutData = null;
-            if (registerEvent.order?.id) {
+            if (registerEvent.orderId) {
               try {
                 checkoutData = await CheckoutUtils.getCheckoutByOrderId(
-                  registerEvent.order.id,
+                  registerEvent.orderId,
                   this.orderRepository,
                   this.checkoutRepository,
                   this.checkoutCartItemRepository
                 );
               } catch (error) {
                 // If checkout not found, continue without checkout data
-                console.log('Checkout data not found for order:', registerEvent.order.id);
+                console.log('Checkout data not found for order:', registerEvent.orderId);
               }
             }
 
@@ -447,9 +490,8 @@ export class RegisterEventService {
               isCreatedByAdmin: registerEvent.isCreatedByAdmin,
               event: basicEvent,
               user: cleanedUser,
-              order: registerEvent.order || null,
               adminInfo: registerEvent.adminInfo || null,
-              checkout: checkoutData || null,
+              checkout: checkoutData ? await this.attachPaymentSummaryForEvent(checkoutData, registerEvent) : null,
             };
           } else {
             // For regular users: Keep full details
@@ -621,19 +663,19 @@ export class RegisterEventService {
               ...cleanRegisterEvent
             } = registerEvent;
 
-            // Fetch checkout data if order exists
+            // Fetch checkout data if order exists (use orderId; we no longer join order)
             let checkoutData = null;
-            if (registerEvent.order?.id) {
+            if (registerEvent.orderId) {
               try {
                 checkoutData = await CheckoutUtils.getCheckoutByOrderId(
-                  registerEvent.order.id,
+                  registerEvent.orderId,
                   this.orderRepository,
                   this.checkoutRepository,
                   this.checkoutCartItemRepository
                 );
               } catch (error) {
                 // If checkout not found, continue without checkout data
-                console.log('Checkout data not found for order:', registerEvent.order.id);
+                console.log('Checkout data not found for order:', registerEvent.orderId);
               }
             }
 
@@ -643,7 +685,7 @@ export class RegisterEventService {
               user: cleanedUser,
               isCreatedByAdmin: registerEvent.isCreatedByAdmin,
               adminInfo: registerEvent.adminInfo || null,
-              checkout: checkoutData || null,
+              checkout: checkoutData ? await this.attachPaymentSummaryForEvent(checkoutData, registerEvent) : null,
             };
           }
         }),
@@ -846,7 +888,6 @@ export class RegisterEventService {
           'event.programmeTracks.sessions.speakers',
           'event.programmeTracks.sessions.speakers.speakerProfile',
           'event.programmeTracks.sessions.speakers.addresses',
-          'order',
           'adminInfo',
           'billingDetails',
         ],
@@ -1014,11 +1055,12 @@ export class RegisterEventService {
         registerEvent.user || {};
       const cleanedUser = { firstName, lastName, email, mobile, id };
 
-      // Exclude unnecessary fields
+      // Exclude unnecessary fields (order not needed – use checkout.orderNo etc. instead)
       const {
         orderId: _,
         eventId: __,
         isRegister: ___,
+        order: _order,
         ...cleanRegisterEvent
       } = registerEvent;
 
@@ -1029,19 +1071,19 @@ export class RegisterEventService {
           }
         : null;
 
-      // Fetch checkout data if order exists
+      // Fetch checkout data if order exists (use orderId; we no longer join order)
       let checkoutData = null;
-      if (registerEvent.order?.id) {
+      if (registerEvent.orderId) {
         try {
           checkoutData = await CheckoutUtils.getCheckoutByOrderId(
-            registerEvent.order.id,
+            registerEvent.orderId,
             this.orderRepository,
             this.checkoutRepository,
             this.checkoutCartItemRepository
           );
         } catch (error) {
           // If checkout not found, continue without checkout data
-          console.log('Checkout data not found for order:', registerEvent.order.id);
+          console.log('Checkout data not found for order:', registerEvent.orderId);
         }
       }
 
@@ -1053,9 +1095,8 @@ export class RegisterEventService {
           event,
           user: cleanedUser,
           isCreatedByAdmin: registerEvent.isCreatedByAdmin,
-          adminInfo, // Add admin info
-          checkout: checkoutData || null, // Add checkout data as separate field
-          // Add user's personal agenda data
+          adminInfo,
+          checkout: checkoutData ? await this.attachPaymentSummaryForEvent(checkoutData, registerEvent) : null,
         },
       };
     } catch (error) {
@@ -1288,14 +1329,15 @@ export class RegisterEventService {
       const checkout = data.checkout;
       const user = data.user;
       const event = data.event;
-      const order = data.order;
 
-      // Prepare receipt data
+      // Prepare receipt data (orderNo from checkout; totalAmount/discount may be omitted from checkout payload – use thisEventAmountPaid if needed)
+      const totalAmount = checkout.totalAmount != null ? parseFloat(checkout.totalAmount.toString()) : (checkout.thisEventAmountPaid != null ? Number(checkout.thisEventAmountPaid) : 0);
+      const discount = checkout.discount != null ? parseFloat(checkout.discount.toString()) : undefined;
       return {
         checkoutId: checkout.checkoutId,
         transactionId: checkout.transactionId,
-        totalAmount: parseFloat(checkout.totalAmount?.toString() || '0'),
-        discount: checkout.discount ? parseFloat(checkout.discount.toString()) : undefined,
+        totalAmount,
+        discount,
         couponCode: checkout.couponCode,
         promoCode: checkout.promoCode,
         paymentGateway: checkout.paymentGateway,
@@ -1316,7 +1358,7 @@ export class RegisterEventService {
           location: event?.location || undefined,
           venue: event?.venue || undefined,
         },
-        orderNo: order?.orderNo || undefined,
+        orderNo: checkout?.orderNo || undefined,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {

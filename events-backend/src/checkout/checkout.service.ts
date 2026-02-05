@@ -11,6 +11,7 @@ import { Repository, Like, MoreThanOrEqual } from 'typeorm';
 import { WooShPayService } from './wooshpay.service';
 import { Checkout } from './checkout.entity';
 import { CheckoutCartItem } from './checkout-cart-item.entity';
+import { Refund } from './refund.entity';
 import { ErrorHandlerUtil } from '../utils/error-handler.util';
 import { CheckoutResponseUtils } from '../utils/checkout-response.utils';
 import { CheckoutUtils } from '../utils/checkout.utils';
@@ -30,9 +31,16 @@ import {
 } from './checkout.dto';
 import { OrderStatus, PaymentMethod } from 'order/order.dto';
 import { buildGstBreakdown } from '../utils/gst.utils';
+import { generateUniqueOrderNumber } from 'utils/order-number.utils';
+
+/** Max webhook event IDs to keep for deduplication (prevents same event being processed twice on retry). */
+const WEBHOOK_DEDUPE_MAX = 50000;
 
 @Injectable()
 export class CheckoutService {
+  /** Processed webhook event keys (eventId or type+objectId) – skip if already seen (retries/duplicates). */
+  private processedWebhookKeys = new Set<string>();
+
   constructor(
     @InjectRepository(Checkout)
     private checkoutRepository: Repository<Checkout>,
@@ -50,6 +58,8 @@ export class CheckoutService {
     private orderItemRepository: Repository<OrderItemEntity>,
     @InjectRepository(RegisterEvent)
     private registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(Refund)
+    private refundRepository: Repository<Refund>,
     private couponService: CouponService,
     private wooShPayService: WooShPayService,
     @Inject(forwardRef(() => CartService))
@@ -154,12 +164,19 @@ export class CheckoutService {
 
     const finalAmount = calculatedTotal - discount;
 
-    // Build couponApplied for gstBreakdown (same shape as GET session)
+    // Build couponApplied for gstBreakdown (same shape as GET session). Add discountPercentage for UI to show "10% off".
     let couponApplied: any = null;
     if (couponData) {
+      const discountPercentage =
+        couponData.discountType === 'percentage'
+          ? Number(couponData.discountValue)
+          : calculatedTotal > 0
+            ? Math.round((discount / calculatedTotal) * 10000) / 100
+            : 0;
       couponApplied = {
         name: couponData.name,
         discount,
+        discountPercentage,
         type: couponData.discountType,
         couponId: couponData.id,
         actualValue: couponData.actualValue,
@@ -187,19 +204,39 @@ export class CheckoutService {
     console.log('🔍 About to check for existing checkout...');
     const existingCheckout = await this.findExistingPendingCheckout(userId, validatedCartItems, discount, dto.couponCode);
     if (existingCheckout) {
-      console.log('🔄 Found existing pending checkout, returning existing one:', existingCheckout.checkoutId);
       const existingCartItems = existingCheckout.checkoutCartItems?.map(item => ({
         eventId: item.eventId,
         price: 0,
         eventName: ''
       })) || validatedCartItems;
+
+      // If current request has different coupon/discount, update existing checkout (single API: create-checkout with coupon applies it)
+      const couponChanged = (dto.couponCode || '') !== (existingCheckout.couponCode || '');
+      const discountChanged = Number(discount) !== Number(existingCheckout.discount || 0);
+      const totalChanged = Math.abs(Number(finalAmount) - Number(existingCheckout.totalAmount || 0)) > 0.01;
+      if (couponChanged || discountChanged || totalChanged) {
+        console.log('🔄 Updating existing checkout with new coupon/discount:', { couponChanged, discountChanged, totalChanged });
+        existingCheckout.couponCode = dto.couponCode ?? existingCheckout.couponCode;
+        existingCheckout.discount = discount;
+        existingCheckout.totalAmount = finalAmount;
+        await this.checkoutRepository.save(existingCheckout);
+      }
+
       let existingCouponApplied: any = null;
-      if (existingCheckout.couponCode) {
+      const couponCodeToUse = existingCheckout.couponCode;
+      if (couponCodeToUse) {
         try {
-          const coupon = await this.couponService.getCouponByName(existingCheckout.couponCode);
+          const coupon = await this.couponService.getCouponByName(couponCodeToUse);
+          const subTotal = Number(existingCheckout.totalAmount || 0) + Number(existingCheckout.discount || 0);
+          const discAmount = Number(existingCheckout.discount || 0);
+          const discountPercentage =
+            coupon.discountType === 'percentage'
+              ? Number(coupon.discountValue)
+              : subTotal > 0 ? Math.round((discAmount / subTotal) * 10000) / 100 : 0;
           existingCouponApplied = {
             name: coupon.name,
-            discount: Number(existingCheckout.discount || 0),
+            discount: discAmount,
+            discountPercentage,
             type: coupon.discountType,
             couponId: coupon.id,
             actualValue: coupon.actualValue,
@@ -213,13 +250,37 @@ export class CheckoutService {
         Number(existingCheckout.discount || 0),
         existingCouponApplied,
       );
+      let couponDetails: any = null;
+      if (couponCodeToUse) {
+        try {
+          const coupon = await this.couponService.getCouponByName(couponCodeToUse);
+          const subTotal = Number(existingCheckout.totalAmount || 0) + Number(existingCheckout.discount || 0);
+          const discAmount = Number(existingCheckout.discount || 0);
+          const discountPercentage =
+            coupon.discountType === 'percentage'
+              ? Number(coupon.discountValue)
+              : subTotal > 0 ? Math.round((discAmount / subTotal) * 10000) / 100 : 0;
+          couponDetails = {
+            id: coupon.id,
+            name: coupon.name,
+            discountValue: coupon.discountValue,
+            discountType: coupon.discountType,
+            discountPercentage,
+            actualValue: coupon.actualValue,
+            validFrom: coupon.validFrom,
+            validTo: coupon.validTo,
+          };
+        } catch (_) {}
+      }
       return {
         id: existingCheckout.id,
         checkoutId: existingCheckout.checkoutId,
         status: existingCheckout.status,
         totalAmount: existingCheckout.totalAmount,
         discount: existingCheckout.discount,
+        discountPercentage: existingCouponApplied?.discountPercentage ?? null,
         couponCode: existingCheckout.couponCode,
+        coupon: couponDetails,
         promoCode: existingCheckout.promoCode,
         cartItems: existingCartItems,
         gstBreakdown: existingGstBreakdown,
@@ -269,16 +330,23 @@ export class CheckoutService {
       }
     }
 
-    // Get coupon details if coupon code exists
+    // Get coupon details if coupon code exists. Add discountPercentage for UI to show "10% off".
     let couponDetails = null;
     if (savedCheckout.couponCode) {
       try {
         const coupon = await this.couponService.getCouponByName(savedCheckout.couponCode);
+        const subTotal = Number(savedCheckout.totalAmount || 0) + Number(savedCheckout.discount || 0);
+        const discAmount = Number(savedCheckout.discount || 0);
+        const discountPercentage =
+          coupon.discountType === 'percentage'
+            ? Number(coupon.discountValue)
+            : subTotal > 0 ? Math.round((discAmount / subTotal) * 10000) / 100 : 0;
         couponDetails = {
           id: coupon.id,
           name: coupon.name,
           discountValue: coupon.discountValue,
           discountType: coupon.discountType,
+          discountPercentage,
           actualValue: coupon.actualValue,
           validFrom: coupon.validFrom,
           validTo: coupon.validTo
@@ -294,6 +362,7 @@ export class CheckoutService {
       status: savedCheckout.status,
       totalAmount: savedCheckout.totalAmount,
       discount: savedCheckout.discount,
+      discountPercentage: couponDetails?.discountPercentage ?? null,
       couponCode: savedCheckout.couponCode,
       coupon: couponDetails,
       cartItems: validatedCartItems,
@@ -408,25 +477,18 @@ export class CheckoutService {
    * Cart items for this checkout are removed here – never on checkout create.
    */
   private async createOrderFromCheckout(checkout: Checkout): Promise<any> {
+    const cartCount = checkout.checkoutCartItems?.length ?? 0;
+    console.log('[WEBHOOK createOrderFromCheckout] checkoutId=', checkout.checkoutId, '| cartItems=', cartCount);
     return await this.orderRepository.manager.transaction(async (manager) => {
-      // Generate order number
-      const currentYear = new Date().getFullYear();
-      const lastOrder = await manager.find(Order, {
-        where: { orderNo: Like(`${currentYear}%`) },
-        order: { orderNo: 'DESC' },
-        take: 1,
+      const orderNo = await generateUniqueOrderNumber(async (candidate) => {
+        const existing = await manager.findOne(Order, {
+          where: { orderNo: candidate },
+          select: ['id'],
+        });
+        return !!existing;
+      }).catch(() => {
+        throw new InternalServerErrorException('Could not generate unique order number. Please retry.');
       });
-
-      let orderNo: string;
-      if (lastOrder.length > 0) {
-        const lastSequentialNumber = parseInt(
-          lastOrder[0].orderNo.slice(5),
-          10,
-        );
-        orderNo = `${currentYear}-${(lastSequentialNumber + 1).toString().padStart(4, '0')}`;
-      } else {
-        orderNo = `${currentYear}-0001`;
-      }
 
       // Create order
       const order = manager.create(Order, {
@@ -440,10 +502,16 @@ export class CheckoutService {
       });
 
       const savedOrder = await manager.save(Order, order);
+      console.log('[WEBHOOK createOrderFromCheckout] Order created id=', savedOrder.id, 'orderNo=', (savedOrder as any).orderNo);
+
+      // Link checkout to order for refund lookups
+      await manager.update(Checkout, { checkoutId: checkout.checkoutId }, { orderId: savedOrder.id });
 
       // Get checkout cart items from CheckoutCartItem table
       const checkoutCartItems = checkout.checkoutCartItems || [];
-      
+      if (checkoutCartItems.length === 0) {
+        console.warn('[WEBHOOK createOrderFromCheckout] No checkoutCartItems – no order items or register events will be created');
+      }
       // Create order items and register events
       for (const checkoutCartItem of checkoutCartItems) {
         const event = await manager.findOne(Event, {
@@ -465,6 +533,7 @@ export class CheckoutService {
             orderId: savedOrder.id,
           });
           await manager.save(RegisterEvent, registerEvent);
+          console.log('[WEBHOOK createOrderFromCheckout] RegisterEvent created for eventId=', event.id);
 
           // Remove from cart only when payment has successfully completed (this method is called only from webhook: checkout.session.completed / payment_link.paid)
           await manager.delete(Cart, {
@@ -523,9 +592,15 @@ export class CheckoutService {
       try {
         const coupon = await this.couponService.getCouponByName(checkout.couponCode);
         if (coupon) {
+          const subTotal = totalAmount + discount;
+          const discountPercentage =
+            coupon.discountType === 'percentage'
+              ? Number(coupon.discountValue)
+              : subTotal > 0 ? Math.round((discount / subTotal) * 10000) / 100 : 0;
           couponApplied = {
             name: checkout.couponCode,
             discount,
+            discountPercentage,
             type: coupon.discountType,
             couponId: coupon.id,
             actualValue: coupon.actualValue,
@@ -555,9 +630,11 @@ export class CheckoutService {
     return {
       id: checkout.id,
       checkoutId: checkout.checkoutId,
+      orderId: checkout.orderId ?? null,
       status: checkout.status,
       totalAmount: checkout.totalAmount,
       discount: checkout.discount,
+      discountPercentage: couponApplied?.discountPercentage ?? null,
       couponCode: checkout.couponCode,
       paymentGateway: checkout.paymentGateway,
       paymentMethod: checkout.paymentMethod,
@@ -649,16 +726,42 @@ export class CheckoutService {
       throw new BadRequestException('No cart items in checkout');
     }
 
+    // Use discounted total (checkout.totalAmount) so WooShPay charges the amount after coupon, not original
+    const amountToCharge = Number(checkout.totalAmount ?? 0);
+    const amountToChargeCents = Math.round(amountToCharge * 100);
+
     const line_items: Array<{
       price_data: { currency: string; unit_amount: number; product_data: { name: string; description?: string } };
       quantity: number;
     }> = [];
 
+    const eventPrices: { event: any; price: number }[] = [];
+    let originalTotal = 0;
     for (const item of items) {
       const event = await this.eventRepository.findOne({ where: { id: item.eventId } });
       if (!event) continue;
       const price = Number(event.price ?? 0);
-      const unitAmountCents = Math.round(price * 100); // smallest unit (cents)
+      originalTotal += price;
+      eventPrices.push({ event, price });
+    }
+
+    if (eventPrices.length === 0) {
+      throw new BadRequestException('No valid events found for checkout');
+    }
+
+    // Split amountToCharge across line items (proportional to event price) so WooShPay total = discounted amount
+    for (let i = 0; i < eventPrices.length; i++) {
+      const { event, price } = eventPrices[i];
+      let unitAmountCents: number;
+      if (originalTotal <= 0) {
+        unitAmountCents = Math.round(amountToChargeCents / eventPrices.length);
+      } else if (i === eventPrices.length - 1) {
+        // Last item: use remainder so total is exactly amountToChargeCents (avoids rounding drift)
+        const soFar = line_items.reduce((sum, li) => sum + (li.price_data.unit_amount || 0) * (li.quantity || 1), 0);
+        unitAmountCents = Math.max(0, amountToChargeCents - soFar);
+      } else {
+        unitAmountCents = Math.round((price / originalTotal) * amountToChargeCents);
+      }
       const eventName = (event.name && String(event.name).trim()) || `Event ${event.id}`;
       const rawDesc = event.description ? String(event.description) : '';
       const plainDesc = rawDesc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -673,10 +776,6 @@ export class CheckoutService {
         },
         quantity: 1,
       });
-    }
-
-    if (line_items.length === 0) {
-      throw new BadRequestException('No valid events found for checkout');
     }
 
     const sessionPayload: any = {
@@ -696,7 +795,7 @@ export class CheckoutService {
     }
 
     const sessionId = session?.id;
-    checkout.paymentUrl = url;
+    // Do not store paymentUrl (sensitive); return URL only for one-time redirect
     if (sessionId) checkout.wooshpaySessionId = sessionId;
     await this.checkoutRepository.save(checkout);
 
@@ -757,6 +856,89 @@ export class CheckoutService {
     );
   }
 
+  /**
+   * Create a refund for an order paid via WooShPay.
+   * Finds the checkout by orderId (must belong to the user), then calls WooShPay refund API.
+   * @param orderId - Order UUID
+   * @param userId - Requesting user (must own the order)
+   * @param amount - Optional amount in cents; omit for full refund
+   * @param reason - Optional reason (e.g. 'requested_by_customer', 'duplicate')
+   */
+  async createRefundForOrder(
+    orderId: string,
+    userId: string,
+    amount?: number,
+    reason?: string,
+  ): Promise<any> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, user: { id: userId } },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found or you do not have access to it');
+    }
+
+    const checkout = await this.checkoutRepository.findOne({
+      where: { orderId, user: { id: userId } },
+    });
+    if (!checkout) {
+      throw new NotFoundException('Checkout not found for this order. Refund is only available for WooShPay orders.');
+    }
+
+    const paymentIntentId = checkout.wooshpayPaymentIntentId;
+    if (!paymentIntentId) {
+      throw new BadRequestException(
+        'No payment intent stored for this order. Refunds are only supported for orders paid via WooShPay checkout.',
+      );
+    }
+
+    const result = await this.wooShPayService.createRefund(
+      paymentIntentId,
+      amount,
+      reason,
+    );
+
+    // Store refund so user can track status
+    const refundEntity = this.refundRepository.create({
+      orderId,
+      wooshpayRefundId: result.id,
+      amount: result.amount ?? 0,
+      currency: result.currency ?? 'USD',
+      status: result.status ?? 'pending',
+      reason: result.reason ?? reason ?? undefined,
+    });
+    await this.refundRepository.save(refundEntity);
+
+    return result;
+  }
+
+  /**
+   * Get refund status for an order (so user can track). Returns list of refunds for that order.
+   */
+  async getRefundStatusForOrder(orderId: string, userId: string): Promise<any[]> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, user: { id: userId } },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found or you do not have access to it');
+    }
+
+    const refunds = await this.refundRepository.find({
+      where: { orderId },
+      order: { createdAt: 'DESC' },
+    });
+
+    return refunds.map((r) => ({
+      id: r.id,
+      wooshpayRefundId: r.wooshpayRefundId,
+      amount: r.amount,
+      amountFormatted: `$${(r.amount / 100).toFixed(2)}`,
+      currency: r.currency,
+      status: r.status,
+      reason: r.reason,
+      createdAt: r.createdAt,
+    }));
+  }
+
   async updateCheckoutCartItems(checkoutId: string, cartItemsMinimal: any[]): Promise<void> {
     const checkout = await this.checkoutRepository.findOne({
       where: { checkoutId },
@@ -806,6 +988,7 @@ export class CheckoutService {
       throw new BadRequestException('No cart items found in checkout');
     }
 
+
     // Calculate total from cart items
     let totalAmount = 0;
     for (const item of checkoutCartItems) {
@@ -847,7 +1030,7 @@ export class CheckoutService {
         discountValue: couponResult.coupon.discountValue,
         discountType: couponResult.coupon.discountType,
         actualValue: couponResult.coupon.actualValue,
-        expiryDate: couponResult.coupon.expiryDate,
+        validTo: couponResult.coupon.validTo,
       },
       priceBreakdown: {
         subtotal: totalAmount,
@@ -881,9 +1064,10 @@ export class CheckoutService {
       eventId: item.eventId,
     })) || [];
 
+    const { paymentUrl: _omit, ...rest } = checkout;
     return {
-      ...checkout,
-      cartItems: cartItems,
+      ...rest,
+      cartItems,
     };
   }
 
@@ -923,34 +1107,85 @@ export class CheckoutService {
       );
     }
 
+    // Expire WooShPay session immediately so payment URL cannot be reused
+    if (checkout.wooshpaySessionId) {
+      try {
+        await this.expireWooShPaySession(checkout.wooshpaySessionId);
+      } catch (e) {
+        console.warn('[cancelCheckout] Expire session failed (may already be expired):', (e as Error)?.message);
+      }
+    }
+    checkout.paymentUrl = undefined;
     checkout.status = CheckoutStatus.Cancelled;
     await this.checkoutRepository.save(checkout);
   }
 
 
   /**
-   * Process WooShPay webhook events according to their format
-   * This method handle WooShPay webhook format according to payment events
+   * Process WooShPay webhook events according to their format.
+   * Deduplicates by event ID / type+objectId so the same webhook (retry or duplicate) is not processed twice.
    */
   async processPaymentCompletion(webhookData: any): Promise<void> {
-    const eventType = webhookData.type;
-    const eventData = webhookData.data?.object;
+    // Support both webhook shapes: { type, data: { object } } and { event_type, object } or { event_type, data }
+    let eventType = webhookData.type || webhookData.event_type;
+    if (!eventType && webhookData.data?.object) {
+      const obj = webhookData.data.object;
+      if (obj.object === 'checkout_session') {
+        eventType = obj.status === 'complete' ? 'checkout.session.completed'
+          : obj.status === 'expired' ? 'checkout.session.expired'
+          : obj.status === 'canceled' || obj.status === 'cancelled' ? 'checkout.session.canceled'
+          : 'checkout.session.completed'; // fallback for unknown status
+      } else if (obj.object === 'payment_link' && obj.status === 'paid') eventType = 'payment_link.paid';
+    }
+    if (!eventType && webhookData.object) {
+      const obj = webhookData.object;
+      if (obj.object === 'checkout_session') {
+        eventType = obj.status === 'complete' ? 'checkout.session.completed'
+          : obj.status === 'expired' ? 'checkout.session.expired'
+          : obj.status === 'canceled' || obj.status === 'cancelled' ? 'checkout.session.canceled'
+          : 'checkout.session.completed';
+      } else if (obj.object === 'payment_link' && obj.status === 'paid') eventType = 'payment_link.paid';
+    }
+    const eventData =
+      webhookData.data?.object ??
+      webhookData.object ??
+      webhookData.data ??
+      webhookData;
 
-    console.log('🔔 Processing webhook event:', {
-      type: eventType,
-      objectId: eventData?.id,
-      status: eventData?.status,
-      checkoutId: eventData?.metadata?.checkout_id,
-      timestamp: new Date().toISOString()
-    });
+    // Deduplicate: if we already processed this exact webhook event (same id or type+objectId), skip
+    const eventId = webhookData.id ?? eventData?.id;
+    const dedupeKey = eventId ? String(eventId) : (eventType && eventData?.id ? `${eventType}-${eventData.id}` : null);
+    if (dedupeKey) {
+      if (this.processedWebhookKeys.has(dedupeKey)) {
+        console.log('[WEBHOOK processPaymentCompletion] Already processed dedupeKey=', dedupeKey, '→ skipping (duplicate/retry)');
+        return;
+      }
+      this.processedWebhookKeys.add(dedupeKey);
+      if (this.processedWebhookKeys.size > WEBHOOK_DEDUPE_MAX) {
+        const arr = Array.from(this.processedWebhookKeys);
+        this.processedWebhookKeys = new Set(arr.slice(-Math.floor(WEBHOOK_DEDUPE_MAX / 2)));
+      }
+    }
+
+    console.log('[WEBHOOK processPaymentCompletion] eventType=', eventType, '| objectId=', eventData?.id, '| status=', eventData?.status);
+    console.log('[WEBHOOK processPaymentCompletion] metadata=', eventData?.metadata, '| checkout_id=', eventData?.metadata?.checkout_id);
+    if (!eventType) {
+      console.error('[WEBHOOK processPaymentCompletion] No event type found. Payload keys:', Object.keys(webhookData || {}));
+    }
 
     try {
       switch (eventType) {
         case 'checkout.session.completed':
-          console.log('✅ Checkout session completed, completing checkout...');
+          console.log('[WEBHOOK] → completeCheckoutFromSession');
           await this.completeCheckoutFromSession(eventData);
           break;
+        case 'checkout.session.expired':
+        case 'checkout.session.canceled':
+          console.log('[WEBHOOK] → handleCheckoutSessionCanceledOrExpired (user refused or session expired)');
+          await this.handleCheckoutSessionCanceledOrExpired(eventData);
+          break;
         case 'payment_link.paid':
+          console.log('[WEBHOOK] → completeCheckoutFromPaymentLink');
           await this.completeCheckoutFromPaymentLink(eventData);
           break;
         case 'payment_link.failed':
@@ -966,10 +1201,10 @@ export class CheckoutService {
           await this.handlePayoutFailed(eventData);
           break;
         default:
-          console.log(`Unhandled WooShPay webhook event type: ${eventType}`);
+          console.log('[WEBHOOK] Unhandled event type:', eventType, '| Full payload keys:', JSON.stringify(Object.keys(webhookData || {})));
       }
     } catch (error: any) {
-      console.error(`Error processing WooShPay webhook ${eventType}:`, error);
+      console.error('[WEBHOOK] Error in processPaymentCompletion:', eventType, error?.message, error?.stack);
       ErrorHandlerUtil.handleError(error, `Webhook processing failed for event: ${eventType}`);
     }
   }
@@ -980,10 +1215,18 @@ export class CheckoutService {
    * Only then we create order and remove those items from cart.
    */
   private async completeCheckoutFromSession(session: any): Promise<void> {
-    const checkoutId = session.metadata?.checkout_id;
+    const status = (session?.status || '').toLowerCase();
+    if (status !== 'complete') {
+      console.log('[WEBHOOK completeCheckoutFromSession] Session status is not complete:', session?.status, '→ treating as canceled/expired');
+      await this.handleCheckoutSessionCanceledOrExpired(session);
+      return;
+    }
 
+    const checkoutId = session?.metadata?.checkout_id ?? session?.checkout_id;
+
+    console.log('[WEBHOOK completeCheckoutFromSession] session.metadata=', session?.metadata, '| checkoutId=', checkoutId);
     if (!checkoutId) {
-      console.log('No checkout_id found in session metadata');
+      console.error('[WEBHOOK completeCheckoutFromSession] No checkout_id. Session keys:', session ? Object.keys(session) : 'null');
       return;
     }
 
@@ -993,20 +1236,45 @@ export class CheckoutService {
     });
 
     if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
+      console.error('[WEBHOOK completeCheckoutFromSession] Checkout NOT FOUND for id:', checkoutId);
       return;
     }
+    // Idempotency: avoid creating a second order if webhook is called again (retry or duplicate event)
+    if (checkout.orderId) {
+      console.log('[WEBHOOK completeCheckoutFromSession] Order already created for checkoutId=', checkoutId, '| orderId=', checkout.orderId, '→ skipping');
+      return;
+    }
+    const itemCount = checkout.checkoutCartItems?.length ?? 0;
+    console.log('[WEBHOOK completeCheckoutFromSession] Checkout found, cart items=', itemCount);
 
-    // Complete the checkout
+    if (itemCount === 0) {
+      console.warn('[WEBHOOK completeCheckoutFromSession] No cart items – order will have no items/register events. CheckoutId:', checkoutId);
+    }
+
+    // Store WooShPay payment intent ID for refunds (session may have payment_intent or payment_intent_id)
+    const paymentIntentId = session.payment_intent ?? session.payment_intent_id;
+    if (paymentIntentId) {
+      checkout.wooshpayPaymentIntentId = typeof paymentIntentId === 'string' ? paymentIntentId : paymentIntentId?.id ?? paymentIntentId;
+      checkout.transactionId = checkout.wooshpayPaymentIntentId;
+    }
+
     checkout.status = CheckoutStatus.Completed;
     checkout.isCompleted = true;
     checkout.completedAt = new Date();
+    checkout.paymentUrl = undefined; // clear any stored URL; sensitive and no longer needed
     await this.checkoutRepository.save(checkout);
 
-    // Create order and remove cart items only after payment success
+    console.log('[WEBHOOK completeCheckoutFromSession] Creating order from checkout...');
     await this.createOrderFromCheckout(checkout);
-
-    console.log(`✅ Checkout session completed for ID: ${checkoutId} (order created, cart items removed)`);
+    // Expire WooShPay session so payment URL cannot be reused
+    if (checkout.wooshpaySessionId) {
+      try {
+        await this.expireWooShPaySession(checkout.wooshpaySessionId);
+      } catch (e) {
+        console.warn('[WEBHOOK completeCheckoutFromSession] Expire session failed (may already be expired):', (e as Error)?.message);
+      }
+    }
+    console.log('[WEBHOOK completeCheckoutFromSession] ✅ Done. Order and register events created for checkoutId:', checkoutId);
   }
 
   /**
@@ -1016,10 +1284,11 @@ export class CheckoutService {
   private async completeCheckoutFromPaymentLink(
     paymentLink: any,
   ): Promise<void> {
-    const checkoutId = paymentLink.metadata?.checkout_id;
+    const checkoutId = paymentLink?.metadata?.checkout_id ?? paymentLink?.checkout_id;
 
+    console.log('[WEBHOOK completeCheckoutFromPaymentLink] metadata=', paymentLink?.metadata, '| checkoutId=', checkoutId);
     if (!checkoutId) {
-      console.log('No checkout_id found in payment link metadata');
+      console.error('[WEBHOOK completeCheckoutFromPaymentLink] No checkout_id. PaymentLink keys:', paymentLink ? Object.keys(paymentLink) : 'null');
       return;
     }
 
@@ -1029,20 +1298,79 @@ export class CheckoutService {
     });
 
     if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
+      console.error('[WEBHOOK completeCheckoutFromPaymentLink] Checkout NOT FOUND for id:', checkoutId);
       return;
     }
+    // Idempotency: avoid creating a second order if webhook is called again (e.g. both checkout.session.completed and payment_link.paid)
+    if (checkout.orderId) {
+      console.log('[WEBHOOK completeCheckoutFromPaymentLink] Order already created for checkoutId=', checkoutId, '| orderId=', checkout.orderId, '→ skipping');
+      return;
+    }
+    const itemCount = checkout.checkoutCartItems?.length ?? 0;
+    console.log('[WEBHOOK completeCheckoutFromPaymentLink] Checkout found, cart items=', itemCount);
 
-    // Complete the checkout
+    if (itemCount === 0) {
+      console.warn('[WEBHOOK completeCheckoutFromPaymentLink] No cart items – order will have no items. CheckoutId:', checkoutId);
+    }
+
     checkout.status = CheckoutStatus.Completed;
     checkout.isCompleted = true;
     checkout.completedAt = new Date();
+    checkout.paymentUrl = undefined; // clear any stored URL; sensitive and no longer needed
     await this.checkoutRepository.save(checkout);
 
-    // Create order and remove cart items only after payment success
+    console.log('[WEBHOOK completeCheckoutFromPaymentLink] Creating order from checkout...');
     await this.createOrderFromCheckout(checkout);
+    // Expire WooShPay session so payment URL cannot be reused
+    if (checkout.wooshpaySessionId) {
+      try {
+        await this.expireWooShPaySession(checkout.wooshpaySessionId);
+      } catch (e) {
+        console.warn('[WEBHOOK completeCheckoutFromPaymentLink] Expire session failed (may already be expired):', (e as Error)?.message);
+      }
+    }
+    console.log('[WEBHOOK completeCheckoutFromPaymentLink] ✅ Done. Order and register events created for checkoutId:', checkoutId);
+  }
 
-    console.log(`✅ Payment link completed for ID: ${checkoutId} (order created, cart items removed)`);
+  /**
+   * Handle checkout session canceled or expired (user refused payment, clicked cancel, or session expired).
+   * Marks checkout as Cancelled so it is not left stuck in Pending.
+   */
+  private async handleCheckoutSessionCanceledOrExpired(session: any): Promise<void> {
+    const checkoutId = session?.metadata?.checkout_id ?? session?.checkout_id;
+
+    if (!checkoutId) {
+      console.log('[WEBHOOK handleCheckoutSessionCanceledOrExpired] No checkout_id in session metadata');
+      return;
+    }
+
+    const checkout = await this.checkoutRepository.findOne({
+      where: { checkoutId },
+    });
+
+    if (!checkout) {
+      console.error('[WEBHOOK handleCheckoutSessionCanceledOrExpired] Checkout not found:', checkoutId);
+      return;
+    }
+
+    if (checkout.status === CheckoutStatus.Completed) {
+      console.log('[WEBHOOK handleCheckoutSessionCanceledOrExpired] Checkout already completed, skipping:', checkoutId);
+      return;
+    }
+
+    checkout.status = CheckoutStatus.Cancelled;
+    checkout.paymentUrl = undefined; // clear sensitive URL; expire session immediately
+    checkout.paymentNotes = `Payment refused or cancelled. Session status: ${session?.status || 'unknown'}`;
+    if (checkout.wooshpaySessionId) {
+      try {
+        await this.expireWooShPaySession(checkout.wooshpaySessionId);
+      } catch (e) {
+        console.warn('[WEBHOOK handleCheckoutSessionCanceledOrExpired] Expire session failed (may already be expired):', (e as Error)?.message);
+      }
+    }
+    await this.checkoutRepository.save(checkout);
+
+    console.log('[WEBHOOK handleCheckoutSessionCanceledOrExpired] Checkout marked as cancelled:', checkoutId);
   }
 
   /**
@@ -1075,31 +1403,32 @@ export class CheckoutService {
   }
 
   /**
-   * Handle refund updated
-   * Refund update checkout refund information store
+   * Handle refund updated (webhook from WooShPay when refund status changes)
    */
   private async handleRefundUpdated(refund: any): Promise<void> {
+    const refundId = refund.id ?? refund.refund_id;
+
+    if (refundId) {
+      const existing = await this.refundRepository.findOne({
+        where: { wooshpayRefundId: refundId },
+      });
+      if (existing) {
+        existing.status = refund.status ?? existing.status;
+        await this.refundRepository.save(existing);
+        console.log(`💰 Refund status updated: ${refundId} → ${refund.status}`);
+      }
+    }
+
     const checkoutId = refund.metadata?.checkout_id;
-
-    if (!checkoutId) {
-      console.log('No checkout_id found in refund metadata');
-      return;
+    if (checkoutId) {
+      const checkout = await this.checkoutRepository.findOne({
+        where: { checkoutId },
+      });
+      if (checkout) {
+        checkout.paymentNotes = `Refund updated: ${refund.status}`;
+        await this.checkoutRepository.save(checkout);
+      }
     }
-
-    const checkout = await this.checkoutRepository.findOne({
-      where: { checkoutId },
-    });
-
-    if (!checkout) {
-      console.error(`Checkout not found for ID: ${checkoutId}`);
-      return;
-    }
-
-    // Update checkout with refund information
-    checkout.paymentNotes = `Refund updated: ${refund.status}`;
-    await this.checkoutRepository.save(checkout);
-
-    console.log(`💰 Refund updated for checkout: ${checkoutId}`);
   }
 
   /**

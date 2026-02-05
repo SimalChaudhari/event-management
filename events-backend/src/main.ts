@@ -39,7 +39,8 @@ async function bootstrap() {
     const jsonParser = json({
       limit: '20mb',
       verify: (req: any, _res, buf: Buffer, encoding?: string) => {
-        if (buf?.length && req.headers['wooshpay-signature']) {
+        const hasWebhookSig = req.headers['wooshpay-signature'] || req.headers['x-wooshpay-signature'];
+        if (buf?.length && hasWebhookSig) {
           req.rawBody = buf.toString((encoding as BufferEncoding) || 'utf8');
         }
       },

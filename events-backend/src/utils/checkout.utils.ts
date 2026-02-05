@@ -95,7 +95,7 @@ export class CheckoutUtils {
           paymentGateway: checkout.paymentGateway,
           paymentMethod: checkout.paymentMethod,
           transactionId: checkout.transactionId,
-          paymentUrl: checkout.paymentUrl,
+          // paymentUrl omitted – sensitive; not stored and not returned
           paymentNotes: checkout.paymentNotes,
           isCompleted: checkout.isCompleted,
           createdAt: checkout.createdAt,

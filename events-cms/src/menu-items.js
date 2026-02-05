@@ -214,6 +214,12 @@ const chartData = {
                     type: 'item',
                     // icon: 'feather icon-image',
                     url: '/media-manager/logo-management'
+                },
+                {
+                    id: 'coupons',
+                    title: 'Coupons',
+                    type: 'item',
+                    url: '/media-manager/coupons'
                 }
             ]
             }
