@@ -68,6 +68,7 @@ function AddEventPage() {
         documentNames: [], // Add this new field
         type: 'Physical',
         price: '',
+        gstRate: 18,
         speakerIds: [],
         categoryIds: [],
         latitude: '',
@@ -484,6 +485,7 @@ function AddEventPage() {
                         documentNames: documentNamesData,
                         type: editData.type || 'Physical',
                         price: editData.price || '',
+                        gstRate: editData.gstRate ?? 18,
                         speakerIds: speakerIds,
                         categoryIds: categoryIds,
                         floorPlan: floorPlanData,
@@ -723,6 +725,7 @@ function AddEventPage() {
             documentNames: [], // Add this
             type: 'Physical',
             price: '',
+            gstRate: 18,
             speakerIds: [],
             categoryIds: [],
             latitude: '',
@@ -1572,6 +1575,37 @@ function AddEventPage() {
                                                     SGD
                                                 </span>
                                             </div>
+                                        </div>
+                                    </Col>
+                                    <Col sm={6}>
+                                        <div className="form-group fill">
+                                            <label className="floating-label" htmlFor="gstRate">
+                                                GST/Tax (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                name="gstRate"
+                                                value={formData.gstRate}
+                                                onChange={handleChange}
+                                                placeholder="18"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                title="GST/Tax percentage added on top of event price (shown on checkout)"
+                                            />
+                                            <small className="text-muted">% on top of price. Shown on checkout page only.</small>
+                                            {formData.price && parseFloat(formData.price) > 0 && (
+                                                <div className="mt-2 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+                                                    <small className="d-block text-muted mb-2" style={{ fontWeight: '600' }}>Price Breakdown</small>
+                                                    <div className="d-flex flex-column gap-1" style={{ fontSize: '13px' }}>
+                                                        <span>Price: <strong>{parseFloat(formData.price).toFixed(2)} SGD</strong></span>
+                                                        <span>GST: <strong>{(formData.gstRate || 18)}%</strong></span>
+                                                        <span>GST Amount: <strong>{(parseFloat(formData.price) * ((formData.gstRate || 18) / 100)).toFixed(2)} SGD</strong></span>
+                                                        <span style={{ color: '#28a745', fontWeight: '600', borderTop: '1px solid #dee2e6', paddingTop: '6px', marginTop: '4px' }}>Total: <strong>{(parseFloat(formData.price) * (1 + (formData.gstRate || 18) / 100)).toFixed(2)} SGD</strong></span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </Col>
 

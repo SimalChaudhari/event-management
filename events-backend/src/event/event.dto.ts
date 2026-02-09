@@ -9,6 +9,7 @@ import {
   Validate,
   IsUUID,
   IsArray,
+  IsNumber,
   ValidateNested,
 } from 'class-validator';
 import { Column } from 'typeorm';
@@ -108,6 +109,10 @@ export class EventDto {
 
   @IsOptional()
   price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  gstRate?: number;
 
   @IsOptional()
   @IsString()

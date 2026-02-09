@@ -23,6 +23,18 @@ import { TRANSACTION_PATHS } from '../../utils/constants';
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
+// Normalize order/checkout status for display (backend: Pending, Completed, Cancelled; checkout can add Failed, Processing)
+function getOrderStatusDisplay(status) {
+    const s = (status || '').toString().trim();
+    const lower = s.toLowerCase();
+    if (lower === 'completed' || lower === 'success') return { label: 'Completed', color: '#28a745', badgeClass: 'badge-light-success' };
+    if (lower === 'cancelled' || lower === 'canceled') return { label: 'Cancelled', color: '#dc3545', badgeClass: 'badge-light-danger' };
+    if (lower === 'pending') return { label: 'Pending', color: '#ffc107', badgeClass: 'badge-light-warning' };
+    if (lower === 'failed') return { label: 'Failed', color: '#fd7e14', badgeClass: 'badge-light-danger' };
+    if (lower === 'processing') return { label: 'Processing', color: '#17a2b8', badgeClass: 'badge-light-info' };
+    return { label: s || 'N/A', color: '#6c757d', badgeClass: 'badge-light-secondary' };
+}
+
 function getOrderColumns() {
     return [
         {
@@ -30,21 +42,17 @@ function getOrderColumns() {
             title: 'Order No',
             orderable: true,
             render: function (data, type, row) {
-                const status = row?.status || 'N/A';
-                let statusColor = '#6c757d';
-                const currencySymbol = '$';
-                if (status.toLowerCase() === 'completed') statusColor = '#28a745';
-                else if (status.toLowerCase() === 'cancelled') statusColor = '#dc3545';
-                else if (status.toLowerCase() === 'pending') statusColor = '#ffc107';
-                else if (status.toLowerCase() === 'failed') statusColor = '#fd7e14';
+                const statusDisplay = getOrderStatusDisplay(row?.status);
+                const priceVal = row?.price;
+                const amountPaid = (priceVal != null && priceVal !== '') ? '$' + parseFloat(priceVal).toFixed(2) : '—';
                 return `
                     <div class="d-inline-block align-middle">
                         <div class="d-inline-block">
                             <h6 class="mb-1" style="font-weight: bold;">${(row && row.orderNo) || ''}</h6>
-                            <p class="mb-1" style="font-weight: 500;"><strong>Payment Method:</strong> ${row?.paymentMethod || ''}</p>
-                            <p class="mb-1" style="font-weight: 600;"><strong>Price:</strong> ${currencySymbol}${row?.price ?? ''}</p>
+                            <p class="mb-1" style="font-weight: 500;"><strong>Payment Method:</strong> ${row?.paymentMethod || '—'}</p>
+                            <p class="mb-1" style="font-weight: 600;"><strong>Amount Paid:</strong> ${amountPaid}</p>
                             <p class="mb-0"><strong>Status:</strong>
-                                <span style="background-color: ${statusColor}; color: #fff; padding: 3px 7px; border-radius: 4px; margin-left: 4px;">${status}</span>
+                                <span class="badge ${statusDisplay.badgeClass}" style="background-color: ${statusDisplay.color}; color: #fff;">${statusDisplay.label}</span>
                             </p>
                         </div>
                     </div>`;
@@ -88,13 +96,8 @@ function getOrderColumns() {
             title: 'Status',
             orderable: false,
             render: function (data, type, row) {
-                const status = (row && row.status) ? row.status : 'N/A';
-                let statusClass = 'badge-light-secondary';
-                if (status === 'Completed') statusClass = 'badge-light-success';
-                else if (status === 'Cancelled') statusClass = 'badge-light-danger';
-                else if (status === 'Pending') statusClass = 'badge-light-warning';
-                else if (status === 'Failed') statusClass = 'badge-light-danger';
-                return `<span class="badge ${statusClass}">${status}</span>`;
+                const statusDisplay = getOrderStatusDisplay(row?.status);
+                return `<span class="badge ${statusDisplay.badgeClass}" style="background-color: ${statusDisplay.color}; color: #fff;">${statusDisplay.label}</span>`;
             }
         },
         {
@@ -401,6 +404,8 @@ const OrderView = () => {
                                     <option value="Pending">Pending</option>
                                     <option value="Completed">Completed</option>
                                     <option value="Cancelled">Cancelled</option>
+                                    <option value="Failed">Failed</option>
+                                    <option value="Processing">Processing</option>
                                 </Form.Select>
                             </Form.Group>
                         </Col>

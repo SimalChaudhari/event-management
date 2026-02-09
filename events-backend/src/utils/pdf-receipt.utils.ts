@@ -6,6 +6,10 @@ export interface ReceiptData {
   transactionId?: string;
   totalAmount: number;
   discount?: number;
+  eventPrice?: number;
+  gstPrice?: number;
+  gstRate?: number;
+  subtotalBeforeDiscount?: number;
   couponCode?: string;
   promoCode?: string;
   paymentGateway?: string;
@@ -172,31 +176,50 @@ export class PDFReceiptUtils {
     // Table Data Row
     let rowY = tableTop + headerHeight;
     const eventName = receiptData.event.name || 'Event Registration';
-    const originalAmount = receiptData.discount
-      ? receiptData.totalAmount + receiptData.discount
-      : receiptData.totalAmount;
+    const eventPrice = receiptData.eventPrice ?? (receiptData.discount ? receiptData.totalAmount + receiptData.discount : receiptData.totalAmount);
+    const gstPrice = receiptData.gstPrice ?? 0;
+    const gstRate = receiptData.gstRate ?? 18;
     const discountAmount = receiptData.discount || 0;
     const couponCode = receiptData.couponCode || receiptData.promoCode || null;
     const finalTotal = receiptData.totalAmount;
+    const subtotalWithGst = receiptData.subtotalBeforeDiscount ?? (eventPrice + gstPrice);
 
     // Row background
     doc
       .rect(margin, rowY, contentWidth, rowHeight)
       .fill('#F8F9FA');
 
-    // Row content - Main row with SNO, Name, Amount
+    // Row content - Main row with SNO, Name, Amount (subtotal with GST or event total)
     doc
       .fontSize(10)
       .font('Helvetica')
       .fillColor('#000000')
       .text('1', snoX, rowY + 12, { width: colWidths.sno - 10, align: 'center' })
       .text(eventName, nameX, rowY + 12, { width: colWidths.name - 10, ellipsis: true })
-      .text(`$${originalAmount.toFixed(2)}`, amountX, rowY + 12, { width: colWidths.amount - 10, align: 'right' });
+      .text(`$${subtotalWithGst.toFixed(2)}`, amountX, rowY + 12, { width: colWidths.amount - 10, align: 'right' });
 
-    // Discount and Coupon info below the row (aligned with Name column)
+    // Event Price, GST, Discount, Coupon (aligned with Name column)
     let detailY = rowY + rowHeight;
-    
-    // Discount row
+
+    if (receiptData.eventPrice != null && receiptData.gstPrice != null) {
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text('Event Price:', nameX, detailY + 8)
+        .fillColor('#000000')
+        .text(`$${eventPrice.toFixed(2)}`, amountX, detailY + 8, { width: colWidths.amount - 10, align: 'right' });
+      detailY += 18;
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#666666')
+        .text(`GST (${gstRate}%):`, nameX, detailY + 8)
+        .fillColor('#000000')
+        .text(`$${gstPrice.toFixed(2)}`, amountX, detailY + 8, { width: colWidths.amount - 10, align: 'right' });
+      detailY += 18;
+    }
+
     if (discountAmount > 0) {
       doc
         .fontSize(9)
@@ -205,17 +228,16 @@ export class PDFReceiptUtils {
         .text('Discount:', nameX, detailY + 8)
         .fillColor('#000000')
         .text(`-$${discountAmount.toFixed(2)}`, amountX, detailY + 8, { width: colWidths.amount - 10, align: 'right' });
-      detailY += 20;
+      detailY += 18;
     }
 
-    // Coupon code row
     if (couponCode) {
       doc
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#666666')
         .text(`Apply Coupon No: ${couponCode}`, nameX, detailY + 8);
-      detailY += 20;
+      detailY += 18;
     }
 
     // Divider line before total

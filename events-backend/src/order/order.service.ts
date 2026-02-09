@@ -1,7 +1,7 @@
 // events-backend/src/order/order.service.ts
 import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { EntityManager, Like, Repository } from 'typeorm';
 import { Order } from './order.entity';
 import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto, OrderStatus, OrderListQueryDto } from './order.dto';
 import { UserEntity } from 'user/users.entity'; // Ensure this import is correct
@@ -49,12 +49,29 @@ export class OrderService {
             startDate: event.startDate,
             endDate: event.endDate,
             price: event.price,
+            gstRate: event.gstRate != null ? Number(event.gstRate) : undefined,
             currency: event.currency,
             type: event.type,
             location: event.location,
             venue: event.venue,
             color: getEventColor(event.type),
         };
+    }
+
+    /** Build price breakdown for an order from its items and order discount. */
+    private buildOrderPriceBreakdown(order: Order): { eventTotal: number; gstTotal: number; discount: number; total: number } {
+        const items = order.orderItems || [];
+        let eventTotal = 0;
+        let gstTotal = 0;
+        items.forEach((item) => {
+            const base = Number(item.event?.price) || 0;
+            const rate = Number(item.event?.gstRate) || 18;
+            eventTotal += base;
+            gstTotal += Math.round(base * (rate / 100) * 100) / 100;
+        });
+        const discount = Number(order.discount) || 0;
+        const total = Number(order.price) ?? eventTotal + gstTotal - discount;
+        return { eventTotal, gstTotal, discount, total };
     }
 
     private async getCheckoutForOrder(orderId: string): Promise<any> {
@@ -160,31 +177,35 @@ export class OrderService {
             
             const savedOrder = await transactionalEntityManager.save(Order, order);
             
-            // 7. Now create order items and register events
+            // 7. Now create order items (Completed + invoice) and register events
             const savedOrderItems: any[] = [];
-            
+
             for (const eventData of validatedEvents) {
+              const invoiceNumber = await this.generateInvoiceNumberInTransaction(transactionalEntityManager);
               const orderItem = transactionalEntityManager.create(OrderItemEntity, {
                 order: savedOrder,
                 event: eventData,
+                status: OrderNoStatus.Completed,
+                invoiceNumber,
               });
-            
+
               const savedItem = await transactionalEntityManager.save(OrderItemEntity, orderItem);
-            
+
               savedOrderItems.push({
                 id: savedItem.id,
                 event: eventData,
                 status: savedItem.status,
+                invoiceNumber: savedItem.invoiceNumber,
                 createdAt: savedItem.createdAt,
               });
-            
+
               const registerEvent = transactionalEntityManager.create(RegisterEvent, {
                 userId,
                 eventId: eventData.id,
-                type: "Attendee",
+                type: 'Attendee',
                 orderId: savedOrder.id,
               });
-            
+
               await transactionalEntityManager.save(RegisterEvent, registerEvent);
             }
 
@@ -241,15 +262,24 @@ export class OrderService {
         }));
 
         const checkout = await this.getCheckoutForOrder(order.id);
+        const price = Number(order.price);
+        const priceBreakdown = this.buildOrderPriceBreakdown(order);
 
         return {
             id: order.id,
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
-            price: Number(order.price),
-            status: order.status,
+            price,
+            amountPaid: price,
+            status: order.status ?? 'Pending',
             discount: Number(order.discount),
             originalPrice: Number(order.originalPrice),
+            priceBreakdown: {
+                eventTotal: priceBreakdown.eventTotal,
+                gstTotal: priceBreakdown.gstTotal,
+                discount: priceBreakdown.discount,
+                total: priceBreakdown.total,
+            },
             user: {
                 id: order.user.id,
                 firstName: order.user.firstName,
@@ -352,14 +382,24 @@ export class OrderService {
     }
 
     private mapOrderToResponse(order: Order): any {
+        const price = Number(order.price);
+        const discount = Number(order.discount);
+        const priceBreakdown = this.buildOrderPriceBreakdown(order);
         return {
             id: order.id,
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
-            price: Number(order.price),
-            status: order.status,
-            discount: Number(order.discount),
+            price,
+            amountPaid: price,
+            status: order.status ?? 'Pending',
+            discount,
             originalPrice: Number(order.originalPrice),
+            priceBreakdown: {
+                eventTotal: priceBreakdown.eventTotal,
+                gstTotal: priceBreakdown.gstTotal,
+                discount: priceBreakdown.discount,
+                total: priceBreakdown.total,
+            },
             createdAt: order.createdAt,
             user: {
                 id: order.user?.id,
@@ -510,35 +550,34 @@ export class OrderService {
         return { deleted: count };
     }
 
-    private async generateInvoiceNumber(): Promise<string> {
+    private async generateInvoiceNumber(repo?: Repository<OrderItemEntity>): Promise<string> {
+        const orderItemRepo = repo ?? this.orderItemRepository;
         try {
             const currentYear = new Date().getFullYear();
             const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
-            
-            // Get the highest invoice number for current year and month
-            const lastInvoice = await this.orderItemRepository.find({
-                where: { 
-                    invoiceNumber: Like(`INV-${currentYear}${currentMonth}%`)
-                },
+
+            const lastInvoice = await orderItemRepo.find({
+                where: { invoiceNumber: Like(`INV-${currentYear}${currentMonth}%`) },
                 select: ['invoiceNumber'],
                 order: { invoiceNumber: 'DESC' },
                 take: 1,
             });
 
-            let nextInvoiceNo: string;
-
             if (lastInvoice.length > 0 && lastInvoice[0].invoiceNumber) {
                 const lastSequentialNumber = parseInt(lastInvoice[0].invoiceNumber.slice(12), 10);
-                const nextSequentialNumber = lastSequentialNumber + 1;
-                nextInvoiceNo = `INV-${currentYear}${currentMonth}-${nextSequentialNumber.toString().padStart(4, '0')}`;
-            } else {
-                nextInvoiceNo = `INV-${currentYear}${currentMonth}-0001`;
+                const next = (lastSequentialNumber + 1).toString().padStart(4, '0');
+                return `INV-${currentYear}${currentMonth}-${next}`;
             }
-
-            return nextInvoiceNo;
+            return `INV-${currentYear}${currentMonth}-0001`;
         } catch (error) {
             throw new InternalServerErrorException('Error generating invoice number');
         }
+    }
+
+    /** Use inside a transaction so the next invoice number sees already-saved items in the same transaction. */
+    async generateInvoiceNumberInTransaction(manager: EntityManager): Promise<string> {
+        const repo = manager.getRepository(OrderItemEntity);
+        return this.generateInvoiceNumber(repo);
     }
 
     async updateOrderItemStatus(

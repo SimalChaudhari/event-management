@@ -97,6 +97,10 @@ export class Event {
   @Column({ type: 'decimal', nullable: true })
   price?: number;
 
+  /** GST/Tax % for this event (e.g. 18 for 18%). Used for checkout breakdown. */
+  @Column({ type: 'decimal', nullable: true, default: 18 })
+  gstRate?: number;
+
   @Column({ type: 'varchar', length: 10, default: 'SGD' })
   currency?: string = 'SGD';
 

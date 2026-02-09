@@ -51,8 +51,23 @@ export function getGstBreakdown(gstInclusivePrice: number): GstBreakdown {
 }
 
 /**
+ * Compute GST breakdown when price is base (GST exclusive).
+ * Base = price, GST = price × gstRate/100, total = base + GST
+ */
+export function getGstBreakdownFromBase(
+  basePrice: number,
+  gstRate: number = GST_RATE,
+): GstBreakdown {
+  const base = Number(basePrice) || 0;
+  const rate = Number(gstRate) || GST_RATE;
+  const gstAmount = Math.round(base * (rate / 100) * 100) / 100;
+  const total = Math.round((base + gstAmount) * 100) / 100;
+  return { baseAmount: base, gstAmount, total };
+}
+
+/**
  * Build full GST breakdown from cart items, total, discount and optional coupon.
- * Uses GST_RATE and getGstBreakdown for per-item and final summary.
+ * Items can have gstRate (from event) - price is base (ex-GST). Uses getGstBreakdownFromBase.
  * description = eventName + " - Month YYYY" when startDate present (dynamic for Price Breakdown UI).
  */
 export function buildGstBreakdown(
@@ -62,6 +77,7 @@ export function buildGstBreakdown(
     eventName?: string;
     price: number;
     startDate?: Date | string | null;
+    gstRate?: number;
   }>,
   totalAmount: number,
   discount: number,
@@ -72,8 +88,9 @@ export function buildGstBreakdown(
   const finalAmount = Math.max(0, totalAmt - disc);
 
   const items: GstBreakdownItem[] = cartItems.map((item) => {
-    const price = Number(item.price) || 0;
-    const b = getGstBreakdown(price);
+    const basePrice = Number(item.price) || 0;
+    const gstRate = Number(item.gstRate) || GST_RATE;
+    const b = getGstBreakdownFromBase(basePrice, gstRate);
     const name = item.eventName ?? '';
     const description = item.startDate
       ? `${name} - ${formatMonthYear(item.startDate)}`
@@ -83,7 +100,7 @@ export function buildGstBreakdown(
       eventId: item.eventId,
       eventName: name,
       description,
-      price,
+      price: b.total,
       baseAmount: b.baseAmount,
       gstAmount: b.gstAmount,
     };
@@ -98,13 +115,20 @@ export function buildGstBreakdown(
   totalBase = Math.round(totalBase * 100) / 100;
   totalGst = Math.round(totalGst * 100) / 100;
 
+  const avgRate =
+    items.length > 0
+      ? items.reduce((sum, i) => {
+          const item = cartItems.find((c) => c.cartId === i.cartId);
+          return sum + (Number(item?.gstRate) || GST_RATE);
+        }, 0) / items.length
+      : GST_RATE;
   const fb = disc > 0 ? getGstBreakdown(finalAmount) : null;
   const finalSummary: GstBreakdownSummary | null = fb
     ? { totalBaseAmount: fb.baseAmount, totalGst: fb.gstAmount, total: fb.total }
     : null;
 
   return {
-    gstRate: GST_RATE,
+    gstRate: items.length > 0 ? avgRate : GST_RATE,
     items,
     summary: { totalBaseAmount: totalBase, totalGst, total: totalAmt },
     finalAmount,

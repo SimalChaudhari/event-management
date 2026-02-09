@@ -42,10 +42,11 @@ const ViewOrderPage = () => {
     };
 
     const getStatusBadge = (status) => {
-        const s = (status || '').toLowerCase();
-        if (s === 'completed') return 'success';
-        if (s === 'cancelled' || s === 'failed') return 'danger';
+        const s = (status || '').toString().toLowerCase();
+        if (s === 'completed' || s === 'success') return 'success';
+        if (s === 'cancelled' || s === 'canceled' || s === 'failed') return 'danger';
         if (s === 'pending') return 'warning';
+        if (s === 'processing') return 'info';
         return 'secondary';
     };
 
@@ -170,8 +171,8 @@ const ViewOrderPage = () => {
                         <Col xs={6} sm={4} md={3}>
                             <div className="text-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', padding: '15px', height: '100%' }}>
                                 <i className="fas fa-dollar-sign text-primary mb-2" style={{ fontSize: '1.3rem' }} />
-                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.85rem' }}>Total Amount</h6>
-                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>${Number(orderData.price ?? 0).toFixed(2)}</p>
+                                <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.85rem' }}>Amount Paid</h6>
+                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#28a745' }}>${Number(orderData.price ?? 0).toFixed(2)}</p>
                             </div>
                         </Col>
                         <Col xs={6} sm={4} md={3}>
@@ -203,7 +204,7 @@ const ViewOrderPage = () => {
                                 <Row>
                                     <InfoField label="Order No" value={orderData.orderNo} colSize={6} />
                                     <InfoField label="Status" value={<Badge bg={getStatusBadge(orderData.status)}>{orderData.status || 'N/A'}</Badge>} colSize={6} />
-                                    <InfoField label="Price" value={`$${Number(orderData.price ?? 0).toFixed(2)}`} colSize={6} />
+                                    <InfoField label="Amount paid" value={<span style={{ fontWeight: '600', color: '#28a745' }}>${Number(orderData.price ?? 0).toFixed(2)}</span>} colSize={6} />
                                     {orderData.discount != null && Number(orderData.discount) > 0 && (
                                         <InfoField label="Discount" value={`$${Number(orderData.discount).toFixed(2)}`} colSize={6} />
                                     )}
@@ -211,6 +212,33 @@ const ViewOrderPage = () => {
                                         <InfoField label="Original Price" value={`$${Number(orderData.originalPrice).toFixed(2)}`} colSize={6} />
                                     )}
                                     <InfoField label="Payment Method" value={orderData.paymentMethod} colSize={6} />
+                                    {(() => {
+                                        const orderItems = orderData.orderItems || [];
+                                        let totalBase = 0, totalGst = 0;
+                                        orderItems.forEach((item) => {
+                                            const base = Number(item.event?.price) || 0;
+                                            const rate = Number(item.event?.gstRate) || 18;
+                                            totalBase += base;
+                                            totalGst += Math.round(base * (rate / 100) * 100) / 100;
+                                        });
+                                        const disc = Number(orderData.discount) || 0;
+                                        if (totalBase > 0 || totalGst > 0) {
+                                            return (
+                                                <Col xs={12} className="mb-2">
+                                                    <div style={{ padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+                                                        <small className="d-block text-muted mb-2" style={{ fontWeight: '600' }}>Price breakdown</small>
+                                                        <div className="d-flex flex-wrap gap-3">
+                                                            <span>Event Price: <strong>${totalBase.toFixed(2)}</strong></span>
+                                                            <span>GST: <strong>${totalGst.toFixed(2)}</strong></span>
+                                                            {disc > 0 && <span>Discount: <strong>-${disc.toFixed(2)}</strong></span>}
+                                                            <span style={{ color: '#28a745', fontWeight: '600' }}>Total: <strong>${Number(orderData.price ?? 0).toFixed(2)}</strong></span>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                     <InfoField label="Customer" value={[user.firstName, user.lastName].filter(Boolean).join(' ').trim()} colSize={6} />
                                     <InfoField label="Email" value={user.email} colSize={6} />
                                     <InfoField label="Mobile" value={user.mobile} colSize={6} />
@@ -233,11 +261,18 @@ const ViewOrderPage = () => {
                                                     {item.event?.startDate && (
                                                         <p className="mb-1 mt-1 small text-muted">{formatTimestamp(item.event.startDate)}</p>
                                                     )}
-                                                    {item.event?.price != null && (
-                                                        <p className="mb-1" style={{ fontWeight: '600', color: '#28a745' }}>
-                                                            ${Number(item.event.price).toFixed(2)} {item.event.currency || ''}
-                                                        </p>
-                                                    )}
+                                                    {item.event?.price != null && (() => {
+                                                        const base = Number(item.event.price);
+                                                        const rate = Number(item.event.gstRate) || 18;
+                                                        const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                                        const total = base + gst;
+                                                        return (
+                                                            <div className="mb-1">
+                                                                <p className="mb-0" style={{ fontWeight: '600', color: '#28a745' }}>${total.toFixed(2)} {item.event.currency || ''}</p>
+                                                                <small className="text-muted">Event: ${base.toFixed(2)} | GST ({rate}%): ${gst.toFixed(2)}</small>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     {item.event?.location && <p className="mb-0 small">{item.event.location}</p>}
                                                 </div>
                                             </Col>

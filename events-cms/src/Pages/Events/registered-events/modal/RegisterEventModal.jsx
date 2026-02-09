@@ -676,12 +676,24 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                                         <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
                                                             Price
                                                         </h6>
-                                                        <p
-                                                            className="mb-0"
-                                                            style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}
-                                                        >
-                                                            {eventData.event?.price} {eventData.event?.currency}
-                                                        </p>
+                                                        {eventData.event?.price != null ? (
+                                                            <>
+                                                                <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#28a745' }}>
+                                                                    {(() => {
+                                                                        const base = Number(eventData.event.price);
+                                                                        const rate = Number(eventData.event.gstRate) || 18;
+                                                                        const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                                                        const total = base + gst;
+                                                                        return `${total.toFixed(2)} ${eventData.event?.currency || 'SGD'}`;
+                                                                    })()}
+                                                                </p>
+                                                                <small className="text-muted d-block mt-1">
+                                                                    Event: {Number(eventData.event.price).toFixed(2)} | GST ({(Number(eventData.event.gstRate) || 18)}%): {(Math.round(Number(eventData.event.price) * ((Number(eventData.event.gstRate) || 18) / 100) * 100) / 100).toFixed(2)}
+                                                                </small>
+                                                            </>
+                                                        ) : (
+                                                            <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500', color: '#28a745' }}>N/A</p>
+                                                        )}
                                                     </div>
                                                 </Col>
                                             </Row>
@@ -764,6 +776,26 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                                 : 'N/A'}
                                         </p>
                                     </Col>
+                                    {eventData.event?.price != null && (
+                                        <Col xs={12} className="text-start mt-2">
+                                            <div style={{ padding: '10px 12px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+                                                <small className="d-block text-muted mb-1" style={{ fontWeight: '600' }}>Price breakdown</small>
+                                                {(() => {
+                                                    const base = Number(eventData.event.price);
+                                                    const rate = Number(eventData.event.gstRate) || 18;
+                                                    const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                                    const total = base + gst;
+                                                    return (
+                                                        <div className="d-flex flex-wrap gap-3">
+                                                            <span>Event Price: <strong>${base.toFixed(2)}</strong></span>
+                                                            <span>GST ({rate}%): <strong>${gst.toFixed(2)}</strong></span>
+                                                            <span style={{ color: '#28a745', fontWeight: '600' }}>Total: <strong>${total.toFixed(2)}</strong></span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </Col>
+                                    )}
                                     <Col xs={6} md={4} className="text-start mt-2">
                                         <p className="mb-2">
                                             <strong>Payment Method:</strong>

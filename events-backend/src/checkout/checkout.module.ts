@@ -18,10 +18,12 @@ import { CouponUsage } from 'coupon/coupon-usage.entity';
 import { CouponService } from 'coupon/coupon.service';
 import { JwtModule } from '@nestjs/jwt';
 import { CartModule } from 'cart/cart.module';
+import { OrderModule } from 'order/order.module';
 
 @Module({
     imports: [
         forwardRef(() => CartModule),
+        OrderModule,
         TypeOrmModule.forFeature([
             Checkout,
             CheckoutCartItem,

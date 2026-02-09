@@ -144,7 +144,6 @@ export class CartController {
                 totalAmount: body.couponId && body.couponId.trim() !== '' 
                     ? finalAmount  // Show discounted amount when coupon applied
                     : totalAmount, // Show original amount when no coupon
-                cartItems: cartIdsMinimal, // Only IDs (minimal data)
                 itemCount: cartIdsMinimal.length,
                 user: checkout.user,
                 createdAt: checkout.createdAt,
@@ -165,25 +164,31 @@ export class CartController {
                 const discountPct = totalAmount > 0 ? Math.round((discount / totalAmount) * 10000) / 100 : 0;
                 responseData.discountPercentage = discountPct;
                 responseData.originalTotal = totalAmount;
+            }
 
-                // Price breakdown with discount
-                responseData.priceBreakdown = {
-                    subtotal: totalAmount,
-                    discount,
-                    discountPercentage: responseData.discountPercentage,
-                    total: finalAmount,
-                    currency: 'USD',
-                    gstInclusive: true
-                };
+            // Price breakdown: eventPrice, discount, tax, total
+            const gb = checkout.gstBreakdown;
+            const eventPrice = gb?.finalSummary?.totalBaseAmount ?? gb?.summary?.totalBaseAmount ?? Math.round((totalAmount - discount) / (1 + (gb?.gstRate ?? 18) / 100) * 100) / 100;
+            const tax = gb?.finalSummary?.totalGst ?? gb?.summary?.totalGst ?? Math.round((totalAmount - discount - eventPrice) * 100) / 100;
+            responseData.priceBreakdown = {
+                eventPrice,
+                discount: discount,
+                tax,
+                total: finalAmount,
+                currency: 'SGD',
+                gstRate: gb?.gstRate ?? 18
+            };
+
+            // Items: only id, name, actual price (base), gst price
+            if (gb?.items?.length) {
+                responseData.items = gb.items.map((i: any) => ({
+                    id: i.eventId,
+                    name: i.eventName,
+                    actualPrice: i.baseAmount,
+                    gstPrice: i.gstAmount
+                }));
             } else {
-                // Price breakdown without discount
-                responseData.priceBreakdown = {
-                    subtotal: totalAmount, // Same as total when no discount
-                    discount: 0, // No discount
-                    total: totalAmount, // Same as subtotal
-                    currency: 'USD',
-                    gstInclusive: true
-                };
+                responseData.items = [];
             }
 
             return response.status(201).json({
@@ -542,7 +547,6 @@ export class CartController {
                 orderId: checkout.orderId || null,
                 status: checkout.status,
                 totalAmount: actualFinalAmount, // Show final amount (with or without discount)
-                cartItems: fullCartItems, // Full cart item details
                 itemCount: fullCartItems.length,
                 user: {
                     id: req.user.id,
@@ -571,24 +575,43 @@ export class CartController {
                 responseData.coupon = couponDetails;
                 responseData.discount = discount;
                 responseData.originalTotal = actualOriginalTotal;
-                
-                // Price breakdown with discount
-                responseData.priceBreakdown = {
-                    subtotal: actualOriginalTotal, // Original total before discount
-                    discount: discount, // Discount applied
-                    total: actualFinalAmount, // Final amount after discount
-                    currency: 'USD',
-                    gstInclusive: true
-                };
+            }
+
+            // Price breakdown: eventPrice, discount, tax, total
+            const gb = checkout.gstBreakdown;
+            const eventPrice = gb?.finalSummary?.totalBaseAmount ?? gb?.summary?.totalBaseAmount ?? Math.round(actualFinalAmount / (1 + (gb?.gstRate ?? 18) / 100) * 100) / 100;
+            const tax = gb?.finalSummary?.totalGst ?? gb?.summary?.totalGst ?? Math.round((actualFinalAmount - eventPrice) * 100) / 100;
+            responseData.priceBreakdown = {
+                eventPrice,
+                discount: discount,
+                tax,
+                total: actualFinalAmount,
+                currency: 'SGD',
+                gstRate: gb?.gstRate ?? 18
+            };
+
+            // Items: only id, name, actual price (base), gst price
+            if (gb?.items?.length) {
+                responseData.items = gb.items.map((i: any) => ({
+                    id: i.eventId,
+                    name: i.eventName,
+                    actualPrice: i.baseAmount,
+                    gstPrice: i.gstAmount
+                }));
+            } else if (fullCartItems?.length) {
+                const gstRate = gb?.gstRate ?? 18;
+                responseData.items = fullCartItems.map((item: any) => {
+                    const base = Number(item?.event?.price) || 0;
+                    const gstAmount = Math.round(base * (gstRate / 100) * 100) / 100;
+                    return {
+                        id: item?.event?.id ?? item?.eventId,
+                        name: item?.event?.name ?? 'Event',
+                        actualPrice: base,
+                        gstPrice: gstAmount
+                    };
+                });
             } else {
-                // Price breakdown without discount
-                responseData.priceBreakdown = {
-                    subtotal: actualOriginalTotal, // Same as total when no discount
-                    discount: 0, // No discount
-                    total: actualFinalAmount, // Same as subtotal
-                    currency: 'USD',
-                    gstInclusive: true
-                };
+                responseData.items = [];
             }
 
             return response.status(200).json({

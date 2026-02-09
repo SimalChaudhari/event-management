@@ -1333,11 +1333,22 @@ export class RegisterEventService {
       // Prepare receipt data (orderNo from checkout; totalAmount/discount may be omitted from checkout payload – use thisEventAmountPaid if needed)
       const totalAmount = checkout.totalAmount != null ? parseFloat(checkout.totalAmount.toString()) : (checkout.thisEventAmountPaid != null ? Number(checkout.thisEventAmountPaid) : 0);
       const discount = checkout.discount != null ? parseFloat(checkout.discount.toString()) : undefined;
+
+      // GST breakdown for receipt: event price (base), GST amount, gstRate
+      const eventPriceBase = event?.price != null ? Number(event.price) : 0;
+      const gstRate = event?.gstRate != null ? Number(event.gstRate) : 18;
+      const gstPrice = Math.round(eventPriceBase * (gstRate / 100) * 100) / 100;
+      const subtotalBeforeDiscount = Math.round((eventPriceBase + gstPrice) * 100) / 100;
+
       return {
         checkoutId: checkout.checkoutId,
         transactionId: checkout.transactionId,
         totalAmount,
         discount,
+        eventPrice: eventPriceBase,
+        gstPrice,
+        gstRate,
+        subtotalBeforeDiscount,
         couponCode: checkout.couponCode,
         promoCode: checkout.promoCode,
         paymentGateway: checkout.paymentGateway,

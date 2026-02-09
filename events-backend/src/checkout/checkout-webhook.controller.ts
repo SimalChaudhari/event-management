@@ -51,12 +51,13 @@ export class CheckoutWebhookController {
 
             if (isProduction && !skipVerify) {
                 const payload = hasRawBody ? rawBody : JSON.stringify(webhookData);
+                const livemode = webhookData?.livemode;
                 try {
                     if (!hasRawBody) {
                         console.warn('⚠️ [WEBHOOK] No raw body – signature verification may fail. Ensure main.ts stores req.rawBody for webhook requests.');
                     }
-                    if (!signature || !this.wooShPayService.verifyWebhookSignature(payload, signature)) {
-                        console.error('❌ [WEBHOOK] Signature verification FAILED. Check: WOOSHPay_WEBHOOK_SECRET (production secret), webhook URL in WooShPay dashboard.');
+                    if (!signature || !this.wooShPayService.verifyWebhookSignature(payload, signature, livemode)) {
+                        console.error('❌ [WEBHOOK] Signature verification FAILED. For test events (livemode: false) set WOOSHPay_WEBHOOK_SECRET_TEST. For live use WOOSHPay_WEBHOOK_SECRET. Check webhook URL in WooShPay dashboard.');
                         return response.status(HttpStatus.UNAUTHORIZED).json({
                             success: false,
                             message: 'Webhook signature verification failed',

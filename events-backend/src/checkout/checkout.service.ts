@@ -19,8 +19,9 @@ import { UserEntity } from 'user/users.entity';
 import { Event } from 'event/event.entity';
 import { Cart } from 'cart/cart.entity';
 import { Order } from 'order/order.entity';
-import { OrderItemEntity } from 'order/event.item.entity';
+import { OrderItemEntity, OrderNoStatus } from 'order/event.item.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { OrderService } from 'order/order.service';
 import { CouponService } from 'coupon/coupon.service';
 import { CartService } from 'cart/cart.service';
 import {
@@ -64,6 +65,7 @@ export class CheckoutService {
     private wooShPayService: WooShPayService,
     @Inject(forwardRef(() => CartService))
     private cartService: CartService,
+    private orderService: OrderService,
   ) {}
 
   private async generateUniqueCheckoutId(): Promise<string> {
@@ -102,7 +104,14 @@ export class CheckoutService {
     // Validate cart items and calculate total; build itemsForGst for gstBreakdown (same shape as GET session)
     let calculatedTotal = 0;
     const validatedCartItems: CartItemDto[] = [];
-    const itemsForGst: Array<{ cartId: string; eventId: string; eventName: string; price: number; startDate?: Date | string | null }> = [];
+    const itemsForGst: Array<{
+      cartId: string;
+      eventId: string;
+      eventName: string;
+      price: number;
+      startDate?: Date | string | null;
+      gstRate?: number;
+    }> = [];
 
     for (const item of cartItemsToProcess) {
       const event = await this.eventRepository.findOne({
@@ -121,22 +130,27 @@ export class CheckoutService {
         );
       }
 
-      if (Number(item.price) !== Number(event.price)) {
+      const basePrice = Number(event.price);
+      const gstRate = Number(event.gstRate) || 18;
+      const totalPrice = Math.round(basePrice * (1 + gstRate / 100) * 100) / 100;
+
+      if (Number(item.price) !== basePrice && Number(item.price) !== totalPrice) {
         throw new BadRequestException(`Price mismatch for event ${event.name}`);
       }
 
-      calculatedTotal += Number(event.price);
+      calculatedTotal += totalPrice;
       validatedCartItems.push({
         eventId: item.eventId,
-        price: Number(event.price),
+        price: basePrice,
         eventName: event.name,
       });
       itemsForGst.push({
         cartId: cartItem.id,
         eventId: item.eventId,
         eventName: event.name,
-        price: Number(event.price),
+        price: basePrice,
         startDate: event.startDate ?? null,
+        gstRate,
       });
     }
 
@@ -512,16 +526,18 @@ export class CheckoutService {
       if (checkoutCartItems.length === 0) {
         console.warn('[WEBHOOK createOrderFromCheckout] No checkoutCartItems – no order items or register events will be created');
       }
-      // Create order items and register events
+      // Create order items (Completed + invoice) and register events
       for (const checkoutCartItem of checkoutCartItems) {
         const event = await manager.findOne(Event, {
           where: { id: checkoutCartItem.eventId },
         });
         if (event) {
-          // Create order item
+          const invoiceNumber = await this.orderService.generateInvoiceNumberInTransaction(manager);
           const orderItem = manager.create(OrderItemEntity, {
             order: savedOrder,
-            event: event,
+            event,
+            status: OrderNoStatus.Completed,
+            invoiceNumber,
           });
           await manager.save(OrderItemEntity, orderItem);
 
@@ -620,6 +636,7 @@ export class CheckoutService {
           eventName: item.eventName || '',
           price: Number(item.price) || 0,
           startDate: item.startDate ?? null,
+          gstRate: Number(item.gstRate) || 18,
         }));
         gstBreakdown = buildGstBreakdown(itemsWithPrice, totalAmount, discount, couponApplied);
       } catch (_) {

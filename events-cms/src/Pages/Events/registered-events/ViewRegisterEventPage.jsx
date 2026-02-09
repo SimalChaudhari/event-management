@@ -660,6 +660,25 @@ const ViewRegisterEventPage = () => {
                                                                 <i className="fas fa-credit-card mr-2" style={{ color: '#4680ff' }}></i>
                                                                 Payment Details
                                                             </h5>
+                                                            {(eventData.eventInfo?.price != null || eventData.event?.price != null) && (
+                                                                <div className="mb-3 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+                                                                    <small className="d-block text-muted mb-2" style={{ fontWeight: '600' }}>Price breakdown</small>
+                                                                    {(() => {
+                                                                        const ev = eventData.eventInfo || eventData.event;
+                                                                        const base = Number(ev?.price);
+                                                                        const rate = Number(ev?.gstRate) || 18;
+                                                                        const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                                                        const total = base + gst;
+                                                                        return (
+                                                                            <div className="d-flex flex-wrap gap-4">
+                                                                                <span>Event Price: <strong>${base.toFixed(2)}</strong></span>
+                                                                                <span>GST ({rate}%): <strong>${gst.toFixed(2)}</strong></span>
+                                                                                <span style={{ color: '#28a745', fontWeight: '600' }}>Total: <strong>${total.toFixed(2)}</strong></span>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
                                                             <Row>
                                                                 <InfoField 
                                                                     label="Checkout ID" 
@@ -873,6 +892,25 @@ const ViewRegisterEventPage = () => {
                                                         <i className="fas fa-credit-card mr-2" style={{ color: '#4680ff' }}></i>
                                                         Payment Details
                                                     </h5>
+                                                    {(eventData.eventInfo?.price != null || eventData.event?.price != null) && (
+                                                        <div className="mb-3 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+                                                            <small className="d-block text-muted mb-2" style={{ fontWeight: '600' }}>Price breakdown</small>
+                                                            {(() => {
+                                                                const ev = eventData.eventInfo || eventData.event;
+                                                                const base = Number(ev?.price);
+                                                                const rate = Number(ev?.gstRate) || 18;
+                                                                const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                                                const total = base + gst;
+                                                                return (
+                                                                    <div className="d-flex flex-wrap gap-4">
+                                                                        <span>Event Price: <strong>${base.toFixed(2)}</strong></span>
+                                                                        <span>GST ({rate}%): <strong>${gst.toFixed(2)}</strong></span>
+                                                                        <span style={{ color: '#28a745', fontWeight: '600' }}>Total: <strong>${total.toFixed(2)}</strong></span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
                                                     <Row>
                                                         <InfoField 
                                                             label="Checkout ID" 

@@ -76,19 +76,15 @@ function ViewOrderModal({ show, handleClose, orderData }) {
         }
     };
 
-    // Get order status badge
+    // Get order status badge (match backend: Pending, Completed, Cancelled; checkout: Failed, Processing, Success)
     const getOrderStatusBadge = (status) => {
-        let bgColor = 'secondary';
-        if (status?.toLowerCase() === 'completed') {
-            bgColor = 'success';
-        } else if (status?.toLowerCase() === 'cancelled') {
-            bgColor = 'danger';
-        } else if (status?.toLowerCase() === 'pending') {
-            bgColor = 'warning';
-        } else if (status?.toLowerCase() === 'failed') {
-            bgColor = 'danger';
-        }
-        return bgColor;
+        const s = (status || '').toString().toLowerCase();
+        if (s === 'completed' || s === 'success') return 'success';
+        if (s === 'cancelled' || s === 'canceled') return 'danger';
+        if (s === 'pending') return 'warning';
+        if (s === 'failed') return 'danger';
+        if (s === 'processing') return 'info';
+        return 'secondary';
     };
 
     // Render order statistics
@@ -127,11 +123,33 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                     >
                         <i className="fas fa-dollar-sign text-primary mb-2" style={{ fontSize: '1.5rem' }}></i>
                         <h6 className="mb-1" style={{ color: '#495057', fontSize: '0.9rem' }}>
-                            Total Amount
+                            Amount Paid
                         </h6>
-                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '500' }}>
-                            {orderData.price} {orderData.currency || '$'}
+                        <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#28a745' }}>
+                            ${typeof orderData.price === 'number' ? orderData.price.toFixed(2) : (orderData.price != null ? parseFloat(orderData.price).toFixed(2) : '—')}
                         </p>
+                        {(() => {
+                            const orderItems = orderData.orderItems || [];
+                            let totalBase = 0, totalGst = 0;
+                            orderItems.forEach((item) => {
+                                const base = Number(item.event?.price) || 0;
+                                const rate = Number(item.event?.gstRate) || 18;
+                                totalBase += base;
+                                totalGst += Math.round(base * (rate / 100) * 100) / 100;
+                            });
+                            const disc = Number(orderData.discount) || 0;
+                            if (totalBase > 0 || totalGst > 0) {
+                                return (
+                                    <div className="mt-2 pt-2" style={{ borderTop: '1px solid #dee2e6', fontSize: '11px', color: '#6c757d', textAlign: 'left' }}>
+                                        <span className="d-block">Event total: ${totalBase.toFixed(2)}</span>
+                                        <span className="d-block">GST: ${totalGst.toFixed(2)}</span>
+                                        {disc > 0 && <span className="d-block">Discount: -${disc.toFixed(2)}</span>}
+                                        <span className="d-block mt-1" style={{ fontWeight: '600', color: '#28a745' }}>Total: ${(Number(orderData.price) || totalBase + totalGst - disc).toFixed(2)}</span>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                 </Col>
                 <Col xs={6} md={3} className="mb-3">
@@ -557,8 +575,22 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                             </h6>
                         </div>
                         <p className="mb-0" style={{ fontSize: '13px', fontWeight: '600', color: '#28a745' }}>
-                            {event.price} {event.currency}
+                            {(() => {
+                                const base = Number(event.price) || 0;
+                                const rate = Number(event.gstRate) || 18;
+                                const gst = Math.round(base * (rate / 100) * 100) / 100;
+                                const total = base + gst;
+                                return <>{total.toFixed(2)} {event.currency || ''}</>;
+                            })()}
                         </p>
+                        {event.price != null && (() => {
+                            const base = Number(event.price);
+                            const rate = Number(event.gstRate) || 18;
+                            const gst = Math.round(base * (rate / 100) * 100) / 100;
+                            return (
+                                <small className="text-muted d-block mt-1">Event: ${base.toFixed(2)} | GST ({rate}%): ${gst.toFixed(2)}</small>
+                            );
+                        })()}
                     </div>
                 </Col>
 
@@ -864,16 +896,46 @@ function ViewOrderModal({ show, handleClose, orderData }) {
                                             <Row>
                                                 <Col md={12}>
                                                     <p>
-                                                        <strong>Customer Name:</strong> {orderData.user.firstName} {orderData.user.lastName}
+                                                        <strong>Customer Name:</strong> {orderData.user?.firstName} {orderData.user?.lastName}
                                                     </p>
                                                     <p>
-                                                        <strong>Email:</strong> {orderData.user.email}
+                                                        <strong>Email:</strong> {orderData.user?.email}
                                                     </p>
                                                     <p>
-                                                        <strong>Mobile:</strong> {orderData.user.mobile || 'N/A'}
+                                                        <strong>Mobile:</strong> {orderData.user?.mobile || 'N/A'}
                                                     </p>
                                                 </Col>
-                                                
+
+                                                {/* Payment summary & price breakdown */}
+                                                <Col xs={12} className="mb-3">
+                                                    <div style={{ padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+                                                        <h6 className="mb-2" style={{ color: '#495057', fontWeight: '600' }}>
+                                                            <i className="fas fa-wallet me-2" style={{ color: '#4680ff' }}></i>
+                                                            Payment summary & price breakdown
+                                                        </h6>
+                                                        {(() => {
+                                                            const orderItems = orderData.orderItems || [];
+                                                            let totalBase = 0, totalGst = 0;
+                                                            orderItems.forEach((item) => {
+                                                                const base = Number(item.event?.price) || 0;
+                                                                const rate = Number(item.event?.gstRate) || 18;
+                                                                totalBase += base;
+                                                                totalGst += Math.round(base * (rate / 100) * 100) / 100;
+                                                            });
+                                                            const disc = Number(orderData.discount) || 0;
+                                                            const total = Number(orderData.price) || totalBase + totalGst - disc;
+                                                            return (
+                                                                <div className="d-flex flex-wrap align-items-center gap-3">
+                                                                    <span><strong>Amount paid:</strong> <span style={{ color: '#28a745', fontWeight: '600' }}>${total.toFixed(2)}</span></span>
+                                                                    {totalBase > 0 && <span>Event total: <strong>${totalBase.toFixed(2)}</strong></span>}
+                                                                    {totalGst > 0 && <span>GST: <strong>${totalGst.toFixed(2)}</strong></span>}
+                                                                    {disc > 0 && <span>Discount: <strong>-${disc.toFixed(2)}</strong></span>}
+                                                                    <span className="text-muted">Payment: {orderData.paymentMethod || 'N/A'}</span>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </Col>
 
                                                 <Col xs={12} md={4} className="mb-3">
                                                     <div
