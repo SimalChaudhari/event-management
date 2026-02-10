@@ -56,6 +56,10 @@ export class CreateCheckoutDto {
 
     @IsOptional()
     useSelectedItemsOnly?: boolean; // Flag to indicate if only selected cart items should be processed
+
+    @IsOptional()
+    @IsBoolean()
+    billingSameAsShipping?: boolean; // When true, billing/shipping address is sent to WooShPay from user's default address
 }
 
 

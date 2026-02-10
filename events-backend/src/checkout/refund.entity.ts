@@ -22,7 +22,7 @@ export class Refund {
   @Column({ type: 'int' })
   amount!: number;
 
-  @Column({ type: 'varchar', length: 10, default: 'USD' })
+  @Column({ type: 'varchar', length: 10, default: 'SGD' })
   currency!: string;
 
   /** pending | succeeded | failed | canceled */

@@ -25,25 +25,59 @@ export interface PaymentLinkData {
   expires_at?: string;
 }
 
+/** WooShPay payment_intent_data – billing and shipping shown on Payment page */
+export interface WooShPayBillingDetails {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+  };
+}
+
+export interface WooShPayShippingDetails {
+  name?: string;
+  phone?: string;
+  carrier?: string;
+  address?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+  };
+}
+
 export interface CheckoutSessionData {
   cancel_url: string;
   success_url: string;
   mode: 'payment';
-  customer?: string; // WooShPay customer ID (cus_xxx)
-  payment_method?: string; // WooShPay payment method ID (pm_xxx) – pre-fill saved card (if supported)
-  default_payment_method?: string; // Alternative param name some APIs use for pre-selecting card
+  customer?: string;
+  payment_method?: string;
+  default_payment_method?: string;
   line_items: Array<{
     price_data: {
       currency: string;
-      unit_amount: number; // in cents/smallest unit
-      product_data: {
-        name: string;
-        description?: string;
-      };
+      unit_amount: number;
+      product_data: { name: string; description?: string };
     };
     quantity: number;
   }>;
   metadata?: Record<string, any>;
+  /** When set, billing/shipping show on WooShPay Payment page; only pass when user has address */
+  billing_address_collection?: 'required' | 'auto';
+  shipping_address_collection?: { allowed_countries: string[] };
+  payment_method_types?: string[];
+  payment_intent_data?: {
+    billing_details?: WooShPayBillingDetails;
+    shipping?: WooShPayShippingDetails;
+  };
 }
 
 /** WooShPay customer create payload - all fields optional except email recommended */

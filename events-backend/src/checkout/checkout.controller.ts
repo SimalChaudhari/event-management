@@ -109,7 +109,7 @@ export class CheckoutController {
         cancelUrl = `${baseUrl}/payment/cancel?checkout_id=${checkoutIdEnc}`;
       }
 
-      const currency = process.env.CHECKOUT_CURRENCY || 'USD';
+      const currency = process.env.CHECKOUT_CURRENCY || 'SGD';
       const result = await this.checkoutService.createWooShPayCheckoutSession(
         userId,
         dto.checkoutId,

@@ -67,6 +67,10 @@ export class Checkout {
     @Column({ type: 'boolean', default: false })
     isDeleted!: boolean;
 
+    /** When true, send billing/shipping to WooShPay from user's default address; when false, do not. */
+    @Column({ type: 'boolean', default: false })
+    billingSameAsShipping!: boolean;
+
     @CreateDateColumn({ type: 'timestamp' })
     createdAt?: Date;
 

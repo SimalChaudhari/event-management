@@ -21,7 +21,7 @@ export class CartController {
     
     @Post('create-checkout')
     async createCheckout(
-        @Body() body: { selectedCartIds: string[]; couponId?: string },
+        @Body() body: { selectedCartIds: string[]; couponId?: string; billingSameAsShipping?: boolean },
         @Request() req: any,
         @Res() response: Response
     ) {
@@ -31,7 +31,7 @@ export class CartController {
     /** Apply rebate/redeem code (coupon required). Same logic as create-checkout; couponId is required. */
     @Post('apply-coupon')
     async applyCouponRoute(
-        @Body() body: { selectedCartIds: string[]; couponId: string },
+        @Body() body: { selectedCartIds: string[]; couponId: string; billingSameAsShipping?: boolean },
         @Request() req: any,
         @Res() response: Response
     ) {
@@ -49,7 +49,7 @@ export class CartController {
     private async runCreateCheckout(
         req: any,
         response: Response,
-        body: { selectedCartIds: string[]; couponId?: string },
+        body: { selectedCartIds: string[]; couponId?: string; billingSameAsShipping?: boolean },
         options: { requireCouponId: boolean },
     ) {
         try {
@@ -132,6 +132,7 @@ export class CartController {
                 discount,
                 couponCode: couponCodeForCheckout,
                 useSelectedItemsOnly: true,
+                billingSameAsShipping: body.billingSameAsShipping,
             };
 
             const checkout = await this.checkoutService.createCheckout(userId, checkoutDto);

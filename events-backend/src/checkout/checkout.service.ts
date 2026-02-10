@@ -33,6 +33,28 @@ import {
 import { OrderStatus, PaymentMethod } from 'order/order.dto';
 import { buildGstBreakdown } from '../utils/gst.utils';
 import { generateUniqueOrderNumber } from 'utils/order-number.utils';
+import { AddressService } from 'user/address.service';
+import type { WooShPayBillingDetails, WooShPayShippingDetails } from './wooshpay.service';
+import * as isoCountries from 'i18n-iso-countries';
+
+// WooShPay requires ISO 2-letter country codes (e.g. IN, SG). Default to Singapore when missing/invalid.
+const WOOSHPAY_DEFAULT_COUNTRY = 'SG';
+
+/** Normalize country to ISO 2-letter code; default to Singapore (SG) when missing or invalid. */
+function toCountryCode(country: string | undefined | null): string {
+  const raw = (country ?? '').trim();
+  if (!raw) return WOOSHPAY_DEFAULT_COUNTRY;
+  if (raw.length === 2 && /^[A-Za-z]{2}$/.test(raw)) return raw.toUpperCase();
+  try {
+    if (!isoCountries.getNames('en')) {
+      isoCountries.registerLocale(require('i18n-iso-countries/langs/en.json'));
+    }
+    const code = isoCountries.getAlpha2Code(raw, 'en');
+    return code ? code.toUpperCase() : WOOSHPAY_DEFAULT_COUNTRY;
+  } catch {
+    return WOOSHPAY_DEFAULT_COUNTRY;
+  }
+}
 
 /** Max webhook event IDs to keep for deduplication (prevents same event being processed twice on retry). */
 const WEBHOOK_DEDUPE_MAX = 50000;
@@ -66,6 +88,7 @@ export class CheckoutService {
     @Inject(forwardRef(() => CartService))
     private cartService: CartService,
     private orderService: OrderService,
+    private addressService: AddressService,
   ) {}
 
   private async generateUniqueCheckoutId(): Promise<string> {
@@ -321,6 +344,7 @@ export class CheckoutService {
       couponCode: dto.couponCode,
       promoCode: dto.promoCode,
       status: CheckoutStatus.Pending,
+      billingSameAsShipping: dto.billingSameAsShipping ?? false,
     });
 
     const savedCheckout = await this.checkoutRepository.save(checkout);
@@ -718,7 +742,7 @@ export class CheckoutService {
     checkoutId: string,
     successUrl: string,
     cancelUrl: string,
-    currency: string = 'USD',
+    currency: string = 'SGD',
   ): Promise<{ url: string; sessionId?: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -802,7 +826,65 @@ export class CheckoutService {
       customer: customerId,
       line_items,
       metadata: { checkout_id: checkoutId, user_id: userId },
+      payment_method_types: ['card'],
     };
+
+    // Only pass billing/shipping when billingSameAsShipping is true AND user has address – WooShPay format
+    const useBillingShipping = checkout.billingSameAsShipping === true;
+    let defaultAddress: { street: string; apartment?: string; city: string; state: string; postalCode: string; country: string } | null = null;
+    if (useBillingShipping) {
+      try {
+        const addr = await this.addressService.findDefaultAddress(userId);
+        if (addr && addr.street && addr.city && addr.country) {
+          defaultAddress = {
+            street: addr.street,
+            apartment: addr.apartment ?? undefined,
+            city: addr.city,
+            state: addr.state,
+            postalCode: addr.postalCode,
+            country: addr.country,
+          };
+        }
+      } catch {
+        // No address or error – do not add billing_address_collection or payment_intent_data
+      }
+    }
+
+    if (defaultAddress) {
+      const countryCode = toCountryCode(defaultAddress.country);
+      const userName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || undefined;
+      const billing_details: WooShPayBillingDetails = {
+        name: userName,
+        email: user.email ?? undefined,
+        phone: user.mobile ?? undefined,
+        address: {
+          line1: defaultAddress.street,
+          line2: defaultAddress.apartment,
+          city: defaultAddress.city,
+          state: defaultAddress.state,
+          postal_code: defaultAddress.postalCode,
+          country: countryCode,
+        },
+      };
+      const shipping: WooShPayShippingDetails = {
+        name: userName,
+        phone: user.mobile ?? undefined,
+        address: {
+          line1: defaultAddress.street,
+          line2: defaultAddress.apartment,
+          city: defaultAddress.city,
+          state: defaultAddress.state,
+          postal_code: defaultAddress.postalCode,
+          country: countryCode,
+        },
+      };
+      sessionPayload.billing_address_collection = 'required';
+      sessionPayload.shipping_address_collection = { allowed_countries: [countryCode] };
+      sessionPayload.payment_intent_data = {
+        billing_details,
+        shipping,
+      };
+    }
 
     const session = await this.wooShPayService.createCheckoutSession(sessionPayload);
 
@@ -919,7 +1001,7 @@ export class CheckoutService {
       orderId,
       wooshpayRefundId: result.id,
       amount: result.amount ?? 0,
-      currency: result.currency ?? 'USD',
+      currency: result.currency ?? 'SGD',
       status: result.status ?? 'pending',
       reason: result.reason ?? reason ?? undefined,
     });
@@ -1053,7 +1135,7 @@ export class CheckoutService {
         subtotal: totalAmount,
         discount: discount,
         total: finalAmount,
-        currency: 'USD',
+        currency: 'SGD',
         gstInclusive: true,
       },
     };

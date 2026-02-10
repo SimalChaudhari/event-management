@@ -19,11 +19,13 @@ import { CouponService } from 'coupon/coupon.service';
 import { JwtModule } from '@nestjs/jwt';
 import { CartModule } from 'cart/cart.module';
 import { OrderModule } from 'order/order.module';
+import { AddressModule } from 'user/address.module';
 
 @Module({
     imports: [
         forwardRef(() => CartModule),
         OrderModule,
+        AddressModule,
         TypeOrmModule.forFeature([
             Checkout,
             CheckoutCartItem,
