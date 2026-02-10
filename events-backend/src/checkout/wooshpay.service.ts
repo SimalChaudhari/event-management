@@ -85,11 +85,11 @@ export class WooShPayService {
    * Get WooShPay configuration from environment
    */
   private getConfig(): WooShPayConfig {
+    const baseUrl =
+      process.env.WOOSHPay_BASE_URL?.trim() ||
+      (process.env.WOOSHPay_TEST_MODE === 'true' ? 'https://apitest.wooshpay.com' : 'https://api.wooshpay.com');
     const config: WooShPayConfig = {
-      baseUrl:
-        process.env.WOOSHPay_TEST_MODE === 'true'
-          ? 'https://apitest.wooshpay.com'
-          : 'https://api.wooshpay.com',
+      baseUrl,
       secretKey: process.env.WOOSHPay_API_KEY || '',
       testMode: process.env.WOOSHPay_TEST_MODE === 'true',
       webhookSecret: process.env.WOOSHPay_WEBHOOK_SECRET,
@@ -195,64 +195,47 @@ export class WooShPayService {
   }
 
   /**
-   * Get webhook secret for verification. Use test secret when livemode is false if set.
+   * Verify webhook signature. Single WOOSHPay_WEBHOOK_SECRET (test account used in prod too).
+   * Supports Stripe-style t=timestamp,v1=sig and plain HMAC-SHA256(payload); hex or base64.
    */
-  private getWebhookSecret(livemode?: boolean): string | undefined {
-    const isTestEvent = livemode === false;
-    if (isTestEvent && process.env.WOOSHPay_WEBHOOK_SECRET_TEST) {
-      return process.env.WOOSHPay_WEBHOOK_SECRET_TEST;
-    }
-    return process.env.WOOSHPay_WEBHOOK_SECRET;
-  }
-
-  /**
-   * Verify webhook signature for security.
-   * @param payload - Raw request body (exactly as received)
-   * @param signature - Header value from wooshpay-signature or x-wooshpay-signature
-   * @param livemode - From payload: use false for test events so test webhook secret is used when set
-   */
-  verifyWebhookSignature(payload: string, signature: string, livemode?: boolean): boolean {
-    const webhookSecret = this.getWebhookSecret(livemode);
-
+  verifyWebhookSignature(payload: string, signature: string): boolean {
+    const webhookSecret = process.env.WOOSHPay_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      this.logger.warn(
-        'Webhook secret not configured - skipping signature verification',
-      );
-      return true; // Allow in development, but log warning
+      this.logger.warn('Webhook secret not configured - skipping signature verification');
+      return true;
     }
-
     try {
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(payload)
-        .digest('hex');
+      const raw = (signature || '').trim();
+      if (!raw) return false;
+      const tMatch = raw.match(/\bt=(\d+)/);
+      const v1Match = raw.match(/\bv1=([a-zA-Z0-9+/=_-]+)/);
+      const timestamp = tMatch ? tMatch[1] : null;
+      let providedSignature = v1Match ? v1Match[1] : raw.replace(/^sha256=/, '').replace(/^v1=/, '').trim();
+      if (!providedSignature) return false;
 
-      const providedSignature = (signature || '').replace(/^sha256=/, '').trim();
-      if (!providedSignature) {
-        this.logger.error('Webhook signature header empty');
+      let providedBuf = Buffer.from(providedSignature, 'hex');
+      if (providedBuf.length === 0 && providedSignature.length > 0) {
+        try {
+          const base64 = providedSignature.replace(/-/g, '+').replace(/_/g, '/');
+          providedBuf = Buffer.from(base64, 'base64');
+        } catch {
+          /* keep empty */
+        }
+      }
+
+      const tryVerify = (signedPayload: string): boolean => {
+        const expectedHex = crypto.createHmac('sha256', webhookSecret).update(signedPayload).digest('hex');
+        const expectedBuf = Buffer.from(expectedHex, 'hex');
+        if (expectedBuf.length !== providedBuf.length) return false;
+        return crypto.timingSafeEqual(expectedBuf, providedBuf);
+      };
+      if (timestamp) {
+        if (tryVerify(`${timestamp}.${payload}`)) return true;
+        if (tryVerify(payload)) return true;
         return false;
       }
-
-      const expectedBuf = Buffer.from(expectedSignature, 'hex');
-      const providedBuf = Buffer.from(providedSignature, 'hex');
-
-      if (expectedBuf.length !== providedBuf.length) {
-        this.logger.warn(
-          `Webhook signature length mismatch (expected ${expectedBuf.length}, got ${providedBuf.length}). ` +
-            'Use WOOSHPay_WEBHOOK_SECRET for live and WOOSHPay_WEBHOOK_SECRET_TEST for test (livemode: false).',
-        );
-        return false;
-      }
-
-      const isValid = crypto.timingSafeEqual(expectedBuf, providedBuf);
-
-      if (!isValid) {
-        this.logger.error('Webhook signature verification failed');
-      }
-
-      return isValid;
-    } catch (error) {
-      this.logger.error('Error verifying webhook signature', error);
+      return tryVerify(payload);
+    } catch {
       return false;
     }
   }

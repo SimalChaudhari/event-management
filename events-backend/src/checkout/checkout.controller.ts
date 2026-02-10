@@ -83,7 +83,7 @@ export class CheckoutController {
     }
   }
 
-  /** Step 2: Create WooShPay Checkout Session. Call when user clicks "Process now". successUrl, cancelUrl, currency are set by backend from env. */
+  /** Step 2: Create WooShPay Checkout Session. Redirects use evential:// deep link when PAYMENT_CALLBACK_DEEP_LINK=true. */
   @Post('wooshpay-session')
   @HttpCode(HttpStatus.OK)
   async createWooShPaySession(
@@ -93,10 +93,22 @@ export class CheckoutController {
   ) {
     try {
       const userId = req.user.id;
-      // All URLs and currency from backend (env) – frontend only sends checkoutId
-      const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://example.com';
-      const successUrl = `${baseUrl}/payment/success`;
-      const cancelUrl = `${baseUrl}/payment/cancel?checkout_id=${encodeURIComponent(dto.checkoutId)}`;
+      const useDeepLink = process.env.PAYMENT_CALLBACK_DEEP_LINK === 'true';
+      const itemName = (dto.itemName || process.env.PAYMENT_CALLBACK_ITEM_NAME || 'Event 1').trim();
+      const checkoutIdEnc = encodeURIComponent(dto.checkoutId);
+      const itemNameEnc = encodeURIComponent(itemName);
+
+      let successUrl: string;
+      let cancelUrl: string;
+      if (useDeepLink) {
+        successUrl = `evential://callback/payment?status=success&itemName=${itemNameEnc}&checkout_id=${checkoutIdEnc}`;
+        cancelUrl = `evential://callback/payment?status=cancel&itemName=${itemNameEnc}&checkout_id=${checkoutIdEnc}`;
+      } else {
+        const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://example.com';
+        successUrl = `${baseUrl}/payment/success?checkout_id=${checkoutIdEnc}`;
+        cancelUrl = `${baseUrl}/payment/cancel?checkout_id=${checkoutIdEnc}`;
+      }
+
       const currency = process.env.CHECKOUT_CURRENCY || 'USD';
       const result = await this.checkoutService.createWooShPayCheckoutSession(
         userId,

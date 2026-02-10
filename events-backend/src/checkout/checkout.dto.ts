@@ -116,11 +116,15 @@ export class WooShPayCustomerDto {
   };
 }
 
-/** Body for creating WooShPay checkout session. successUrl, cancelUrl, currency are set by backend from env. */
+/** Body for creating WooShPay checkout session. successUrl, cancelUrl from backend (env or deep link). */
 export class CreateWooShPaySessionDto {
   @IsNotEmpty()
   @IsString()
   checkoutId!: string;
+
+  @IsOptional()
+  @IsString()
+  itemName?: string;
 }
 
 /** Body for refund request. amount in cents (omit for full refund); reason optional. */

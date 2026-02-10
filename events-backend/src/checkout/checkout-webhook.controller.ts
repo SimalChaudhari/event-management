@@ -29,80 +29,43 @@ export class CheckoutWebhookController {
         @Req() req: Request,
         @Res() response: Response
     ) {
-        const isProduction = process.env.NODE_ENV === 'production';
         const skipVerify = process.env.WOOSHPay_WEBHOOK_SKIP_VERIFY === 'true';
-
-        console.log('🔔 [WEBHOOK] Received at', new Date().toISOString(), '| NODE_ENV=', process.env.NODE_ENV, '| isProduction=', isProduction);
-        console.log('🔔 [WEBHOOK] Payload keys:', webhookData ? Object.keys(webhookData) : 'null');
-        console.log('🔔 [WEBHOOK] type=', webhookData?.type, '| event_type=', webhookData?.event_type, '| data?.object?.metadata=', webhookData?.data?.object?.metadata);
-        if (webhookData && typeof webhookData === 'object') {
-            try {
-                console.log('🔔 [WEBHOOK] Full payload (truncated):', JSON.stringify(webhookData).slice(0, 800));
-            } catch (_) {}
-        }
+        const signature = (req.headers['wooshpay-signature'] || req.headers['x-wooshpay-signature']) as string;
+        const rawBody = (req as any).rawBody;
+        const hasRawBody = typeof rawBody === 'string' && rawBody.length > 0;
 
         try {
-            const signature = (req.headers['wooshpay-signature'] || req.headers['x-wooshpay-signature']) as string;
-            const hasSignature = !!signature;
-            const rawBody = (req as any).rawBody;
-            const hasRawBody = typeof rawBody === 'string' && rawBody.length > 0;
-
-            console.log('🔔 [WEBHOOK] hasSignature=', hasSignature, '| hasRawBody=', hasRawBody);
-
-            if (isProduction && !skipVerify) {
+            if (!skipVerify) {
                 const payload = hasRawBody ? rawBody : JSON.stringify(webhookData);
-                const livemode = webhookData?.livemode;
-                try {
-                    if (!hasRawBody) {
-                        console.warn('⚠️ [WEBHOOK] No raw body – signature verification may fail. Ensure main.ts stores req.rawBody for webhook requests.');
-                    }
-                    if (!signature || !this.wooShPayService.verifyWebhookSignature(payload, signature, livemode)) {
-                        console.error('❌ [WEBHOOK] Signature verification FAILED. For test events (livemode: false) set WOOSHPay_WEBHOOK_SECRET_TEST. For live use WOOSHPay_WEBHOOK_SECRET. Check webhook URL in WooShPay dashboard.');
-                        return response.status(HttpStatus.UNAUTHORIZED).json({
-                            success: false,
-                            message: 'Webhook signature verification failed',
-                        });
-                    }
-                    console.log('✅ [WEBHOOK] Signature verified');
-                } catch (error: any) {
-                    console.error('❌ [WEBHOOK] Signature error:', error?.message);
+                const verified = !!signature && this.wooShPayService.verifyWebhookSignature(payload, signature);
+                if (!verified) {
                     return response.status(HttpStatus.UNAUTHORIZED).json({
                         success: false,
                         message: 'Webhook signature verification failed',
                     });
                 }
-            } else {
-                if (skipVerify && isProduction) {
-                    console.warn('⚠️ [WEBHOOK] SKIP_VERIFY=true – signature check disabled. Remove in production after debugging.');
-                } else {
-                    console.log('🔔 [WEBHOOK] Signature check skipped (development or SKIP_VERIFY)');
-                }
             }
-
-            console.log('🔔 [WEBHOOK] Calling processPaymentCompletion...');
             await this.checkoutService.processPaymentCompletion(webhookData);
-
-            console.log('✅ [WEBHOOK] Processed successfully');
             return response.status(HttpStatus.OK).json({
                 success: true,
                 message: 'Payment processed successfully',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             });
         } catch (error: any) {
-            console.error('❌ [WEBHOOK] Error:', error?.message);
-            console.error('❌ [WEBHOOK] Stack:', error?.stack);
-            console.error('❌ [WEBHOOK] webhookType=', webhookData?.type, 'eventId=', webhookData?.id);
-
             try {
                 ErrorHandlerUtil.handleError(error, 'Webhook processing failed');
             } catch (handledError: any) {
-                return response.status(handledError.getStatus()).json({
+                return response.status(handledError.getStatus?.() ?? HttpStatus.INTERNAL_SERVER_ERROR).json({
                     success: false,
-                    message: handledError.message,
-                    error: handledError.message,
-                    timestamp: new Date().toISOString()
+                    message: handledError.message ?? 'Webhook processing failed',
+                    timestamp: new Date().toISOString(),
                 });
             }
+            return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+                success: false,
+                message: error?.message ?? 'Webhook processing failed',
+                timestamp: new Date().toISOString(),
+            });
         }
     }
 
