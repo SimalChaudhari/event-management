@@ -21,12 +21,36 @@ export class CartController {
     
     @Post('create-checkout')
     async createCheckout(
-        @Body() body: { 
-            selectedCartIds: string[],
-            couponId?: string  // Optional - can be null or empty
-        },
+        @Body() body: { selectedCartIds: string[]; couponId?: string },
         @Request() req: any,
         @Res() response: Response
+    ) {
+        return this.runCreateCheckout(req, response, body, { requireCouponId: false });
+    }
+
+    /** Apply rebate/redeem code (coupon required). Same logic as create-checkout; couponId is required. */
+    @Post('apply-coupon')
+    async applyCouponRoute(
+        @Body() body: { selectedCartIds: string[]; couponId: string },
+        @Request() req: any,
+        @Res() response: Response
+    ) {
+        if (!body.couponId || String(body.couponId).trim() === '') {
+            return response.status(400).json({
+                success: false,
+                message: 'couponId (rebate/redeem code) is required for apply-coupon.',
+                error: 'couponId is required',
+            });
+        }
+        return this.runCreateCheckout(req, response, body, { requireCouponId: true });
+    }
+
+    /** Shared logic for create-checkout and apply-coupon. No duplicate code. */
+    private async runCreateCheckout(
+        req: any,
+        response: Response,
+        body: { selectedCartIds: string[]; couponId?: string },
+        options: { requireCouponId: boolean },
     ) {
         try {
             const userId = req.user.id;
@@ -46,9 +70,7 @@ export class CartController {
                 });
             }
 
-            // Get selected cart items with full details
             let result = await this.cartService.getCartItemsByIds(userId, body.selectedCartIds);
-            
             if (result.totalCount === 0) {
                 return response.status(400).json({
                     success: false,
@@ -56,15 +78,20 @@ export class CartController {
                 });
             }
 
-            // Apply coupon if provided (optional)
-            if (body.couponId && body.couponId.trim() !== '') {
+            const applyCoupon = options.requireCouponId || (body.couponId && body.couponId.trim() !== '');
+            if (applyCoupon) {
+                const couponId = body.couponId?.trim();
+                if (!couponId) {
+                    return response.status(400).json({
+                        success: false,
+                        message: 'couponId is required.',
+                        error: 'couponId is required',
+                    });
+                }
                 try {
-                    // Get coupon by ID first, then apply using the code
-                    const couponService = this.cartService['couponService']; // Access coupon service
-                    const coupon = await couponService.getCouponById(body.couponId);
-                    
+                    const couponService = this.cartService['couponService'];
+                    const coupon = await couponService.getCouponById(couponId);
                     const couponResult = await this.cartService.applyCoupon(userId, body.selectedCartIds, coupon.name);
-                    // Update result with coupon data (including discountPercentage for "10% off" display)
                     result = {
                         ...result,
                         discount: couponResult.discount,
@@ -81,73 +108,52 @@ export class CartController {
                 }
             }
 
-            // Convert cart items to checkout format - store only IDs for storage
-            // But we still need to pass full data to checkout service for validation
             const checkoutItems = result.items.map(item => ({
                 eventId: item.eventId,
                 price: item.price,
                 eventName: item.eventName
             }));
+            const cartIdsMinimal = result.items.map(item => ({ cartId: item.cartId, eventId: item.eventId }));
 
-            // Prepare minimal cart data (only IDs) for storage after checkout creation
-            const cartIdsMinimal = result.items.map(item => ({
-                cartId: item.cartId,
-                eventId: item.eventId
-            }));
-
-            // Calculate total amount (with or without coupon)
             const totalAmount = result.totalAmount;
             const discount = result.discount || 0;
             const finalAmount = totalAmount - discount;
 
-            // Create checkout DTO
-            let couponCodeForCheckout = undefined;
-            if (body.couponId && body.couponId.trim() !== '') {
-                // Get coupon name from coupon ID
+            let couponCodeForCheckout: string | undefined;
+            if (applyCoupon && body.couponId?.trim()) {
                 const couponService = this.cartService['couponService'];
-                const coupon = await couponService.getCouponById(body.couponId);
-                couponCodeForCheckout = coupon.name; // couponCode variable stores the voucher name
+                const coupon = await couponService.getCouponById(body.couponId.trim());
+                couponCodeForCheckout = coupon.name;
             }
 
             const checkoutDto: CreateCheckoutDto = {
                 cartItems: checkoutItems,
                 totalAmount: finalAmount,
-                discount: discount, // ✅ Include the discount amount
+                discount,
                 couponCode: couponCodeForCheckout,
                 useSelectedItemsOnly: true,
             };
 
-            // Create checkout session
             const checkout = await this.checkoutService.createCheckout(userId, checkoutDto);
-
-            // Update checkout to store only IDs (minimal data) instead of full cart item data
             await this.checkoutService.updateCheckoutCartItems(checkout.checkoutId, cartIdsMinimal);
 
-            // Automatically create WooShPay customer if not already created (so "Process now" works without extra call)
             try {
                 await this.checkoutService.getOrCreateWooShPayCustomer(userId);
             } catch (err: any) {
                 console.warn('WooShPay customer create/skip on create-checkout:', err?.message);
-                // Still return success; customer will be created when user clicks "Process now" if needed
             }
 
-            // Determine success message based on coupon application
-            const successMessage = body.couponId && body.couponId.trim() !== '' 
+            const successMessage = applyCoupon
                 ? 'Checkout session created successfully with coupon applied'
                 : 'Checkout session created successfully';
 
-            // Prepare response data based on whether coupon is applied
-            // Return only IDs (minimal data) in response
             const responseData: any = {
                 checkoutId: checkout.checkoutId,
                 status: checkout.status,
-                totalAmount: body.couponId && body.couponId.trim() !== '' 
-                    ? finalAmount  // Show discounted amount when coupon applied
-                    : totalAmount, // Show original amount when no coupon
+                totalAmount: applyCoupon ? finalAmount : totalAmount,
                 itemCount: cartIdsMinimal.length,
                 user: checkout.user,
                 createdAt: checkout.createdAt,
-                // Payment URLs and methods will be available in the checkout session
                 paymentMethods: {
                     inAppPayment: true,
                     savedPaymentMethods: true,
@@ -155,8 +161,7 @@ export class CartController {
                 }
             };
 
-            // Add coupon-related fields only if coupon is applied (discountPercentage for "10% off" display)
-            if (body.couponId && body.couponId.trim() !== '') {
+            if (applyCoupon) {
                 responseData.couponCode = checkout.couponCode;
                 responseData.coupon = checkout.coupon;
                 responseData.couponApplied = result.couponApplied || null;
@@ -166,20 +171,18 @@ export class CartController {
                 responseData.originalTotal = totalAmount;
             }
 
-            // Price breakdown: eventPrice, discount, tax, total
             const gb = checkout.gstBreakdown;
             const eventPrice = gb?.finalSummary?.totalBaseAmount ?? gb?.summary?.totalBaseAmount ?? Math.round((totalAmount - discount) / (1 + (gb?.gstRate ?? 18) / 100) * 100) / 100;
             const tax = gb?.finalSummary?.totalGst ?? gb?.summary?.totalGst ?? Math.round((totalAmount - discount - eventPrice) * 100) / 100;
             responseData.priceBreakdown = {
                 eventPrice,
-                discount: discount,
+                discount,
                 tax,
                 total: finalAmount,
                 currency: 'SGD',
                 gstRate: gb?.gstRate ?? 18
             };
 
-            // Items: only id, name, actual price (base), gst price
             if (gb?.items?.length) {
                 responseData.items = gb.items.map((i: any) => ({
                     id: i.eventId,
