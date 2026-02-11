@@ -461,7 +461,7 @@ const EventView = () => {
     }, [navigate, location.pathname, baseClearFilters]);
 
     // Use pagination persistence hook
-    const { initialPage, restoreTablePage, checkAndAdjustPage } = usePersistedTablePage();
+    const { initialPage, restoreTablePage } = usePersistedTablePage();
 
     // Use reusable table navigation hook for page preservation
     const { handleView, handleEdit, handleAdd } = useTableNavigation({
@@ -598,9 +598,9 @@ const EventView = () => {
             await dispatch(eventDelete(itemToDelete.id));
             setShowDeleteModal(false);
             setItemToDelete(null);
-            // Reload table after deletion
+            // Reload table after deletion - pass false to keep current page (same flow as Categories)
             if (tableRef.current) {
-                tableRef.current.ajax.reload();
+                tableRef.current.ajax.reload(null, false);
             }
         } catch (error) {
             // Delete failed

@@ -1535,68 +1535,74 @@ function AddEventPage() {
                                         </div>
                                     </Col>
                                     <Col sm={12}>
-                                        <div className="form-group fill" style={{ position: 'relative' }}>
-                                            <label
-                                                className="floating-label"
-                                                htmlFor="price"
-                                                style={{
-                                                    zIndex: 10,
-                                                    position: 'absolute',
-                                                    backgroundColor: 'white',
-                                                    paddingRight: '4px',
-                                                    paddingLeft: '2px'
-                                                }}
-                                            >
-                                                Price <span style={{ color: 'red' }}>*</span>
-                                            </label>
-                                            <div className="input-group" style={{ position: 'relative', zIndex: 1, marginTop: '8px' }}>
-                                                <input
-                                                    type="number"
-                                                    className="form-control"
-                                                    name="price"
-                                                    value={formData.price}
-                                                    onChange={handleChange}
-                                                    placeholder="0.00"
-                                                    step="0.01"
-                                                    min="0"
-                                                />
-                                                <span
-                                                    className="input-group-text border-start-0"
-                                                    style={{
-                                                        fontSize: '12px',
-                                                        color: 'white',
-                                                        fontWeight: '600',
-                                                        backgroundColor: '#0066cc',
-                                                        minWidth: '60px',
-                                                        justifyContent: 'center',
-                                                        padding: '0.5rem 0.75rem'
-                                                    }}
-                                                >
-                                                    SGD
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </Col>
-                                    <Col sm={6}>
-                                        <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="gstRate">
-                                                GST/Tax (%)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                className="form-control"
-                                                name="gstRate"
-                                                value={formData.gstRate}
-                                                onChange={handleChange}
-                                                placeholder="18"
-                                                step="0.01"
-                                                min="0"
-                                                max="100"
-                                                title="GST/Tax percentage added on top of event price (shown on checkout)"
-                                            />
-                                            <small className="text-muted">% on top of price. Shown on checkout page only.</small>
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <Row>
+                                                <Col sm={6}>
+                                                    <div className="form-group fill" style={{ position: 'relative' }}>
+                                                        <label
+                                                            className="floating-label"
+                                                            htmlFor="price"
+                                                            style={{
+                                                                zIndex: 10,
+                                                                position: 'absolute',
+                                                                backgroundColor: 'white',
+                                                                paddingRight: '4px',
+                                                                paddingLeft: '2px'
+                                                            }}
+                                                        >
+                                                            Price <span style={{ color: 'red' }}>*</span>
+                                                        </label>
+                                                        <div className="input-group" style={{ position: 'relative', zIndex: 1, marginTop: '8px' }}>
+                                                            <input
+                                                                type="number"
+                                                                className="form-control"
+                                                                name="price"
+                                                                value={formData.price}
+                                                                onChange={handleChange}
+                                                                placeholder="0.00"
+                                                                step="0.01"
+                                                                min="0"
+                                                            />
+                                                            <span
+                                                                className="input-group-text border-start-0"
+                                                                style={{
+                                                                    fontSize: '12px',
+                                                                    color: 'white',
+                                                                    fontWeight: '600',
+                                                                    backgroundColor: '#0066cc',
+                                                                    minWidth: '60px',
+                                                                    justifyContent: 'center',
+                                                                    padding: '0.5rem 0.75rem'
+                                                                }}
+                                                            >
+                                                                SGD
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                                <Col sm={6}>
+                                                    <div className="form-group fill">
+                                                        <label className="floating-label" htmlFor="gstRate">
+                                                            GST/Tax (%)
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            name="gstRate"
+                                                            value={formData.gstRate}
+                                                            onChange={handleChange}
+                                                            placeholder="18"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="100"
+                                                            title="GST/Tax percentage added on top of event price (shown on checkout)"
+                                                        />
+                                                        <small className="text-muted">% on top of price. Shown on checkout page only.</small>
+                                                    </div>
+                                                </Col>
+                                            </Row>
                                             {formData.price && parseFloat(formData.price) > 0 && (
-                                                <div className="mt-2 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+                                                <div className="mt-2 p-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef', clear: 'both' }}>
                                                     <small className="d-block text-muted mb-2" style={{ fontWeight: '600' }}>Price Breakdown</small>
                                                     <div className="d-flex flex-column gap-1" style={{ fontSize: '13px' }}>
                                                         <span>Price: <strong>{parseFloat(formData.price).toFixed(2)} SGD</strong></span>

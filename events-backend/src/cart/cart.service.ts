@@ -1,11 +1,12 @@
 // src/services/cart.service.ts
-import { Injectable, NotFoundException, forwardRef, Inject } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
+import { Repository, In } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cart, UserCartPreference } from './cart.entity';
 import { CartDto } from './cart.dto';
 import { EventService } from 'event/event.service';
 import { CouponService } from 'coupon/coupon.service';
+import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 
 @Injectable()
 export class CartService {
@@ -14,6 +15,8 @@ export class CartService {
         private cartRepository: Repository<Cart>,
         @InjectRepository(UserCartPreference)
         private userCartPreferenceRepository: Repository<UserCartPreference>,
+        @InjectRepository(RegisterEvent)
+        private registerEventRepository: Repository<RegisterEvent>,
         @Inject(forwardRef(() => EventService))
         private eventService: EventService, // Inject EventService
         private couponService: CouponService, // Inject CouponService
@@ -24,7 +27,33 @@ export class CartService {
         return !!cart; // Return true if cart exists, false otherwise
     }
 
+    /** Check if user is already registered for an event (prevents duplicate registration) */
+    async isUserAlreadyRegistered(userId: string, eventId: string): Promise<boolean> {
+        const existing = await this.registerEventRepository.findOne({
+            where: { userId, eventId },
+        });
+        return !!existing;
+    }
+
+    /** Get event IDs the user is already registered for (used at checkout) */
+    async getAlreadyRegisteredEventIds(userId: string, eventIds: string[]): Promise<string[]> {
+        if (!eventIds?.length) return [];
+        const registrations = await this.registerEventRepository.find({
+            where: { userId, eventId: In(eventIds) },
+            select: ['eventId'],
+        });
+        return [...new Set(registrations.map((r) => r.eventId!).filter(Boolean))];
+    }
+
     async addToCart(cartDto: CartDto) {
+        const { userId, eventId } = cartDto;
+        if (!userId || !eventId) {
+            throw new BadRequestException('userId and eventId are required');
+        }
+        const alreadyRegistered = await this.isUserAlreadyRegistered(userId, eventId);
+        if (alreadyRegistered) {
+            throw new BadRequestException('You are already registered for this event.');
+        }
         const cartEntry = this.cartRepository.create(cartDto);
         return await this.cartRepository.save(cartEntry);
     }

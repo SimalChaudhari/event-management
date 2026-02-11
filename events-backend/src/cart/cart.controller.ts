@@ -78,6 +78,19 @@ export class CartController {
                 });
             }
 
+            const eventIds = (result.items || []).map((item: any) => item.eventId).filter(Boolean);
+            const alreadyRegisteredIds = await this.cartService.getAlreadyRegisteredEventIds(userId, eventIds);
+            if (alreadyRegisteredIds.length > 0) {
+                const names = (result.items || [])
+                    .filter((item: any) => alreadyRegisteredIds.includes(item.eventId))
+                    .map((item: any) => item.eventName || item.eventId);
+                return response.status(400).json({
+                    success: false,
+                    message: 'You are already registered for one or more events in your cart. Please remove them before checkout.',
+                    alreadyRegisteredEvents: names,
+                });
+            }
+
             const applyCoupon = options.requireCouponId || (body.couponId && body.couponId.trim() !== '');
             if (applyCoupon) {
                 const couponId = body.couponId?.trim();
@@ -279,21 +292,23 @@ export class CartController {
                 });
             }
 
-            // Get completed checkouts from checkout service
             const completedCheckouts = await this.checkoutService.getCompletedCheckouts(userId);
+            const data = await Promise.all(
+                completedCheckouts.map((c: any) => this.buildEnrichedCheckoutData(c.checkoutId, userId, req))
+            );
 
             return response.status(200).json({
                 success: true,
-                message: 'Completed checkouts retrieved successfully',
-                count: completedCheckouts.length,
-                data: completedCheckouts,
+                message: 'Checkouts retrieved successfully',
+                count: data.length,
+                data,
             });
 
         } catch (error: any) {
-            console.error('❌ Get completed checkouts failed:', error);
+            console.error('❌ Get checkouts failed:', error);
             return response.status(400).json({
                 success: false,
-                message: error.message || 'Failed to retrieve completed checkouts',
+                message: error.message || 'Failed to retrieve checkouts',
                 error: error.message
             });
         }
@@ -312,13 +327,19 @@ export class CartController {
                 });
             }
 
-            // Get specific completed checkout
-            const checkout = await this.checkoutService.getCompletedCheckoutById(checkoutId, userId);
+            if (!checkoutId) {
+                return response.status(400).json({
+                    success: false,
+                    message: 'Checkout ID is required.',
+                });
+            }
+
+            const data = await this.buildEnrichedCheckoutData(checkoutId, userId, req);
 
             return response.status(200).json({
                 success: true,
                 message: 'Checkout details retrieved successfully',
-                data: checkout,
+                data,
             });
 
         } catch (error: any) {
@@ -349,31 +370,8 @@ export class CartController {
         return response.status(200).json(result);
     }
 
-    @Get('get-checkout/:checkoutId')
-    async getCheckout(
-        @Param('checkoutId') checkoutId: string,
-        @Request() req: any,
-        @Res() response: Response
-    ) {
-        try {
-            const userId = req.user.id;
-            const role = req.user.role;
-
-            if (role !== 'user') {
-                return response.status(403).json({
-                    success: false,
-                    message: 'Access denied. Only users can view checkout sessions.',
-                });
-            }
-
-            if (!checkoutId) {
-                return response.status(400).json({
-                    success: false,
-                    message: 'Checkout ID is required.',
-                });
-            }
-
-            // Get checkout session by checkoutId
+    /** Shared: builds enriched checkout response (items, cartItems, priceBreakdown) - used by GET checkouts and GET checkouts/:id */
+    private async buildEnrichedCheckoutData(checkoutId: string, userId: string, req: any): Promise<any> {
             const checkout = await this.checkoutService.getCheckoutById(checkoutId, userId);
 
             // Fetch full cart item details with event information
@@ -618,20 +616,21 @@ export class CartController {
                 responseData.items = [];
             }
 
-            return response.status(200).json({
-                success: true,
-                message: 'Checkout session retrieved successfully',
-                data: responseData
+            responseData.cartItems = fullCartItems.map((item: any) => {
+                const base = Number(item?.event?.price) || 0;
+                const gstRate = gb?.gstRate ?? 18;
+                const gstAmount = Math.round(base * (gstRate / 100) * 100) / 100;
+                return {
+                    cartId: item.cartId,
+                    eventId: item?.event?.id ?? item?.eventId,
+                    event: item?.event ?? null,
+                    actualPrice: base,
+                    gstPrice: gstAmount,
+                    totalPrice: base + gstAmount
+                };
             });
 
-        } catch (error: any) {
-            console.error('❌ Get checkout failed:', error);
-            return response.status(400).json({
-                success: false,
-                message: error.message || 'Failed to retrieve checkout session',
-                error: error.message
-            });
-        }
+            return responseData;
     }
 
 }
