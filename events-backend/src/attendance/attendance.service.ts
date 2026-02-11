@@ -25,6 +25,8 @@ import { ResourceNotFoundException, DuplicateResourceException } from '../utils/
 //test
 @Injectable()
 export class AttendanceService {
+  private attendanceGateway: { emitAttendanceUpdate: (eventId: string) => void } | null = null;
+
   constructor(
     @InjectRepository(EventAttendance)
     private attendanceRepository: Repository<EventAttendance>,
@@ -38,6 +40,10 @@ export class AttendanceService {
     private adminInfoRepository: Repository<AdminInfo>,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
+
+  setAttendanceGateway(gateway: { emitAttendanceUpdate: (eventId: string) => void }): void {
+    this.attendanceGateway = gateway;
+  }
 
   /**
    * Scan QR code and get user information for attendance check-in
@@ -233,6 +239,8 @@ export class AttendanceService {
         await this.generateLuckyDrawNumber(registration.id, checkInData.eventId);
       }
 
+      this.attendanceGateway?.emitAttendanceUpdate(checkInData.eventId);
+
       return savedAttendance;
     } catch (error) {
       if (
@@ -329,6 +337,8 @@ export class AttendanceService {
         await this.generateLuckyDrawNumber(registration.id, checkInData.eventId);
       }
 
+      this.attendanceGateway?.emitAttendanceUpdate(checkInData.eventId);
+
       return savedAttendance;
     } catch (error) {
       if (
@@ -369,7 +379,9 @@ export class AttendanceService {
       attendance.checkOutTime = new Date();
       attendance.notes = checkOutData.notes;
 
-      return await this.attendanceRepository.save(attendance);
+      const saved = await this.attendanceRepository.save(attendance);
+      this.attendanceGateway?.emitAttendanceUpdate(checkOutData.eventId);
+      return saved;
     } catch (error) {
       if (
         error instanceof BadRequestException ||

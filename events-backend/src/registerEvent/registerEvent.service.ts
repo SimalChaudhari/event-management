@@ -37,7 +37,11 @@ import { CheckoutUtils } from '../utils/checkout.utils';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { EventStampService } from '../event/event-stamp.service';
-import { forwardRef, Inject } from '@nestjs/common';
+import { forwardRef, Inject, Optional } from '@nestjs/common';
+import { EventRegistrationShareLink } from './event-registration-share-link.entity';
+import * as crypto from 'crypto';
+import { EventAttendance, AttendanceStatus } from '../attendance/attendance.entity';
+import { AttendanceGateway } from '../attendance/attendance.gateway';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -91,11 +95,18 @@ export class RegisterEventService {
     @InjectRepository(ExhibitorRating)
     private readonly exhibitorRatingRepository: Repository<ExhibitorRating>,
 
+    @InjectRepository(EventRegistrationShareLink)
+    private readonly eventRegistrationShareLinkRepository: Repository<EventRegistrationShareLink>,
+
+    @InjectRepository(EventAttendance)
+    private readonly eventAttendanceRepository: Repository<EventAttendance>,
+
     private readonly engagementService: EngagementService,
     private readonly surveyUtils: SurveyUtils,
     private readonly errorHandler: ErrorHandlerService,
     @Inject(forwardRef(() => EventStampService))
     private readonly eventStampService: EventStampService,
+    @Optional() private readonly attendanceGateway?: AttendanceGateway,
   ) {}
 
   /**
@@ -182,7 +193,9 @@ export class RegisterEventService {
         ) {
           // Update existing registration to exhibitor type
           existingRegistration.type = Type.Exhibitor;
-          return await this.registerEventRepository.save(existingRegistration);
+          const saved = await this.registerEventRepository.save(existingRegistration);
+          if (eventId) this.attendanceGateway?.emitParticipantsUpdate(eventId);
+          return saved;
         } else if (
           user.role === UserRole.Exhibitor &&
           existingRegistration.type === Type.Exhibitor
@@ -215,7 +228,9 @@ export class RegisterEventService {
 
       const registerEvent =
         this.registerEventRepository.create(registerEventData);
-      return await this.registerEventRepository.save(registerEvent);
+      const saved = await this.registerEventRepository.save(registerEvent);
+      if (eventId) this.attendanceGateway?.emitParticipantsUpdate(eventId);
+      return saved;
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -1377,5 +1392,151 @@ export class RegisterEventService {
       }
       this.errorHandler.handleDatabaseError(error, 'Get receipt data');
     }
+  }
+
+  /**
+   * Generate or retrieve share link for event registration list (admin).
+   * Returns dynamic URL for public page that shows name, email, basic details only.
+   */
+  async generateRegistrationShareLink(eventId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      shareUrl: string;
+      shareToken: string;
+      eventId: string;
+      expiresAt?: Date;
+      createdAt: Date;
+    };
+  }> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+
+    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+    const sharePath = '/events/registrations/share';
+
+    let shareLink = await this.eventRegistrationShareLinkRepository.findOne({
+      where: { eventId, isActive: true },
+    });
+
+    if (shareLink) {
+      if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+        shareLink.isActive = false;
+        await this.eventRegistrationShareLinkRepository.save(shareLink);
+        shareLink = null;
+      } else {
+        const shareUrl = `${baseUrl}${sharePath}/${shareLink.shareToken}`;
+        return {
+          success: true,
+          message: 'Share link retrieved successfully',
+          data: {
+            shareUrl,
+            shareToken: shareLink.shareToken,
+            eventId: shareLink.eventId,
+            expiresAt: shareLink.expiresAt ?? undefined,
+            createdAt: shareLink.createdAt,
+          },
+        };
+      }
+    }
+
+    const shareToken = crypto.randomBytes(16).toString('hex');
+    const newLink = this.eventRegistrationShareLinkRepository.create({
+      eventId,
+      shareToken,
+      isActive: true,
+    });
+    const saved = await this.eventRegistrationShareLinkRepository.save(newLink);
+    const shareUrl = `${baseUrl}${sharePath}/${saved.shareToken}`;
+
+    return {
+      success: true,
+      message: 'Share link generated successfully',
+      data: {
+        shareUrl,
+        shareToken: saved.shareToken,
+        eventId: saved.eventId,
+        expiresAt: saved.expiresAt ?? undefined,
+        createdAt: saved.createdAt,
+      },
+    };
+  }
+
+  /**
+   * Get participants by share token (public). Returns basic details plus attendance status.
+   */
+  async getParticipantsByShareToken(shareToken: string): Promise<{
+    eventId: string;
+    eventName: string;
+    participants: Array<{
+      firstName: string;
+      lastName: string;
+      email: string;
+      type: string;
+      attendanceStatus: 'Attended' | 'Not Attended';
+      checkInTime?: string;
+    }>;
+  }> {
+    const shareLink = await this.eventRegistrationShareLinkRepository.findOne({
+      where: { shareToken, isActive: true },
+    });
+    if (!shareLink) {
+      throw new ResourceNotFoundException('Share link', shareToken);
+    }
+    if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+      throw new ValidationException('This share link has expired');
+    }
+
+    const event = await this.eventRepository.findOne({
+      where: { id: shareLink.eventId },
+    });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', shareLink.eventId);
+    }
+
+    const registrations = await this.registerEventRepository.find({
+      where: { eventId: shareLink.eventId, isRegister: true },
+      relations: ['user'],
+      order: { createdAt: 'ASC' },
+    });
+
+    const attendanceRecords = await this.eventAttendanceRepository.find({
+      where: { eventId: shareLink.eventId },
+    });
+    const attendanceByUserId = new Map<string, { status: AttendanceStatus; checkInTime?: Date }>();
+    attendanceRecords.forEach((a) => {
+      attendanceByUserId.set(a.userId, {
+        status: a.status,
+        checkInTime: a.checkInTime,
+      });
+    });
+
+    const participants = registrations
+      .filter((r) => r.user)
+      .map((r) => {
+        const att = r.userId ? attendanceByUserId.get(r.userId) : undefined;
+        const hasAttended =
+          att &&
+          (att.status === AttendanceStatus.CheckedIn || att.status === AttendanceStatus.CheckedOut);
+        const attendanceStatus: 'Attended' | 'Not Attended' = hasAttended ? 'Attended' : 'Not Attended';
+        return {
+          firstName: r.user!.firstName ?? '',
+          lastName: r.user!.lastName ?? '',
+          email: r.user!.email ?? '',
+          type: r.type ?? 'Attendee',
+          attendanceStatus,
+          checkInTime: att?.checkInTime
+            ? att.checkInTime.toISOString()
+            : undefined,
+        };
+      });
+
+    return {
+      eventId: shareLink.eventId,
+      eventName: event.name ?? '',
+      participants,
+    };
   }
 }

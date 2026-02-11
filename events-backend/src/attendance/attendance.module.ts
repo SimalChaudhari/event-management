@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
+import { AttendanceGateway } from './attendance.gateway';
 import { EventQRCodeService } from './event-qr-code.service';
 import { EventAttendance } from './attendance.entity';
 import { EventQRCode } from './event-qr-code.entity';
@@ -34,7 +35,7 @@ import { JwtModule } from '@nestjs/jwt';
     UtilsModule,
   ],
   controllers: [AttendanceController],
-  providers: [AttendanceService, EventQRCodeService],
-  exports: [AttendanceService, EventQRCodeService],
+  providers: [AttendanceService, AttendanceGateway, EventQRCodeService],
+  exports: [AttendanceService, AttendanceGateway, EventQRCodeService],
 })
 export class AttendanceModule {}

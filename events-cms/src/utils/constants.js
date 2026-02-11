@@ -74,6 +74,7 @@ export const EVENT_PATHS = {
 
     // Public facing pages
     PUBLIC_EVENT_QR: '/events/participants-qr/:eventId',
+    REGISTRATION_LIST_SHARE: '/events/registrations/share/:shareToken',
 };  
 
 export const MEDIA_MANAGER_PATHS = {

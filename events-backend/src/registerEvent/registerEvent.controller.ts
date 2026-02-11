@@ -118,6 +118,29 @@ export class RegisterEventController {
     }
   }
 
+  @Post('admin/generate-registration-share-link')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async generateRegistrationShareLink(
+    @Body('eventId') eventId: string,
+    @Req() req: Request,
+    @Res() response: Response,
+  ) {
+    try {
+      if (!eventId) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'eventId is required',
+        });
+      }
+      const result = await this.registerEventService.generateRegistrationShareLink(eventId);
+      return response.status(HttpStatus.OK).json(result);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Generate registration share link', req.user?.id);
+      throw error;
+    }
+  }
+
   @Delete('admin/delete/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.Admin)
@@ -281,6 +304,29 @@ export class PublicRegisterEventController {
     private readonly registerEventService: RegisterEventService,
     private readonly errorHandler: ErrorHandlerService,
   ) {}
+
+  @Get('share/:shareToken/participants')
+  async getParticipantsByShareToken(
+    @Param('shareToken') shareToken: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const result = await this.registerEventService.getParticipantsByShareToken(shareToken);
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Participants retrieved successfully',
+        data: result,
+        metadata: {
+          total: result.participants?.length ?? 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get participants by share token');
+      throw error;
+    }
+  }
 
   @Get(':eventId/participants')
   async getPublicParticipants(

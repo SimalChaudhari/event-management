@@ -28,13 +28,17 @@ import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { EventModule } from '../event/event.module';
+import { EventRegistrationShareLink } from './event-registration-share-link.entity';
+import { EventAttendance } from '../attendance/attendance.entity';
+import { AttendanceModule } from '../attendance/attendance.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem, EventStaff, ExhibitorRating]), UtilsModule,
+        TypeOrmModule.forFeature([RegisterEvent, AdminInfo, BillingDetail, Event, Order, FavoriteEvent, EventExhibitor, Exhibitor, UserEntity, EventAgenda, Engagement, EventNotification, EventNotificationRead, PushNotification, UserPermissions, PermissionTemplate, Checkout, CheckoutCartItem, EventStaff, ExhibitorRating, EventRegistrationShareLink, EventAttendance]), UtilsModule,
         EngagementModule,
         CheckoutModule,
         EventModule,
+        AttendanceModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

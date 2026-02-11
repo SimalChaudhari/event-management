@@ -762,7 +762,7 @@ export const getRegisteredParticipantsWithAttendance = (eventId) => async (dispa
             payload: true
         });
 
-        const response = await axiosInstance.get(`/attendance/event/${eventId}/registered-participants`);
+        const response = await axiosInstance.get(`/attendance/participants/${eventId}`);
         
         if (response.data.success) {
             dispatch({

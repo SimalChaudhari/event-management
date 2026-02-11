@@ -14,13 +14,16 @@ import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmatio
 import ExportConfirmationModal from '../../../components/modal/ExportConfirmationModal';
 import CsvUploadDetailsModal from './modal/CsvUploadDetailsModal';
 import EventAdminInfoModal from './modal/EventAdminInfoModal';
+import RegistrationShareLinkModal from './modal/RegistrationShareLinkModal';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
+import axiosInstance from '../../../configs/axiosInstance';
+import { toast } from 'react-toastify';
 import { EVENT_PATHS } from '../../../utils/constants';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
 import useTableNavigation from '../../../hooks/useTableNavigation';
 import { useRef, useCallback, useMemo } from 'react';
 import { initializeServerSideDataTable } from '../../../utils/dataTableServerSide';
-import axiosInstance from '../../../configs/axiosInstance';
+// import axiosInstance from '../../../configs/axiosInstance';
 import { PARTICIPATED_EVENTS, EVENT_LOADING } from '../../../store/constants/actionTypes';
 
 // @ts-ignore
@@ -441,6 +444,11 @@ const RegisteredEvents = () => {
     const [showEventAdminInfoModal, setShowEventAdminInfoModal] = useState(false);
     const [eventAdminInfoData, setEventAdminInfoData] = useState(null);
 
+    // Registration List Share Link (dynamic from backend)
+    const [registrationShareUrl, setRegistrationShareUrl] = useState('');
+    const [showRegistrationShareModal, setShowRegistrationShareModal] = useState(false);
+    const [generatingRegistrationShareLink, setGeneratingRegistrationShareLink] = useState(false);
+
     // Add handler for Add Register Event button
     const handleAddRegisterEvent = useCallback(() => {
         handleAdd();
@@ -496,6 +504,27 @@ const RegisteredEvents = () => {
         }
         const qrPath = EVENT_PATHS.PUBLIC_EVENT_QR.replace(':eventId', selectedEventId);
         window.open(qrPath, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleRegistrationShareLinkClick = async () => {
+        if (!selectedEventId) {
+            toast.warning('Please select an event first');
+            return;
+        }
+        setGeneratingRegistrationShareLink(true);
+        try {
+            const res = await axiosInstance.post('/register-events/admin/generate-registration-share-link', { eventId: selectedEventId });
+            if (res?.data?.success && res?.data?.data?.shareUrl) {
+                setRegistrationShareUrl(res.data.data.shareUrl);
+                setShowRegistrationShareModal(true);
+            } else {
+                toast.error(res?.data?.message || 'Failed to generate share link');
+            }
+        } catch (e) {
+            toast.error(e?.response?.data?.message || 'Failed to generate share link');
+        } finally {
+            setGeneratingRegistrationShareLink(false);
+        }
     };
 
     // CSV Upload handlers
@@ -744,6 +773,15 @@ const RegisteredEvents = () => {
                             <i className="feather icon-download mr-1"></i>
                             Export Users
                         </button>
+                        <button
+                            className="btn btn-primary d-flex align-items-center mb-2 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0"
+                            onClick={handleRegistrationShareLinkClick}
+                            disabled={!selectedEventId || generatingRegistrationShareLink}
+                            style={{ whiteSpace: 'nowrap' }}
+                        >
+                            <i className="feather icon-link mr-1"></i>
+                            {generatingRegistrationShareLink ? 'Generating...' : 'Registration List Share Link'}
+                        </button>
                     </>
                 }
             />
@@ -942,6 +980,12 @@ const RegisteredEvents = () => {
                 eventName={selectedEventName}
                 onSave={handleSaveEventAdminInfo}
                 initialData={eventAdminInfoData}
+            />
+
+            <RegistrationShareLinkModal
+                show={showRegistrationShareModal}
+                onHide={() => setShowRegistrationShareModal(false)}
+                shareUrl={registrationShareUrl}
             />
         </>
     );

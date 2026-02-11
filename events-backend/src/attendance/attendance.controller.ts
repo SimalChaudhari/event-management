@@ -625,7 +625,7 @@ export class AttendanceController {
    * Get registered participants with their attendance status (Admin only)
    * Returns all registered participants and whether they marked attendance (QR scanned)
    */
-  @Get('event/:eventId/registered-participants')
+  @Get('participants/:eventId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.Admin)
   async getRegisteredParticipantsWithAttendance(
