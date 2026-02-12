@@ -35,7 +35,6 @@ import { EmailLogDetails, EmailRecipientLog } from '../logs/csv-upload-log.types
 import { EmailBatchService } from '../utils/email-batch.service';
 import { CsvProcessorService } from '../utils/csv-processor.service';
 import { csvUploadConfig } from '../utils/csv-upload.config';
-import { QRCodeUtils } from '../utils/qr-code.utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -1561,15 +1560,11 @@ export class AuthService {
       }
 
       try {
-        const qrCodeBuffer = await QRCodeUtils.generateQRCodeBuffer(user.id);
-        const qrCodeCid = `user-qr-${user.id}@events`;
         const normalizedEmail = normalizeEmail(user.email);
-        
-        // Determine if this is a new user (has password) or existing user
         const isNewUser = newUserPasswords && newUserPasswords.has(normalizedEmail);
         const password = isNewUser ? newUserPasswords.get(normalizedEmail) : undefined;
         const showCredentials = isNewUser && password !== undefined;
-        
+
         payloads.push({
           email: user.email,
           firstName: user.firstName || entry.firstName || '',
@@ -1577,14 +1572,11 @@ export class AuthService {
           salutation: user.salutation || entry.salutation,
           eventName,
           eventStartDate: eventStartDate,
-          qrCodeCid,
-          qrCodeBuffer,
-          qrCodeFilename: `qr-${user.id}.png`,
           password,
           showCredentials,
         });
       } catch (error) {
-        console.error(`❌ Failed to generate QR code for ${entry.email}:`, error);
+        console.error(`❌ Failed to prepare registration email for ${entry.email}:`, error);
       }
     }
 
@@ -1660,8 +1652,7 @@ export class AuthService {
    */
   async bulkDeleteUsers(userIds: string[]): Promise<{message: string, deletedCount: number, skippedUsers: string[]}> {
     try {
-      console.log(`🗑️ Starting bulk delete for ${userIds.length} users...`);
-      console.log(`📊 ================================================`);
+    
 
       if (!userIds || userIds.length === 0) {
         throw new BadRequestException('No user IDs provided for deletion');

@@ -1,5 +1,9 @@
 // src/utils/email-templates.utils.ts
 
+/** App Store badge PNG for email. Override with APP_STORE_BADGE_IMAGE_URL in .env. */
+const DEFAULT_APP_STORE_BADGE_IMAGE_URL =
+  'https://appstorebadges.careevolutionapps.com/images/apple/black/logo-en.png';
+
 export interface SpeakerCredentialsData {
   salutation?: string;
   email: string;
@@ -30,8 +34,8 @@ export interface UserQRCodeEmailData {
   salutation?: string;
   eventName: string;
   eventStartDate?: string | Date; // Event start date for calculating days remaining
-  qrCodeCid: string;
-  qrCodeBuffer: Buffer;
+  qrCodeCid?: string;
+  qrCodeBuffer?: Buffer;
   qrCodeFilename?: string;
   eventInfoImageCid?: string;
   eventInfoImageBuffer?: Buffer;
@@ -361,30 +365,40 @@ export class EmailTemplateUtils {
 
           ${credentialsSection}
 
-          <p style="color: #555; font-size: 16px;">
-           The QR code below will be used for your event day registration on ${formattedEventDate}. Please save it and have it ready when you arrive at the venue.
-          </p>
-
-              <br>
-              <br>
-          <div style="
-              background-color: #ffffff;
-              border: 1px solid #e0e0e0;
-              padding: 20px;
-              margin: 20px auto;
-              border-radius: 8px;
-              text-align: center;
-              max-width: 360px;
-          ">
-              <h3 style="margin: 0 0 15px 0; color: #333;">Your Event QR Code</h3>
-              <img src="cid:${data.qrCodeCid}" alt="Event QR Code" style="width: 100%; max-width: 300px; height: auto; border-radius: 4px; border: 1px solid #ccc;" />
-          </div>
-
          <p style="color: #555; font-size: 16px;">
           For a seamless experience, here are some key details and tips:
          </p>
 
           <div style="height: 2px;"></div>
+
+          <div style="
+              background-color: #f8fafc;
+              border: 1px solid #e2e8f0;
+              padding: 24px;
+              margin: 24px auto;
+              border-radius: 10px;
+              max-width: 420px;
+          ">
+              <p style="color: #334155; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">
+                  Download App
+              </p>
+              <p style="color: #555; font-size: 15px; margin: 0 0 20px 0; line-height: 1.5;">
+                  Get the app using the badge for your device so you can access your event pass and QR code on the day.
+              </p>
+              <p style="margin: 0 0 16px 0;">
+                  ${(process.env.PLATFORM_URL || process.env.APP_STORE_URL) ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;"><tr><td style="padding: 0 8px 0 0; vertical-align: middle;">${process.env.PLATFORM_URL ? `<a href="${process.env.PLATFORM_URL}" target="_blank" rel="noopener" style="display: inline-block; text-decoration: none;"><img src="${process.env.PLAY_STORE_BADGE_IMAGE_URL || 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'}" alt="GET IT ON Google Play" width="170" height="80" style="height: 80px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td><td style="padding: 0; vertical-align: middle;">${process.env.APP_STORE_URL ? `<a href="${process.env.APP_STORE_URL}" target="_blank" rel="noopener" style="display: inline-block; text-decoration: none;"><img src="${DEFAULT_APP_STORE_BADGE_IMAGE_URL}" alt="Download on the App Store" width="140" height="50" style="height: 50px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td></tr></table>` : ''}
+                  ${!(process.env.PLATFORM_URL) && !(process.env.APP_STORE_URL) ? `<a href="#" target="_blank" rel="noopener" style="display: inline-block; background-color: #0d9488; color: #fff; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px;">Download App</a>` : ''}
+              </p>
+              <p style="color: #334155; font-size: 16px; margin: 0 0 12px 0; font-weight: 600;">
+                  ✔ Instructions
+              </p>
+              <ol style="margin: 0; padding-left: 22px; color: #555; font-size: 15px; line-height: 1.9;">
+                  <li style="margin-bottom: 6px;">Download the app from the link above (Android or iPhone, depending on your device).</li>
+                  <li style="margin-bottom: 6px;">Log in using the credentials provided above.</li>
+                  <li>At the event, open the app, go to the Profile section, and show your QR code at the registration desk to participate in the event.</li>
+              </ol>
+          </div> 
+             <div style="height: 2px;"></div>
 
           <div style="
               margin: 30px auto 20px;
@@ -411,7 +425,7 @@ export class EmailTemplateUtils {
               <strong>Terence Lam </strong><br>
               Director<br>
               Advocacy and Professional Standards
-          </p>
+          </p>       
       </div>
     `;
   }
@@ -422,31 +436,21 @@ export class EmailTemplateUtils {
    * @returns Email options object
    */
   static getUserQRCodeEmailOptions(data: UserQRCodeEmailData) {
+    const attachments: Array<{ filename: string; content: Buffer; cid?: string; contentType: string }> = [];
+    if (data.eventInfoImageCid && data.eventInfoImageBuffer) {
+      attachments.push({
+        filename: data.eventInfoImageFilename || 'isca-conference-2025-what-to-expect.png',
+        content: data.eventInfoImageBuffer,
+        cid: data.eventInfoImageCid,
+        contentType: 'image/png',
+      });
+    }
     return {
       from: `ISCA Events <${process.env.FROM_EMAIL}>`,
       to: data.email,
       subject: `${data.eventName} – Your Registration & Event Guide Inside`,
       html: this.generateUserQRCodeTemplate(data),
-      attachments: [
-        {
-          filename: data.qrCodeFilename || 'event-qr.png',
-          content: data.qrCodeBuffer,
-          cid: data.qrCodeCid,
-          contentType: 'image/png',
-        },
-        ...(data.eventInfoImageCid && data.eventInfoImageBuffer
-          ? [
-              {
-                filename:
-                  data.eventInfoImageFilename ||
-                  'isca-conference-2025-what-to-expect.png',
-                content: data.eventInfoImageBuffer,
-                cid: data.eventInfoImageCid,
-                contentType: 'image/png',
-              },
-            ]
-          : []),
-      ],
+      attachments,
     };
   }
 
@@ -456,13 +460,13 @@ export class EmailTemplateUtils {
    * @returns Email options object
    */
   static getEmailOptions(data: EmailTemplatePayload) {
-    // Check for QR code first (has qrCodeBuffer property)
-    if ('qrCodeBuffer' in data) {
-      return this.getUserQRCodeEmailOptions(data);
+    // Registration / event guide email (has eventName)
+    if ('eventName' in data) {
+      return this.getUserQRCodeEmailOptions(data as UserQRCodeEmailData);
     }
 
-    // Otherwise it's a credentials email (has password property and no qrCodeBuffer)
-    if ('password' in data && !('qrCodeBuffer' in data)) {
+    // Credentials-only email (has password, no eventName)
+    if ('password' in data) {
       return this.getUserCredentialsEmailOptions(data as UserCredentialsData);
     }
 
