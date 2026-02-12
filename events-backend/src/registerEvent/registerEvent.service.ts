@@ -1471,6 +1471,7 @@ export class RegisterEventService {
     eventId: string;
     eventName: string;
     participants: Array<{
+      id: string;
       firstName: string;
       lastName: string;
       email: string;
@@ -1522,6 +1523,7 @@ export class RegisterEventService {
           (att.status === AttendanceStatus.CheckedIn || att.status === AttendanceStatus.CheckedOut);
         const attendanceStatus: 'Attended' | 'Not Attended' = hasAttended ? 'Attended' : 'Not Attended';
         return {
+          id: r.user!.id ?? r.userId ?? '',
           firstName: r.user!.firstName ?? '',
           lastName: r.user!.lastName ?? '',
           email: r.user!.email ?? '',

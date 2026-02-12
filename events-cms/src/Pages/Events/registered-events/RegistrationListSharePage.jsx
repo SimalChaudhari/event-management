@@ -28,14 +28,25 @@ const RegistrationListSharePage = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showUpdatedBadge, setShowUpdatedBadge] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
   const socketRef = useRef(null);
+
+  const handleCopyId = useCallback((id) => {
+    if (!id) return;
+    const str = String(id);
+    navigator.clipboard.writeText(str).then(() => {
+      setCopiedId(str);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }, []);
 
   const filteredParticipants = participants.filter((p) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
     const name = [p.firstName, p.lastName].filter(Boolean).join(' ').toLowerCase();
     const email = (p.email || '').toLowerCase();
-    return name.includes(q) || email.includes(q);
+    const id = (p.id ? String(p.id) : '').toLowerCase();
+    return name.includes(q) || email.includes(q) || id.includes(q);
   });
 
   const fetchData = useCallback(async (isSilentRefresh = false) => {
@@ -202,7 +213,7 @@ const RegistrationListSharePage = () => {
                     >
                       <Form.Control
                         className="border-right-0"
-                        placeholder="Search by name or email..."
+                        placeholder="Search by ID, name or email..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
@@ -268,6 +279,7 @@ const RegistrationListSharePage = () => {
                   <thead className="bg-light">
                     <tr>
                       <th className="text-center" style={{ width: 50 }}>#</th>
+                      <th style={{ width: 90 }}>ID</th>
                       <th>Name</th>
                       <th>Email</th>
                       <th className="text-center">Attendance Status</th>
@@ -277,7 +289,7 @@ const RegistrationListSharePage = () => {
                   <tbody>
                     {filteredParticipants.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center text-muted py-4">
+                        <td colSpan={6} className="text-center text-muted py-4">
                           {participants.length === 0
                             ? 'No participants in this list.'
                             : 'No matches for your search.'}
@@ -285,8 +297,29 @@ const RegistrationListSharePage = () => {
                       </tr>
                     ) : (
                       filteredParticipants.map((p, index) => (
-                        <tr key={`${p.email}-${index}`}>
+                        <tr key={p.id || `${p.email}-${index}`}>
                           <td className="text-center text-muted">{index + 1}</td>
+                          <td className="text-muted small" style={{ fontSize: '0.8rem' }}>
+                            {p.id ? (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                title={String(p.id)}
+                                onClick={() => handleCopyId(p.id)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleCopyId(p.id)}
+                                style={{
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline',
+                                  textUnderlineOffset: 2,
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {copiedId === String(p.id) ? 'Copied!' : String(p.id).slice(0, 8)}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
                           <td>
                             <strong>
                               {[p.firstName, p.lastName].filter(Boolean).join(' ') || '—'}
@@ -353,7 +386,7 @@ const RegistrationListSharePage = () => {
                 ) : (
                   filteredParticipants.map((p, index) => (
                     <div
-                      key={`${p.email}-${index}`}
+                      key={p.id || `${p.email}-${index}`}
                       className="border rounded p-3 mb-2 bg-white"
                     >
                       <div className="d-flex justify-content-between align-items-start mb-2">
@@ -363,6 +396,27 @@ const RegistrationListSharePage = () => {
                         <span className="text-muted small">#{index + 1}</span>
                       </div>
                       <div className="small" style={{ fontSize: '0.85rem' }}>
+                        {p.id && (
+                          <div className="d-flex align-items-center mb-2">
+                            <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>ID</span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              title={String(p.id)}
+                              onClick={() => handleCopyId(p.id)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCopyId(p.id)}
+                              style={{
+                                fontSize: '0.8rem',
+                                fontFamily: 'monospace',
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                textUnderlineOffset: 2,
+                              }}
+                            >
+                              {copiedId === String(p.id) ? 'Copied!' : String(p.id).slice(0, 8)}
+                            </span>
+                          </div>
+                        )}
                         <div className="d-flex align-items-start mb-2">
                           <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>Email</span>
                           <span className="text-break">{p.email || '—'}</span>
