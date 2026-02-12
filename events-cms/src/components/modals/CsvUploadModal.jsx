@@ -15,6 +15,7 @@ const SALUTATION_OPTIONS = ['Mr', 'Ms', 'Mrs', 'Miss', 'Mdm', 'Dr', 'Prof'];
 const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
     const dispatch = useDispatch();
     const fileInputRef = useRef(null);
+    const uploadSuccessNotifiedRef = useRef(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
@@ -384,6 +385,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
             setUploadResult(enhancedResult);
 
             if (result.success) {
+                uploadSuccessNotifiedRef.current = false; // Reset so we can notify when user closes
                 // Mark upload as completed
                 setIsUploadCompleted(true);
                 
@@ -430,6 +432,11 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
     };
 
     const handleClose = () => {
+        // Notify parent once to reload table when closing after successful upload (avoid duplicate API calls)
+        if (isUploadCompleted && uploadResult?.success && onUploadSuccess && !uploadSuccessNotifiedRef.current) {
+            uploadSuccessNotifiedRef.current = true;
+            onUploadSuccess();
+        }
         // Complete page reset - reset ALL states to initial values
         setSelectedFile(null);
         setUploadProgress(0);
@@ -1155,7 +1162,7 @@ const CsvUploadModal = ({ show, onHide, onUploadSuccess }) => {
                 size="md" 
                 centered
             >
-                <Modal.Header className="bg-primary text-white">
+                <Modal.Header className="text-dark">
                     <Modal.Title className="d-flex align-items-center">
                         <i className="feather icon-alert-triangle mr-2"></i>
                         {confirmModalData.title}

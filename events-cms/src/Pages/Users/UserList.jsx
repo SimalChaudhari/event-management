@@ -293,6 +293,7 @@ const UserList = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const roleFilterRef = React.useRef('all'); // Ref to store current filter for immediate access
     const tableRef = React.useRef(null);
+    const csvReloadTimeoutRef = React.useRef(null);
     const [showProfileImageModal, setShowProfileImageModal] = useState(false);
     const [selectedImageUrl, setSelectedImageUrl] = useState('');
 
@@ -386,11 +387,19 @@ const UserList = () => {
         setShowCsvUploadModal(true);
     };
 
-    const handleCsvUploadSuccess = async () => {
+    const handleCsvUploadSuccess = () => {
         setShowCsvUploadModal(false);
-        // CSV upload adds multiple users, so we need to fetch the updated list
-        // (unlike single create/update/delete which update Redux directly)
-        await fetchData(roleFilter === 'all' ? null : roleFilter);
+        // Cancel any pending reload to avoid multiple API calls
+        if (csvReloadTimeoutRef.current) {
+            clearTimeout(csvReloadTimeoutRef.current);
+        }
+        // Single reload after modal closes - one API call only
+        csvReloadTimeoutRef.current = setTimeout(() => {
+            csvReloadTimeoutRef.current = null;
+            if (tableRef.current && $.fn.DataTable.isDataTable('#user-data-table')) {
+                tableRef.current.ajax.reload(null, true); // true = reset to page 1
+            }
+        }, 150);
     };
 
     const handleExportUsers = () => {
@@ -424,6 +433,10 @@ const UserList = () => {
     ];
 
     const destroyTable = () => {
+        if (csvReloadTimeoutRef.current) {
+            clearTimeout(csvReloadTimeoutRef.current);
+            csvReloadTimeoutRef.current = null;
+        }
         if (currentTable) {
             currentTable.off('page.dt');
             const tableSelector = '#user-data-table';
