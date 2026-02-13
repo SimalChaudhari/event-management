@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ChatController } from './chat.controller';
@@ -8,6 +8,7 @@ import { ChatNotificationService } from './chat-notification.service';
 import { ChatThread, ChatMessage, ChatParticipant } from './chat.entity';
 import { UserEntity } from '../user/users.entity';
 import { PushNotification } from '../settings/setting.entity';
+import { RegisterEventModule } from '../registerEvent/registerEvent.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PushNotification } from '../settings/setting.entity';
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
+    forwardRef(() => RegisterEventModule),
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, ChatNotificationService],

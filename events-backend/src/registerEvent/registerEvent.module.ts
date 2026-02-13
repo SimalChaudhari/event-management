@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
+import { ChatModule } from '../chat/chat.module';
 import { RegisterEvent } from './registerEvent.entity';
 import { RegisterEventService } from './registerEvent.service';
 import { PublicRegisterEventController, RegisterEventController } from './registerEvent.controller';
@@ -39,6 +40,7 @@ import { AttendanceModule } from '../attendance/attendance.module';
         CheckoutModule,
         EventModule,
         AttendanceModule,
+        forwardRef(() => ChatModule),
         JwtModule.register({
             secret: process.env.JWT_SECRET,  // Use JWT secret from .env file
             signOptions: {},  // Set token expiration

@@ -129,4 +129,9 @@ export class GetChatListDto {
   @IsString({ message: 'Search query must be a string' })
   @Transform(({ value }) => value?.trim())
   search?: string;
+
+  /** When provided, only return chat threads with other registered attendees of this event (event chatroom). */
+  @IsOptional()
+  @IsUUID(4, { message: 'EventID must be a valid UUID' })
+  eventId?: string;
 }

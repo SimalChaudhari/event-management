@@ -5,6 +5,7 @@ import { ChatThread, ChatMessage, ChatParticipant, MessageType } from './chat.en
 import { UserEntity } from 'user/users.entity';
 import { SendMessageDto, GetChatDto, CreateThreadDto, MarkReadDto, DeleteMessageDto, DeleteAllMessagesDto, EditMessageDto, GetChatListDto } from './chat.dto';
 import { ChatNotificationService } from './chat-notification.service';
+import { RegisterEventService } from '../registerEvent/registerEvent.service';
 
 @Injectable()
 export class ChatService {
@@ -15,7 +16,9 @@ export class ChatService {
     @InjectRepository(ChatMessage) private messageRepo: Repository<ChatMessage>,
     @InjectRepository(ChatParticipant) private participantRepo: Repository<ChatParticipant>,
     @InjectRepository(UserEntity) private userRepo: Repository<UserEntity>,
-    private chatNotificationService: ChatNotificationService
+    private chatNotificationService: ChatNotificationService,
+    @Inject(forwardRef(() => RegisterEventService))
+    private registerEventService: RegisterEventService,
   ) {}
 
   // Method to set gateway reference (called from gateway)
@@ -173,7 +176,7 @@ export class ChatService {
         relations: ['sender', 'receiver', 'replyToMessage', 'replyToMessage.sender']
       });
 
-      return {
+      const result = {
         msgID: savedMessage!.msgID,
         threadID: savedMessage!.threadID,
         msg: savedMessage!.msg,
@@ -192,6 +195,13 @@ export class ChatService {
           senderNick: savedMessage!.replyToMessage.sender?.firstName || 'Unknown'
         } : null
       };
+
+      // Emit to receiver in real-time (works when message sent via REST or socket)
+      if (this.chatGateway?.server) {
+        this.chatGateway.server.to(`user:${receiverID}`).emit('new_message', result);
+      }
+
+      return result;
 
     } catch (error) {
       throw new BadRequestException('Failed to send message');
@@ -619,12 +629,19 @@ export class ChatService {
     }
   }
 
-  // Get chat list (WhatsApp style contact list)
+  // Get chat list (WhatsApp style contact list). Optional eventId: only threads with other registered attendees of that event.
   async getChatList(userID: string, dto: GetChatListDto): Promise<any> {
     try {
       const limit = Math.min(dto.paginationCount || 20, 100);
       const page = Math.max(dto.paginationCurrentPage || 1, 1);
       const skip = (page - 1) * limit;
+
+      // When eventId is provided, get allowed attendee IDs for event chatroom (only chat with other registered users)
+      let eventAttendeeIds: Set<string> | null = null;
+      if (dto.eventId) {
+        const ids = await this.registerEventService.getRegisteredUserIdsForEvent(dto.eventId, userID);
+        eventAttendeeIds = new Set(ids);
+      }
 
       // First, get all threads where user is a participant
       const participants = await this.participantRepo.find({
@@ -644,9 +661,17 @@ export class ChatService {
       }
 
       // Filter threads that have messages
-      const threadsWithMessages = participants.filter(p => 
+      let threadsWithMessages = participants.filter(p => 
         p.thread && p.thread.lastMessage && p.thread.lastMessage.trim() !== ''
       );
+
+      // When eventId provided, keep only threads where the other user is a registered attendee of the event
+      if (eventAttendeeIds !== null) {
+        threadsWithMessages = threadsWithMessages.filter(p => {
+          const otherUser = p.thread!.userID === userID ? p.thread!.receiver : p.thread!.user;
+          return otherUser && eventAttendeeIds!.has(otherUser.id);
+        });
+      }
 
       // Apply search filter if provided
       let filteredThreads = threadsWithMessages;
@@ -732,6 +757,46 @@ export class ChatService {
       console.error('Chat list error:', error);
       throw new BadRequestException('Failed to get chat list');
     }
+  }
+
+  /**
+   * Get all event chats for the current user in one response (for mobile app / Postman).
+   * Returns every conversation with that user's other attendees and full message thread.
+   */
+  async getEventChats(userID: string, eventId: string): Promise<any> {
+    if (!eventId) {
+      throw new BadRequestException('EventID is required');
+    }
+    const listResult = await this.getChatList(userID, {
+      eventId,
+      paginationCount: 50,
+      paginationCurrentPage: 1,
+    });
+    const chatList = listResult?.chatList || [];
+    const conversations = await Promise.all(
+      chatList.map(async (c: any) => {
+        const chatData = await this.getChat(userID, {
+          receiverID: c.userID,
+          paginationCount: 100,
+          paginationCurrentPage: 1,
+        });
+        return {
+          threadID: c.threadID,
+          userID: c.userID,
+          userName: c.userName,
+          userImage: c.userImage,
+          lastMessageTime: c.lastMessageTime,
+          unreadCount: c.unreadCount || 0,
+          messages: chatData?.aChatOpen || [],
+        };
+      }),
+    );
+    return {
+      success: true,
+      eventId,
+      conversations,
+      totalConversations: conversations.length,
+    };
   }
 
 }

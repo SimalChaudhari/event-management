@@ -244,6 +244,39 @@ export class RegisterEventController {
     }
   }
 
+  @Get('export/event/:eventId/all-chats-zip')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async exportAllEventChatsAsZip(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Req() req: Request,
+  ) {
+    try {
+      await this.registerEventService.exportAllEventChatsAsZip(eventId, response);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Export all event chats as ZIP', req.user?.id);
+      throw error;
+    }
+  }
+
+  @Get('export/event/:eventId/user/:userId/chat-pdf')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async exportSingleUserEventChatAsPdf(
+    @Param('eventId') eventId: string,
+    @Param('userId') userId: string,
+    @Res() response: Response,
+    @Req() req: Request,
+  ) {
+    try {
+      await this.registerEventService.exportSingleUserEventChatAsPdf(userId, eventId, response);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Export single user event chat as PDF', req.user?.id);
+      throw error;
+    }
+  }
+
   @Get('export/event/:eventId')
   @UseGuards(RolesGuard)
   @Roles(UserRole.Admin)

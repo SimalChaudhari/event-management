@@ -42,6 +42,10 @@ import { EventRegistrationShareLink } from './event-registration-share-link.enti
 import * as crypto from 'crypto';
 import { EventAttendance, AttendanceStatus } from '../attendance/attendance.entity';
 import { AttendanceGateway } from '../attendance/attendance.gateway';
+import { ChatService } from '../chat/chat.service';
+import { Response } from 'express';
+import archiver from 'archiver';
+import { generateChatPdfBuffer, streamChatPdfToResponse, ConversationForExport } from '../utils/chat-export.utils';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -106,6 +110,8 @@ export class RegisterEventService {
     private readonly errorHandler: ErrorHandlerService,
     @Inject(forwardRef(() => EventStampService))
     private readonly eventStampService: EventStampService,
+    @Inject(forwardRef(() => ChatService))
+    private readonly chatService: ChatService,
     @Optional() private readonly attendanceGateway?: AttendanceGateway,
   ) {}
 
@@ -462,24 +468,31 @@ export class RegisterEventService {
             const { firstName, lastName, email, mobile, id } = registerEvent.user || {};
             const cleanedUser = { firstName, lastName, email, mobile, id };
 
-            // Extract only basic event fields (no nested relations)
-            const basicEvent = registerEvent.event ? {
-              id: registerEvent.event.id,
-              name: registerEvent.event.name,
-              description: registerEvent.event.description,
-              startDate: registerEvent.event.startDate,
-              endDate: registerEvent.event.endDate,
-              startTime: registerEvent.event.startTime,
-              endTime: registerEvent.event.endTime,
-              location: registerEvent.event.location,
-              venue: registerEvent.event.venue,
-              country: registerEvent.event.country,
-              type: registerEvent.event.type,
-              price: registerEvent.event.price,
-              currency: registerEvent.event.currency,
-              registerEventId: registerEvent.id,
-              attendanceCount: attendanceCount,
-            } : null;
+            // Extract basic event fields + chatroom (so admin can see Chatroom tab and registrant's chats)
+            const basicEvent = registerEvent.event
+              ? {
+                  id: registerEvent.event.id,
+                  name: registerEvent.event.name,
+                  description: registerEvent.event.description,
+                  startDate: registerEvent.event.startDate,
+                  endDate: registerEvent.event.endDate,
+                  startTime: registerEvent.event.startTime,
+                  endTime: registerEvent.event.endTime,
+                  location: registerEvent.event.location,
+                  venue: registerEvent.event.venue,
+                  country: registerEvent.event.country,
+                  type: registerEvent.event.type,
+                  price: registerEvent.event.price,
+                  currency: registerEvent.event.currency,
+                  registerEventId: registerEvent.id,
+                  attendanceCount: attendanceCount,
+                  chatroom: await this.buildChatroomForUser(
+                    registerEvent.userId,
+                    registerEvent.eventId,
+                    registerEvent.userId,
+                  ),
+                }
+              : null;
 
             // Fetch checkout data if order exists (use orderId; we no longer join order)
             let checkoutData = null;
@@ -659,6 +672,11 @@ export class RegisterEventService {
                     })
                 ),
               },
+              chatroom: await this.buildChatroomForUser(
+                registerEvent.userId,
+                registerEvent.eventId,
+                userId,
+              ),
               myAgendas: formattedAgendas || [],
               attendanceCount: attendanceCount,
               surveyDetails: surveyDetails,
@@ -877,6 +895,83 @@ export class RegisterEventService {
     }
   }
 
+  /**
+   * Get other registered attendees for an event (for chatroom - one-to-one chat between registered users).
+   * Excludes the current user. Returns basic user info for display in chat list.
+   */
+  async getRegisteredAttendeesForEvent(
+    eventId: string,
+    excludeUserId?: string,
+  ): Promise<{ id: string; firstName: string; lastName: string; profilePicture?: string }[]> {
+    try {
+      const qb = this.registerEventRepository
+        .createQueryBuilder('re')
+        .innerJoinAndSelect('re.user', 'user')
+        .where('re.eventId = :eventId', { eventId });
+      if (excludeUserId) {
+        qb.andWhere('re.userId != :excludeUserId', { excludeUserId });
+      }
+      const registrations = await qb.getMany();
+      const seen = new Set<string>();
+      return registrations
+        .filter((re) => re.user && !seen.has(re.user.id) && (seen.add(re.user.id), true))
+        .map((re) => ({
+          id: re.user!.id,
+          firstName: re.user!.firstName || '',
+          lastName: re.user!.lastName || '',
+          profilePicture: (re.user as any).profilePicture ?? undefined,
+        }));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get Registered Attendees For Event', eventId);
+      return [];
+    }
+  }
+
+  /**
+   * Get user IDs of registered attendees for an event (for filtering event-scoped chat list).
+   */
+  async getRegisteredUserIdsForEvent(eventId: string, excludeUserId?: string): Promise<string[]> {
+    const attendees = await this.getRegisteredAttendeesForEvent(eventId, excludeUserId);
+    return attendees.map((a) => a.id);
+  }
+
+  /**
+   * Build chatroom object: attendees + conversations (sare chat) only when requester is the registrant.
+   * So when USER calls registered-events API they get their chats; admin viewing someone's registration does not get that user's messages.
+   */
+  private async buildChatroomForUser(
+    registrantUserId: string | undefined,
+    eventId: string | undefined,
+    requesterUserId?: string,
+  ): Promise<{ enabled: boolean; attendees: any[]; conversations: any[] }> {
+    const attendees =
+      eventId && registrantUserId
+        ? await this.getRegisteredAttendeesForEvent(eventId, registrantUserId)
+        : [];
+    let conversations: any[] = [];
+    if (
+      eventId &&
+      registrantUserId &&
+      requesterUserId &&
+      registrantUserId === requesterUserId
+    ) {
+      try {
+        const result = await this.chatService.getEventChats(
+          registrantUserId,
+          eventId,
+        );
+        conversations = result?.conversations || [];
+      } catch {
+        conversations = [];
+      }
+    }
+    return {
+      enabled: true,
+      attendees,
+      conversations,
+    };
+  }
+
   async findOne(registrationId: string, userId: string, role: string) {
     try {
       // Query to find the specific register event
@@ -1056,6 +1151,11 @@ export class RegisterEventService {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: exhibitors,
         },
+        chatroom: await this.buildChatroomForUser(
+          registerEvent.userId,
+          registerEvent.eventId,
+          role === 'admin' ? registerEvent.userId : userId,
+        ),
         myAgendas: formattedAgendas || [],
 
         attendanceCount: attendanceCount,
@@ -1271,6 +1371,99 @@ export class RegisterEventService {
     } catch (error) {
       this.errorHandler.handleDatabaseError(error, 'Export registered users by event');
     }
+  }
+
+  /**
+   * Export all registered users' event chats as a ZIP (one PDF per user).
+   * Admin only. GET export/event/:eventId/all-chats-zip
+   */
+  async exportAllEventChatsAsZip(eventId: string, res: Response): Promise<void> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const registrations = await this.registerEventRepository.find({
+      where: { eventId, isRegister: true },
+      relations: ['user'],
+    });
+    const seenUserIds = new Set<string>();
+    const users: { id: string; firstName: string; lastName: string }[] = [];
+    for (const re of registrations) {
+      if (re.user && !seenUserIds.has(re.user.id)) {
+        seenUserIds.add(re.user.id);
+        users.push({
+          id: re.user.id,
+          firstName: re.user.firstName || '',
+          lastName: re.user.lastName || '',
+        });
+      }
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="event-${eventId}-all-chats-${new Date().toISOString().split('T')[0]}.zip"`,
+    );
+    archive.pipe(res);
+
+    for (const u of users) {
+      try {
+        const result = await this.chatService.getEventChats(u.id, eventId);
+        const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+          userID: c.userID,
+          userName: c.userName || 'Unknown',
+          messages: (c.messages || []).map((m: any) => ({
+            msg: m.msg,
+            senderID: m.senderID,
+            senderNick: m.senderNick,
+            msgDateUTC: m.msgDateUTC,
+          })),
+        }));
+        const userName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id;
+        const pdfBuffer = await generateChatPdfBuffer(conversations, {
+          userName,
+          eventName,
+        });
+        const safeName = userName.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 80);
+        archive.append(pdfBuffer, { name: `${safeName}-event-chats.pdf` });
+      } catch (err) {
+        this.errorHandler.logError(err, `Export chat for user ${u.id} in event ${eventId}`);
+      }
+    }
+
+    await archive.finalize();
+  }
+
+  /**
+   * Export a single user's event chat as PDF.
+   * Admin only. GET export/event/:eventId/user/:userId/chat-pdf
+   */
+  async exportSingleUserEventChatAsPdf(userId: string, eventId: string, res: Response): Promise<void> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') || userId : userId;
+
+    const result = await this.chatService.getEventChats(userId, eventId);
+    const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    const safeName = userName.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
+    const filename = `event-chat-${safeName}-${new Date().toISOString().split('T')[0]}.pdf`;
+    streamChatPdfToResponse(conversations, res, filename, { userName, eventName });
   }
 
   async getPublicParticipants(
