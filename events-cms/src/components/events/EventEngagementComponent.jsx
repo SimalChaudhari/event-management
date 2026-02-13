@@ -612,8 +612,8 @@ const EventEngagementComponent = ({ engagements, formatTime }) => {
                     </Card.Body>
                 </Card>
             </div>
-            {/* Mobile: No card wrapper, minimal padding */}
-            <div>
+            {/* Mobile: No card wrapper, minimal padding - hide on desktop to avoid duplicate */}
+            <div className="d-block d-md-none">
                 {content}
             </div>
         </div>
