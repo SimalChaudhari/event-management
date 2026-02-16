@@ -117,7 +117,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('send_message')
-  async handleSendMessage(@ConnectedSocket() client: Socket, @MessageBody() data: { receiverID: string; msg: string; reply?: string; msgType?: string; msgJson?: any }) {
+  async handleSendMessage(@ConnectedSocket() client: Socket, @MessageBody() data: { receiverID: string; msg: string; reply?: string; msgType?: string; msgJson?: any; eventId?: string }) {
     try {
       const userId = this.userSockets.get(client.id);
       if (!userId) return;
@@ -126,7 +126,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         msg: data.msg,
         reply: data.reply,
         msgType: data.msgType as MessageType,
-        msgJson: data.msgJson
+        msgJson: data.msgJson,
+        eventId: data.eventId,
       });
 
       // Auto-join sender to thread room if not already joined
@@ -135,7 +136,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Stop typing indicator when message is sent (WhatsApp behavior)
       this.stopTyping(message.threadID, userId);
 
-      // Send to receiver
+      // Send new_message to receiver (real-time delivery via WebSocket)
       this.server.to(`user:${message.receiverID}`).emit('new_message', message);
 
       // Send delivery confirmation immediately if receiver is online

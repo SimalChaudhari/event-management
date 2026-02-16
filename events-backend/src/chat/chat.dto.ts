@@ -18,6 +18,11 @@ export class SendMessageDto {
 
   @IsOptional()
   msgJson?: any;
+
+  /** Optional event ID: associates thread with event chatroom (register event). */
+  @IsOptional()
+  @IsUUID(4, { message: 'EventID must be a valid UUID' })
+  eventId?: string;
 }
 
 export class GetChatDto {
@@ -41,6 +46,10 @@ export class GetChatDto {
 export class CreateThreadDto {
   @IsUUID()
   receiverID!: string;
+
+  @IsOptional()
+  @IsUUID(4, { message: 'EventID must be a valid UUID' })
+  eventId?: string;
 }
 
 export class MarkReadDto {

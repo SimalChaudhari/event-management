@@ -1004,8 +1004,8 @@ export class RegisterEventService {
 
   /**
    * Build chatroom object: one-to-one chat only.
-   * Attendees list = only people with whom the registrant has a conversation (with last message for list display).
-   * No conversations list in response – use open-chat API to load messages when opening a thread.
+   * Attendees = only people with whom the registrant has already chatted (existing thread with messages).
+   * Use open-chat API to load messages when opening a thread.
    */
   private async buildChatroomForUser(
     registrantUserId: string | undefined,
@@ -1025,22 +1025,18 @@ export class RegisterEventService {
         chatList = [];
       }
     }
-    const attendees = chatList.map((c: any) => {
-      const nameParts = (c.userName || 'Unknown').trim().split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      return {
-        id: c.userID,
-        firstName,
-        lastName,
-        profilePicture: c.userImage || undefined,
-        lastMessage: c.lastMessage || undefined,
-        lastMessageTime: c.lastMessageTime || undefined,
-        lastMessageSender: c.lastMessageSender || undefined,
-        isLastMessageFromMe: !!c.isLastMessageFromMe,
-        unreadCount: c.unreadCount || 0,
-      };
-    });
+    const attendees = chatList.map((c: any) => ({
+      id: c.userID,
+      firstName: c.firstName ?? (c.userName || 'Unknown').trim().split(/\s+/)[0] ?? '',
+      lastName: c.lastName ?? (c.userName || '').trim().split(/\s+/).slice(1).join(' ') ?? '',
+      profilePicture: c.userImage || undefined,
+      ...(c.threadID && { threadID: c.threadID }),
+      lastMessage: c.lastMessage || undefined,
+      lastMessageTime: c.lastMessageTime || undefined,
+      lastMessageSender: c.lastMessageSender || undefined,
+      isLastMessageFromMe: !!c.isLastMessageFromMe,
+      unreadCount: c.unreadCount || 0,
+    }));
     return {
       enabled: true,
       attendees,

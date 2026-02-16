@@ -24,6 +24,10 @@ export class ChatThread {
   @Column({ type: 'text', nullable: true })
   lastMessage?: string;
 
+  /** When set, this thread is part of the event chatroom (only show in event chat list). */
+  @Column({ type: 'uuid', nullable: true })
+  eventId?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -57,10 +57,11 @@ export class ChatService {
 
     if (!thread) {
       try {
-        // Create new thread with explicit values
+        // Create new thread with explicit values (optional eventId for event chatroom)
         const newThread = this.threadRepo.create({
           userID: userID,
-          receiverID: dto.receiverID
+          receiverID: dto.receiverID,
+          ...(dto.eventId && { eventId: dto.eventId }),
         });
         
         thread = await this.threadRepo.save(newThread);
@@ -82,6 +83,10 @@ export class ChatService {
       } catch (error) {
         throw new BadRequestException('Failed to create thread');
       }
+    } else if (dto.eventId && !thread!.eventId) {
+      // Existing thread: tag with event when first used in event chatroom
+      await this.threadRepo.update(thread!.threadID, { eventId: dto.eventId });
+      thread!.eventId = dto.eventId;
     }
 
     return {
@@ -103,8 +108,11 @@ export class ChatService {
       throw new BadRequestException('Cannot send message to yourself');
     }
 
-    // Find or create thread automatically
-    const threadData = await this.createOrGetThread(senderID, { receiverID });
+    // Find or create thread automatically (optional eventId for event chatroom)
+    const threadData = await this.createOrGetThread(senderID, {
+      receiverID,
+      ...(dto.eventId && { eventId: dto.eventId }),
+    });
     const threadID = threadData.threadID;
 
     // Verify both users are participants
@@ -665,11 +673,13 @@ export class ChatService {
         p.thread && p.thread.lastMessage && p.thread.lastMessage.trim() !== ''
       );
 
-      // When eventId provided, keep only threads where the other user is a registered attendee of the event
+      // When eventId provided: only threads for this event chatroom (thread.eventId = eventId) and other user is registered attendee
       if (eventAttendeeIds !== null) {
         threadsWithMessages = threadsWithMessages.filter(p => {
           const otherUser = p.thread!.userID === userID ? p.thread!.receiver : p.thread!.user;
-          return otherUser && eventAttendeeIds!.has(otherUser.id);
+          const otherIsAttendee = otherUser && eventAttendeeIds!.has(otherUser.id);
+          const threadBelongsToEvent = p.thread!.eventId === dto.eventId;
+          return otherIsAttendee && threadBelongsToEvent;
         });
       }
 
@@ -731,6 +741,8 @@ export class ChatService {
             threadID: thread.threadID,
             userID: otherUser.id,
             userName: `${otherUser.firstName || ''} ${otherUser.lastName || ''}`.trim() || 'Unknown User',
+            firstName: otherUser.firstName || '',
+            lastName: otherUser.lastName || '',
             userImage: otherUser.profilePicture || null,
             lastMessage: thread.lastMessage || '',
             lastMessageTime: thread.updatedAt,
