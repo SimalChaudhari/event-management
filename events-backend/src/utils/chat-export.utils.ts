@@ -21,7 +21,7 @@ export interface ConversationForExport {
  */
 export function generateChatPdfBuffer(
   conversations: ConversationForExport[],
-  options: { userName?: string; eventName?: string },
+  options: { userName?: string; eventName?: string; exportUserId?: string },
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -83,7 +83,7 @@ export function streamChatPdfToResponse(
   conversations: ConversationForExport[],
   res: Response,
   filename: string,
-  options: { userName?: string; eventName?: string },
+  options: { userName?: string; eventName?: string; exportUserId?: string },
 ): void {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   res.setHeader('Content-Type', 'application/pdf');

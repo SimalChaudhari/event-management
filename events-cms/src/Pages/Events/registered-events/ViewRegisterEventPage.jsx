@@ -47,23 +47,23 @@ const ViewRegisterEventPage = () => {
     const registrantUserId = registration?.user?.id ?? eventData?.userId;
     const hasChatDownload = !!eventId;
 
-    const handleDownloadAllChatsZip = async () => {
-        if (!eventId) return;
-        try {
-            const res = await axiosInstance.get(`/register-events/export/event/${eventId}/all-chats-zip`, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([res.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `event-${eventId}-all-chats-${new Date().toISOString().split('T')[0]}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-            toast.success('Download started');
-        } catch (err) {
-            toast.error(err?.response?.data?.message || 'Download failed');
-        }
-    };
+    // const handleDownloadAllChatsZip = async () => {
+    //     if (!eventId) return;
+    //     try {
+    //         const res = await axiosInstance.get(`/register-events/export/event/${eventId}/all-chats-zip`, { responseType: 'blob' });
+    //         const url = window.URL.createObjectURL(new Blob([res.data]));
+    //         const link = document.createElement('a');
+    //         link.href = url;
+    //         link.setAttribute('download', `event-${eventId}-all-chats-${new Date().toISOString().split('T')[0]}.zip`);
+    //         document.body.appendChild(link);
+    //         link.click();
+    //         link.remove();
+    //         window.URL.revokeObjectURL(url);
+    //         toast.success('Download started');
+    //     } catch (err) {
+    //         toast.error(err?.response?.data?.message || 'Download failed');
+    //     }
+    // };
 
     const handleDownloadUserChatPdf = async () => {
         if (!eventId || !registrantUserId) return;
@@ -188,7 +188,7 @@ const ViewRegisterEventPage = () => {
                                         <i className="fas fa-file-pdf" style={{ color: '#dc3545', marginRight: '8px' }}></i>
                                         Download chat (PDF)
                                     </Button>
-                                    <Button
+                                    {/* <Button
                                         variant="outline-secondary"
                                         size="sm"
                                         onClick={handleDownloadAllChatsZip}
@@ -197,7 +197,7 @@ const ViewRegisterEventPage = () => {
                                     >
                                         <i className="fas fa-file-archive" style={{ color: '#6c757d', marginRight: '8px' }}></i>
                                         All chats (ZIP)
-                                    </Button>
+                                    </Button> */}
                                 </>
                             )}
                             <Button variant="secondary" onClick={() => navigate(-1)} className="d-inline-flex align-items-center">

@@ -140,18 +140,4 @@ export class ChatController {
     return result;
   }
 
-  /**
-   * Get all event chats for current user in one response (sare chat – for mobile app / Postman).
-   * User must be registered for the event. Returns all conversations with other attendees and full messages.
-   */
-  @Get('event/:eventId/all-chats')
-  async getEventChats(@Req() req: any, @Param('eventId') eventId: string) {
-    const userID = req.user?.sub || req.user?.id;
-    if (!userID) {
-      throw new BadRequestException('User authentication failed');
-    }
-    const result = await this.chatService.getEventChats(userID, eventId);
-    return result;
-  }
-
 }

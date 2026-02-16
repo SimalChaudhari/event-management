@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -936,39 +937,113 @@ export class RegisterEventService {
   }
 
   /**
-   * Build chatroom object: attendees + conversations (sare chat) only when requester is the registrant.
-   * So when USER calls registered-events API they get their chats; admin viewing someone's registration does not get that user's messages.
+   * Get paginated list of attendees registered for an event, with optional search (name, email).
+   */
+  async getEventAttendeesPaginated(
+    eventId: string,
+    options: { page?: number; limit?: number; search?: string } = {},
+  ): Promise<{
+    data: Array<{
+      id: string;
+      registrationId: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      profilePicture?: string;
+      type: string;
+      createdAt: Date;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+    const search = options.search?.trim();
+    const skip = (page - 1) * limit;
+
+    const qb = this.registerEventRepository
+      .createQueryBuilder('re')
+      .innerJoinAndSelect('re.user', 'user')
+      .where('re.eventId = :eventId', { eventId })
+      .orderBy('user.firstName', 'ASC')
+      .addOrderBy('user.lastName', 'ASC')
+      .addOrderBy('re.createdAt', 'ASC');
+
+    if (search) {
+      qb.andWhere(
+        '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [registrations, total] = await qb.skip(skip).take(limit).getManyAndCount();
+
+    const data = registrations
+      .filter((re) => re.user)
+      .map((re) => ({
+        id: re.user!.id,
+        registrationId: re.id,
+        firstName: re.user!.firstName ?? '',
+        lastName: re.user!.lastName ?? '',
+        email: re.user!.email ?? '',
+        profilePicture: (re.user as any).profilePicture ?? undefined,
+        type: re.type ?? 'Attendee',
+        createdAt: re.createdAt!,
+      }));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  /**
+   * Build chatroom object: one-to-one chat only.
+   * Attendees list = only people with whom the registrant has a conversation (with last message for list display).
+   * No conversations list in response – use open-chat API to load messages when opening a thread.
    */
   private async buildChatroomForUser(
     registrantUserId: string | undefined,
     eventId: string | undefined,
-    requesterUserId?: string,
-  ): Promise<{ enabled: boolean; attendees: any[]; conversations: any[] }> {
-    const attendees =
-      eventId && registrantUserId
-        ? await this.getRegisteredAttendeesForEvent(eventId, registrantUserId)
-        : [];
-    let conversations: any[] = [];
-    if (
-      eventId &&
-      registrantUserId &&
-      requesterUserId &&
-      registrantUserId === requesterUserId
-    ) {
+    _requesterUserId?: string,
+  ): Promise<{ enabled: boolean; attendees: any[] }> {
+    let chatList: any[] = [];
+    if (eventId && registrantUserId) {
       try {
-        const result = await this.chatService.getEventChats(
-          registrantUserId,
+        const result = await this.chatService.getChatList(registrantUserId, {
           eventId,
-        );
-        conversations = result?.conversations || [];
+          paginationCount: 50,
+          paginationCurrentPage: 1,
+        });
+        chatList = result?.chatList || [];
       } catch {
-        conversations = [];
+        chatList = [];
       }
     }
+    const attendees = chatList.map((c: any) => {
+      const nameParts = (c.userName || 'Unknown').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      return {
+        id: c.userID,
+        firstName,
+        lastName,
+        profilePicture: c.userImage || undefined,
+        lastMessage: c.lastMessage || undefined,
+        lastMessageTime: c.lastMessageTime || undefined,
+        lastMessageSender: c.lastMessageSender || undefined,
+        isLastMessageFromMe: !!c.isLastMessageFromMe,
+        unreadCount: c.unreadCount || 0,
+      };
+    });
     return {
       enabled: true,
       attendees,
-      conversations,
     };
   }
 
@@ -1374,63 +1449,69 @@ export class RegisterEventService {
   }
 
   /**
-   * Export all registered users' event chats as a ZIP (one PDF per user).
-   * Admin only. GET export/event/:eventId/all-chats-zip
+   * Export current user's event chats: only the conversations they have in this event.
+   * If 1 conversation → single PDF. If 2+ → ZIP with one PDF per conversation.
+   * Any authenticated user (must be registered for the event).
    */
-  async exportAllEventChatsAsZip(eventId: string, res: Response): Promise<void> {
+  async exportMyEventChats(eventId: string, currentUserId: string, res: Response): Promise<void> {
     const event = await this.eventRepository.findOne({ where: { id: eventId } });
     if (!event) {
       throw new ResourceNotFoundException('Event', eventId);
     }
-    const eventName = (event as any).name || (event as any).eventName || 'Event';
-    const registrations = await this.registerEventRepository.find({
-      where: { eventId, isRegister: true },
-      relations: ['user'],
+    const registration = await this.registerEventRepository.findOne({
+      where: { eventId, userId: currentUserId, isRegister: true },
     });
-    const seenUserIds = new Set<string>();
-    const users: { id: string; firstName: string; lastName: string }[] = [];
-    for (const re of registrations) {
-      if (re.user && !seenUserIds.has(re.user.id)) {
-        seenUserIds.add(re.user.id);
-        users.push({
-          id: re.user.id,
-          firstName: re.user.firstName || '',
-          lastName: re.user.lastName || '',
-        });
-      }
+    if (!registration) {
+      throw new ForbiddenException('You must be registered for this event to download chats');
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const result = await this.chatService.getEventChats(currentUserId, eventId);
+    const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    if (conversations.length === 0) {
+      throw new NotFoundException('No chats found for this event');
+    }
+
+    const currentUser = await this.userRepository.findOne({ where: { id: currentUserId } });
+    const currentUserName = currentUser
+      ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ').trim() || currentUserId
+      : currentUserId;
+
+    if (conversations.length === 1) {
+      const filename = `event-chat-${new Date().toISOString().split('T')[0]}.pdf`;
+      streamChatPdfToResponse(conversations, res, filename, {
+        userName: currentUserName,
+        eventName,
+        exportUserId: currentUserId,
+      });
+      return;
     }
 
     const archive = archiver('zip', { zlib: { level: 9 } });
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="event-${eventId}-all-chats-${new Date().toISOString().split('T')[0]}.zip"`,
+      `attachment; filename="event-${eventId}-my-chats-${new Date().toISOString().split('T')[0]}.zip"`,
     );
     archive.pipe(res);
 
-    for (const u of users) {
-      try {
-        const result = await this.chatService.getEventChats(u.id, eventId);
-        const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
-          userID: c.userID,
-          userName: c.userName || 'Unknown',
-          messages: (c.messages || []).map((m: any) => ({
-            msg: m.msg,
-            senderID: m.senderID,
-            senderNick: m.senderNick,
-            msgDateUTC: m.msgDateUTC,
-          })),
-        }));
-        const userName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id;
-        const pdfBuffer = await generateChatPdfBuffer(conversations, {
-          userName,
-          eventName,
-        });
-        const safeName = userName.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 80);
-        archive.append(pdfBuffer, { name: `${safeName}-event-chats.pdf` });
-      } catch (err) {
-        this.errorHandler.logError(err, `Export chat for user ${u.id} in event ${eventId}`);
-      }
+    for (const conv of conversations) {
+      const pdfBuffer = await generateChatPdfBuffer([conv], {
+        userName: currentUserName,
+        eventName,
+        exportUserId: currentUserId,
+      });
+      const safeName = (conv.userName || conv.userID).replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
+      archive.append(pdfBuffer, { name: `${safeName}-chat.pdf` });
     }
 
     await archive.finalize();
@@ -1438,9 +1519,17 @@ export class RegisterEventService {
 
   /**
    * Export a single user's event chat as PDF.
-   * Admin only. GET export/event/:eventId/user/:userId/chat-pdf
+   * User can download their own (userId === requesterUserId); admin can download any user's.
    */
-  async exportSingleUserEventChatAsPdf(userId: string, eventId: string, res: Response): Promise<void> {
+  async exportSingleUserEventChatAsPdf(
+    userId: string,
+    eventId: string,
+    res: Response,
+    options: { requesterUserId: string; isAdmin: boolean },
+  ): Promise<void> {
+    if (!options.isAdmin && options.requesterUserId !== userId) {
+      throw new ForbiddenException('You can only download your own chat');
+    }
     const event = await this.eventRepository.findOne({ where: { id: eventId } });
     if (!event) {
       throw new ResourceNotFoundException('Event', eventId);
@@ -1463,7 +1552,11 @@ export class RegisterEventService {
 
     const safeName = userName.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
     const filename = `event-chat-${safeName}-${new Date().toISOString().split('T')[0]}.pdf`;
-    streamChatPdfToResponse(conversations, res, filename, { userName, eventName });
+    streamChatPdfToResponse(conversations, res, filename, {
+      userName,
+      eventName,
+      exportUserId: userId,
+    });
   }
 
   async getPublicParticipants(

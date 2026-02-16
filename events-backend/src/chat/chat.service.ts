@@ -785,6 +785,7 @@ export class ChatService {
           userID: c.userID,
           userName: c.userName,
           userImage: c.userImage,
+          lastMessage: c.lastMessage || '',
           lastMessageTime: c.lastMessageTime,
           unreadCount: c.unreadCount || 0,
           messages: chatData?.aChatOpen || [],

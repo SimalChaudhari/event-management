@@ -168,6 +168,41 @@ export class RegisterEventController {
     }
   }
 
+  /**
+   * Get paginated attendee list for an event with optional search (name, email).
+   * GET event/:eventId/attendees?page=1&limit=20&search=john
+   */
+  @Get('event/:eventId/attendees')
+  async getEventAttendees(
+    @Req() req: Request,
+    @Res() response: Response,
+    @Param('eventId') eventId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    try {
+      const result = await this.registerEventService.getEventAttendeesPaginated(eventId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ?? undefined,
+      });
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Get event attendees', req.user?.id);
+      throw error;
+    }
+  }
+
   @Get('all')
   async getAll(
     @Req() req: Request, 
@@ -244,25 +279,33 @@ export class RegisterEventController {
     }
   }
 
+  /**
+   * Download my event chats: only conversations I have in this event.
+   * 1 conversation → PDF; 2+ → ZIP. Any authenticated user (must be registered for event).
+   */
   @Get('export/event/:eventId/all-chats-zip')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin)
-  async exportAllEventChatsAsZip(
+  async exportMyEventChats(
     @Param('eventId') eventId: string,
     @Res() response: Response,
     @Req() req: Request,
   ) {
     try {
-      await this.registerEventService.exportAllEventChatsAsZip(eventId, response);
+      const userId = req.user?.id;
+      if (!userId) {
+        return response.status(401).json({ success: false, message: 'User authentication required' });
+      }
+      await this.registerEventService.exportMyEventChats(eventId, userId, response);
     } catch (error) {
-      this.errorHandler.logError(error, 'Export all event chats as ZIP', req.user?.id);
+      this.errorHandler.logError(error, 'Export my event chats', req.user?.id);
       throw error;
     }
   }
 
+  /**
+   * Download a user's event chat as single PDF.
+   * User can download own (userId = me); admin can download any user's.
+   */
   @Get('export/event/:eventId/user/:userId/chat-pdf')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin)
   async exportSingleUserEventChatAsPdf(
     @Param('eventId') eventId: string,
     @Param('userId') userId: string,
@@ -270,7 +313,15 @@ export class RegisterEventController {
     @Req() req: Request,
   ) {
     try {
-      await this.registerEventService.exportSingleUserEventChatAsPdf(userId, eventId, response);
+      const requesterUserId = req.user?.id;
+      const isAdmin = req.user?.role === UserRole.Admin;
+      if (!requesterUserId) {
+        return response.status(401).json({ success: false, message: 'User authentication required' });
+      }
+      await this.registerEventService.exportSingleUserEventChatAsPdf(userId, eventId, response, {
+        requesterUserId,
+        isAdmin,
+      });
     } catch (error) {
       this.errorHandler.logError(error, 'Export single user event chat as PDF', req.user?.id);
       throw error;
