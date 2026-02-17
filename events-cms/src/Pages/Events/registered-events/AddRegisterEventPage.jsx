@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button, Row, Col, Container } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -187,6 +187,41 @@ const AddRegisterEventPage = () => {
         loadEvents(searchTerm, 1, false);
     }, [loadEvents]);
 
+    // Build user options: in edit mode include currentUser so selected value displays correctly
+    const userOptions = useMemo(() => {
+        const list = users.map(user => {
+            const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+            const name = fullName ? (user.email ? `${fullName} (${user.email})` : fullName) : (user.email || user.id);
+            return { id: user.id, name };
+        });
+        if (id && currentUser && formData.userId) {
+            const hasCurrent = list.some(o => o.id === currentUser.id);
+            if (!hasCurrent) {
+                const fullName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
+                const name = fullName ? (currentUser.email ? `${fullName} (${currentUser.email})` : fullName) : (currentUser.email || currentUser.id);
+                list.unshift({ id: currentUser.id, name });
+            }
+        }
+        return list;
+    }, [users, id, currentUser, formData.userId]);
+
+    // Build event options: in edit mode include currentEvent so selected value displays correctly
+    const eventOptions = useMemo(() => {
+        const list = events.map(event => ({
+            id: event.id,
+            name: `${event.name || event.eventName || 'Event'} - ${event.startDate ? new Date(event.startDate).toLocaleDateString() : ''}`
+        }));
+        if (id && currentEvent && formData.eventId) {
+            const hasCurrent = list.some(o => o.id === currentEvent.id);
+            if (!hasCurrent) {
+                const eventName = currentEvent.name || currentEvent.eventName || 'Event';
+                const dateStr = currentEvent.startDate ? new Date(currentEvent.startDate).toLocaleDateString() : '';
+                list.unshift({ id: currentEvent.id, name: `${eventName} - ${dateStr}` });
+            }
+        }
+        return list;
+    }, [events, id, currentEvent, formData.eventId]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -262,10 +297,7 @@ const AddRegisterEventPage = () => {
                                                 name="userId"
                                                 value={formData.userId}
                                                 onChange={handleInputChange}
-                                                options={users.map(user => ({
-                                                    id: user.id,
-                                                    name: `${user.firstName} ${user.lastName}${user.email ? ` (${user.email})` : ''}`
-                                                }))}
+                                                options={userOptions}
                                                 onLoadMore={handleLoadMoreUsers}
                                                 hasMore={userPage < userPagination.totalPages}
                                                 loading={userLoading}
@@ -277,11 +309,6 @@ const AddRegisterEventPage = () => {
                                                 onOpen={handleUserDropdownOpen}
                                                 onSearch={handleUserSearch}
                                             />
-                                            {id && currentUser && (
-                                                <small className="text-info">
-                                                    Current: {currentUser.firstName} {currentUser.lastName} ({currentUser.email})
-                                                </small>
-                                            )}
                                         </Col>
 
                                         <Col sm={12}>
@@ -290,10 +317,7 @@ const AddRegisterEventPage = () => {
                                                 name="eventId"
                                                 value={formData.eventId}
                                                 onChange={handleInputChange}
-                                                options={events.map(event => ({
-                                                    id: event.id,
-                                                    name: `${event.name} - ${new Date(event.startDate).toLocaleDateString()}`
-                                                }))}
+                                                options={eventOptions}
                                                 onLoadMore={handleLoadMoreEvents}
                                                 hasMore={eventPage < eventPagination.totalPages}
                                                 loading={eventLoading}
@@ -305,12 +329,6 @@ const AddRegisterEventPage = () => {
                                                 onOpen={handleEventDropdownOpen}
                                                 onSearch={handleEventSearch}
                                             />
-                                            {id && currentEvent && (
-                                                <small className="text-info">
-                                                    Current: {currentEvent.name} (
-                                                    {new Date(currentEvent.startDate).toLocaleDateString()})
-                                                </small>
-                                            )}
                                         </Col>
 
                                         <Col sm={12}>

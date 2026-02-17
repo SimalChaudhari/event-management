@@ -668,10 +668,27 @@ export class ChatService {
         };
       }
 
-      // Filter threads that have messages
-      let threadsWithMessages = participants.filter(p => 
-        p.thread && p.thread.lastMessage && p.thread.lastMessage.trim() !== ''
-      );
+      const threadIds = participants.map((p) => p.thread?.threadID).filter(Boolean) as string[];
+      let threadIdsWithMessagesInDb: Set<string> = new Set();
+      if (threadIds.length > 0) {
+        const rows = await this.messageRepo
+          .createQueryBuilder('m')
+          .select('DISTINCT m.threadID')
+          .where('m.threadID IN (:...threadIds)', { threadIds })
+          .getRawMany();
+        rows.forEach((r: any) => {
+          const id = r.m_threadID ?? r.threadID ?? Object.values(r)[0];
+          if (id) threadIdsWithMessagesInDb.add(String(id));
+        });
+      }
+
+      // Filter threads that have messages (either lastMessage set on thread, or at least one message in DB)
+      let threadsWithMessages = participants.filter((p) => {
+        if (!p.thread) return false;
+        const hasLastMessage = p.thread.lastMessage && p.thread.lastMessage.trim() !== '';
+        const hasMessagesInDb = threadIdsWithMessagesInDb.has(p.thread.threadID);
+        return hasLastMessage || hasMessagesInDb;
+      });
 
       // When eventId provided: only threads for this event chatroom (thread.eventId = eventId) and other user is registered attendee
       if (eventAttendeeIds !== null) {

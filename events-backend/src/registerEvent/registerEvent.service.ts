@@ -1,8 +1,11 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
@@ -47,6 +50,19 @@ import { ChatService } from '../chat/chat.service';
 import { Response } from 'express';
 import archiver from 'archiver';
 import { generateChatPdfBuffer, streamChatPdfToResponse, ConversationForExport } from '../utils/chat-export.utils';
+import {
+  ensureChatExportDir,
+  getChatExportAllUsersKey,
+  getChatExportKey,
+  getChatExportMyChatsKey,
+  getChatExportPublicPath,
+  isChatExportFileValid,
+  scheduleDeleteAfterTtl,
+  startChatExportCleanupInterval,
+  writeChatExportPdfAndScheduleDelete,
+} from '../utils/chat-export-download.util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface PublicParticipantDto {
   registrationId: string;
@@ -62,7 +78,7 @@ export interface PublicParticipantDto {
 }
 
 @Injectable()
-export class RegisterEventService {
+export class RegisterEventService implements OnModuleInit {
   constructor(
     @InjectRepository(RegisterEvent)
     private readonly registerEventRepository: Repository<RegisterEvent>,
@@ -115,6 +131,10 @@ export class RegisterEventService {
     private readonly chatService: ChatService,
     @Optional() private readonly attendanceGateway?: AttendanceGateway,
   ) {}
+
+  onModuleInit() {
+    startChatExportCleanupInterval();
+  }
 
   /**
    * For multi-event orders: attach this event's price, name, and discount-aware amounts
@@ -908,7 +928,8 @@ export class RegisterEventService {
       const qb = this.registerEventRepository
         .createQueryBuilder('re')
         .innerJoinAndSelect('re.user', 'user')
-        .where('re.eventId = :eventId', { eventId });
+        .where('re.eventId = :eventId', { eventId })
+        .andWhere('(re.isRegister = :isRegister OR re.isRegister IS NULL)', { isRegister: true });
       if (excludeUserId) {
         qb.andWhere('re.userId != :excludeUserId', { excludeUserId });
       }
@@ -1445,8 +1466,7 @@ export class RegisterEventService {
   }
 
   /**
-   * Export current user's event chats: only the conversations they have in this event.
-   * If 1 conversation → single PDF. If 2+ → ZIP with one PDF per conversation.
+   * Export current user's event chats: always ZIP with one PDF per conversation (even if only 1).
    * Any authenticated user (must be registered for the event).
    */
   async exportMyEventChats(eventId: string, currentUserId: string, res: Response): Promise<void> {
@@ -1482,16 +1502,6 @@ export class RegisterEventService {
       ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ').trim() || currentUserId
       : currentUserId;
 
-    if (conversations.length === 1) {
-      const filename = `event-chat-${new Date().toISOString().split('T')[0]}.pdf`;
-      streamChatPdfToResponse(conversations, res, filename, {
-        userName: currentUserName,
-        eventName,
-        exportUserId: currentUserId,
-      });
-      return;
-    }
-
     const archive = archiver('zip', { zlib: { level: 9 } });
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader(
@@ -1511,6 +1521,218 @@ export class RegisterEventService {
     }
 
     await archive.finalize();
+  }
+
+  /**
+   * Generate download URL for the current user's own event chats as ZIP only (always ZIP, even if 1 conversation).
+   * Each user gets their own link; User 1 gets only their chats, User 2 gets only their chats, etc.
+   */
+  async createMyEventChatsZipDownloadLink(eventId: string, currentUserId: string): Promise<string> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const registration = await this.registerEventRepository.findOne({
+      where: { eventId, userId: currentUserId, isRegister: true },
+    });
+    if (!registration) {
+      throw new ForbiddenException('You must be registered for this event to download chats');
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const result = await this.chatService.getEventChats(currentUserId, eventId);
+    const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    if (conversations.length === 0) {
+      throw new NotFoundException('No chats found for this event');
+    }
+
+    const currentUser = await this.userRepository.findOne({ where: { id: currentUserId } });
+    const currentUserName = currentUser
+      ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ').trim() || currentUserId
+      : currentUserId;
+
+    const dir = ensureChatExportDir();
+    const key = getChatExportMyChatsKey(eventId, currentUserId);
+    const filePath = path.join(dir, key);
+
+    if (isChatExportFileValid(filePath)) {
+      return getChatExportPublicPath(key);
+    }
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    const writeStream = fs.createWriteStream(filePath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(writeStream);
+
+    for (const conv of conversations) {
+      const pdfBuffer = await generateChatPdfBuffer([conv], {
+        userName: currentUserName,
+        eventName,
+        exportUserId: currentUserId,
+      });
+      const safeName = (conv.userName || conv.userID).replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
+      archive.append(pdfBuffer, { name: `${safeName}-chat.pdf` });
+    }
+
+    await archive.finalize();
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    scheduleDeleteAfterTtl(filePath);
+    return getChatExportPublicPath(key);
+  }
+
+  /**
+   * Export all registered users' event chats as a ZIP of PDFs (one PDF per user).
+   * Admin only. Streams ZIP to response.
+   */
+  async exportAllUsersEventChatsAsZip(eventId: string, res: Response): Promise<void> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+
+    const registrations = await this.registerEventRepository
+      .createQueryBuilder('registerEvent')
+      .select(['registerEvent.id', 'registerEvent.userId', 'registerEvent.eventId'])
+      .leftJoinAndSelect('registerEvent.user', 'user')
+      .where('registerEvent.eventId = :eventId', { eventId })
+      .andWhere('(registerEvent.isRegister = :isRegister OR registerEvent.isRegister IS NULL)', { isRegister: true })
+      .getMany();
+    if (registrations.length === 0) {
+      throw new NotFoundException('No registered users found for this event');
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="event-${eventId}-all-users-chats-${new Date().toISOString().split('T')[0]}.zip"`,
+    );
+    archive.pipe(res);
+
+    for (const reg of registrations) {
+      const userId = reg.userId;
+      if (!userId) continue;
+      const user = reg.user as any;
+      const userName = user
+        ? [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || userId
+        : userId;
+      const result = await this.chatService.getEventChats(userId, eventId);
+      const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+        userID: c.userID,
+        userName: c.userName || 'Unknown',
+        messages: (c.messages || []).map((m: any) => ({
+          msg: m.msg,
+          senderID: m.senderID,
+          senderNick: m.senderNick,
+          msgDateUTC: m.msgDateUTC,
+        })),
+      }));
+      const hasChat = conversations.some((c) => c.messages && c.messages.length > 0);
+      if (!hasChat) continue;
+      const pdfBuffer = await generateChatPdfBuffer(conversations, {
+        userName,
+        eventName,
+        exportUserId: userId,
+      });
+      const safeName = (userName || userId).replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 50);
+      const uniqueId = userId.slice(0, 8);
+      archive.append(pdfBuffer, { name: `${safeName}-${uniqueId}-chat.pdf` });
+    }
+
+    await archive.finalize();
+  }
+
+  /**
+   * Generate download URL for all-users chats ZIP. Admin only.
+   * Reuses existing ZIP if &lt; 5 min old. File is auto-deleted after 5 min.
+   */
+  async createAllUsersChatsZipDownloadLink(eventId: string): Promise<string> {
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+
+    const dir = ensureChatExportDir();
+    const key = getChatExportAllUsersKey(eventId);
+    const filePath = path.join(dir, key);
+
+    if (isChatExportFileValid(filePath)) {
+      return getChatExportPublicPath(key);
+    }
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const registrations = await this.registerEventRepository
+      .createQueryBuilder('registerEvent')
+      .select(['registerEvent.id', 'registerEvent.userId', 'registerEvent.eventId'])
+      .leftJoinAndSelect('registerEvent.user', 'user')
+      .where('registerEvent.eventId = :eventId', { eventId })
+      .andWhere('(registerEvent.isRegister = :isRegister OR registerEvent.isRegister IS NULL)', { isRegister: true })
+      .getMany();
+    if (registrations.length === 0) {
+      throw new NotFoundException('No registered users found for this event');
+    }
+
+    const writeStream = fs.createWriteStream(filePath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(writeStream);
+
+    for (const reg of registrations) {
+      const userId = reg.userId;
+      if (!userId) continue;
+      const user = reg.user as any;
+      const userName = user
+        ? [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || userId
+        : userId;
+      const result = await this.chatService.getEventChats(userId, eventId);
+      const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+        userID: c.userID,
+        userName: c.userName || 'Unknown',
+        messages: (c.messages || []).map((m: any) => ({
+          msg: m.msg,
+          senderID: m.senderID,
+          senderNick: m.senderNick,
+          msgDateUTC: m.msgDateUTC,
+        })),
+      }));
+      const hasChat = conversations.some((c) => c.messages && c.messages.length > 0);
+      if (!hasChat) continue;
+      const pdfBuffer = await generateChatPdfBuffer(conversations, {
+        userName,
+        eventName,
+        exportUserId: userId,
+      });
+      const safeName = (userName || userId).replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 50);
+      const uniqueId = userId.slice(0, 8);
+      archive.append(pdfBuffer, { name: `${safeName}-${uniqueId}-chat.pdf` });
+    }
+
+    await archive.finalize();
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    scheduleDeleteAfterTtl(filePath);
+    return getChatExportPublicPath(key);
   }
 
   /**
@@ -1553,6 +1775,61 @@ export class RegisterEventService {
       eventName,
       exportUserId: userId,
     });
+  }
+
+  /**
+   * Generate single user's event chat PDF, save to uploads/chat-exports, return public download URL.
+   * Reuses existing PDF for same user+event if file is less than 5 minutes old (no duplicate generation).
+   * Files are auto-deleted 5 minutes after creation (see chat-export-download.util).
+   */
+  async createChatPdfDownloadLink(
+    userId: string,
+    eventId: string,
+    options: { requesterUserId: string; isAdmin: boolean },
+  ): Promise<string> {
+    if (!options.isAdmin && options.requesterUserId !== userId) {
+      throw new ForbiddenException('You can only create a download link for your own chat');
+    }
+
+    const dir = ensureChatExportDir();
+    const key = getChatExportKey(eventId, userId);
+    const filePath = path.join(dir, key);
+
+    if (isChatExportFileValid(filePath)) {
+      return getChatExportPublicPath(key);
+    }
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') || userId : userId;
+
+    const result = await this.chatService.getEventChats(userId, eventId);
+    const conversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    const pdfBuffer = await generateChatPdfBuffer(conversations, {
+      userName,
+      eventName,
+      exportUserId: userId,
+    });
+
+    writeChatExportPdfAndScheduleDelete(filePath, pdfBuffer);
+    return getChatExportPublicPath(key);
   }
 
   async getPublicParticipants(

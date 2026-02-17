@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus, Query, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { RegisterEventService } from './registerEvent.service';
 import { CreateRegisterEventDto, UpdateRegisterEventDto, AdminCreateRegisterEventDto } from './registerEvent.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -302,7 +302,32 @@ export class RegisterEventController {
   }
 
   /**
-   * Download a user's event chat as single PDF.
+   * Get a one-time download link for a user's event chat PDF.
+   * Requires JWT. Returns downloadUrl (e.g. /uploads/chat-exports/xxx.pdf) that works without token.
+   */
+  @Get('export/event/:eventId/user/:userId/chat-pdf/download-url')
+  async getSingleUserEventChatPdfDownloadUrl(
+    @Param('eventId') eventId: string,
+    @Param('userId') userId: string,
+    @Req() req: Request,
+  ) {
+    const requesterUserId = req.user?.id;
+    const isAdmin = req.user?.role === UserRole.Admin;
+    if (!requesterUserId) {
+      throw new UnauthorizedException('User authentication required');
+    }
+    if (!isAdmin && requesterUserId !== userId) {
+      throw new ForbiddenException('You can only get the download URL for your own chat');
+    }
+    const downloadUrl = await this.registerEventService.createChatPdfDownloadLink(userId, eventId, {
+      requesterUserId,
+      isAdmin: !!isAdmin,
+    });
+    return { success: true, downloadUrl };
+  }
+
+  /**
+   * Download a user's event chat as single PDF (stream, requires JWT).
    * User can download own (userId = me); admin can download any user's.
    */
   @Get('export/event/:eventId/user/:userId/chat-pdf')
@@ -324,6 +349,56 @@ export class RegisterEventController {
       });
     } catch (error) {
       this.errorHandler.logError(error, 'Export single user event chat as PDF', req.user?.id);
+      throw error;
+    }
+  }
+
+  /**
+   * Get download URL for my own event chats only (ZIP or PDF). Each user gets their own link.
+   * User 1 → link to User 1's chats; User 2 → link to User 2's chats; no token needed to open link.
+   */
+  @Get('export/event/:eventId/all-chats-zip/download-url')
+  async getMyEventChatsZipDownloadUrl(
+    @Param('eventId') eventId: string,
+    @Req() req: Request,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('User authentication required');
+    }
+    const downloadUrl = await this.registerEventService.createMyEventChatsZipDownloadLink(eventId, userId);
+    return { success: true, downloadUrl };
+  }
+
+  /**
+   * Get download URL for all-users chats ZIP (one ZIP with every user's PDF). Admin only.
+   */
+  @Get('export/event/:eventId/all-users-chats-zip/download-url')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async getAllUsersChatsZipDownloadUrl(
+    @Param('eventId') eventId: string,
+    @Req() req: Request,
+  ) {
+    const downloadUrl = await this.registerEventService.createAllUsersChatsZipDownloadLink(eventId);
+    return { success: true, downloadUrl };
+  }
+
+  /**
+   * Download all registered users' event chats as one ZIP (one PDF per user). Admin only.
+   */
+  @Get('export/event/:eventId/all-users-chats-zip')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.Admin)
+  async exportAllUsersEventChatsAsZip(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Req() req: Request,
+  ) {
+    try {
+      await this.registerEventService.exportAllUsersEventChatsAsZip(eventId, response);
+    } catch (error) {
+      this.errorHandler.logError(error, 'Export all users event chats ZIP', req.user?.id);
       throw error;
     }
   }
