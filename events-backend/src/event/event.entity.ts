@@ -184,6 +184,10 @@ export class Event {
   })
   programmeTracks!: ProgrammeTrack[];
   
+  // Optional limit on number of stamps - if set, only this many exhibitor stamps will be auto-created
+  @Column({ type: 'int', nullable: true })
+  numberOfStampsRequired?: number;
+
   // Tab visibility configuration - JSON object to control which tabs are visible
   @Column({ type: 'json', nullable: true })
   tabVisibility?: {

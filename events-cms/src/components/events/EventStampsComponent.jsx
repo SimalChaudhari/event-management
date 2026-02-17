@@ -80,14 +80,32 @@ const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick 
                                 objectFit: 'cover'
                             }}
                             onError={(e) => {
-                                // Show placeholder instead of hiding
                                 e.target.style.display = 'none';
-                                const placeholder = e.target.parentElement.querySelector('.image-placeholder');
-                                if (placeholder) {
-                                    placeholder.style.display = 'flex';
-                                }
+                                const placeholder = e.target.parentElement.querySelector('.stamp-image-placeholder');
+                                if (placeholder) placeholder.style.display = 'flex';
                             }}
                         />
+                        <div
+                            className="stamp-image-placeholder"
+                            style={{
+                                display: 'none',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#e9ecef',
+                                padding: '10px'
+                            }}
+                        >
+                            <i className="fas fa-image fa-2x text-muted mb-2"></i>
+                            <div style={{ fontSize: '12px', fontWeight: '600', textAlign: 'center', color: '#6c757d' }}>
+                                {boothNumber}
+                            </div>
+                        </div>
                         <div style={{
                             position: 'absolute',
                             bottom: 0,

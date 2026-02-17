@@ -1,5 +1,6 @@
 // src/services/event.service.ts
 import { Injectable, forwardRef, Inject } from '@nestjs/common';
+import { ExhibitorService } from '../exhibitor/exhibitor.service';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventDto, EventType } from './event.dto';
@@ -160,6 +161,8 @@ export class EventService {
     private readonly qnaUtils: QnaUtils,
     private readonly filterService: FilterService,
     private readonly eventStampService: EventStampService,
+    @Inject(forwardRef(() => ExhibitorService))
+    private readonly exhibitorService: ExhibitorService,
   ) {}
 
   async createEvent(eventDto: EventDto) {
@@ -313,6 +316,11 @@ export class EventService {
       // Associate stamps to event
       if (allStampIds.length > 0) {
         await this.eventStampService.associateStampsToEvent(savedEvent.id, allStampIds);
+      }
+
+      // Auto-create stamps for exhibitors (with logo and name), respecting numberOfStampsRequired
+      if (eventDto.exhibitorIds) {
+        await this.exhibitorService.autoCreateStampsForEventExhibitors(savedEvent.id);
       }
 
       return savedEvent;
@@ -1296,18 +1304,17 @@ export class EventService {
           // Remove duplicates and filter to valid UUIDs (36 chars)
           const uniqueIds = [...new Set(validIds)].filter(id => id.length === 36);
           
-          // Validate that all stamp IDs exist
+          // Validate stamp IDs - skip ones that no longer exist (e.g. deleted when exhibitor removed)
           for (const stampId of uniqueIds) {
             try {
               const trimmedId = String(stampId).trim();
               await this.eventStampService.findOne(trimmedId);
               allStampIds.push(trimmedId);
             } catch (error: any) {
-              // Only throw if it's a NotFoundException, otherwise log and continue
               if (error?.name === 'NotFoundException' || error?.constructor?.name === 'NotFoundException') {
-                throw new ValidationException(`Event stamp with ID "${stampId}" not found`);
+                // Stamp may have been deleted (e.g. exhibitor removed) - skip it
+                continue;
               }
-              // Log other errors but don't fail the update
               console.error(`Error validating event stamp ID ${stampId}:`, error);
             }
           }
@@ -1315,6 +1322,11 @@ export class EventService {
         
         // Associate stamps to event (this will replace existing associations)
         await this.eventStampService.associateStampsToEvent(id, allStampIds);
+      }
+
+      // Auto-create stamps for exhibitors when exhibitors are added/updated (adds to existing)
+      if (eventDto.exhibitorIds !== undefined) {
+        await this.exhibitorService.autoCreateStampsForEventExhibitors(id);
       }
 
       return updatedEvent;
@@ -1859,6 +1871,12 @@ export class EventService {
             .filter((id): id is string => id !== undefined);
 
           if (exhibitorIdsToRemove.length > 0) {
+            // Remove stamps for removed exhibitors
+            await this.exhibitorService.removeStampsForExhibitorsFromEvent(
+              eventId,
+              exhibitorIdsToRemove,
+            );
+
             // Delete EventBooth records for removed exhibitors
             await this.eventBoothRepository.delete({
               eventId,
@@ -1896,6 +1914,22 @@ export class EventService {
             }
           }),
         );
+
+        // Remove all exhibitor stamps from this event
+        const allExhibitorIds = (
+          await this.eventExhibitorRepository.find({
+            where: { eventId },
+            select: ['exhibitorId'],
+          })
+        )
+          .map((ee) => ee.exhibitorId)
+          .filter((id): id is string => !!id);
+        if (allExhibitorIds.length > 0) {
+          await this.exhibitorService.removeStampsForExhibitorsFromEvent(
+            eventId,
+            allExhibitorIds,
+          );
+        }
 
         // Delete all EventBooth and EventExhibitor records
         await this.eventBoothRepository.delete({ eventId });

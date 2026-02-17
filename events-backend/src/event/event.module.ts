@@ -54,6 +54,7 @@ import { ScheduledPushNotification } from '../scheduled-push-notification/schedu
 import { EventQRCode } from '../attendance/event-qr-code.entity';
 import { ContactExchange } from '../attendance/contact-exchange.entity';
 import { Coupon } from '../coupon/coupon.entity';
+import { ExhibitorModule } from '../exhibitor/exhibitor.module';
 
 @Module({
     imports: [
@@ -118,6 +119,7 @@ import { Coupon } from '../coupon/coupon.entity';
       AgendaModule,
       ProgrammeModule,
       FilterModule, // Import FilterModule for pagination
+      forwardRef(() => ExhibitorModule),
     ],
     providers: [EventService, EventStampService, ErrorHandlerService, EmailService, EventNotificationService, NotificationUtil],
     controllers: [EventController, EventStampController],

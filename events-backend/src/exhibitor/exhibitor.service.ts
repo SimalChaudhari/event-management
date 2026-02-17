@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Exhibitor } from './exhibitor.entity';
 import { ExhibitorLead } from './exhibitor-lead.entity';
@@ -177,44 +177,33 @@ export class ExhibitorService {
           continue;
         }
 
-        // Check if stamp already exists for this exhibitor and event
-        // We'll use boothNumber as the name, so check if a stamp with that name already exists
+        // Check if stamp already exists for this exhibitor and event (prevent duplicate company stamps)
         const stampName = exhibitorEntity.boothNumber || exhibitorEntity.companyName || 'Exhibitor Stamp';
         
-        // Check if stamp with this name already exists for this event
         const existingStamps = await this.eventStampEventRepository.find({
           where: { eventId: event.id },
           relations: ['eventStamp'],
         });
 
+        // Skip if stamp for this exhibitor (by exhibitorId or name) already exists
         const existingStamp = existingStamps.find(
-          (ese) => ese.eventStamp.name === stampName
+          (ese) =>
+            ese.eventStamp.exhibitorId === exhibitorEntity.id ||
+            ese.eventStamp.name === stampName
         );
 
         if (existingStamp) {
-          // Stamp already exists, skip
           continue;
         }
 
-        // Determine stamp image: use logo if available, otherwise use default from existing stamps
-        let stampImage: string | undefined = exhibitorEntity.logo;
+        // Use exhibitor logo if available, otherwise default (never copy another stamp's logo)
+        const stampImage = exhibitorEntity.logo || ExhibitorService.DEFAULT_STAMP_IMAGE;
 
-        if (!stampImage) {
-          // Find an existing stamp from this event to use as default
-          const eventStamps = existingStamps
-            .map((ese) => ese.eventStamp)
-            .filter((stamp) => stamp.image);
-
-          if (eventStamps.length > 0) {
-            // Use the first existing stamp's image as default
-            stampImage = eventStamps[0].image;
-          }
-        }
-
-        // Create the stamp
+        // Create the stamp with exhibitorId for duplicate prevention
         const newStamp = this.eventStampRepository.create({
           name: stampName,
           image: stampImage,
+          exhibitorId: exhibitorEntity.id,
         });
 
         const savedStamp = await this.eventStampRepository.save(newStamp);
@@ -231,6 +220,131 @@ export class ExhibitorService {
       // Log error but don't throw - we don't want to fail exhibitor creation if stamp creation fails
       console.error('Error in autoCreateStampForExhibitor:', error);
       throw error;
+    }
+  }
+
+  /** Default placeholder image when exhibitor has no logo. Add file at uploads/defaults/default.png */
+  private static readonly DEFAULT_STAMP_IMAGE = 'uploads/defaults/placeholder.png';
+
+  /**
+   * Remove stamps for exhibitors when they are removed from an event.
+   * Deletes EventStampEvent and EventStamp for each exhibitor's stamp in this event.
+   */
+  async removeStampsForExhibitorsFromEvent(
+    eventId: string,
+    exhibitorIds: string[],
+  ): Promise<void> {
+    if (!exhibitorIds?.length) return;
+    try {
+      const stampsToRemove = await this.eventStampRepository.find({
+        where: { exhibitorId: In(exhibitorIds) },
+      });
+      if (!stampsToRemove.length) return;
+
+      const stampIds = stampsToRemove.map((s) => s.id);
+      const linkedToThisEvent = await this.eventStampEventRepository.find({
+        where: { eventId, eventStampId: In(stampIds) },
+      });
+      if (!linkedToThisEvent.length) return;
+
+      const stampIdsToDelete = linkedToThisEvent.map((ese) => ese.eventStampId);
+      await this.eventStampEventRepository.delete({
+        eventId,
+        eventStampId: In(stampIdsToDelete),
+      });
+      await this.eventStampRepository.delete({ id: In(stampIdsToDelete) });
+    } catch (error) {
+      console.error('Error in removeStampsForExhibitorsFromEvent:', error);
+    }
+  }
+
+  /**
+   * Auto-create stamps for exhibitors when they are added to an event.
+   * Creates stamps with company name and logo. Respects numberOfStampsRequired limit.
+   * Skips exhibitors that already have a stamp (no duplicate company stamps).
+   */
+  async autoCreateStampsForEventExhibitors(eventId: string): Promise<void> {
+    try {
+      const event = await this.eventRepository.findOne({
+        where: { id: eventId },
+      });
+      if (!event) return;
+
+      // Stamp feature must be enabled
+      if (event.tabVisibility?.stamps === false) return;
+
+      const { EventExhibitor } = await import('../event/event.entity');
+      const eventExhibitorRepository = this.exhibitorRepository.manager.getRepository(EventExhibitor);
+
+      const eventExhibitors = await eventExhibitorRepository.find({
+        where: { eventId },
+        relations: ['exhibitor'],
+        order: { id: 'ASC' },
+      });
+
+      if (!eventExhibitors?.length) return;
+
+      const existingStampEvents = await this.eventStampEventRepository.find({
+        where: { eventId },
+        relations: ['eventStamp'],
+      });
+      const currentStampCount = existingStampEvents.length;
+      const exhibitorIdsWithStamps = new Set(
+        existingStampEvents
+          .filter((ese) => ese.eventStamp?.exhibitorId)
+          .map((ese) => ese.eventStamp!.exhibitorId!)
+      );
+      const stampNamesSet = new Set(
+        existingStampEvents
+          .filter((ese) => ese.eventStamp?.name)
+          .map((ese) => ese.eventStamp!.name)
+      );
+
+      const numberOfStampsRequired = event.numberOfStampsRequired;
+      let stampsCreated = 0;
+
+      for (const eventExhibitor of eventExhibitors) {
+        const exhibitor = eventExhibitor.exhibitor;
+        if (!exhibitor) continue;
+
+        // Check limit
+        if (
+          numberOfStampsRequired != null &&
+          currentStampCount + stampsCreated >= numberOfStampsRequired
+        ) {
+          break;
+        }
+
+        const stampName = exhibitor.boothNumber || exhibitor.companyName || 'Exhibitor Stamp';
+
+        // Skip if stamp for this exhibitor already exists (no duplicate)
+        if (exhibitorIdsWithStamps.has(exhibitor.id) || stampNamesSet.has(stampName)) {
+          continue;
+        }
+
+        // Use exhibitor logo if available, otherwise default (never copy another stamp's logo)
+        const stampImage = exhibitor.logo || ExhibitorService.DEFAULT_STAMP_IMAGE;
+
+        const newStamp = this.eventStampRepository.create({
+          name: stampName,
+          image: stampImage,
+          exhibitorId: exhibitor.id,
+        });
+        const savedStamp = await this.eventStampRepository.save(newStamp);
+
+        const stampEvent = this.eventStampEventRepository.create({
+          eventId,
+          eventStampId: savedStamp.id,
+        });
+        await this.eventStampEventRepository.save(stampEvent);
+
+        stampsCreated++;
+        exhibitorIdsWithStamps.add(exhibitor.id);
+        stampNamesSet.add(stampName);
+      }
+    } catch (error) {
+      console.error('Error in autoCreateStampsForEventExhibitors:', error);
+      // Don't throw - avoid failing event create/update
     }
   }
 
@@ -545,29 +659,26 @@ export class ExhibitorService {
       // Note: boothBanner cleanup is handled in updateExhibitorBoothBanner method
       await ExhibitorFileUtils.cleanupRemovedFiles(existingExhibitor, exhibitorDto, this.errorHandler);
       
-      // Check if logo is being added or changed
+      // Check if logo is being added, changed, or removed
       const oldLogo = existingExhibitor.logo || '';
-      const newLogo = exhibitorDto.logo || '';
-      const logoIsChanged = oldLogo.trim() !== newLogo.trim() && newLogo.trim() !== '';
+      const newLogo = exhibitorDto.logo ?? '';
+      const logoIsChanged = oldLogo.trim() !== newLogo.trim();
+      const logoAddedOrChanged = logoIsChanged && newLogo.trim() !== '';
+      const logoRemoved = logoIsChanged && oldLogo.trim() !== '' && newLogo.trim() === '';
       
       Object.assign(existingExhibitor, exhibitorDto);
       const savedExhibitor = await this.exhibitorRepository.save(existingExhibitor);
       
-      // If logo is being added or changed, update all stamps for this exhibitor
-      if (logoIsChanged && exhibitorDto.logo) {
+      // Auto-sync stamp images when exhibitor logo is updated
+      if (logoAddedOrChanged || logoRemoved) {
         try {
-          if (oldLogo.trim() === '') {
-            console.log(`🔄 [EXHIBITOR UPDATE] Logo added for exhibitor ${id}, updating stamps...`);
-          } else {
-            console.log(`🔄 [EXHIBITOR UPDATE] Logo changed for exhibitor ${id}, updating stamps...`);
-            console.log(`   [EXHIBITOR UPDATE] Old logo: ${oldLogo}`);
-            console.log(`   [EXHIBITOR UPDATE] New logo: ${exhibitorDto.logo}`);
-          }
-          await this.updateStampsWithLogo(id, exhibitorDto.logo);
-          console.log(`✅ [EXHIBITOR UPDATE] All stamps updated with new logo`);
+          const imageToUse =
+            logoAddedOrChanged && exhibitorDto.logo?.trim()
+              ? exhibitorDto.logo
+              : ExhibitorService.DEFAULT_STAMP_IMAGE;
+          await this.updateStampsWithLogo(id, imageToUse);
         } catch (stampUpdateError) {
-          // Log error but don't fail exhibitor update if stamp update fails
-          console.error(`❌ [EXHIBITOR UPDATE] Failed to update stamps with logo:`, stampUpdateError);
+          console.error(`❌ [EXHIBITOR UPDATE] Failed to sync stamps with logo:`, stampUpdateError);
         }
       }
 

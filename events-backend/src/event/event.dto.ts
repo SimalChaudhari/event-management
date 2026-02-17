@@ -10,6 +10,8 @@ import {
   IsUUID,
   IsArray,
   IsNumber,
+  IsInt,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Column } from 'typeorm';
@@ -125,6 +127,12 @@ export class EventDto {
 
   @IsOptional()
   exhibitorIds?: string; // Add this field
+
+  // Optional limit: only this many exhibitor stamps will be auto-created. If not set, all exhibitors get stamps.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  numberOfStampsRequired?: number;
   
   // Floor plan - single image
   @IsOptional()

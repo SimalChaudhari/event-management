@@ -77,6 +77,7 @@ function AddEventPage() {
         backgroundImage: null,
         exhibitorIds: [],
         exhibitorDescription: '',
+        numberOfStampsRequired: '', // Optional limit: only this many exhibitor stamps auto-created
         eventStampDescription: '', // Description for event stamps
         eventStampIds: [], // Array of existing stamp IDs to associate
         newStamps: [], // Array of new stamps to create: [{ name: string, image: File }]
@@ -492,6 +493,7 @@ function AddEventPage() {
                         backgroundImage: backgroundImageData,
                         exhibitorIds: exhibitorIds,
                         exhibitorDescription: exhibitorDescription,
+                        numberOfStampsRequired: editData.numberOfStampsRequired ?? '',
                         eventStampDescription: editData.eventStampDescription || '',
                         eventStampIds: eventStampIdsData,
                         newStamps: [],
@@ -734,6 +736,7 @@ function AddEventPage() {
             backgroundImage: null,
             exhibitorIds: [],
             exhibitorDescription: '',
+            numberOfStampsRequired: '',
             eventStampDescription: '',
             eventStampIds: [],
             newStamps: []
@@ -889,6 +892,11 @@ function AddEventPage() {
                 formDataToSend.append('exhibitorIds', exhibitorsArray.join(','));
             } else if (key === 'exhibitorDescription') {
                 formDataToSend.append('exhibitorDescription', dataToSend[key]);
+            } else if (key === 'numberOfStampsRequired') {
+                const val = dataToSend[key];
+                if (val !== '' && val !== null && val !== undefined && !isNaN(Number(val))) {
+                    formDataToSend.append('numberOfStampsRequired', String(Math.max(1, parseInt(val, 10))));
+                }
             } else if (key === 'eventStampDescription') {
                 formDataToSend.append('eventStampDescription', dataToSend[key] || '');
             } else if (key === 'eventStampIds') {
@@ -2089,8 +2097,40 @@ function AddEventPage() {
 
                                     <Col sm={12}>
                                         <div className="form-group" style={{ marginTop: '10px' }}>
-                                          
-                                            
+                                            <label htmlFor="numberOfStampsRequired" style={{ 
+                                                display: 'block', 
+                                                marginBottom: '10px', 
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500',
+                                                color: '#4680ff'
+                                            }}>
+                                                Number of Stamps Required (Optional)
+                                            </label>
+                                            <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: '10px' }}>
+                                                Limit how many exhibitor stamps are auto-created. Leave empty to create stamps for all exhibitors.
+                                            </p>
+                                            <Form.Control
+                                                type="number"
+                                                id="numberOfStampsRequired"
+                                                min="1"
+                                                placeholder="e.g. 10"
+                                                value={formData.numberOfStampsRequired ?? ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        numberOfStampsRequired: val === '' ? '' : (parseInt(val, 10) || '')
+                                                    }));
+                                                }}
+                                                style={{ maxWidth: '200px' }}
+                                            />
+                                        </div>
+                                    </Col>
+
+                                    {/* Event Stamp section - only shown in EDIT mode (stamps auto-created from exhibitors at create time) */}
+                                    {id && (
+                                    <Col sm={12}>
+                                        <div className="form-group" style={{ marginTop: '10px' }}>
                                             {/* Event Stamp Description */}
                                             <div className="form-group" style={{ marginBottom: '20px' }}>
                                                 <label htmlFor="eventStampDescription" style={{ 
@@ -2429,26 +2469,6 @@ function AddEventPage() {
                                                                             </div>
                                                                         </div>
                                                                     )}
-                                                                    <Button
-                                                                        variant="danger"
-                                                                        size="sm"
-                                                                        onClick={() => handleRemoveExistingStamp(stamp.id)}
-                                                                        style={{
-                                                                            position: 'absolute',
-                                                                            top: '5px',
-                                                                            right: '5px',
-                                                                            padding: '2px 6px',
-                                                                            fontSize: '10px',
-                                                                            borderRadius: '50%',
-                                                                            width: '24px',
-                                                                            height: '24px',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'center'
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </Button>
                                                                 </div>
                                                             );
                                                         })}
@@ -2463,6 +2483,7 @@ function AddEventPage() {
                                             </div>
                                         </div>
                                     </Col>
+                                    )}
 
                                     <Col sm={12}>
                                         <div className="form-group fill">

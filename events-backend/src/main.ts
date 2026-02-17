@@ -53,12 +53,21 @@ async function bootstrap() {
 
     // Serve static files from uploads directory
     const uploadsPath = join(__dirname, '..', 'uploads');
-    // Check if uploads directory exists
     if (!fs.existsSync(uploadsPath)) {
-      console.warn(`⚠️ Uploads directory does not exist: ${uploadsPath}`);
       fs.mkdirSync(uploadsPath, { recursive: true });
     }
-    
+    // Ensure default stamp placeholder exists
+    const defaultsDir = join(uploadsPath, 'defaults');
+    const defaultStampPath = join(defaultsDir, 'default.png');
+    if (!fs.existsSync(defaultStampPath)) {
+      if (!fs.existsSync(defaultsDir)) fs.mkdirSync(defaultsDir, { recursive: true });
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      fs.writeFileSync(defaultStampPath, png);
+    }
+
     app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
 
     app.enableCors({
