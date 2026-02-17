@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Button, Form, Container, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Button, Form, Spinner } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
@@ -16,6 +16,20 @@ const defaultForm = {
     usageLimit: '1',
     validFrom: '',
     validTo: ''
+};
+
+const sectionLabelStyle = {
+    display: 'block',
+    marginBottom: '12px',
+    marginTop: '24px',
+    fontSize: '0.9375rem',
+    fontWeight: '600',
+    color: '#2c3e50'
+};
+
+const sectionDividerStyle = {
+    margin: '8px 0 20px 0',
+    borderTop: '2px solid #e9ecef'
 };
 
 const AddCouponPage = () => {
@@ -129,150 +143,236 @@ const AddCouponPage = () => {
         );
     }
 
+    const discountVal = parseFloat(form.discountValue) || 0;
+    const minVal = parseFloat(form.actualValue) || 0;
+    const showPreview = form.discountType && discountVal > 0;
+
     return (
         <Container fluid>
-            <Row>
-                <Col xs={12}>
-                    <Card>
-                        <Card.Header className="d-flex align-items-center">
-                            <Button variant="light" size="sm" className="mr-2" onClick={handleBack}>
-                                <i className="feather icon-arrow-left" />
-                            </Button>
-                            <h5 className="mb-0">{isEdit ? 'Update Coupon' : 'Create Coupon'}</h5>
-                        </Card.Header>
-                        <Card.Body>
-                            <Form onSubmit={handleSubmit}>
+            <div className="row">
+                <div className="col-12">
+                    <div className="card" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #e9ecef' }}>
+                        <div className="card-header" style={{
+                            padding: '16px 24px',
+                            backgroundColor: '#f8f9fa',
+                            borderBottom: '1px solid #e9ecef',
+                            fontWeight: '600'
+                        }}>
+                            <div className="d-flex justify-content-between align-items-center">
+                                <h5 className="mb-0" style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                    {isEdit ? 'Edit Coupon' : 'Create Coupon'}
+                                </h5>
+                                <Button variant="secondary" onClick={handleBack}>
+                                    <i className="fas fa-arrow-left" style={{ marginRight: '10px' }}></i>
+                                    Back
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="card-body" style={{ padding: '24px' }}>
+                            <form onSubmit={handleSubmit}>
+                                {/* Coupon code */}
                                 <Row>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Coupon code (name)</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={8} lg={6}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="name">
+                                                Coupon code <span className="text-danger">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
                                                 name="name"
+                                                id="name"
                                                 value={form.name}
                                                 onChange={handleChange}
                                                 placeholder="e.g. WELCOME10"
                                                 required
                                                 disabled={isEdit}
+                                                style={{ textTransform: 'uppercase' }}
                                             />
                                             {isEdit && (
-                                                <Form.Text className="text-muted">Code cannot be changed when editing.</Form.Text>
+                                                <small className="text-muted d-block mt-1">Code cannot be changed when editing.</small>
                                             )}
-                                        </Form.Group>
-                                    </Col>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Status</Form.Label>
-                                            <div className="pt-2">
-                                                <Form.Check
-                                                    type="switch"
-                                                    name="isActive"
-                                                    label={form.isActive ? 'Active' : 'Inactive'}
-                                                    checked={form.isActive}
-                                                    onChange={handleChange}
-                                                />
-                                            </div>
-                                        </Form.Group>
+                                        </div>
                                     </Col>
                                 </Row>
+
+                                {/* Discount settings */}
+                                <label style={sectionLabelStyle}>
+                                    <i className="fas fa-percent" style={{ color: '#4680ff', marginRight: '10px' }}></i>
+                                    Discount settings
+                                </label>
+                                <hr style={sectionDividerStyle} />
                                 <Row>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Discount type</Form.Label>
-                                            <Form.Control
-                                                as="select"
+                                    <Col sm={12} md={6} lg={4}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="discountType">
+                                                Discount type
+                                            </label>
+                                            <select
+                                                className="form-control"
                                                 name="discountType"
+                                                id="discountType"
                                                 value={form.discountType}
                                                 onChange={handleChange}
                                             >
-                                                <option value="percentage">Percentage</option>
-                                                <option value="fixed">Fixed amount</option>
-                                            </Form.Control>
-                                        </Form.Group>
+                                                <option value="percentage">Percentage (%)</option>
+                                                <option value="fixed">Fixed amount ($)</option>
+                                            </select>
+                                        </div>
                                     </Col>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Discount value {form.discountType === 'percentage' ? '(%)' : '($)'}</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={6} lg={4}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="discountValue">
+                                                Discount value <span className="text-danger">*</span>
+                                            </label>
+                                            <input
                                                 type="number"
+                                                className="form-control"
                                                 name="discountValue"
+                                                id="discountValue"
                                                 value={form.discountValue}
                                                 onChange={handleChange}
                                                 min="0"
                                                 step={form.discountType === 'percentage' ? 1 : 0.01}
                                                 required
                                             />
-                                        </Form.Group>
+                                        </div>
                                     </Col>
                                 </Row>
+                                {showPreview && (
+                                    <div className="mb-4 p-3 rounded" style={{ backgroundColor: '#f0f7ff', border: '1px solid #d0e3ff' }}>
+                                        <small className="text-muted d-block mb-1">Preview</small>
+                                        <span style={{ fontWeight: '600', color: '#0066cc' }}>
+                                            {form.discountType === 'percentage'
+                                                ? `${discountVal}% off`
+                                                : `$${discountVal.toFixed(2)} off`}
+                                            {minVal > 0 && ` on orders ≥ $${minVal.toFixed(2)}`}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Usage & validity */}
+                                <label style={sectionLabelStyle}>
+                                    <i className="fas fa-calendar-alt" style={{ color: '#4680ff', marginRight: '10px' }}></i>
+                                    Usage & validity
+                                </label>
+                                <hr style={sectionDividerStyle} />
                                 <Row>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Minimum order value ($)</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={6}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="actualValue">
+                                                Minimum order value ($) <span className="text-danger">*</span>
+                                            </label>
+                                            <input
                                                 type="number"
+                                                className="form-control"
                                                 name="actualValue"
+                                                id="actualValue"
                                                 value={form.actualValue}
                                                 onChange={handleChange}
                                                 min="0"
                                                 step="0.01"
                                                 required
                                             />
-                                        </Form.Group>
+                                            <small className="text-muted">Minimum cart value to apply coupon</small>
+                                        </div>
                                     </Col>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Usage limit per user</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={6}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="usageLimit">
+                                                Usage limit per user <span className="text-danger">*</span>
+                                            </label>
+                                            <input
                                                 type="number"
+                                                className="form-control"
                                                 name="usageLimit"
+                                                id="usageLimit"
                                                 value={form.usageLimit}
                                                 onChange={handleChange}
                                                 min="1"
                                                 required
                                             />
-                                        </Form.Group>
+                                            <small className="text-muted">How many times each user can use this coupon</small>
+                                        </div>
                                     </Col>
-                                </Row>
-                                <Row>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Valid from</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={6}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="validFrom">
+                                                Valid from <span className="text-danger">*</span>
+                                            </label>
+                                            <input
                                                 type="datetime-local"
+                                                className="form-control"
                                                 name="validFrom"
+                                                id="validFrom"
                                                 value={form.validFrom}
                                                 onChange={handleChange}
                                                 required
                                             />
-                                        </Form.Group>
+                                        </div>
                                     </Col>
-                                    <Col md={6}>
-                                        <Form.Group className="mb-3">
-                                            <Form.Label>Valid to</Form.Label>
-                                            <Form.Control
+                                    <Col sm={12} md={6}>
+                                        <div className="form-group fill mb-3">
+                                            <label className="floating-label" htmlFor="validTo">
+                                                Valid to <span className="text-danger">*</span>
+                                            </label>
+                                            <input
                                                 type="datetime-local"
+                                                className="form-control"
                                                 name="validTo"
+                                                id="validTo"
                                                 value={form.validTo}
                                                 onChange={handleChange}
                                                 required
                                             />
-                                        </Form.Group>
+                                        </div>
                                     </Col>
                                 </Row>
-                                <div className="d-flex gap-2 mt-3">
-                                    <Button type="submit" variant="primary" disabled={loading}>
-                                        {loading ? <Spinner animation="border" size="sm" className="mr-1" /> : null}
-                                        {isEdit ? 'Update' : 'Create'}
-                                    </Button>
-                                    <Button type="button" variant="outline-secondary" onClick={handleBack}>
-                                        Cancel
-                                    </Button>
+
+                                {/* Status - Last */}
+                                <label style={sectionLabelStyle}>
+                                    <i className="fas fa-toggle-on" style={{ color: '#4680ff', marginRight: '10px' }}></i>
+                                    Status
+                                </label>
+                                <hr style={sectionDividerStyle} />
+                                <Row>
+                                    <Col sm={12}>
+                                        <div className="d-flex align-items-center p-3 rounded" style={{ backgroundColor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                                            <Form.Check
+                                                type="switch"
+                                                name="isActive"
+                                                id="isActive"
+                                                label={form.isActive ? 'Active – Coupon can be used' : 'Inactive – Coupon is disabled'}
+                                                checked={form.isActive}
+                                                onChange={handleChange}
+                                                style={{ fontSize: '0.95rem' }}
+                                            />
+                                            <span className={`ms-2 badge ${form.isActive ? 'bg-success' : 'bg-secondary'}`}>
+                                                {form.isActive ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
+                                    </Col>
+                                </Row>
+
+                                {/* Actions - same as event form */}
+                                <div className="row mt-4">
+                                    <div className="col-12">
+                                        <div className="d-flex justify-content-between gap-2">
+                                            <Button variant="danger" onClick={handleBack} disabled={loading}>
+                                                Cancel
+                                            </Button>
+                                            <Button variant="primary" type="submit" disabled={loading}>
+                                                {loading ? <Spinner animation="border" size="sm" className="me-2" /> : null}
+                                                {loading ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update' : 'Create')}
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </Form>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </Container>
     );
 };
