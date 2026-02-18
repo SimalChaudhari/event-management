@@ -22,7 +22,8 @@ export const initializeServerSideDataTable = ({
     loadingActionType = null, // Action type to dispatch for loading (e.g., 'EVENT_LOADING')
     rowReorder = null, // RowReorder configuration object
     fetchAction = null, // Redux action function to fetch data (e.g., getAllEngagements)
-    searchParamName = 'keyword' // Backend param for search box (e.g. 'keyword' for events, 'search' for orders)
+    searchParamName = 'keyword', // Backend param for search box (e.g. 'keyword' for events, 'search' for orders)
+    infoEntityName = 'entries' // Label for pagination info: "Showing X to Y of Z entries"
 }) => {
     const $ = window.$ || require('jquery');
     
@@ -358,7 +359,7 @@ export const initializeServerSideDataTable = ({
                 const lastResponse = settings.json;
                 if (lastResponse && lastResponse.metadata) {
                     const metadata = lastResponse.metadata;
-                    const infoText = `Showing ${((metadata.page - 1) * metadata.limit) + 1} to ${Math.min(metadata.page * metadata.limit, metadata.total)} of ${metadata.total} users`;
+                    const infoText = `Showing ${((metadata.page - 1) * metadata.limit) + 1} to ${Math.min(metadata.page * metadata.limit, metadata.total)} of ${metadata.total} ${infoEntityName}`;
                     $(settings.nTable).find('.dataTables_info').html(infoText);
                 }
             }

@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
+import { CACHE_CONFIG } from "../../configs/env";
 import { TERMS_CONDITIONS, PRIVACY_POLICY, LOGO_GET, LOGO_UPDATE, LOGO_DELETE, LOGO_LOADING, LOGO_ERROR, CLEAR_LOGO_ERROR } from "../constants/actionTypes";
 
 // Get Terms & Conditions
@@ -94,16 +95,28 @@ const setLogoError = (dispatch, error) => {
     });
 };
 
-// Get logo
+// Get logo (use localStorage cache first to avoid repeated API calls)
 export const getLogo = () => async (dispatch) => {
     try {
+        const cacheKey = CACHE_CONFIG.LOGO_CACHE_KEY;
+        const cached = typeof localStorage !== 'undefined' && localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                dispatch({ type: LOGO_GET, payload: data });
+                return data;
+            } catch (e) {
+                localStorage.removeItem(cacheKey);
+            }
+        }
         setLogoLoading(dispatch, true);
         const response = await axiosInstance.get('/logos');
-        dispatch({
-            type: LOGO_GET,
-            payload: response.data,
-        });
-        return response.data;
+        const data = response.data;
+        if (data && typeof localStorage !== 'undefined') {
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+        }
+        dispatch({ type: LOGO_GET, payload: data });
+        return data;
     } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to fetch logo';
         setLogoError(dispatch, errorMessage);
@@ -126,9 +139,13 @@ export const updateLogo = (formData) => async (dispatch) => {
         
         if (response && response.status >= 200 && response.status < 300) {
             toast.success('Logo updated successfully!');
+            const logoData = response.data?.data ?? response.data;
+            if (logoData && typeof localStorage !== 'undefined') {
+                localStorage.setItem(CACHE_CONFIG.LOGO_CACHE_KEY, JSON.stringify(logoData));
+            }
             dispatch({
                 type: LOGO_UPDATE,
-                payload: response.data.data,
+                payload: logoData,
             });
             return true;
         }
@@ -151,6 +168,9 @@ export const deleteLogo = () => async (dispatch) => {
         
         if (response && response.status >= 200 && response.status < 300) {
             toast.success('Logo deleted successfully!');
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(CACHE_CONFIG.LOGO_CACHE_KEY);
+            }
             dispatch({
                 type: LOGO_DELETE,
             });

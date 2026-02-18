@@ -2,6 +2,7 @@ import { toast } from "react-toastify";
 import axiosInstance from "../../configs/axiosInstance";
 import { AUTH_DATA, AUTH_LOADING, AUTH_ERROR } from "../constants/actionTypes";
 import { CACHE_CONFIG } from "../../configs/env";
+import { setCookie, getCookie, deleteCookie } from "../../utils/cookieUtils";
 
 // Helper function to dispatch loading state
 const setLoading = (dispatch, loading) => {
@@ -18,10 +19,10 @@ export const login = (data) => async (dispatch) => {
         const response = await axiosInstance.post('auth/admin', data);
         const { accessToken, refreshToken, user } = response.data;
         
-        // Store tokens and user data
-        localStorage.setItem(CACHE_CONFIG.TOKEN_KEY, accessToken);
-        localStorage.setItem(CACHE_CONFIG.REFRESH_TOKEN_KEY, refreshToken);
-        localStorage.setItem('userData', JSON.stringify({ user }));
+        // Store tokens and user data in cookies
+        setCookie(CACHE_CONFIG.TOKEN_KEY, accessToken, 1);
+        setCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY, refreshToken, 30);
+        setCookie(CACHE_CONFIG.USER_KEY, encodeURIComponent(JSON.stringify({ user })), 1);
         
         // Dispatch the authentication action
         dispatch({
@@ -45,9 +46,10 @@ export const logout = () => async (dispatch) => {
     try {
         setLoading(dispatch, true);
         
-        // Clear localStorage
-        localStorage.removeItem('userData');
-        localStorage.removeItem('token');
+        // Clear auth cookies
+        deleteCookie(CACHE_CONFIG.TOKEN_KEY);
+        deleteCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+        deleteCookie(CACHE_CONFIG.USER_KEY);
 
         // Dispatch to match reducer case
         dispatch({
@@ -214,28 +216,33 @@ export const checkAuthStatus = () => async (dispatch) => {
         setLoading(dispatch, true);
         
 
-        const token = localStorage.getItem(CACHE_CONFIG.TOKEN_KEY);
-        const userData = localStorage.getItem('userData');
+        const token = getCookie(CACHE_CONFIG.TOKEN_KEY);
+        const userDataEnc = getCookie(CACHE_CONFIG.USER_KEY);
         
-        if (token && userData) {
+        if (token && userDataEnc) {
             try {
-                const user = JSON.parse(userData).user;
-                dispatch({
-                    type: AUTH_DATA,
-                    payload: { user }
-                });
-                // Set loading to false after successful auth data dispatch
+                const userData = JSON.parse(decodeURIComponent(userDataEnc));
+                const user = userData?.user;
+                if (user) {
+                    dispatch({
+                        type: AUTH_DATA,
+                        payload: { user }
+                    });
+                    setLoading(dispatch, false);
+                    return true;
+                }
+                deleteCookie(CACHE_CONFIG.TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.USER_KEY);
+                dispatch({ type: "LOGOUT" });
                 setLoading(dispatch, false);
-                return true;
+                return false;
             } catch (parseError) {
                 console.error('Failed to parse user data:', parseError);
-                // Clear invalid data
-                localStorage.removeItem(CACHE_CONFIG.TOKEN_KEY);
-                localStorage.removeItem('userData');
-                dispatch({
-                    type: "LOGOUT"
-                });
-              
+                deleteCookie(CACHE_CONFIG.TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.USER_KEY);
+                dispatch({ type: "LOGOUT" });
                 setLoading(dispatch, false);
                 return false;
             }

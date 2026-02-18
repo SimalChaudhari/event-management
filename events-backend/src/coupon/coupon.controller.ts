@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto, ApplyCouponDto } from './coupon.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -18,9 +18,25 @@ export class CouponController {
   }
 
   @Get()
-  // @Roles(UserRole.Admin)
-  async getAllCoupons(@Request() req?: any) {
+  async getAllCoupons(
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('keyword') keyword?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
     const isAdmin = req?.user?.role === UserRole.Admin;
+    const usePagination = page !== undefined || limit !== undefined;
+    if (usePagination && isAdmin) {
+      return this.couponService.getAllCouponsPaginated({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        keyword,
+        sortBy,
+        sortOrder,
+      });
+    }
     return this.couponService.getAllCoupons(isAdmin);
   }
 

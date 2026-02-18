@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Row, Col } from 'react-bootstrap';
 import avatar from '../../../assets/images/user/default.jpg';
-import { API_URL } from '../../../configs/env';
+import { API_URL, CACHE_CONFIG } from '../../../configs/env';
+import { getCookie, setCookie } from '../../../utils/cookieUtils';
 import { useSelector, useDispatch } from 'react-redux';
 import { editUser, removeProfilePicture } from '../../../store/actions/userActions';
 import { AUTH_DATA } from '../../../store/constants/actionTypes';
@@ -48,21 +49,20 @@ const Profile = () => {
     }, [user?.mobile]);
 
 
-    // Update local storage and Redux store with updated user data
+    // Update cookie and Redux store with updated user data
     const updateUserState = (updatedData) => {
-        const userData = JSON.parse(localStorage.getItem('userData'));
+        const userDataEnc = getCookie(CACHE_CONFIG.USER_KEY);
+        const userData = userDataEnc ? JSON.parse(decodeURIComponent(userDataEnc)) : {};
         const updatedUser = { ...user, ...updatedData };
         
         if (!updatedUser.id && user.id) {
             updatedUser.id = user.id;
         }
         
-        localStorage.setItem(
-            'userData',
-            JSON.stringify({
-                ...userData,
-                user: updatedUser
-            })
+        setCookie(
+            CACHE_CONFIG.USER_KEY,
+            encodeURIComponent(JSON.stringify({ ...userData, user: updatedUser })),
+            1
         );
 
         dispatch({

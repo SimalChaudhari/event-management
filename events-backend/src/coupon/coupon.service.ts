@@ -70,6 +70,75 @@ export class CouponService {
     return coupons.map((c) => this.toPublicCouponResponse(c));
   }
 
+  /**
+   * Get coupons with pagination, search and sort (for admin list).
+   * Returns { data, pagination, metadata } in the same format as register-events.
+   */
+  async getAllCouponsPaginated(filters: {
+    page?: number;
+    limit?: number;
+    keyword?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }) {
+    const page = filters?.page ?? 1;
+    const limit = Math.min(Math.max(filters?.limit ?? 10, 1), 100);
+    const sortBy = filters?.sortBy ?? 'name';
+    const sortOrder = (filters?.sortOrder ?? 'ASC').toUpperCase() as 'ASC' | 'DESC';
+    const keyword = filters?.keyword?.trim();
+
+    const qb = this.couponRepo.createQueryBuilder('coupon');
+
+    if (keyword) {
+      qb.andWhere('LOWER(coupon.name) LIKE LOWER(:keyword)', {
+        keyword: `%${keyword}%`,
+      });
+    }
+
+    const total = await qb.getCount();
+
+    const allowedSort: Record<string, string> = {
+      name: 'coupon.name',
+      discountValue: 'coupon.discountValue',
+      actualValue: 'coupon.actualValue',
+      usageLimit: 'coupon.usageLimit',
+      validFrom: 'coupon.validFrom',
+      validTo: 'coupon.validTo',
+      isActive: 'coupon.isActive',
+      createdAt: 'coupon.createdAt',
+      updatedAt: 'coupon.updatedAt',
+    };
+    const orderBy = allowedSort[sortBy] ?? 'coupon.name';
+    qb.orderBy(orderBy, sortOrder);
+
+    const skip = (page - 1) * limit;
+    qb.skip(skip).take(limit);
+
+    const coupons = await qb.getMany();
+    const totalPages = Math.ceil(total / limit);
+
+    const pagination = {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    };
+
+    const metadata = {
+      page,
+      limit,
+      total,
+    };
+
+    return {
+      data: coupons,
+      pagination,
+      metadata,
+    };
+  }
+
   async getCouponById(id: string) {
     const coupon = await this.couponRepo.findOne({ where: { id } });
     if (!coupon) {

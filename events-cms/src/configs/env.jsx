@@ -41,12 +41,13 @@ export const ERROR_MESSAGES = {
     SERVER_ERROR: "Server error. Please try again later."
 };
 
-// Cache Configuration
+// Cache Configuration (auth stored in cookies)
 export const CACHE_CONFIG = {
     TOKEN_KEY: 'auth_token',
     REFRESH_TOKEN_KEY: 'refresh_token',
     USER_KEY: 'user_data',
-    CACHE_DURATION: 24 * 60 * 60 * 1000 // 24 hours
+    CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours
+    LOGO_CACHE_KEY: 'admin_logo_cache' // logo cached in localStorage to avoid repeated API calls
 };
 
 // Feature Flags

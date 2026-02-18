@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { API_URL, ERROR_MESSAGES, CACHE_CONFIG } from './env';
+import { getCookie, setCookie, deleteCookie } from '../utils/cookieUtils';
 
 // Simple and effective approach
 const axiosInstance = axios.create({
@@ -26,7 +27,7 @@ const processQueue = (error, token = null) => {
 // Simple request interceptor
 axiosInstance.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem(CACHE_CONFIG.TOKEN_KEY);
+        const token = getCookie(CACHE_CONFIG.TOKEN_KEY);
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -82,7 +83,7 @@ axiosInstance.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const refreshToken = localStorage.getItem(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                const refreshToken = getCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
                 if (!refreshToken) throw new Error('No refresh token');
 
                 const response = await axios.post(
@@ -91,8 +92,8 @@ axiosInstance.interceptors.response.use(
                 );
 
                 const { accessToken, refreshToken: newRefreshToken } = response.data;
-                localStorage.setItem(CACHE_CONFIG.TOKEN_KEY, accessToken);
-                localStorage.setItem(CACHE_CONFIG.REFRESH_TOKEN_KEY, newRefreshToken);
+                setCookie(CACHE_CONFIG.TOKEN_KEY, accessToken, 1);
+                setCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY, newRefreshToken, 30);
 
                 processQueue(null, accessToken);
                 originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -101,7 +102,9 @@ axiosInstance.interceptors.response.use(
             } catch (refreshError) {
                 console.log('Token refresh failed:', refreshError);
                 processQueue(refreshError, null);
-                localStorage.clear();
+                deleteCookie(CACHE_CONFIG.TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+                deleteCookie(CACHE_CONFIG.USER_KEY);
                 
                 const shouldSkip = shouldSkipTokenRefresh(originalRequest.url);
                 console.log('About to check redirect:', { 
@@ -113,10 +116,7 @@ axiosInstance.interceptors.response.use(
                 if (!shouldSkip) {
                     console.log('🚨 Token expired - Redirecting to login');
                     
-                    // Only redirect if not already on login page
                     if (window.location.pathname !== '/auth/signin') {
-                        // Clear any pending requests and redirect
-                        localStorage.clear();
                         window.location.href = '/auth/signin';
                     } else {
                         console.log('Already on login page, skipping redirect');
