@@ -59,9 +59,9 @@ export const EVENT_PATHS = {
     EDIT_CATEGORY: '/events/edit-category',
     VIEW_CATEGORY: '/events/view-category',
 
-    //gallery
-
+    // Gallery (event-first: select event → then that event's gallery by tracks)
     GALLERY: '/events/gallery',
+    GALLERY_EVENT: '/events/gallery/event',
     ADD_GALLERY: '/events/gallery/add',
     EDIT_GALLERY: '/events/gallery/edit',
     VIEW_GALLERY: '/events/gallery/view',

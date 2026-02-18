@@ -36,6 +36,18 @@ export const galleryByEvent =
         return false;
     };
 
+/** Get event gallery tracks (event → tracks with id, trackTitle, galleryImages per track). */
+export const getGalleryTracksByEvent = (eventId) => async (dispatch) => {
+    try {
+        const response = await axiosInstance.get(`/gallery/event/${eventId}/tracks`);
+        return response?.data?.data;
+    } catch (error) {
+        const errorMessage = error?.response?.data?.message;
+        toast.error(errorMessage);
+    }
+    return null;
+};
+
 export const getAllGalleries = (filters = {}) => async (dispatch) => {
     try {
         const queryParams = new URLSearchParams(filters).toString();

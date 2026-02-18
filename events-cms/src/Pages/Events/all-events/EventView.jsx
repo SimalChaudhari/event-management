@@ -15,7 +15,6 @@ import ImageViewModal from '../../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
-import { getAllGalleries } from '../../../store/actions/galleryActions';
 import FilterComponent from '../../../components/common/FilterComponent';
 import useFilterLogic from '../../../hooks/useFilterLogic';
 import usePersistedTablePage from '../../../hooks/usePersistedTablePage';
@@ -490,22 +489,10 @@ const EventView = () => {
     }, []);
 
     const handleGallery = useCallback(
-        async (data) => {
-            try {
-                const response = await dispatch(getAllGalleries());
-                const allGalleries = response?.data || [];
-                const existingGallery = allGalleries.find((gallery) => gallery.eventId === data.id);
-
-                if (existingGallery) {
-                    navigate(`${EVENT_PATHS.VIEW_GALLERY}/${existingGallery.id}`);
-                } else {
-                    navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
-                }
-            } catch (error) {
-                navigate(`${EVENT_PATHS.ADD_GALLERY}?eventId=${data.id}`);
-            }
+        (data) => {
+            navigate(`${EVENT_PATHS.GALLERY_EVENT}/${data.id}`);
         },
-        [dispatch, navigate]
+        [navigate]
     );
 
     const handleQA = useCallback(

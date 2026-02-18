@@ -49,17 +49,12 @@ const NavItem = (props) => {
     ].includes(props.item.id);
     
     // Special handling for categories - match /events/*-category routes
-    // Special handling for gallery - match /events/gallery routes even though menu URL is /media-manager/gallery
     let isActive;
     if (props.item.id === 'categories') {
         isActive = location.pathname === '/categories' ||
             location.pathname.startsWith('/events/add-category') ||
             location.pathname.startsWith('/events/edit-category') ||
             location.pathname.startsWith('/events/view-category');
-    } else if (props.item.id === 'gallery') {
-        // Gallery menu item has URL /media-manager/gallery but actual routes are /events/gallery/*
-        isActive = location.pathname === '/media-manager/gallery' ||
-            location.pathname.startsWith('/events/gallery');
     } else {
         isActive = shouldMatchChildRoutes 
             ? location.pathname.startsWith(props.item.url)

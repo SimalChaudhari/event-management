@@ -73,7 +73,7 @@ const GalleryPage = () => {
                     const eventName = row.event?.name || 'Unknown Event';
                     
                     if (type === 'sort' || type === 'type') {
-                        return row.title || '';
+                        return row.trackTitle || row.title || '';
                     }
                     
                     // If no real image available, show dummy/placeholder image (not clickable)
@@ -83,7 +83,7 @@ const GalleryPage = () => {
                                 <img src="${placeholderUrl}" alt="gallery" class="img-radius align-top m-r-15" 
                                      style="width:50px; height:50px; object-fit:cover;" />
                                 <div class="d-inline-block">
-                                    <h6 class="m-b-0">${row.title || 'N/A'}</h6>
+                                    <h6 class="m-b-0">${row.trackTitle || row.title || 'N/A'}</h6>
                                     <p class="text-muted m-b-0">${eventName}</p>
                                 </div>
                             </div>   
@@ -100,7 +100,7 @@ const GalleryPage = () => {
                                      onmouseout="this.style.opacity='1'">
                             </span>
                             <div class="d-inline-block">
-                                <h6 class="m-b-0">${row.title || 'N/A'}</h6>
+                                <h6 class="m-b-0">${row.trackTitle || row.title || 'N/A'}</h6>
                                 <p class="text-muted m-b-0">${eventName}</p>
                             </div>
                         </div>   

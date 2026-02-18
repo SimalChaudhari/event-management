@@ -4,7 +4,7 @@ import { Button, Row, Col, Card, Modal, Badge } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { getGalleryById } from '../../../store/actions/galleryActions';
 import { MEDIA_MANAGER_PATHS, EVENT_PATHS } from '../../../utils/constants';
-import { DUMMY_PATH_GALLERY } from '../../../configs/env';
+import { DUMMY_PATH_GALLERY, API_URL } from '../../../configs/env';
 import ImageWithFallback from '../../../components/common/ImageWithFallback';
 
 const ViewGalleryPage = () => {
@@ -41,6 +41,12 @@ const ViewGalleryPage = () => {
         return null;
     }
     
+    const baseUrl = (API_URL || '').replace(/\/+$/, '');
+    const getSingleImageDownloadUrl = (imagePath) =>
+        baseUrl ? `${baseUrl}/api/gallery/download/image?path=${encodeURIComponent(imagePath)}` : '#';
+    const getAllImagesDownloadUrl = () =>
+        baseUrl && id ? `${baseUrl}/api/gallery/download/all/${id}` : '#';
+
     // Image zoom function
     const handleImageClick = (imagePath) => {
         setCurrentImage(imagePath);
@@ -129,8 +135,8 @@ const ViewGalleryPage = () => {
                 
                 <Row>
                     <InfoField 
-                        label="Gallery Title" 
-                        value={galleryData.title || 'N/A'} 
+                        label="Track Name" 
+                        value={galleryData.trackTitle || galleryData.title || 'N/A'} 
                         icon="fas fa-image"
                         colSize={12}
                     />
@@ -162,17 +168,39 @@ const ViewGalleryPage = () => {
                         icon="fas fa-building"
                         colSize={6}
                     />
-                    <InfoField 
-                        label="Created Date" 
-                        value={new Date(galleryData.createdAt).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })} 
-                        icon="fas fa-calendar"
-                        colSize={6}
-                    />
-                </Row>
+                                    <InfoField 
+                                        label="Created Date" 
+                                        value={new Date(galleryData.createdAt).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })} 
+                                        icon="fas fa-calendar"
+                                        colSize={6}
+                                    />
+                                    {galleryData.galleryImages?.length > 0 && (
+                                        <>
+                                            <InfoField 
+                                                label="Single image download URL" 
+                                                value={
+                                                    <a href={getSingleImageDownloadUrl(galleryData.galleryImages[0])} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all', fontSize: '13px' }}>
+                                                        {getSingleImageDownloadUrl(galleryData.galleryImages[0])}
+                                                    </a>
+                                                }
+                                                colSize={12}
+                                            />
+                                            <InfoField 
+                                                label="All images download URL" 
+                                                value={
+                                                    <a href={getAllImagesDownloadUrl()} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all', fontSize: '13px' }}>
+                                                        {getAllImagesDownloadUrl()}
+                                                    </a>
+                                                }
+                                                colSize={12}
+                                            />
+                                        </>
+                                    )}
+                                </Row>
             </Col>
 
             {/* Gallery Images Section */}
@@ -211,7 +239,7 @@ const ViewGalleryPage = () => {
                                     }}
                                 >
                                     <ImageWithFallback
-                                        src={`${process.env.REACT_APP_API_URL}/${imagePath}`}
+                                        src={baseUrl ? `${baseUrl}/${imagePath}` : imagePath}
                                         alt={`Gallery Image ${index + 1}`}
                                         style={{
                                             width: '100%',
@@ -227,40 +255,67 @@ const ViewGalleryPage = () => {
                                             e.target.style.transform = 'scale(1)';
                                         }}
                                     />
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: '12px',
-                                            right: '12px',
-                                            backgroundColor: 'rgba(0,0,0,0.75)',
-                                            color: 'white',
-                                            width: '36px',
-                                            height: '36px',
-                                            borderRadius: '50%',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '16px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.3s ease',
-                                            zIndex: 10
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(70, 128, 255, 0.9)';
-                                            e.currentTarget.style.transform = 'scale(1.1)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.75)';
-                                            e.currentTarget.style.transform = 'scale(1)';
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleImageClick(imagePath);
-                                        }}
-                                    >
-                                        <i className="fas fa-search-plus"></i>
+                                    <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '6px', zIndex: 10 }}>
+                                        <a
+                                            href={getSingleImageDownloadUrl(imagePath)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download
+                                            style={{
+                                                backgroundColor: 'rgba(0,0,0,0.75)',
+                                                color: 'white',
+                                                width: '36px',
+                                                height: '36px',
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '16px',
+                                                transition: 'all 0.3s ease',
+                                                textDecoration: 'none'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(70, 128, 255, 0.9)';
+                                                e.currentTarget.style.transform = 'scale(1.1)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.75)';
+                                                e.currentTarget.style.transform = 'scale(1)';
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <i className="fas fa-download"></i>
+                                        </a>
+                                        <div
+                                            style={{
+                                                backgroundColor: 'rgba(0,0,0,0.75)',
+                                                color: 'white',
+                                                width: '36px',
+                                                height: '36px',
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(70, 128, 255, 0.9)';
+                                                e.currentTarget.style.transform = 'scale(1.1)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.75)';
+                                                e.currentTarget.style.transform = 'scale(1)';
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleImageClick(imagePath);
+                                            }}
+                                        >
+                                            <i className="fas fa-search-plus"></i>
+                                        </div>
                                     </div>
-                                  
                                 </div>
                             </Col>
                         ))}
@@ -337,14 +392,24 @@ const ViewGalleryPage = () => {
                                         View Gallery
                                     </h4>
                                 </div>
-                                <div className="d-flex" style={{ gap: '8px' }}>
+                                <div className="d-flex flex-wrap" style={{ gap: '8px' }}>
+                                    {galleryData.galleryImages?.length > 0 && (
+                                        <Button
+                                            variant="outline-primary"
+                                            as="a"
+                                            href={getAllImagesDownloadUrl()}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ padding: '8px 16px', fontWeight: '500' }}
+                                        >
+                                            <i className="fas fa-download mr-2"></i>
+                                            Download all
+                                        </Button>
+                                    )}
                                     <Button 
                                         variant="primary" 
                                         onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}
-                                        style={{ 
-                                            padding: '8px 16px',
-                                            fontWeight: '500'
-                                        }}
+                                        style={{ padding: '8px 16px', fontWeight: '500' }}
                                     >
                                         <i className="fas fa-edit mr-2"></i>
                                         Edit
@@ -352,10 +417,7 @@ const ViewGalleryPage = () => {
                                     <Button 
                                         variant="secondary" 
                                         onClick={() => navigate(-1)}
-                                        style={{ 
-                                            padding: '8px 16px',
-                                            fontWeight: '500'
-                                        }}
+                                        style={{ padding: '8px 16px', fontWeight: '500' }}
                                     >
                                         <i className="fas fa-arrow-left mr-2"></i>
                                         Back
@@ -378,15 +440,26 @@ const ViewGalleryPage = () => {
                                 View Gallery
                             </h4>
                         </div>
-                        <div className="d-flex" style={{ gap: '8px' }}>
+                        <div className="d-flex flex-wrap" style={{ gap: '8px' }}>
+                            {galleryData.galleryImages?.length > 0 && (
+                                <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    as="a"
+                                    href={getAllImagesDownloadUrl()}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ padding: '6px 12px', fontWeight: '500' }}
+                                >
+                                    <i className="fas fa-download mr-2"></i>
+                                    Download all
+                                </Button>
+                            )}
                             <Button 
                                 variant="primary" 
                                 size="sm"
                                 onClick={() => navigate(`${EVENT_PATHS.EDIT_GALLERY}?galleryId=${id}&eventId=${galleryData.eventId}`)}
-                                style={{ 
-                                    padding: '6px 12px',
-                                    fontWeight: '500'
-                                }}
+                                style={{ padding: '6px 12px', fontWeight: '500' }}
                             >
                                 <i className="fas fa-edit mr-2"></i>
                                 Edit
@@ -395,10 +468,7 @@ const ViewGalleryPage = () => {
                                 variant="secondary" 
                                 size="sm"
                                 onClick={() => navigate(-1)}
-                                style={{ 
-                                    padding: '6px 12px',
-                                    fontWeight: '500'
-                                }}
+                                style={{ padding: '6px 12px', fontWeight: '500' }}
                             >
                                 <i className="fas fa-arrow-left mr-2"></i>
                                 Back
@@ -470,12 +540,11 @@ const ViewGalleryPage = () => {
                     <Button
                         variant="light"
                         size="sm"
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = `${process.env.REACT_APP_API_URL}/${currentImage}`;
-                            link.download = `gallery-image.jpg`;
-                            link.click();
-                        }}
+                        as="a"
+                        href={getSingleImageDownloadUrl(currentImage)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
                         style={{
                             position: 'fixed',
                             top: '20px',
@@ -506,7 +575,7 @@ const ViewGalleryPage = () => {
                         }}
                     >
                         <ImageWithFallback
-                            src={`${process.env.REACT_APP_API_URL}/${currentImage}`}
+                            src={baseUrl ? `${baseUrl}/${currentImage}` : currentImage}
                             alt="Gallery"
                             style={{
                                 maxWidth: '100%',

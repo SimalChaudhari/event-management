@@ -124,6 +124,15 @@ const ViewEventPage = () => {
         return '';
     };
 
+    // Gallery download URLs (single image and all images ZIP) for event listing
+    const baseUrl = API_URL.replace(/\/+$/, '');
+    const getSingleImageDownloadUrl = (imagePath) =>
+        baseUrl && imagePath && typeof imagePath === 'string'
+            ? `${baseUrl}/api/gallery/download/image?path=${encodeURIComponent(imagePath)}`
+            : null;
+    const getDownloadAllUrl = (galleryId) =>
+        baseUrl && galleryId ? `${baseUrl}/api/gallery/download/all/${galleryId}` : null;
+
     useEffect(() => {
         dispatch(eventById(id)).then((res) => {
             const eventData = res?.data;
@@ -766,6 +775,8 @@ const ViewEventPage = () => {
                                                 galleries={eventData?.galleries}
                                                 getImageSrc={getImageSrc}
                                                 handleGalleryImageClick={handleGalleryImageClick}
+                                                getSingleImageDownloadUrl={getSingleImageDownloadUrl}
+                                                getDownloadAllUrl={getDownloadAllUrl}
                                             />
                                         ) : (
                                             <div className="text-center py-5">

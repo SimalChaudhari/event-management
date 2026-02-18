@@ -1,5 +1,6 @@
 // src/gallery/gallery.controller.ts
 import {
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -17,6 +18,7 @@ import {
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
+import { Public } from 'jwt/public.decorator';
 import { GalleryService } from './gallery.service';
 import { Roles } from 'jwt/roles.decorator';
 import { UserRole } from 'user/users.entity';
@@ -72,6 +74,67 @@ export class GalleryController {
       this.errorHandler.logError(
         error,
         'Gallery items retrieval',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  /** Get gallery tracks for an event. With query page/limit → paginated; otherwise returns all tracks. */
+  @Get('event/:eventId/tracks')
+  async getGalleryTracksByEvent(
+    @Param('eventId') eventId: string,
+    @Query()
+    query: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      keyword?: string;
+    },
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const usePagination = query.page !== undefined && query.limit !== undefined;
+      if (usePagination) {
+        const result = await this.galleryService.getGalleryTracksByEventPaginated(eventId, {
+          page: query.page ? Number(query.page) : 1,
+          limit: query.limit ? Number(query.limit) : 10,
+          sortBy: query.sortBy,
+          sortOrder: query.sortOrder as 'ASC' | 'DESC' | undefined,
+          keyword: query.keyword,
+        });
+        const successResponse = {
+          success: true,
+          message: 'Event gallery tracks retrieved successfully',
+          data: result.tracks,
+          metadata: {
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            eventId: result.eventId,
+            eventName: result.eventName,
+            timestamp: new Date().toISOString(),
+          },
+        } as SuccessResponse;
+        return response.status(HttpStatus.OK).json(successResponse);
+      }
+      const result = await this.galleryService.getGalleryTracksByEvent(eventId);
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Event gallery tracks retrieved successfully',
+        data: result,
+        metadata: {
+          total: result.tracks.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(
+        error,
+        'Gallery tracks by event',
         req.user?.id,
       );
       throw error;
@@ -227,6 +290,74 @@ export class GalleryController {
         'Gallery creation/update',
         req.user?.id,
       );
+      throw error;
+    }
+  }
+
+  /** Single image download (Public – for gallery view & event listing). path = relative e.g. uploads/gallery/images/xxx.jpg */
+  @Get('download/image')
+  @Public()
+  async downloadSingleImage(
+    @Query('path') imagePath: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      if (!imagePath || typeof imagePath !== 'string') {
+        throw new ValidationException('Query parameter path is required');
+      }
+      const normalized = imagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      if (!normalized.startsWith('uploads/gallery/images/') || normalized.includes('..')) {
+        throw new BadRequestException('Invalid image path');
+      }
+      const filePath = path.join(process.cwd(), normalized);
+      if (!fs.existsSync(filePath)) {
+        throw new ResourceNotFoundException('Image', imagePath);
+      }
+      const fileName = path.basename(normalized);
+      response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      response.setHeader('Content-Type', 'application/octet-stream');
+      return response.sendFile(path.resolve(filePath));
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery single image download', req.user?.id);
+      throw error;
+    }
+  }
+
+  /** Download all images of a gallery track as ZIP (Public – for gallery view & event listing). */
+  @Get('download/all/:galleryId')
+  @Public()
+  async downloadAllGalleryImages(
+    @Param('galleryId') galleryId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const gallery = await this.galleryService.getGalleryById(galleryId);
+      if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
+        throw new BadRequestException('No images found to download');
+      }
+      const archiver = require('archiver');
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      const safeTitle = (gallery.trackTitle || 'gallery').replace(/[^a-zA-Z0-9-_]/g, '_');
+      response.attachment(`gallery-${safeTitle}-${galleryId}.zip`);
+      archive.pipe(response);
+      let added = 0;
+      for (let i = 0; i < gallery.galleryImages.length; i++) {
+        const relPath = gallery.galleryImages[i];
+        const fullPath = path.join(process.cwd(), relPath);
+        if (fs.existsSync(fullPath)) {
+          const ext = path.extname(relPath);
+          archive.file(fullPath, { name: `image_${i + 1}${ext}` });
+          added++;
+        }
+      }
+      if (added === 0) {
+        throw new BadRequestException('No valid image files found to download');
+      }
+      await archive.finalize();
+    } catch (error) {
+      this.errorHandler.logError(error, 'Gallery all images download', req.user?.id);
       throw error;
     }
   }

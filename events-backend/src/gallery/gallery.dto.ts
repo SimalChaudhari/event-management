@@ -8,32 +8,33 @@ import {
   } from 'class-validator';
   
   export class GalleryDto {
-    @IsNotEmpty()
+    /** When present, update this gallery (edit mode). When absent, create or find by eventId+trackTitle. */
+    @IsOptional()
+    @IsUUID()
+    id?: string;
+
+    /** Track name (e.g. "Track 1", "Track 2"). Defaults to "Default" if empty. */
+    @IsOptional()
     @IsString()
-    title!: string;
-  
-    // @IsNotEmpty()
-    // @IsUUID()
-    // eventId!: string;
-  
+    trackTitle?: string;
+
     @IsOptional()
     @IsArray()
     galleryImages?: string[];
 
     @IsOptional()
-    originalImages?: any; // Add this line for preserving existing images
+    originalImages?: any;
   }
-  
+
   export class UpdateGalleryDto {
     @IsOptional()
     @IsString()
-    title?: string;
-  
+    trackTitle?: string;
+
     @IsOptional()
     @IsArray()
     galleryImages?: string[];
 
     @IsOptional()
-    originalImages?: any; // Add this line
-
+    originalImages?: any;
   }

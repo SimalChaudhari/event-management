@@ -195,13 +195,6 @@ const chartData = {
                     icon: 'feather icon-image',
                     children: [
                 {
-                    id: 'gallery',
-                    title: 'Gallery',
-                    type: 'item',
-                    // icon: 'feather icon-image',
-                    url: '/media-manager/gallery'
-                },
-                {
                     id: 'banners',
                     title: 'Banners',
                     type: 'item',

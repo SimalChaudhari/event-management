@@ -178,9 +178,117 @@ export class GalleryService {
     }
   }
 
+  /** Get all gallery tracks for an event (for admin: Event → Gallery → Tracks). Non-paginated. */
+  async getGalleryTracksByEvent(eventId: string): Promise<{
+    eventId: string;
+    eventName: string;
+    tracks: Array<{
+      id: string;
+      trackTitle: string;
+      galleryImages: string[];
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+  }> {
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+      select: ['id', 'name'],
+    });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const galleries = await this.galleryRepository.find({
+      where: { eventId },
+      order: { trackTitle: 'ASC', createdAt: 'ASC' },
+    });
+    const tracks = galleries.map((g) => ({
+      id: g.id,
+      trackTitle: g.trackTitle || 'Default',
+      galleryImages: g.galleryImages || [],
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    }));
+    return {
+      eventId: event.id,
+      eventName: event.name,
+      tracks,
+    };
+  }
+
+  /** Get gallery tracks for an event with backend pagination (for server-side DataTable). */
+  async getGalleryTracksByEventPaginated(
+    eventId: string,
+    filters: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      keyword?: string;
+    },
+  ): Promise<{
+    eventId: string;
+    eventName: string;
+    tracks: Array<{
+      id: string;
+      trackTitle: string;
+      galleryImages: string[];
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+      select: ['id', 'name'],
+    });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 10));
+    const sortBy = filters.sortBy && ['trackTitle', 'createdAt', 'updatedAt'].includes(filters.sortBy)
+      ? filters.sortBy
+      : 'createdAt';
+    const sortOrder = (filters.sortOrder === 'ASC' || filters.sortOrder === 'DESC') ? filters.sortOrder : 'DESC';
+    const keyword = filters.keyword?.trim();
+
+    const qb = this.galleryRepository
+      .createQueryBuilder('gallery')
+      .where('gallery.eventId = :eventId', { eventId });
+
+    if (keyword) {
+      qb.andWhere('gallery.trackTitle ILIKE :keyword', { keyword: `%${keyword}%` });
+    }
+
+    const total = await qb.getCount();
+
+    qb.orderBy(`gallery.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const galleries = await qb.getMany();
+    const tracks = galleries.map((g) => ({
+      id: g.id,
+      trackTitle: g.trackTitle || 'Default',
+      galleryImages: g.galleryImages || [],
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    }));
+
+    return {
+      eventId: event.id,
+      eventName: event.name,
+      tracks,
+      total,
+      page,
+      limit,
+    };
+  }
+
   async createOrUpdateGallery(eventId: string, galleryDto: GalleryDto) {
     try {
-      // Check if event exists
       const event = await this.eventRepository.findOne({
         where: { id: eventId },
       });
@@ -188,52 +296,59 @@ export class GalleryService {
         throw new ResourceNotFoundException('Event', eventId);
       }
 
-      // Check if gallery already exists for this event
-      const existingGallery = await this.galleryRepository.findOne({
-        where: { eventId: eventId },
-      });
-      
+      const trackTitle = (galleryDto.trackTitle || '').trim() || 'Default';
+
+      // Edit mode: when id is provided, find and update that gallery by id (same event)
+      let existingGallery: Gallery | null = null;
+      if (galleryDto.id) {
+        const byId = await this.galleryRepository.findOne({
+          where: { id: galleryDto.id, eventId },
+        });
+        if (byId) existingGallery = byId;
+      }
+      // Create or find by eventId + trackTitle when no id
+      if (!existingGallery) {
+        existingGallery = await this.galleryRepository.findOne({
+          where: trackTitle === 'Default'
+            ? [{ eventId, trackTitle: 'Default' }, { eventId, trackTitle: null as any }]
+            : { eventId, trackTitle },
+        });
+      }
+
       if (existingGallery) {
-        // Check if user is updating images or just title
+        if (existingGallery.trackTitle == null) {
+          existingGallery.trackTitle = 'Default';
+        }
+        existingGallery.trackTitle = trackTitle;
         const hasNewImages = galleryDto.galleryImages && galleryDto.galleryImages.length > 0;
-        
         if (hasNewImages) {
-          // Instead of replacing, ADD new images to existing ones
           const existingImages = existingGallery.galleryImages || [];
           const newImages = galleryDto.galleryImages || [];
-          
-          // Combine existing and new images
           existingGallery.galleryImages = [...existingImages, ...newImages];
-          
         } else {
-          // If no new images, preserve existing images from originalImages field
           if (galleryDto.originalImages && galleryDto.originalImages.length > 0) {
             existingGallery.galleryImages = galleryDto.originalImages;
           }
         }
-        // Always update title
-        existingGallery.title = galleryDto.title;
-        
         const result = await this.galleryRepository.save(existingGallery);
-        return { 
-          message: hasNewImages ? 'Gallery updated successfully with new images added' : 'Gallery title updated successfully', 
+        return {
+          message: hasNewImages ? 'Gallery updated successfully with new images added' : 'Track updated successfully',
           data: result,
-          isNew: false 
+          isNew: false,
         };
       }
 
-      // Create new gallery if none exists
       const gallery = this.galleryRepository.create({
-        ...galleryDto,
-        eventId: eventId
+        eventId,
+        trackTitle,
+        galleryImages: galleryDto.galleryImages || [],
       });
       const result = await this.galleryRepository.save(gallery);
-      return { 
-        message: 'Gallery created successfully', 
+      return {
+        message: 'Gallery created successfully',
         data: result,
-        isNew: true 
+        isNew: true,
       };
-      
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         throw error;
@@ -275,19 +390,19 @@ export class GalleryService {
       // Track if WHERE clause has been set
       let whereClauseSet = false;
 
-      // Filter by keyword if provided - search in gallery title and event name
+      // Filter by keyword if provided - search in track name and event name
       if (filters?.keyword && filters.keyword.trim() !== '') {
         const keyword = filters.keyword.toLowerCase().trim();
         queryBuilder.where(
-          '(LOWER(gallery.title) LIKE :keyword OR LOWER(event.name) LIKE :keyword)',
+          '(LOWER(gallery.trackTitle) LIKE :keyword OR LOWER(event.name) LIKE :keyword)',
           { keyword: `%${keyword}%` }
         );
         whereClauseSet = true;
       }
 
       // Apply sorting
-      if (sortBy === 'title') {
-        queryBuilder.orderBy('gallery.title', sortOrder);
+      if (sortBy === 'trackTitle' || sortBy === 'title') {
+        queryBuilder.orderBy('gallery.trackTitle', sortOrder);
       } else if (sortBy === 'eventName' || sortBy === 'event.name') {
         queryBuilder.orderBy('event.name', sortOrder);
       } else if (sortBy === 'createdAt') {

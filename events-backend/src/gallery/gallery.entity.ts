@@ -14,15 +14,16 @@ import {
   export class Gallery {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
-  
-    @Column({ type: 'varchar' })
-    title!: string;
-  
+
     @Column({ type: 'uuid' })
     eventId!: string;
-  
-    @Column('simple-array', { nullable: true })
-    galleryImages?: string[];
+
+    /** Track name within event gallery (e.g. "Track 1", "Track 2"). */
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    trackTitle?: string;
+
+  @Column('simple-array', { nullable: true })
+  galleryImages?: string[];
   
     @CreateDateColumn()
     createdAt!: Date;

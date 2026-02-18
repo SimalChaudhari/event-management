@@ -14,11 +14,12 @@ const AddGalleryPage = () => {
     const [searchParams] = useSearchParams();
     const id = searchParams.get('eventId');
     const galleryId = searchParams.get('galleryId');
-    const isEditMode = !!galleryId; // Edit mode based on galleryId
+    const trackTitleParam = searchParams.get('trackTitle') || '';
+    const isEditMode = !!galleryId;
 
     const [formData, setFormData] = useState({
-        title: '',
         eventId: id,
+        trackTitle: trackTitleParam || '',
         galleryImages: []
     });
     const [loading, setLoading] = useState(false);
@@ -55,8 +56,8 @@ const AddGalleryPage = () => {
                         }
 
                         setFormData({
-                            title: gallery.title || '',
                             eventId: gallery.eventId || id,
+                            trackTitle: gallery.trackTitle || trackTitleParam || 'Default',
                             galleryImages: imagesData
                         });
 
@@ -238,8 +239,7 @@ const AddGalleryPage = () => {
 
         try {
             const submitData = new FormData();
-            submitData.append('title', formData.title);
-            // Add ID for edit mode
+            submitData.append('trackTitle', (formData.trackTitle || '').trim() || 'Default');
             if (galleryId) {
                 submitData.append('id', galleryId);
             }
@@ -272,11 +272,14 @@ const AddGalleryPage = () => {
                 }
             }
 
-            // Pass eventId instead of galleryId - backend expects eventId in the URL
-            const response = await dispatch(createOrUpdateGallery(submitData, formData.eventId || id));
+            const eventIdForApi = formData.eventId || id;
+            const response = await dispatch(createOrUpdateGallery(submitData, eventIdForApi));
             if (response) {
-                // Navigate to gallery page instead of events list
-                navigate(`${EVENT_PATHS.GALLERY}`);
+                if (eventIdForApi) {
+                    navigate(`${EVENT_PATHS.GALLERY_EVENT}/${eventIdForApi}`);
+                } else {
+                    navigate(EVENT_PATHS.GALLERY);
+                }
             }
         } catch (error) {
             console.log('An error occurred while saving gallery');
@@ -320,16 +323,16 @@ const AddGalleryPage = () => {
                                 <Row>
                                     <Col sm={6}>
                                         <div className="form-group fill">
-                                            <label className="floating-label" htmlFor="title">
-                                                Gallery Title *
+                                            <label className="floating-label" htmlFor="trackTitle">
+                                                Track Name *
                                             </label>
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                name="title"
-                                                value={formData.title}
+                                                name="trackTitle"
+                                                value={formData.trackTitle}
                                                 onChange={handleInputChange}
-                                                placeholder="Enter gallery title"
+                                                placeholder="e.g. Track 1, Track 2"
                                                 required
                                             />
                                         </div>
@@ -650,7 +653,7 @@ const AddGalleryPage = () => {
                                                 type="submit"
                                                 disabled={
                                                     loading ||
-                                                    !formData.title.trim() ||
+                                                    !formData.trackTitle.trim() ||
                                                     !formData.eventId ||
                                                     (!galleryId && formData.galleryImages.length === 0) ||
                                                     deletingImage !== null

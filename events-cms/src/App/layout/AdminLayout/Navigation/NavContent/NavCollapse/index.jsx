@@ -94,18 +94,7 @@ const NavCollapse = (props) => {
                         return pathname === childUrl;
                     }
                     
-                    // Special handling for Media Library collapse - match gallery routes even though they're under /events/
                     if (props.collapse.id === 'Media Library') {
-                        if (childId === 'gallery') {
-                            // Gallery routes are under /events/gallery but menu URL is /media-manager/gallery
-                            if (pathname === '/media-manager/gallery' ||
-                                pathname.startsWith('/events/gallery')) {
-                                return true;
-                            }
-                            // If not a gallery route, don't match
-                            return false;
-                        }
-                        // For other Media Library children, use standard check
                         if (pathname.startsWith(childUrl)) {
                             const remainingPath = pathname.substring(childUrl.length);
                             if (remainingPath === '' || remainingPath.startsWith('/')) {
@@ -158,14 +147,12 @@ const NavCollapse = (props) => {
         // Then check if collapse id is in pathname (but only if it's actually part of the route)
         let currentIndex = -1;
         
-        // Special handling for Events collapse - exclude category and gallery routes
+        // Special handling for Events collapse - exclude category routes (gallery is managed from event icon under Events)
         if (props.collapse.id === 'events') {
-            // Don't match if pathname contains category or gallery routes
             if (location.pathname.includes('/add-category') ||
                 location.pathname.includes('/edit-category') ||
                 location.pathname.includes('/view-category') ||
-                location.pathname.includes('/categories') ||
-                location.pathname.includes('/gallery')) {
+                location.pathname.includes('/categories')) {
                 currentIndex = -1;
             } else if (props.collapse.id && location.pathname.includes(props.collapse.id)) {
                 const pathParts = location.pathname.split('/').filter(part => part);
@@ -182,13 +169,6 @@ const NavCollapse = (props) => {
                 location.pathname.startsWith('/order') ||
                 location.pathname.startsWith('/engagements')) {
                 // Module collapse should be active for these routes
-                currentIndex = 0; // Set to 0 to indicate it should be open
-            }
-        } else if (props.collapse.id === 'Media Library') {
-            // Special handling for Media Library collapse - match gallery routes
-            if (location.pathname === '/media-manager/gallery' ||
-                location.pathname.startsWith('/events/gallery')) {
-                // Media Library collapse should be active for gallery routes
                 currentIndex = 0; // Set to 0 to indicate it should be open
             }
         } else {
@@ -261,8 +241,7 @@ const NavCollapse = (props) => {
         if (!location.pathname.includes('/add-category') &&
             !location.pathname.includes('/edit-category') &&
             !location.pathname.includes('/view-category') &&
-            !location.pathname.includes('/categories') &&
-            !location.pathname.includes('/gallery')) {
+            !location.pathname.includes('/categories')) {
             const currentIndex = location.pathname
                 .toString()
                 .split('/')

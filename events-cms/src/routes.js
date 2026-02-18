@@ -52,7 +52,8 @@ const eventComponents = {
     ViewRegisterEvent: React.lazy(() => import('./Pages/Events/registered-events/ViewRegisterEventPage.jsx')),
     ParticipantsQr: React.lazy(() => import('./Pages/Events/registered-events/PublicParticipantsQrPage.jsx')),
 
-    Gallery: React.lazy(() => import('./Pages/Events/gallery/GalleryPage.jsx')),
+    Gallery: React.lazy(() => import('./Pages/Events/gallery/GalleryEventSelectPage.jsx')),
+    EventGalleryTracks: React.lazy(() => import('./Pages/Events/gallery/EventGalleryTracksPage.jsx')),
     AddGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
     EditGallery: React.lazy(() => import('./Pages/Events/gallery/AddGalleryPage.jsx')),
     ViewGallery: React.lazy(() => import('./Pages/Events/gallery/ViewGalleryPage.jsx')),
@@ -400,13 +401,19 @@ const eventRoutes = [
         component: eventComponents.ViewRegisterEvent
     },
 
-    // Gallery
+    // Gallery (event-first: select event → then event gallery by tracks)
 
     {
         path: EVENT_PATHS.GALLERY,
         exact: true,
         name: 'Gallery',
         component: eventComponents.Gallery
+    },
+    {
+        path: EVENT_PATHS.GALLERY_EVENT + '/:eventId',
+        exact: true,
+        name: 'Event Gallery',
+        component: eventComponents.EventGalleryTracks
     },
     {
         path: EVENT_PATHS.ADD_GALLERY,
@@ -476,12 +483,6 @@ const eventRoutes = [
 ];
 
 const MediaManagerRoutes = [
-    {
-        path: MEDIA_MANAGER_PATHS.GALLERY,
-        exact: true,
-        name: 'Gallery',
-        component: eventComponents.Gallery
-    },
     {
         path: MEDIA_MANAGER_PATHS.BANNER_MANAGEMENT,
         exact: true,
