@@ -41,6 +41,11 @@ export class GetChatDto {
   @Min(1, { message: 'Pagination page must be at least 1' })
   @Transform(({ value }) => parseInt(value))
   paginationCurrentPage?: number = 1;
+
+  /** Optional: pass for event chatroom, omit for general chat */
+  @IsOptional()
+  @IsUUID(4, { message: 'EventID must be a valid UUID' })
+  eventId?: string;
 }
 
 export class CreateThreadDto {

@@ -68,3 +68,6 @@ pnpm-lock.yaml
 # API keys or other credentials
 *.key
 *.crt
+
+# Uploaded files (generated at runtime, do not push to GitHub)
+uploads/

@@ -48,7 +48,7 @@ export class ChatController {
     };
   }
 
-  // Get chat API
+  // Get chat API: ?receiverID=xxx&eventId=yyy (eventId optional – use for event chatroom only)
   @Get('open-chat')
   async getChat(@Req() req: any, @Query() dto: GetChatDto) {
     const userID = req.user?.sub || req.user?.id;

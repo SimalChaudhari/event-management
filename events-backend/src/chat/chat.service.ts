@@ -223,8 +223,11 @@ export class ChatService {
       throw new BadRequestException('UserID and ReceiverID are required');
     }
 
-    // Find or create thread
-    const threadData = await this.createOrGetThread(userID, { receiverID: dto.receiverID });
+    // Find or create thread (optional eventId for event chatroom)
+    const threadData = await this.createOrGetThread(userID, {
+      receiverID: dto.receiverID,
+      ...(dto.eventId && { eventId: dto.eventId }),
+    });
     const threadID = threadData.threadID;
 
     const limit = Math.min(dto.paginationCount || 20, 100); // Max 100 messages per page
