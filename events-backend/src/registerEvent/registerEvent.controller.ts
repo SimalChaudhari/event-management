@@ -278,79 +278,28 @@ export class RegisterEventController {
       throw error;
     }
   }
-
+  
   /**
-   * Download my event chats: only conversations I have in this event.
-   * 1 conversation → PDF; 2+ → ZIP. Any authenticated user (must be registered for event).
+   * Get download link for PDF of my chat with one person only. Logged-in user = me, no need to pass my userId.
+   * Example: I want PDF of my chat with User 2 → only eventId + otherUserId (User 2's id).
    */
-  @Get('export/event/:eventId/all-chats-zip')
-  async exportMyEventChats(
+  @Get('export/event/:eventId/user/:otherUserId/chat-pdf/download-url')
+  async getMyConversationChatPdfDownloadUrl(
     @Param('eventId') eventId: string,
-    @Res() response: Response,
-    @Req() req: Request,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return response.status(401).json({ success: false, message: 'User authentication required' });
-      }
-      await this.registerEventService.exportMyEventChats(eventId, userId, response);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Export my event chats', req.user?.id);
-      throw error;
-    }
-  }
-
-  /**
-   * Get a one-time download link for a user's event chat PDF.
-   * Requires JWT. Returns downloadUrl (e.g. /uploads/chat-exports/xxx.pdf) that works without token.
-   */
-  @Get('export/event/:eventId/user/:userId/chat-pdf/download-url')
-  async getSingleUserEventChatPdfDownloadUrl(
-    @Param('eventId') eventId: string,
-    @Param('userId') userId: string,
+    @Param('otherUserId') otherUserId: string,
     @Req() req: Request,
   ) {
     const requesterUserId = req.user?.id;
-    const isAdmin = req.user?.role === UserRole.Admin;
     if (!requesterUserId) {
       throw new UnauthorizedException('User authentication required');
     }
-    if (!isAdmin && requesterUserId !== userId) {
-      throw new ForbiddenException('You can only get the download URL for your own chat');
-    }
-    const downloadUrl = await this.registerEventService.createChatPdfDownloadLink(userId, eventId, {
+    const downloadUrl = await this.registerEventService.createSingleConversationChatPdfDownloadLink(
+      eventId,
       requesterUserId,
-      isAdmin: !!isAdmin,
-    });
+      otherUserId,
+      { requesterUserId, isAdmin: false },
+    );
     return { success: true, downloadUrl };
-  }
-
-  /**
-   * Download a user's event chat as single PDF (stream, requires JWT).
-   * User can download own (userId = me); admin can download any user's.
-   */
-  @Get('export/event/:eventId/user/:userId/chat-pdf')
-  async exportSingleUserEventChatAsPdf(
-    @Param('eventId') eventId: string,
-    @Param('userId') userId: string,
-    @Res() response: Response,
-    @Req() req: Request,
-  ) {
-    try {
-      const requesterUserId = req.user?.id;
-      const isAdmin = req.user?.role === UserRole.Admin;
-      if (!requesterUserId) {
-        return response.status(401).json({ success: false, message: 'User authentication required' });
-      }
-      await this.registerEventService.exportSingleUserEventChatAsPdf(userId, eventId, response, {
-        requesterUserId,
-        isAdmin,
-      });
-    } catch (error) {
-      this.errorHandler.logError(error, 'Export single user event chat as PDF', req.user?.id);
-      throw error;
-    }
   }
 
   /**
@@ -370,38 +319,7 @@ export class RegisterEventController {
     return { success: true, downloadUrl };
   }
 
-  /**
-   * Get download URL for all-users chats ZIP (one ZIP with every user's PDF). Admin only.
-   */
-  @Get('export/event/:eventId/all-users-chats-zip/download-url')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin)
-  async getAllUsersChatsZipDownloadUrl(
-    @Param('eventId') eventId: string,
-    @Req() req: Request,
-  ) {
-    const downloadUrl = await this.registerEventService.createAllUsersChatsZipDownloadLink(eventId);
-    return { success: true, downloadUrl };
-  }
 
-  /**
-   * Download all registered users' event chats as one ZIP (one PDF per user). Admin only.
-   */
-  @Get('export/event/:eventId/all-users-chats-zip')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.Admin)
-  async exportAllUsersEventChatsAsZip(
-    @Param('eventId') eventId: string,
-    @Res() response: Response,
-    @Req() req: Request,
-  ) {
-    try {
-      await this.registerEventService.exportAllUsersEventChatsAsZip(eventId, response);
-    } catch (error) {
-      this.errorHandler.logError(error, 'Export all users event chats ZIP', req.user?.id);
-      throw error;
-    }
-  }
 
   @Get('export/event/:eventId')
   @UseGuards(RolesGuard)

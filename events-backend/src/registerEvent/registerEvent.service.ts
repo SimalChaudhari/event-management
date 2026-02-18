@@ -55,6 +55,7 @@ import {
   getChatExportAllUsersKey,
   getChatExportKey,
   getChatExportMyChatsKey,
+  getChatExportConversationKey,
   getChatExportPublicPath,
   isChatExportFileValid,
   scheduleDeleteAfterTtl,
@@ -1823,6 +1824,114 @@ export class RegisterEventService implements OnModuleInit {
     }));
 
     const pdfBuffer = await generateChatPdfBuffer(conversations, {
+      userName,
+      eventName,
+      exportUserId: userId,
+    });
+
+    writeChatExportPdfAndScheduleDelete(filePath, pdfBuffer);
+    return getChatExportPublicPath(key);
+  }
+
+  /**
+   * Stream PDF of a single conversation only (User 1 with User 2 in this event). For direct download.
+   */
+  async exportSingleConversationChatAsPdf(
+    eventId: string,
+    userId: string,
+    otherUserId: string,
+    res: Response,
+    options: { requesterUserId: string; isAdmin: boolean },
+  ): Promise<void> {
+    if (!options.isAdmin && options.requesterUserId !== userId) {
+      throw new ForbiddenException('You can only download your own conversation');
+    }
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') || userId : userId;
+
+    const result = await this.chatService.getEventChats(userId, eventId);
+    const allConversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    const conversation = allConversations.find((c) => c.userID === otherUserId);
+    if (!conversation) {
+      throw new NotFoundException('No conversation found with this user in this event');
+    }
+
+    const otherName = conversation.userName || otherUserId;
+    const safeName = otherName.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
+    const filename = `event-chat-with-${safeName}-${new Date().toISOString().split('T')[0]}.pdf`;
+    streamChatPdfToResponse([conversation], res, filename, {
+      userName,
+      eventName,
+      exportUserId: userId,
+    });
+  }
+
+  /**
+   * Generate download URL for a single conversation only (e.g. User 1 with User 2 in this event).
+   * userId = the logged-in user (me), otherUserId = the person I chatted with. Returns PDF of only that thread.
+   */
+  async createSingleConversationChatPdfDownloadLink(
+    eventId: string,
+    userId: string,
+    otherUserId: string,
+    options: { requesterUserId: string; isAdmin: boolean },
+  ): Promise<string> {
+    if (!options.isAdmin && options.requesterUserId !== userId) {
+      throw new ForbiddenException('You can only get the download URL for your own conversation');
+    }
+
+    const event = await this.eventRepository.findOne({ where: { id: eventId } });
+    if (!event) {
+      throw new ResourceNotFoundException('Event', eventId);
+    }
+    const eventName = (event as any).name || (event as any).eventName || 'Event';
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') || userId : userId;
+
+    const result = await this.chatService.getEventChats(userId, eventId);
+    const allConversations: ConversationForExport[] = (result?.conversations || []).map((c: any) => ({
+      userID: c.userID,
+      userName: c.userName || 'Unknown',
+      messages: (c.messages || []).map((m: any) => ({
+        msg: m.msg,
+        senderID: m.senderID,
+        senderNick: m.senderNick,
+        msgDateUTC: m.msgDateUTC,
+      })),
+    }));
+
+    const conversation = allConversations.find((c) => c.userID === otherUserId);
+    if (!conversation) {
+      throw new NotFoundException('No conversation found with this user in this event');
+    }
+
+    const dir = ensureChatExportDir();
+    const key = getChatExportConversationKey(eventId, userId, otherUserId);
+    const filePath = path.join(dir, key);
+
+    if (isChatExportFileValid(filePath)) {
+      return getChatExportPublicPath(key);
+    }
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    const pdfBuffer = await generateChatPdfBuffer([conversation], {
       userName,
       eventName,
       exportUserId: userId,

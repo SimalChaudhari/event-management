@@ -36,6 +36,14 @@ export function getChatExportMyChatsKey(eventId: string, userId: string): string
 }
 
 /**
+ * Deterministic key for a single conversation PDF (userId + otherUserId in event).
+ */
+export function getChatExportConversationKey(eventId: string, userId: string, otherUserId: string): string {
+  const ordered = [userId, otherUserId].sort();
+  return `conv-${crypto.createHash('sha256').update(`${eventId}|${ordered[0]}|${ordered[1]}`).digest('hex').slice(0, 24)}.pdf`;
+}
+
+/**
  * Public URL path for a chat export file (no domain).
  */
 export function getChatExportPublicPath(key: string): string {
