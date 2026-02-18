@@ -278,7 +278,28 @@ export class RegisterEventController {
       throw error;
     }
   }
-  
+  @Get('export/event/:eventId/user/:userId/chat-pdf')
+  async exportSingleUserEventChatAsPdf(
+    @Param('eventId') eventId: string,
+    @Param('userId') userId: string,
+    @Res() response: Response,
+    @Req() req: Request,
+  ) {
+    try {
+      const requesterUserId = req.user?.id;
+      const isAdmin = req.user?.role === UserRole.Admin;
+      if (!requesterUserId) {
+        return response.status(401).json({ success: false, message: 'User authentication required' });
+      }
+      await this.registerEventService.exportSingleUserEventChatAsPdf(userId, eventId, response, {
+        requesterUserId,
+        isAdmin,
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Export single user event chat as PDF', req.user?.id);
+      throw error;
+    }
+  }
   /**
    * Get download link for PDF of my chat with one person only. Logged-in user = me, no need to pass my userId.
    * Example: I want PDF of my chat with User 2 → only eventId + otherUserId (User 2's id).
