@@ -624,7 +624,8 @@ export class CheckoutService {
     }));
 
     const cartIds = cartItemsFromDb.map(item => item.cartId);
-    const totalAmount = Number(checkout.totalAmount) || 0;
+    const eventIds = cartItemsFromDb.map(item => item.eventId);
+    let totalAmount = Number(checkout.totalAmount) || 0;
     const discount = Number(checkout.discount) || 0;
 
     let couponApplied: any = null;
@@ -651,10 +652,12 @@ export class CheckoutService {
     }
 
     let gstBreakdown = buildGstBreakdown([], totalAmount, discount, couponApplied);
+    let itemsWithPrice: Array<{ cartId: string; eventId: string; eventName: string; price: number; startDate?: Date | string | null; gstRate: number }> = [];
+
     if (cartIds.length > 0) {
       try {
         const cartData = await this.cartService.getCartItemsByIds(userId, cartIds);
-        const itemsWithPrice = (cartData.items || []).map((item: any) => ({
+        itemsWithPrice = (cartData.items || []).map((item: any) => ({
           cartId: item.cartId,
           eventId: item.eventId,
           eventName: item.eventName || '',
@@ -662,9 +665,42 @@ export class CheckoutService {
           startDate: item.startDate ?? null,
           gstRate: Number(item.gstRate) || 18,
         }));
-        gstBreakdown = buildGstBreakdown(itemsWithPrice, totalAmount, discount, couponApplied);
       } catch (_) {
-        // keep default gstBreakdown if cart fetch fails
+        // cart may be deleted after payment; fall through to event fallback
+      }
+    }
+
+    // After payment, cart is often deleted; build items from events so gstBreakdown has correct gstRate and amounts
+    if (itemsWithPrice.length === 0 && eventIds.length > 0) {
+      for (let i = 0; i < cartItemsFromDb.length; i++) {
+        const row = cartItemsFromDb[i];
+        const event = await this.eventRepository.findOne({ where: { id: row.eventId } });
+        if (event) {
+          const basePrice = Number(event.price) || 0;
+          const gstRate = Number(event.gstRate) || 18;
+          itemsWithPrice.push({
+            cartId: row.cartId,
+            eventId: row.eventId,
+            eventName: event.name || '',
+            price: basePrice,
+            startDate: event.startDate ?? null,
+            gstRate,
+          });
+        }
+      }
+    }
+
+    if (itemsWithPrice.length > 0) {
+      gstBreakdown = buildGstBreakdown(itemsWithPrice, totalAmount, discount, couponApplied);
+      // If stored totalAmount looks like base-only (e.g. 120) but items add to GST-inclusive (144), use GST-inclusive for breakdown
+      const sumBase = itemsWithPrice.reduce((s, i) => s + i.price, 0);
+      const expectedTotal = itemsWithPrice.reduce(
+        (s, i) => s + Math.round(i.price * (1 + i.gstRate / 100) * 100) / 100,
+        0,
+      );
+      if (discount <= 0 && Math.abs(totalAmount - sumBase) < 0.02 && Math.abs(totalAmount - expectedTotal) > 0.02) {
+        totalAmount = Math.round(expectedTotal * 100) / 100;
+        gstBreakdown = buildGstBreakdown(itemsWithPrice, totalAmount, discount, couponApplied);
       }
     }
 
@@ -673,7 +709,7 @@ export class CheckoutService {
       checkoutId: checkout.checkoutId,
       orderId: checkout.orderId ?? null,
       status: checkout.status,
-      totalAmount: checkout.totalAmount,
+      totalAmount: totalAmount,
       discount: checkout.discount,
       discountPercentage: couponApplied?.discountPercentage ?? null,
       couponCode: checkout.couponCode,
@@ -996,11 +1032,13 @@ export class CheckoutService {
       reason,
     );
 
-    // Store refund so user can track status
+    // Store refund so user can track status (WooShPay returns amount in cents; we store in units e.g. 144.00 SGD)
+    const amountCents = result.amount ?? 0;
+    const amountInUnits = Math.round((amountCents / 100) * 100) / 100;
     const refundEntity = this.refundRepository.create({
       orderId,
       wooshpayRefundId: result.id,
-      amount: result.amount ?? 0,
+      amount: amountInUnits,
       currency: result.currency ?? 'SGD',
       status: result.status ?? 'pending',
       reason: result.reason ?? reason ?? undefined,
@@ -1012,6 +1050,7 @@ export class CheckoutService {
 
   /**
    * Get refund status for an order (so user can track). Returns list of refunds for that order.
+   * Syncs status from WooShPay for each refund so DB stays correct even if webhook didn't fire.
    */
   async getRefundStatusForOrder(orderId: string, userId: string): Promise<any[]> {
     const order = await this.orderRepository.findOne({
@@ -1026,16 +1065,45 @@ export class CheckoutService {
       order: { createdAt: 'DESC' },
     });
 
-    return refunds.map((r) => ({
-      id: r.id,
-      wooshpayRefundId: r.wooshpayRefundId,
-      amount: r.amount,
-      amountFormatted: `$${(r.amount / 100).toFixed(2)}`,
-      currency: r.currency,
-      status: r.status,
-      reason: r.reason,
-      createdAt: r.createdAt,
-    }));
+    for (const r of refunds) {
+      const updated = await this.syncRefundStatusFromWooShPay(r);
+      if (updated) Object.assign(r, updated);
+    }
+
+    return refunds.map((r) => {
+      const amount = Math.round(Number(r.amount) * 100) / 100;
+      const currency = r.currency || 'SGD';
+      return {
+        id: r.id,
+        wooshpayRefundId: r.wooshpayRefundId,
+        amount,
+        amountFormatted: `${currency} ${amount.toFixed(2)}`,
+        currency,
+        status: r.status,
+        reason: r.reason,
+        createdAt: r.createdAt,
+      };
+    });
+  }
+
+  /**
+   * Fetch refund status from WooShPay and update our DB if changed (so status is correct even without webhook).
+   */
+  private async syncRefundStatusFromWooShPay(refund: Refund): Promise<Partial<Refund> | null> {
+    if (!refund.wooshpayRefundId) return null;
+    try {
+      const woosh = await this.wooShPayService.getRefund(refund.wooshpayRefundId);
+      const rawStatus = woosh?.status ?? woosh?.refund_status;
+      const status = this.normalizeRefundStatus(rawStatus);
+      if (status && status !== refund.status) {
+        refund.status = status;
+        await this.refundRepository.save(refund);
+        return { status };
+      }
+    } catch (e) {
+      // WooShPay API error – keep our stored status
+    }
+    return null;
   }
 
   async updateCheckoutCartItems(checkoutId: string, cartItemsMinimal: any[]): Promise<void> {
@@ -1502,32 +1570,60 @@ export class CheckoutService {
   }
 
   /**
-   * Handle refund updated (webhook from WooShPay when refund status changes)
+   * Handle refund updated (webhook from WooShPay when refund status changes).
+   * Payload may be the refund object (data.object) or a charge containing refund; we extract refund and update our table.
    */
-  private async handleRefundUpdated(refund: any): Promise<void> {
-    const refundId = refund.id ?? refund.refund_id;
+  private async handleRefundUpdated(payload: any): Promise<void> {
+    const refund =
+      payload.object === 'refund'
+        ? payload
+        : payload.refund
+          ? payload.refund
+          : Array.isArray(payload.refunds?.data) && payload.refunds.data.length > 0
+            ? payload.refunds.data[0]
+            : payload;
+    const refundId =
+      String(refund.id ?? refund.refund_id ?? '').trim() || null;
+    const rawStatus = refund.status ?? refund.refund_status ?? null;
+    const status = this.normalizeRefundStatus(rawStatus);
 
-    if (refundId) {
-      const existing = await this.refundRepository.findOne({
-        where: { wooshpayRefundId: refundId },
-      });
-      if (existing) {
-        existing.status = refund.status ?? existing.status;
-        await this.refundRepository.save(existing);
-        console.log(`💰 Refund status updated: ${refundId} → ${refund.status}`);
-      }
+    if (!refundId) {
+      console.warn('[WEBHOOK handleRefundUpdated] No refund id in payload. Keys:', Object.keys(refund || {}));
+      return;
     }
 
-    const checkoutId = refund.metadata?.checkout_id;
+    const existing = await this.refundRepository.findOne({
+      where: { wooshpayRefundId: refundId },
+    });
+    if (existing) {
+      existing.status = status ?? existing.status;
+      await this.refundRepository.save(existing);
+      console.log(`💰 Refund status updated: ${refundId} → ${existing.status}`);
+    } else {
+      console.warn('[WEBHOOK handleRefundUpdated] No local refund found for wooshpayRefundId=', refundId);
+    }
+
+    const checkoutId = refund.metadata?.checkout_id ?? payload.metadata?.checkout_id;
     if (checkoutId) {
       const checkout = await this.checkoutRepository.findOne({
         where: { checkoutId },
       });
       if (checkout) {
-        checkout.paymentNotes = `Refund updated: ${refund.status}`;
+        checkout.paymentNotes = `Refund updated: ${existing?.status ?? status ?? rawStatus}`;
         await this.checkoutRepository.save(checkout);
       }
     }
+  }
+
+  /** Map WooShPay refund status to our stored value (pending | succeeded | failed | canceled). */
+  private normalizeRefundStatus(raw: any): string | null {
+    if (raw == null || raw === '') return null;
+    const s = String(raw).toLowerCase().trim();
+    if (s === 'succeeded' || s === 'completed' || s === 'complete' || s === 'success') return 'succeeded';
+    if (s === 'failed' || s === 'failure') return 'failed';
+    if (s === 'canceled' || s === 'cancelled' || s === 'cancel') return 'canceled';
+    if (s === 'pending' || s === 'processing') return 'pending';
+    return s;
   }
 
   /**

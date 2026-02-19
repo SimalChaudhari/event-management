@@ -18,8 +18,8 @@ export class Refund {
   @Column({ type: 'varchar' })
   wooshpayRefundId!: string;
 
-  /** Amount refunded in cents */
-  @Column({ type: 'int' })
+  /** Amount refunded in currency units (e.g. 144.00 SGD) */
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   amount!: number;
 
   @Column({ type: 'varchar', length: 10, default: 'SGD' })

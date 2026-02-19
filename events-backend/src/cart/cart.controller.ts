@@ -399,6 +399,7 @@ export class CartController {
                                 id: event.id,
                                 name: event.name,
                                 price: event.price,
+                                gstRate: event.gstRate != null ? Number(event.gstRate) : 18,
                                 currency: event.currency || 'USD',
                                 startDate: event.startDate,
                                 endDate: event.endDate,
@@ -443,6 +444,7 @@ export class CartController {
                             id: checkoutItem.eventId,
                             name: cartItem.eventName,
                             price: cartItem.price,
+                            gstRate: cartItem.gstRate != null ? Number(cartItem.gstRate) : 18,
                             currency: 'USD',
                             image: cartItem.image,
                             images: [],
@@ -480,8 +482,8 @@ export class CartController {
                                 id: finalEventInfo.id || checkoutItem.eventId,
                                 name: finalEventInfo.name || cartItem?.eventName || 'Unknown Event',
                                 price: eventPrice, // Always a number
+                                gstRate: finalEventInfo.gstRate != null ? Number(finalEventInfo.gstRate) : 18,
                                 currency: finalEventInfo.currency || 'USD',
-                            
                                 startDate: finalEventInfo.startDate || cartItem?.startDate || null,
                                 endDate: finalEventInfo.endDate || null,
                                 startTime: finalEventInfo.startTime || null,
@@ -579,20 +581,38 @@ export class CartController {
                 responseData.originalTotal = actualOriginalTotal;
             }
 
-            // Price breakdown: eventPrice, discount, tax, total
+            // Price breakdown: eventPrice, discount, tax, total. Prefer gstBreakdown; if missing/zeros, derive from fullCartItems using each event's gstRate.
             const gb = checkout.gstBreakdown;
-            const eventPrice = gb?.finalSummary?.totalBaseAmount ?? gb?.summary?.totalBaseAmount ?? Math.round(actualFinalAmount / (1 + (gb?.gstRate ?? 18) / 100) * 100) / 100;
-            const tax = gb?.finalSummary?.totalGst ?? gb?.summary?.totalGst ?? Math.round((actualFinalAmount - eventPrice) * 100) / 100;
+            let eventPrice = gb?.finalSummary?.totalBaseAmount ?? gb?.summary?.totalBaseAmount;
+            let tax = gb?.finalSummary?.totalGst ?? gb?.summary?.totalGst;
+            let breakdownGstRate = gb?.gstRate ?? 18;
+            const breakdownHasZeros = (eventPrice == null || eventPrice === 0) && (tax == null || tax === 0);
+            if (breakdownHasZeros && fullCartItems?.length > 0) {
+                eventPrice = fullCartItems.reduce((s: number, item: any) => s + (Number(item?.event?.price) || 0), 0);
+                eventPrice = Math.round(eventPrice * 100) / 100;
+                tax = fullCartItems.reduce((s: number, item: any) => {
+                    const base = Number(item?.event?.price) || 0;
+                    const rate = item?.event?.gstRate != null ? Number(item.event.gstRate) : 18;
+                    return s + Math.round(base * (rate / 100) * 100) / 100;
+                }, 0);
+                tax = Math.round(tax * 100) / 100;
+                breakdownGstRate = fullCartItems.length > 0
+                    ? fullCartItems.reduce((s: number, item: any) => s + (item?.event?.gstRate != null ? Number(item.event.gstRate) : 18), 0) / fullCartItems.length
+                    : 18;
+                breakdownGstRate = Math.round(breakdownGstRate * 100) / 100;
+            }
+            if (eventPrice == null) eventPrice = Math.round(actualFinalAmount / (1 + breakdownGstRate / 100) * 100) / 100;
+            if (tax == null) tax = Math.round((actualFinalAmount - eventPrice) * 100) / 100;
             responseData.priceBreakdown = {
                 eventPrice,
                 discount: discount,
                 tax,
                 total: actualFinalAmount,
                 currency: 'SGD',
-                gstRate: gb?.gstRate ?? 18
+                gstRate: breakdownGstRate
             };
 
-            // Items: only id, name, actual price (base), gst price
+            // Items: only id, name, actual price (base), gst price. Use event's gstRate when gb missing or building from fullCartItems.
             if (gb?.items?.length) {
                 responseData.items = gb.items.map((i: any) => ({
                     id: i.eventId,
@@ -601,9 +621,9 @@ export class CartController {
                     gstPrice: i.gstAmount
                 }));
             } else if (fullCartItems?.length) {
-                const gstRate = gb?.gstRate ?? 18;
                 responseData.items = fullCartItems.map((item: any) => {
                     const base = Number(item?.event?.price) || 0;
+                    const gstRate = item?.event?.gstRate != null ? Number(item.event.gstRate) : (gb?.gstRate ?? 18);
                     const gstAmount = Math.round(base * (gstRate / 100) * 100) / 100;
                     return {
                         id: item?.event?.id ?? item?.eventId,
@@ -618,7 +638,7 @@ export class CartController {
 
             responseData.cartItems = fullCartItems.map((item: any) => {
                 const base = Number(item?.event?.price) || 0;
-                const gstRate = gb?.gstRate ?? 18;
+                const gstRate = item?.event?.gstRate != null ? Number(item.event.gstRate) : (gb?.gstRate ?? 18);
                 const gstAmount = Math.round(base * (gstRate / 100) * 100) / 100;
                 return {
                     cartId: item.cartId,

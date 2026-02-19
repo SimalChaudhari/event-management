@@ -2278,9 +2278,28 @@ export class EventService {
     // Check exhibitors
     if (event.exhibitorsData?.exhibitors && Array.isArray(event.exhibitorsData.exhibitors)) {
       for (const exhibitor of event.exhibitorsData.exhibitors) {
-        if (exhibitor.companyName?.toLowerCase().includes(keywordLower) ||
-            exhibitor.companyDescription?.toLowerCase().includes(keywordLower) ||
-            exhibitor.email?.toLowerCase().includes(keywordLower)) {
+        const companyMatch =
+          exhibitor.companyName?.toLowerCase().includes(keywordLower) ||
+          exhibitor.companyDescription?.toLowerCase().includes(keywordLower) ||
+          exhibitor.email?.toLowerCase().includes(keywordLower) ||
+          exhibitor.mobile?.toLowerCase().includes(keywordLower) ||
+          exhibitor.website?.toLowerCase().includes(keywordLower) ||
+          (exhibitor.boothNumber && exhibitor.boothNumber.toString().toLowerCase().includes(keywordLower));
+        let staffMatch = false;
+        if (exhibitor.eventStaff && Array.isArray(exhibitor.eventStaff)) {
+          for (const staff of exhibitor.eventStaff) {
+            if (
+              staff.firstName?.toLowerCase().includes(keywordLower) ||
+              staff.lastName?.toLowerCase().includes(keywordLower) ||
+              staff.email?.toLowerCase().includes(keywordLower) ||
+              staff.mobile?.toLowerCase().includes(keywordLower)
+            ) {
+              staffMatch = true;
+              break;
+            }
+          }
+        }
+        if (companyMatch || staffMatch) {
           result.matchedExhibitors.push({
             ...exhibitor,
             eventId: event.id,
