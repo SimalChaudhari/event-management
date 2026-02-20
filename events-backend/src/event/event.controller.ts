@@ -36,6 +36,7 @@ import { TabVisibilityFilterUtil } from '../utils/tab-visibility-filter.util';
 import { EventNotificationService } from '../utils/event-notification.service';
 import { ProgrammeService } from '../programme/programme.service';
 import { FilterService } from '../service/filter.service';
+import { Public } from 'jwt/public.decorator';
 import {
   CreateProgrammeTrackDto,
   UpdateProgrammeTrackDto,
@@ -256,6 +257,27 @@ export class EventController {
       return response.status(HttpStatus.OK).json(successResponse);
     } catch (error) {
       this.errorHandler.logError(error, 'Events retrieval', req.user?.id);
+      throw error;
+    }
+  }
+
+  /** Public event listing: id and name only. No authentication required. */
+  @Public()
+  @Get('public/list')
+  async getPublicEventList(@Res() response: Response) {
+    try {
+      const events = await this.eventService.getPublicEventList();
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Event list retrieved successfully',
+        events,
+        metadata: {
+          total: events.length,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Public event list retrieval');
       throw error;
     }
   }

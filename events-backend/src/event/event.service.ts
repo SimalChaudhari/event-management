@@ -336,6 +336,17 @@ export class EventService {
     }
   }
 
+  /**
+   * Public event list: id and name only. No auth required.
+   */
+  async getPublicEventList(): Promise<{ id: string; name: string }[]> {
+    const events = await this.eventRepository.find({
+      select: ['id', 'name'],
+      order: { name: 'ASC' },
+    });
+    return events;
+  }
+
   async getAllEvents(
     filters: {
       keyword?: string;
@@ -655,41 +666,11 @@ export class EventService {
         };
       }
 
+      // Admin: full event. Other roles: only basic info + speakersData
       const eventsWithAttendance = await Promise.all(
         paginatedEvents.map(async (event) => {
-          const attendanceCount = await this.getEventAttendanceCount(event.id);
-          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
-
-          let formattedDocuments: { name: string; document: string }[] = [];
-          if (event.documents && event.documentNames) {
-            formattedDocuments = event.documents.map((doc, index) => ({
-              name: event.documentNames?.[index] || `Document ${index + 1}`,
-              document: doc,
-            }));
-          } else if (event.documents) {
-            // Fallback if no names are provided
-            formattedDocuments = event.documents.map((doc, index) => ({
-              name: `Document ${index + 1}`,
-              document: doc,
-            }));
-          }
-
           const speakers = EventSpeakerUtils.buildSpeakerSchedule(event);
 
-
-          // Get event stamps from new structure
-          const eventStamps = await this.eventStampService.getStampsByEventId(event.id);
-
-          const {
-            eventSpeakers,
-            category,
-            eventExhibitors,
-            documents, // Remove original documents
-            documentNames, // Remove original documentNames
-            ...eventData
-          } = event;
-
-          // Check if event is favorited by user
           let isFavorite = false;
           if (userId) {
             const favorite = await this.favoriteEventRepository.findOne({
@@ -698,132 +679,137 @@ export class EventService {
             isFavorite = !!favorite;
           }
 
-          // Check if user has registered for this event and get registration ID
           let isRegistered = false;
-          let registerEventId = null;
+          let registerEventId: string | null = null;
           if (userId) {
             const registration = await this.registerEventRepository.findOne({
               where: {
-                userId: userId,
+                userId,
                 eventId: event.id,
-                isRegister: true, // Only count active registrations
+                isRegister: true,
               },
             });
             isRegistered = !!registration;
             registerEventId = registration?.id || null;
           }
 
-          const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
-          
-          // Extract eventStampDescription from event directly
-          const eventStampDescription = event.eventStampDescription;
-          
+          const { eventSpeakers: _s, category: _c, eventExhibitors: _e, documents: _d, documentNames: _dn, programmeTracks: _pt, exhibitorDescription: _ed, surveys: _sv, eventStampDescription: _esd, ...basicEvent } = event;
+          const slimEvent = {
+            ...basicEvent,
+            price: this.toDisplayPrice(event.price),
+            color: getEventColor(event.type),
+            speakersData: speakers,
+            isFavorite,
+            isRegistered,
+            registerEventId,
+          };
 
-          // Format programme tracks with basic speaker info using utility
+          // Non-admin: return only basic info + speakers
+          if (userRole !== UserRole.Admin) {
+            if (filters.globalSearch) {
+              const searchResult = this.checkGlobalSearchMatch(slimEvent, filters.globalSearch);
+              return { ...slimEvent, hasGlobalMatch: searchResult.hasMatch, searchResult };
+            }
+            return { ...slimEvent, hasGlobalMatch: false };
+          }
+
+          // Admin: build full event with all details
+          const attendanceCount = await this.getEventAttendanceCount(event.id);
+          const surveyDetails = await this.surveyUtils.getSurveyDetailsByEventId(event.id);
+          let formattedDocuments: { name: string; document: string }[] = [];
+          if (event.documents && event.documentNames) {
+            formattedDocuments = event.documents.map((doc, index) => ({
+              name: event.documentNames?.[index] || `Document ${index + 1}`,
+              document: doc,
+            }));
+          } else if (event.documents) {
+            formattedDocuments = event.documents.map((doc, index) => ({
+              name: `Document ${index + 1}`,
+              document: doc,
+            }));
+          }
+          const eventStamps = await this.eventStampService.getStampsByEventId(event.id);
+          const {
+            eventSpeakers,
+            category,
+            eventExhibitors,
+            documents: _documents,
+            documentNames: _documentNames,
+            ...eventData
+          } = event;
+          const { exhibitorDescription, surveys, programmeTracks, ...eventFilteredData } = eventData;
+          const eventStampDescription = event.eventStampDescription;
           const formattedProgrammeTracks = UserUtils.formatProgrammeTracks(event?.programmeTracks || []);
-         
-          // Get engagements for this event - pass isUserFacing=true for user-facing API
           const engagements = await UserUtils.getEngagementsByEventId(event.id, this.eventRepository, this.engagementRepository, true);
 
-          // Build the complete event object
+          const exhibitorsData = {
+            exhibitorDescription: exhibitorDescription || '',
+            exhibitors: await Promise.all(
+              (event?.eventExhibitors?.filter((ee) => ee.exhibitor.isActive) || []).map(async (ee) => {
+                const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
+                const exhibitorData = {
+                  ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
+                };
+                if (exhibitorId) {
+                  const eventBooth = await this.eventBoothRepository.findOne({
+                    where: { eventId: event.id, exhibitorId },
+                  });
+                  if (eventBooth) (exhibitorData as any).boothCode = eventBooth.uniqueCode;
+                }
+                (exhibitorData as any).eventStaff = await ExhibitorUtils.getEventStaffForExhibitor(
+                  this.eventStaffRepository,
+                  event.id,
+                  exhibitorId!,
+                );
+                (exhibitorData as any).rating = await ExhibitorUtils.getExhibitorRating(
+                  this.exhibitorRatingRepository,
+                  exhibitorId!,
+                  event.id,
+                );
+                return exhibitorData;
+              }),
+            ),
+          };
+
           const completeEvent = {
             ...eventFilteredData,
+            price: this.toDisplayPrice(event.price),
             color: getEventColor(event.type),
             documents: formattedDocuments,
             eventStamps: {
               description: eventStampDescription || '',
-              stamps: eventStamps.map(stamp => ({
+              stamps: eventStamps.map((stamp) => ({
                 id: stamp.id,
-                boothNumber: stamp.name, // name field contains booth number
+                boothNumber: stamp.name,
                 exhibitorId: stamp.exhibitorId || null,
                 image: stamp.image,
               })),
             },
-            attendanceCount: attendanceCount,
-            surveyDetails: surveyDetails,
+            attendanceCount,
+            surveyDetails,
             hasSurvey: !!surveyDetails,
-            isFavorite: isFavorite,
-            isRegistered: isRegistered,
-            registerEventId: registerEventId,
+            isFavorite,
+            isRegistered,
+            registerEventId,
             speakersData: speakers,
             categoriesData: category?.map((ec) => ec.category) || [],
             programmeTracks: formattedProgrammeTracks,
-            engagements: engagements,
-
-            exhibitorsData: {
-              exhibitorDescription: exhibitorDescription || '',
-              exhibitors: await Promise.all(
-                (event?.eventExhibitors
-                  ?.filter((ee) => ee.exhibitor.isActive) || [])
-                  .map(async (ee) => {
-                    const exhibitorId = ee.exhibitorId || ee.exhibitor?.id;
-                    const exhibitorData = {
-                      ...ExhibitorUtils.getBasicExhibitorInfo(ee.exhibitor),
-                    };
-
-                    // Add booth code only for admin users
-                    if (userRole === UserRole.Admin && exhibitorId) {
-                      const eventBooth = await this.eventBoothRepository.findOne({
-                        where: {
-                          eventId: event.id,
-                          exhibitorId: exhibitorId,
-                        },
-                      });
-                      if (eventBooth) {
-                        (exhibitorData as any).boothCode = eventBooth.uniqueCode;
-                      }
-                    }
-
-                    // Get Event Staff for this exhibitor - show to all users
-                    (exhibitorData as any).eventStaff = await ExhibitorUtils.getEventStaffForExhibitor(
-                      this.eventStaffRepository,
-                      event.id,
-                      exhibitorId,
-                    );
-
-                    // Get average rating for this exhibitor in this event
-                    (exhibitorData as any).rating = await ExhibitorUtils.getExhibitorRating(
-                      this.exhibitorRatingRepository,
-                      exhibitorId,
-                      event.id,
-                    );
-
-                    return exhibitorData;
-                  }),
-              ),
-            },
+            engagements,
+            exhibitorsData,
           };
 
-          // Add Q&A data for admin users
-          if (userRole === UserRole.Admin) {
-            try {
-              const qnaData = await this.qnaUtils.getAllQuestionsForEvent(event.id);
-              (completeEvent as any).qnaData = qnaData.data;
-            } catch (error) {
-              // If Q&A data fails to load, continue without it
-              console.warn(`Failed to load Q&A data for event ${event.id}:`, error);
-              (completeEvent as any).qnaData = null;
-            }
+          try {
+            const qnaData = await this.qnaUtils.getAllQuestionsForEvent(event.id);
+            (completeEvent as any).qnaData = qnaData.data;
+          } catch {
+            (completeEvent as any).qnaData = null;
           }
 
-          // For global search, we still return the complete event structure
-          // but mark it as having a global match if search terms are found
           if (filters.globalSearch) {
-            // Get detailed search match information
             const searchResult = this.checkGlobalSearchMatch(completeEvent, filters.globalSearch);
-            
-            return {
-              ...completeEvent,
-              hasGlobalMatch: searchResult.hasMatch,
-              searchResult: searchResult
-            };
+            return { ...completeEvent, hasGlobalMatch: searchResult.hasMatch, searchResult };
           }
-
-          // Regular response - include all data
-          return {
-            ...completeEvent,
-            hasGlobalMatch: false
-          };
+          return { ...completeEvent, hasGlobalMatch: false };
         }),
       );
 
@@ -1043,14 +1029,8 @@ export class EventService {
         throw new ResourceNotFoundException('Event', id);
       }
 
-      const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
-      const attendanceCount = await this.getEventAttendanceCount(id);
+      const speakerSchedule = EventSpeakerUtils.buildSpeakerSchedule(event);
 
-      // Get survey details for this event
-      const surveyDetails =
-        await this.surveyUtils.getSurveyDetailsByEventId(id);
-
-      // Check if event is favorited by user
       let isFavorite = false;
       if (userId) {
         const favorite = await this.favoriteEventRepository.findOne({
@@ -1059,20 +1039,38 @@ export class EventService {
         isFavorite = !!favorite;
       }
 
-      // Check if user has registered for this event and get registration ID
       let isRegistered = false;
-      let registerEventId = null;
+      let registerEventId: string | null = null;
       if (userId) {
         const registration = await this.registerEventRepository.findOne({
           where: {
-            userId: userId,
+            userId,
             eventId: id,
-            isRegister: true, // Only count active registrations
+            isRegister: true,
           },
         });
         isRegistered = !!registration;
         registerEventId = registration?.id || null;
       }
+
+      // Non-admin: return only basic info + speakers (skip heavy loading)
+      if (userRole !== UserRole.Admin) {
+        const { eventSpeakers: _s, category: _c, eventExhibitors: _e, documents: _d, documentNames: _dn, programmeTracks: _pt, exhibitorDescription: _ed, surveys: _sv, eventStampDescription: _esd, ...basicEvent } = event;
+        return {
+          ...basicEvent,
+          price: this.toDisplayPrice(event.price),
+          color: getEventColor(event.type),
+          speakersData: speakerSchedule,
+          isFavorite,
+          isRegistered,
+          registerEventId,
+        };
+      }
+
+      const { eventSpeakers, category, eventExhibitors, ...eventData } = event;
+      const attendanceCount = await this.getEventAttendanceCount(id);
+      const surveyDetails =
+        await this.surveyUtils.getSurveyDetailsByEventId(id);
 
       // Format documents with names
       let formattedDocuments: { name: string; document: string }[] = [];
@@ -1106,8 +1104,6 @@ export class EventService {
 
       // Get engagements for this event - pass isUserFacing=true for user-facing API
       const engagements = await UserUtils.getEngagementsByEventId(id, this.eventRepository, this.engagementRepository, true);
-
-      const speakerSchedule = EventSpeakerUtils.buildSpeakerSchedule(event);
 
       // Get booth codes and event staff for all exhibitors
       const exhibitorsWithBoothCodes = await Promise.all(
@@ -1144,6 +1140,7 @@ export class EventService {
 
       const eventResponse = {
         ...eventFilteredData,
+        price: this.toDisplayPrice(event.price),
         color: getEventColor(event.type),
         speakers: speakerSchedule,
         speakersData: speakerSchedule,
@@ -2200,6 +2197,19 @@ export class EventService {
       this.errorHandler.logError(fileError, 'Event file deletion', event.id);
       // Continue with event deletion even if file deletion fails
     }
+  }
+
+  /**
+   * Normalize event price for API: always a number (never string).
+   * Set EVENT_PRICE_IN_CENTS=true if price is stored in cents (e.g. 12000 → 120.00 SGD).
+   * Then 9000 in DB → 90, 12000 in DB → 120.
+   */
+  private toDisplayPrice(price: unknown): number {
+    const n = Number(price ?? 0);
+    if (process.env.EVENT_PRICE_IN_CENTS === 'true') {
+      return Math.round((n / 100) * 100) / 100;
+    }
+    return n;
   }
 
   private checkGlobalSearchMatch(event: any, keyword: string): {
