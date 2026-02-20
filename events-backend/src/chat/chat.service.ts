@@ -686,6 +686,7 @@ export class ChatService {
 
       const threadIds = participants.map((p) => p.thread?.threadID).filter(Boolean) as string[];
       let threadIdsWithMessagesInDb: Set<string> = new Set();
+      let threadIdsVisibleToUser: Set<string> = new Set();
       if (threadIds.length > 0) {
         const rows = await this.messageRepo
           .createQueryBuilder('m')
@@ -696,14 +697,28 @@ export class ChatService {
           const id = r.m_threadID ?? r.threadID ?? Object.values(r)[0];
           if (id) threadIdsWithMessagesInDb.add(String(id));
         });
+        // Only show threads where current user has at least one visible message (after delete-all, hide thread so kisi aur ka message na dikhe)
+        const visibleRows = await this.messageRepo
+          .createQueryBuilder('m')
+          .select('DISTINCT m.threadID')
+          .where('m.threadID IN (:...threadIds)', { threadIds })
+          .andWhere(
+            '(m.senderID = :userID AND m.visibleToSender = true) OR (m.receiverID = :userID AND m.visibleToReceiver = true)',
+            { userID }
+          )
+          .getRawMany();
+        visibleRows.forEach((r: any) => {
+          const id = r.m_threadID ?? r.threadID ?? Object.values(r)[0];
+          if (id) threadIdsVisibleToUser.add(String(id));
+        });
       }
 
-      // Filter threads that have messages (either lastMessage set on thread, or at least one message in DB)
+      // Filter threads that have messages AND at least one message visible to current user (exclude deleted chats)
       let threadsWithMessages = participants.filter((p) => {
         if (!p.thread) return false;
-        const hasLastMessage = p.thread.lastMessage && p.thread.lastMessage.trim() !== '';
         const hasMessagesInDb = threadIdsWithMessagesInDb.has(p.thread.threadID);
-        return hasLastMessage || hasMessagesInDb;
+        const hasVisibleToUser = threadIdsVisibleToUser.has(p.thread.threadID);
+        return hasMessagesInDb && hasVisibleToUser;
       });
 
       // When eventId provided: show threads where other user is event attendee; include if thread has this eventId OR no eventId yet (so send with eventId stores last chat here)
@@ -757,9 +772,8 @@ export class ChatService {
             .orderBy('msg.msgDateUTC', 'DESC')
             .getOne();
 
-          const lastMessageText = (thread.lastMessage && String(thread.lastMessage).trim() !== '')
-            ? thread.lastMessage
-            : (lastMessage?.msg ?? '');
+          // Only show last message that current user can see. After delete, do not show thread.lastMessage (it may be other user's message).
+          const lastMessageText = lastMessage?.msg ?? '';
           const lastMessageTime = lastMessage?.msgDateUTC ?? thread.updatedAt;
 
           const isOnline = this.chatGateway?.isUserOnline(otherUser.id) || false;
