@@ -130,8 +130,10 @@ export class SpeakerProfileService {
     };
   }> {
     try {
-      const page = filters?.page || 1;
-      const limit = filters?.limit || 10;
+      const page = filters?.page ?? 1;
+      const limit = filters?.limit;
+      const usePagination = limit != null && limit > 0;
+      const effectiveLimit = usePagination ? limit : 99999;
       const search = filters?.keyword;
       const sortBy = filters?.sortBy || 'firstName';
       const sortOrder = filters?.sortOrder || 'ASC';
@@ -189,9 +191,12 @@ export class SpeakerProfileService {
       // Get total count before pagination
       const total = await queryBuilder.getCount();
 
-      // Apply pagination
-      const skip = (page - 1) * limit;
-      const speakers = await queryBuilder.skip(skip).take(limit).getMany();
+      // Apply pagination only when limit is provided; otherwise return all
+      const skip = usePagination ? (page - 1) * effectiveLimit : 0;
+      const take = usePagination ? effectiveLimit : undefined;
+      const speakers = take != null
+        ? await queryBuilder.skip(skip).take(take).getMany()
+        : await queryBuilder.getMany();
 
       // Format speakers data
       const formattedSpeakers = speakers.map((speaker) =>
@@ -199,15 +204,15 @@ export class SpeakerProfileService {
       );
 
       // Calculate pagination metadata
-      const totalPages = Math.ceil(total / limit);
-      const hasNext = page < totalPages;
-      const hasPrev = page > 1;
+      const totalPages = usePagination ? Math.ceil(total / effectiveLimit) : 1;
+      const hasNext = usePagination && page < totalPages;
+      const hasPrev = usePagination && page > 1;
 
       return {
         data: formattedSpeakers,
         pagination: {
           page,
-          limit,
+          limit: usePagination ? effectiveLimit : total,
           total,
           totalPages,
           hasNext,

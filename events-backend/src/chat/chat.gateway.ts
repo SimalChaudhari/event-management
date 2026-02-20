@@ -311,6 +311,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** Notify register chatroom so last chat shows when message is sent with eventId */
+  emitRegisterChatroomUpdate(
+    eventId: string,
+    registrantUserId: string,
+    payload: { threadID: string; receiverID: string; lastMessage: string; lastMessageTime: Date; lastMessageType: string; lastMessageSender: string; isLastMessageFromMe: boolean },
+  ) {
+    this.server.to(`register_chatroom:${eventId}:${registrantUserId}`).emit('register_chatroom_message', payload);
+  }
+
+  @SubscribeMessage('join_register_chatroom')
+  async handleJoinRegisterChatroom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { eventId: string; registrantUserId: string },
+  ) {
+    if (data.eventId && data.registrantUserId) {
+      await client.join(`register_chatroom:${data.eventId}:${data.registrantUserId}`);
+      client.emit('register_chatroom_joined', { eventId: data.eventId, registrantUserId: data.registrantUserId });
+    }
+  }
+
   // Check if user is online
   isUserOnline(userId: string): boolean {
     return this.connectedUsers.has(userId);

@@ -1053,9 +1053,10 @@ export class RegisterEventService implements OnModuleInit {
       lastName: c.lastName ?? (c.userName || '').trim().split(/\s+/).slice(1).join(' ') ?? '',
       profilePicture: c.userImage || undefined,
       ...(c.threadID && { threadID: c.threadID }),
-      lastMessage: c.lastMessage || undefined,
+      lastMessage: c.lastMessage ?? '',
       lastMessageTime: c.lastMessageTime || undefined,
       lastMessageSender: c.lastMessageSender || undefined,
+      lastMessageType: c.lastMessageType || 'text',
       isLastMessageFromMe: !!c.isLastMessageFromMe,
       unreadCount: c.unreadCount || 0,
     }));

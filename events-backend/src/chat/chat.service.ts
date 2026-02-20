@@ -83,8 +83,8 @@ export class ChatService {
       } catch (error) {
         throw new BadRequestException('Failed to create thread');
       }
-    } else if (dto.eventId && !thread!.eventId) {
-      // Existing thread: tag with event when first used in event chatroom
+    } else if (dto.eventId) {
+      // When sending from register/event chatroom: always tag thread with this eventId so last chat shows in that event's list
       await this.threadRepo.update(thread!.threadID, { eventId: dto.eventId });
       thread!.eventId = dto.eventId;
     }
@@ -207,6 +207,19 @@ export class ChatService {
       // Emit to receiver in real-time (works when message sent via REST or socket)
       if (this.chatGateway?.server) {
         this.chatGateway.server.to(`user:${receiverID}`).emit('new_message', result);
+      }
+
+      // Store last chat in register chatroom: notify so UI updates immediately (and thread already has eventId + lastMessage saved above)
+      if (dto.eventId && this.chatGateway?.emitRegisterChatroomUpdate) {
+        this.chatGateway.emitRegisterChatroomUpdate(dto.eventId, senderID, {
+          threadID: result.threadID,
+          receiverID: result.receiverID,
+          lastMessage: result.msg,
+          lastMessageTime: result.msgDateUTC,
+          lastMessageType: result.msgType || 'text',
+          lastMessageSender: result.senderNick,
+          isLastMessageFromMe: true,
+        });
       }
 
       return result;
@@ -693,13 +706,14 @@ export class ChatService {
         return hasLastMessage || hasMessagesInDb;
       });
 
-      // When eventId provided: only threads for this event chatroom (thread.eventId = eventId) and other user is registered attendee
+      // When eventId provided: show threads where other user is event attendee; include if thread has this eventId OR no eventId yet (so send with eventId stores last chat here)
       if (eventAttendeeIds !== null) {
         threadsWithMessages = threadsWithMessages.filter(p => {
           const otherUser = p.thread!.userID === userID ? p.thread!.receiver : p.thread!.user;
           const otherIsAttendee = otherUser && eventAttendeeIds!.has(otherUser.id);
           const threadBelongsToEvent = p.thread!.eventId === dto.eventId;
-          return otherIsAttendee && threadBelongsToEvent;
+          const threadUntagged = !p.thread!.eventId;
+          return otherIsAttendee && (threadBelongsToEvent || threadUntagged);
         });
       }
 
@@ -726,36 +740,35 @@ export class ChatService {
       const total = filteredThreads.length;
       const paginatedThreads = filteredThreads.slice(skip, skip + limit);
 
-      // Build chat list
+      // Build chat list – last message from DB (visible to user) so register chatroom always shows it
       const chatList = await Promise.all(
         paginatedThreads.map(async (participant) => {
           const thread = participant.thread;
           const otherUser = thread.userID === userID ? thread.receiver : thread.user;
           
-          // Get last message details
-          const lastMessage = await this.messageRepo.findOne({
-            where: { 
-              threadID: thread.threadID,
-              // Only visible messages
-            },
-            relations: ['sender'],
-            order: { msgDateUTC: 'DESC' }
-          });
+          const lastMessage = await this.messageRepo
+            .createQueryBuilder('msg')
+            .leftJoinAndSelect('msg.sender', 'sender')
+            .where('msg.threadID = :threadID', { threadID: thread.threadID })
+            .andWhere(
+              '(msg.senderID = :userID AND msg.visibleToSender = true) OR (msg.receiverID = :userID AND msg.visibleToReceiver = true)',
+              { userID }
+            )
+            .orderBy('msg.msgDateUTC', 'DESC')
+            .getOne();
 
-          // Check if other user is online
+          const lastMessageText = (thread.lastMessage && String(thread.lastMessage).trim() !== '')
+            ? thread.lastMessage
+            : (lastMessage?.msg ?? '');
+          const lastMessageTime = lastMessage?.msgDateUTC ?? thread.updatedAt;
+
           const isOnline = this.chatGateway?.isUserOnline(otherUser.id) || false;
-          
-          // Get other user's last seen
           const otherParticipant = await this.participantRepo.findOne({
             where: { threadID: thread.threadID, userID: otherUser.id }
           });
-
           let lastSeen: string | null = null;
-          if (isOnline) {
-            lastSeen = 'online';
-          } else if (otherParticipant?.lastSeen) {
-            lastSeen = otherParticipant.lastSeen.toISOString();
-          }
+          if (isOnline) lastSeen = 'online';
+          else if (otherParticipant?.lastSeen) lastSeen = otherParticipant.lastSeen.toISOString();
 
           return {
             threadID: thread.threadID,
@@ -764,8 +777,8 @@ export class ChatService {
             firstName: otherUser.firstName || '',
             lastName: otherUser.lastName || '',
             userImage: otherUser.profilePicture || null,
-            lastMessage: thread.lastMessage || '',
-            lastMessageTime: thread.updatedAt,
+            lastMessage: lastMessageText,
+            lastMessageTime,
             unreadCount: participant.unreadCount || 0,
             isOnline,
             lastSeen,

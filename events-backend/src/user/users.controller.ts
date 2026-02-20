@@ -313,9 +313,16 @@ export class UserController {
     @Res() response: Response,
     @Request() req: any,
     @Query() filterDto: BaseFilterDto,
+    @Query('all') all?: string,
   ) {
     try {
-      const result = await this.userService.getAllSpeakers(filterDto);
+      // When all=true, or when page/limit not in query (pagination not requested), return all speakers
+      const paginationNotRequested = req.query?.page === undefined && req.query?.limit === undefined;
+      const returnAll = all === 'true' || all === '1' || paginationNotRequested;
+      const options = returnAll
+        ? { ...filterDto, page: 1, limit: undefined as unknown as number }
+        : filterDto;
+      const result = await this.userService.getAllSpeakers(options);
       
       const successResponse: SuccessResponse = {
         success: true,

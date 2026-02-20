@@ -333,33 +333,59 @@ export class GalleryController {
     @Request() req: any,
   ) {
     try {
-      const gallery = await this.galleryService.getGalleryById(galleryId);
-      if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
-        throw new BadRequestException('No images found to download');
-      }
-      const archiver = require('archiver');
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      const safeTitle = (gallery.trackTitle || 'gallery').replace(/[^a-zA-Z0-9-_]/g, '_');
-      response.attachment(`gallery-${safeTitle}-${galleryId}.zip`);
-      archive.pipe(response);
-      let added = 0;
-      for (let i = 0; i < gallery.galleryImages.length; i++) {
-        const relPath = gallery.galleryImages[i];
-        const fullPath = path.join(process.cwd(), relPath);
-        if (fs.existsSync(fullPath)) {
-          const ext = path.extname(relPath);
-          archive.file(fullPath, { name: `image_${i + 1}${ext}` });
-          added++;
-        }
-      }
-      if (added === 0) {
-        throw new BadRequestException('No valid image files found to download');
-      }
-      await archive.finalize();
+      await this.streamAllGalleryImagesAsZip(galleryId, response);
     } catch (error) {
       this.errorHandler.logError(error, 'Gallery all images download', req.user?.id);
       throw error;
     }
+  }
+
+  /** Get download URL for all gallery images. Frontend shows this link; on click, ZIP downloads (Public). */
+  @Get('download-all-url/:galleryId')
+  @Public()
+  async getDownloadAllGalleryUrl(
+    @Param('galleryId') galleryId: string,
+    @Request() req: any,
+  ) {
+    const gallery = await this.galleryService.getGalleryById(galleryId);
+    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
+      throw new BadRequestException('No images found to download');
+    }
+    const protocol = req.protocol || 'https';
+    const host = req.get?.('host') || req.headers?.host || '';
+    const baseUrl = `${protocol}://${host}`;
+    const downloadUrl = `${baseUrl}/api/gallery/download/all/${galleryId}`;
+    return {
+      success: true,
+      downloadUrl,
+      message: 'Use this URL as link – when user clicks, ZIP will download',
+    };
+  }
+
+  private async streamAllGalleryImagesAsZip(galleryId: string, response: Response): Promise<void> {
+    const gallery = await this.galleryService.getGalleryById(galleryId);
+    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
+      throw new BadRequestException('No images found to download');
+    }
+    const archiver = require('archiver');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const safeTitle = (gallery.trackTitle || 'gallery').replace(/[^a-zA-Z0-9-_]/g, '_');
+    response.attachment(`gallery-${safeTitle}-${galleryId}.zip`);
+    archive.pipe(response);
+    let added = 0;
+    for (let i = 0; i < gallery.galleryImages.length; i++) {
+      const relPath = gallery.galleryImages[i];
+      const fullPath = path.join(process.cwd(), relPath);
+      if (fs.existsSync(fullPath)) {
+        const ext = path.extname(relPath);
+        archive.file(fullPath, { name: `image_${i + 1}${ext}` });
+        added++;
+      }
+    }
+    if (added === 0) {
+      throw new BadRequestException('No valid image files found to download');
+    }
+    await archive.finalize();
   }
 
   @Get('get-all')
