@@ -17,6 +17,25 @@ import {
 import publicAxiosInstance from '../../../configs/publicAxiosInstance';
 import { API_URL } from '../../../configs/env';
 
+const CHECK_IN_METHOD_LABELS = {
+  qr_code: 'QR code',
+  physical_device: 'Physical scanner',
+  mobile_camera: 'Mobile camera',
+  manual: 'Manual',
+  admin: 'Admin',
+};
+
+const CHECK_IN_METHOD_STYLES = {
+  qr_code: { backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd' },
+  physical_device: { backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' },
+  mobile_camera: { backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #5eead4' },
+  manual: { backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' },
+  admin: { backgroundColor: '#e9d5ff', color: '#6b21a8', border: '1px solid #d8b4fe' },
+};
+
+const checkInMethodBadgeStyle = (method) =>
+  CHECK_IN_METHOD_STYLES[method] || { backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' };
+
 const RegistrationListSharePage = () => {
   const { shareToken } = useParams();
   const navigate = useNavigate();
@@ -295,13 +314,14 @@ const RegistrationListSharePage = () => {
                       <th>Name</th>
                       <th>Email</th>
                       <th className="text-center">Attendance Status</th>
+                      <th className="text-center">Check-in Method</th>
                       <th className="text-center">Check-in Time</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredParticipants.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center text-muted py-4">
+                        <td colSpan={7} className="text-center text-muted py-4">
                           {participants.length === 0
                             ? 'No participants in this list.'
                             : 'No matches for your search.'}
@@ -368,6 +388,23 @@ const RegistrationListSharePage = () => {
                                 <i className="feather icon-clock mr-1" style={{ fontSize: '12px' }}></i>
                                 Not Attended
                               </span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            {p.checkInMethod ? (
+                              <span
+                                className="badge px-2 py-1"
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  borderRadius: '999px',
+                                  ...checkInMethodBadgeStyle(p.checkInMethod),
+                                }}
+                              >
+                                {CHECK_IN_METHOD_LABELS[p.checkInMethod] || p.checkInMethod}
+                              </span>
+                            ) : (
+                              <span className="text-muted small">—</span>
                             )}
                           </td>
                           <td className="text-center text-muted small">
@@ -466,6 +503,25 @@ const RegistrationListSharePage = () => {
                               <i className="feather icon-clock mr-1" style={{ fontSize: '11px', flexShrink: 0 }}></i>
                               Not Attended
                             </span>
+                          )}
+                        </div>
+                        <div className="d-flex align-items-center mb-2">
+                          <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>Check-in method</span>
+                          {p.checkInMethod ? (
+                            <span
+                              className="badge d-inline-flex align-items-center"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                borderRadius: '999px',
+                                padding: '4px 10px',
+                                ...checkInMethodBadgeStyle(p.checkInMethod),
+                              }}
+                            >
+                              {CHECK_IN_METHOD_LABELS[p.checkInMethod] || p.checkInMethod}
+                            </span>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.8rem' }}>—</span>
                           )}
                         </div>
                         <div className="d-flex align-items-center">

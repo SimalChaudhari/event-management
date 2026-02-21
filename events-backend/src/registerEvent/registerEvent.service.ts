@@ -44,7 +44,7 @@ import { EventStampService } from '../event/event-stamp.service';
 import { forwardRef, Inject, Optional } from '@nestjs/common';
 import { EventRegistrationShareLink } from './event-registration-share-link.entity';
 import * as crypto from 'crypto';
-import { EventAttendance, AttendanceStatus } from '../attendance/attendance.entity';
+import { EventAttendance, AttendanceStatus, CheckInMethod } from '../attendance/attendance.entity';
 import { AttendanceGateway } from '../attendance/attendance.gateway';
 import { AttendanceService } from '../attendance/attendance.service';
 import { ChatService } from '../chat/chat.service';
@@ -2149,6 +2149,7 @@ export class RegisterEventService implements OnModuleInit {
       type: string;
       attendanceStatus: 'Attended' | 'Not Attended';
       checkInTime?: string;
+      checkInMethod?: CheckInMethod;
     }>;
   }> {
     const shareLink = await this.eventRegistrationShareLinkRepository.findOne({
@@ -2177,11 +2178,15 @@ export class RegisterEventService implements OnModuleInit {
     const attendanceRecords = await this.eventAttendanceRepository.find({
       where: { eventId: shareLink.eventId },
     });
-    const attendanceByUserId = new Map<string, { status: AttendanceStatus; checkInTime?: Date }>();
+    const attendanceByUserId = new Map<
+      string,
+      { status: AttendanceStatus; checkInTime?: Date; checkInMethod?: CheckInMethod }
+    >();
     attendanceRecords.forEach((a) => {
       attendanceByUserId.set(a.userId, {
         status: a.status,
         checkInTime: a.checkInTime,
+        checkInMethod: a.checkInMethod,
       });
     });
 
@@ -2203,6 +2208,7 @@ export class RegisterEventService implements OnModuleInit {
           checkInTime: att?.checkInTime
             ? att.checkInTime.toISOString()
             : undefined,
+          checkInMethod: att?.checkInMethod,
         };
       });
 
