@@ -12,6 +12,19 @@ try {
   Html5QrcodeLib = require('html5-qrcode').Html5Qrcode;
 } catch (_) {}
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function extractUserIdFromQR(decodedText) {
+  const raw = (decodedText || '').trim();
+  if (!raw) return '';
+  if (UUID_REGEX.test(raw)) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.includes('/')) {
+    const segments = raw.split(/[/?#]/).filter(Boolean);
+    const uuidSegment = segments.find((s) => UUID_REGEX.test(s));
+    if (uuidSegment) return uuidSegment;
+  }
+  return raw;
+}
+
 const TEAL = '#00D4AA';
 const ORANGE = '#f97316';
 const SCANNER_STYLES = {
@@ -288,10 +301,11 @@ const RegistrationListCheckInScanPage = () => {
     const config = { fps: 8, qrbox: { width: 280, height: 280 } };
     const facingMode = cameraFacing === 'environment' ? 'environment' : 'user';
     html5Qr.start({ facingMode }, config, (decodedText) => {
+      const userId = extractUserIdFromQR(decodedText);
       html5Qr.stop().catch(() => {}).then(() => {
         html5QrRef.current = null;
         setCameraScanActive(false);
-        handleSubmit(null, decodedText.trim(), 'mobile_camera');
+        handleSubmit(null, userId, 'mobile_camera');
       });
     }, () => {}).catch((err) => {
       setError(err?.message || 'Camera access failed');
@@ -567,6 +581,15 @@ const RegistrationListCheckInScanPage = () => {
               <div className="scan-page-card-body" style={SCANNER_STYLES.cardBody}>
                 <div style={{ ...SCANNER_STYLES.cardTitle, color: ORANGE }}>Physical Device Scan</div>
                 <Form onSubmit={handleSubmit}>
+                <Form.Check
+                    type="checkbox"
+                    id="manual-entry-check"
+                    label="Manual entry (admin typed ID)"
+                    checked={isManualEntry}
+                    onChange={(e) => setIsManualEntry(e.target.checked)}
+                    style={{ marginBottom: 10, color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}
+                  />
+
                   <Form.Control
                     ref={inputRef}
                     type="text"
@@ -580,14 +603,7 @@ const RegistrationListCheckInScanPage = () => {
                     style={{ ...SCANNER_STYLES.input, ...SCANNER_STYLES.inputPhysical }}
                     aria-label="Participant ID"
                   />
-                  <Form.Check
-                    type="checkbox"
-                    id="manual-entry-check"
-                    label="Manual entry (admin typed ID)"
-                    checked={isManualEntry}
-                    onChange={(e) => setIsManualEntry(e.target.checked)}
-                    style={{ marginTop: 10, color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}
-                  />
+                
                 </Form>
                 <div className="physical-card-status-line" style={{ ...SCANNER_STYLES.statusLine }}>
                   <span style={{ ...SCANNER_STYLES.statusDot, background: ORANGE }} />
