@@ -4,18 +4,23 @@ import { Form } from 'react-bootstrap';
 import publicAxiosInstance from '../../../configs/publicAxiosInstance';
 import axiosInstance from '../../../configs/axiosInstance';
 
+import physicalScanImg from '../../../assets/scan/physical.png';
+import mobileScanImg from '../../../assets/scan/mobile.png';
+
 let Html5QrcodeLib = null;
 try {
   Html5QrcodeLib = require('html5-qrcode').Html5Qrcode;
 } catch (_) {}
 
+const TEAL = '#00D4AA';
+const ORANGE = '#f97316';
 const SCANNER_STYLES = {
   wrapper: {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: 'linear-gradient(180deg, #0f1419 0%, #0a0d10 100%)',
-    color: '#e2e8f0',
+    background: 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 40%, #e2e8f0 100%)',
+    color: '#1e293b',
     fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif',
     padding: 0,
     margin: 0,
@@ -25,70 +30,141 @@ const SCANNER_STYLES = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 20px',
-    borderBottom: '1px solid rgba(0,0,0,0.25)',
-    backgroundColor: '#0d9488',
-    color: '#fff',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    padding: '14px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    background: 'linear-gradient(90deg, #0d9488 0%, #0f766e 100%)',
+    color: '#ffffff',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
   },
   backLink: {
-    color: 'rgba(255,255,255,0.95)',
+    color: TEAL,
     fontSize: '14px',
     fontWeight: 500,
     textDecoration: 'none',
     cursor: 'pointer',
     padding: '8px 14px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.35)',
-    background: 'rgba(255,255,255,0.12)',
-    transition: 'background 0.2s, border-color 0.2s',
+    borderRadius: '10px',
+    border: '1px solid rgba(0, 212, 170, 0.4)',
+    background: 'transparent',
+    transition: 'background 0.2s, border-color 0.2s, color 0.2s',
   },
   mainCenter: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     padding: '24px 16px',
     minHeight: 0,
+    overflow: 'auto',
   },
-  scanZone: {
+  card: {
+    width: '100%',
+    maxWidth: '560px',
+    borderRadius: '16px',
+    padding: '24px',
+    marginBottom: '20px',
+    background: 'rgba(255, 255, 255, 0.92)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    alignItems: 'center',
+    color: '#1e293b',
+  },
+  cardContentWidth: { maxWidth: '560px' },
+  cardAccentOrange: {
+    borderLeft: '8px solid ' + ORANGE,
+    borderBottom: '8px solid ' + ORANGE,
+  },
+  cardAccentTeal: {
+    borderLeft: '8px solid ' + TEAL,
+    borderBottom: '8px solid ' + TEAL,
+  },
+  cardIcon: {
+    width: 'clamp(120px, 28vw, 220px)',
+    height: 'clamp(120px, 28vw, 220px)',
+    minWidth: 120,
+    minHeight: 120,
+    maxWidth: '100%',
+    objectFit: 'contain',
+    flexShrink: 0,
+  },
+  cardBody: { flex: 1, minWidth: 0 },
+  cardTitle: { fontSize: '1.1rem', fontWeight: 700, marginBottom: 14, letterSpacing: '0.02em' },
+  input: {
+    width: '100%',
+    padding: '14px 16px',
+    fontSize: '1rem',
+    letterSpacing: '0.08em',
+    background: 'rgba(255, 255, 255, 0.9)',
+    border: '1px solid rgba(0, 212, 170, 0.5)',
+    borderRadius: '10px',
+    color: '#1e293b',
+    outline: 'none',
+    textAlign: 'center',
+    caretColor: TEAL,
+    fontWeight: 500,
+  },
+  inputPhysical: {
+    borderColor: 'rgba(249, 115, 22, 0.6)',
+    caretColor: ORANGE,
+  },
+  statusLine: { fontSize: '12px', color: '#475569', marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 },
+  statusDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
+  scanZoneVisual: {
     position: 'relative',
     width: '100%',
-    maxWidth: '520px',
-    padding: '28px 24px',
-    border: '2px solid rgba(0, 212, 170, 0.35)',
-    borderRadius: '16px',
-    background: 'linear-gradient(145deg, rgba(0, 212, 170, 0.06) 0%, rgba(0,0,0,0.2) 100%)',
-    boxShadow: '0 0 0 1px rgba(255,255,255,0.03), 0 8px 32px rgba(0,0,0,0.3), 0 0 48px rgba(0, 212, 170, 0.06)',
+    height: 56,
+    background: 'rgba(255, 255, 255, 0.7)',
+    border: '2px solid rgba(0, 212, 170, 0.5)',
+    borderRadius: '10px',
+    marginBottom: 14,
+    overflow: 'hidden',
   },
   scanLine: {
     position: 'absolute',
-    left: '24px',
-    right: '24px',
+    left: 12,
+    right: 12,
     height: '2px',
-    background: 'linear-gradient(90deg, transparent, rgba(0, 212, 170, 0.75), transparent)',
+    background: 'linear-gradient(90deg, transparent, rgba(0, 212, 170, 0.9), transparent)',
     animation: 'scanMove 2.2s ease-in-out infinite',
     borderRadius: 1,
   },
-  input: {
+  scanNowBtn: {
     width: '100%',
-    padding: '20px 18px',
-    fontSize: '1.35rem',
-    letterSpacing: '0.12em',
-    background: 'rgba(0,0,0,0.45)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    padding: '12px 20px',
+    fontSize: '14px',
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    background: '#ef4444',
+    color: '#ffffff',
+    border: 'none',
     borderRadius: '10px',
-    color: '#e2e8f0',
-    outline: 'none',
-    textAlign: 'center',
-    caretColor: '#14b8a6',
-    fontWeight: 500,
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+    transition: 'opacity 0.2s',
+  },
+  alignHint: { fontSize: '12px', color: '#64748b', marginTop: 10, textAlign: 'center' },
+  statusBar: {
+    flexShrink: 0,
+    width: '100%',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    border: '1px solid rgba(0, 212, 170, 0.5)',
+    background: 'rgba(255, 255, 255, 0.92)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 'auto',
   },
   statusBox: {
-    width: '100%',
-    maxWidth: '520px',
-    marginTop: '20px',
     padding: '18px 22px',
     borderRadius: '12px',
     textAlign: 'center',
@@ -96,26 +172,10 @@ const SCANNER_STYLES = {
     fontWeight: 600,
     letterSpacing: '0.03em',
   },
-  statusReady: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: '#94a3b8',
-  },
-  statusProcessing: {
-    background: 'rgba(251, 191, 36, 0.1)',
-    border: '1px solid rgba(251, 191, 36, 0.35)',
-    color: '#fbbf24',
-  },
-  statusSuccess: {
-    background: 'rgba(34, 197, 94, 0.12)',
-    border: '1px solid rgba(34, 197, 94, 0.45)',
-    color: '#22c55e',
-  },
-  statusError: {
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.35)',
-    color: '#ef4444',
-  },
+  statusReady: { color: '#0d9488' },
+  statusProcessing: { color: '#d97706' },
+  statusSuccess: { color: '#059669' },
+  statusError: { color: '#dc2626' },
 };
 
 const RegistrationListCheckInScanPage = () => {
@@ -128,6 +188,8 @@ const RegistrationListCheckInScanPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [showMobileSection, setShowMobileSection] = useState(false);
+  const [showMobileCard, setShowMobileCard] = useState(false);
   const [cameraScanActive, setCameraScanActive] = useState(false);
   const [cameraFacing, setCameraFacing] = useState('user');
   const inputRef = useRef(null);
@@ -296,7 +358,7 @@ const RegistrationListCheckInScanPage = () => {
         `}</style>
         <div style={{ padding: '80px 20px', textAlign: 'center', color: '#64748b' }}>
           <div style={{ fontSize: '14px', letterSpacing: '0.2em', marginBottom: '12px' }}>INITIALIZING</div>
-          <div style={{ width: 32, height: 32, border: '2px solid #334155', borderTopColor: '#00d4aa', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ width: 32, height: 32, border: '2px solid #cbd5e1', borderTopColor: TEAL, borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -320,121 +382,328 @@ const RegistrationListCheckInScanPage = () => {
           0%, 100% { top: 24px; opacity: 0.6; }
           50% { top: calc(100% - 24px); opacity: 1; }
         }
+        @keyframes cardFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes iconFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes scanSweep {
+          0% { top: 0; opacity: 0.9; }
+          100% { top: 100%; opacity: 0.9; }
+        }
+        .scan-icon-wrap {
+          position: relative;
+          overflow: hidden;
+          display: inline-flex;
+        }
+        .scan-line-overlay {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 4px;
+          border-radius: 2px;
+          pointer-events: none;
+          animation: scanSweep 2s ease-in-out infinite;
+        }
+        .scan-icon-wrap.scan-overlay-orange .scan-line-overlay {
+          background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.9), transparent);
+        }
+        .scan-icon-wrap.scan-overlay-teal .scan-line-overlay {
+          background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.9), transparent);
+        }
+        .scan-page-card-physical .scan-page-card-icon {
+          animation: iconFloat 3s ease-in-out infinite;
+        }
+        .scan-page-card-mobile .scan-page-card-icon {
+          animation: iconFloat 3s ease-in-out infinite;
+        }
+        .scan-page-card-physical {
+          animation: cardFadeIn 0.45s ease-out;
+          background: rgba(15, 23, 42, 0.95) !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          border-left: 8px solid #f97316 !important;
+          border-bottom: 8px solid #f97316 !important;
+          color: #e2e8f0;
+        }
+        .scan-page-card-physical .scan-page-card-body {
+          color: #e2e8f0;
+        }
+        .scan-page-card-physical .physical-card-input {
+          background: #0f172a !important;
+          border-color: rgba(249, 115, 22, 0.5) !important;
+          color: #f1f5f9 !important;
+        }
+        .scan-page-card-physical .physical-card-status-line {
+          color: #94a3b8 !important;
+        }
+        .scan-page-card-mobile {
+          animation: cardFadeIn 0.45s ease-out;
+        }
+        .scan-page-card-mobile-idle {
+          flex-direction: column !important;
+          align-items: center !important;
+        }
+        .scan-page-card-mobile-idle .scan-page-card-body {
+          width: 100%;
+          text-align: center;
+        }
+        @media (max-width: 768px) {
+          .scan-page-card {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center;
+          }
+          .scan-page-card .scan-page-card-body {
+            text-align: left;
+            width: 100%;
+          }
+          .scan-page-card .scan-page-card-icon {
+            margin: 0 auto;
+          }
+          .scan-page-card-mobile .scan-page-card-icon {
+            width: clamp(160px, 48vw, 260px) !important;
+            height: clamp(160px, 48vw, 260px) !important;
+            min-width: 160px !important;
+            min-height: 160px !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .scan-page-card {
+            max-width: 720px !important;
+            padding: 28px 32px !important;
+            gap: 24px !important;
+            margin-bottom: 24px !important;
+          }
+          .scan-page-card:not(.scan-page-card-mobile) {
+            flex-direction: column !important;
+            align-items: center !important;
+          }
+          .scan-page-card:not(.scan-page-card-mobile) .scan-page-card-body {
+            text-align: left;
+            width: 100%;
+          }
+          .scan-page-card:not(.scan-page-card-mobile) .scan-page-card-icon {
+            width: clamp(140px, 20vw, 260px) !important;
+            height: clamp(140px, 20vw, 260px) !important;
+            min-width: 140px !important;
+            min-height: 140px !important;
+            margin: 0 auto;
+          }
+          .scan-page-card-mobile {
+            flex-direction: row !important;
+            align-items: flex-start !important;
+          }
+          .scan-page-card-mobile.scan-page-card-mobile-idle {
+            flex-direction: column !important;
+            align-items: center !important;
+          }
+          .scan-page-card-mobile .scan-page-card-icon {
+            width: clamp(180px, 28vw, 320px) !important;
+            height: clamp(180px, 28vw, 320px) !important;
+            min-width: 180px !important;
+            min-height: 180px !important;
+            margin: 0;
+          }
+          .scan-page-card-mobile .scan-page-card-body {
+            width: 100%;
+          }
+          .scan-content-width {
+            max-width: 720px !important;
+          }
+        }
       `}</style>
 
       <header style={SCANNER_STYLES.topBar}>
-        <div style={{ flex: '0 0 130px' }} />
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0, padding: '0 12px', fontSize: '14px', fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
-          {eventName || '—'}
+        <div style={{ padding: '8px 14px', borderRadius: 10, color: 'rgba(255,255,255,0.95)', fontSize: 14, fontWeight: 500 }}>
+          {eventName || 'Event'}
         </div>
-        <div style={{ flex: '0 0 130px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" style={SCANNER_STYLES.backLink} onClick={() => navigate(`/events/registrations/share/${shareToken}`)}>
-            ← List
-          </button>
-        </div>
+        <button
+          type="button"
+          style={{ ...SCANNER_STYLES.backLink, color: '#fff', borderColor: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.15)' }}
+          onClick={() => navigate(`/events/registrations/share/${shareToken}`)}
+        >
+          ← List
+        </button>
       </header>
 
       <main style={SCANNER_STYLES.mainCenter}>
-        {!cameraScanActive && (
-          <div style={SCANNER_STYLES.scanZone}>
-            <div style={{ ...SCANNER_STYLES.scanLine, top: 20 }} />
-            <Form onSubmit={handleSubmit}>
-              <Form.Control
-                ref={inputRef}
-                type="text"
-                placeholder=""
-                value={scanValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                autoComplete="off"
-                disabled={submitting}
-                style={SCANNER_STYLES.input}
-                aria-label="Participant ID"
-              />
-            </Form>
-            <div style={{ marginTop: '14px', fontSize: '11px', color: '#64748b', letterSpacing: '0.2em', textAlign: 'center', fontWeight: 500 }}>
-              SCAN ZONE
-            </div>
-          </div>
-        )}
+        {/* Status bar on top - READY + refresh */}
+        <div style={{ ...SCANNER_STYLES.statusBar, marginBottom: 20, marginTop: 0 }}>
+          <span style={{ color: status.style.color, display: 'flex', alignItems: 'center' }}>
+            <span style={{ marginRight: 8 }}>{status.icon}</span>
+            {status.text}
+          </span>
+          <button
+            type="button"
+            style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid rgba(13,148,136,0.5)', background: 'transparent', color: '#0d9488', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}
+            onClick={() => { setError(null); setSuccessMsg(null); inputRef.current?.focus(); }}
+            aria-label="Refresh"
+          >
+            ↻
+          </button>
+        </div>
 
-        {!cameraScanActive && (
-          <div style={{ width: '100%', maxWidth: 520, marginTop: 16, textAlign: 'center' }}>
-            <button
-              type="button"
-              style={{
-                ...SCANNER_STYLES.backLink,
-                padding: '10px 18px',
-                fontSize: '14px',
-                background: 'rgba(0, 212, 170, 0.12)',
-                borderColor: 'rgba(0, 212, 170, 0.45)',
-                color: '#5eead4',
-              }}
-              onClick={() => {
-                setError(null);
-                if (Html5QrcodeLib) {
-                  setCameraScanActive(true);
-                } else {
-                  setError('Camera scanning not available. Run: npm install html5-qrcode');
-                }
-              }}
-            >
-              📷 Use camera to scan
-            </button>
-          </div>
-        )}
-
-        {cameraScanActive && (
-          <div style={{ width: '100%', maxWidth: 520, marginTop: 16, position: 'relative', borderRadius: 16, overflow: 'hidden', border: '2px solid rgba(0, 212, 170, 0.35)', background: '#000', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-            <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.6)', color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>
-              Show your mobile&apos;s QR or barcode in front of the camera
+        {/* Card + button: centered vertically in space between top and bottom */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 0, width: '100%' }}>
+        {!showMobileSection ? (
+          <>
+            {/* Physical Device Scan card - black/dark inner */}
+            <div className="scan-page-card scan-page-card-physical" style={{ ...SCANNER_STYLES.card, ...SCANNER_STYLES.cardAccentOrange }}>
+              <div className="scan-icon-wrap scan-overlay-orange" style={{ position: 'relative', overflow: 'hidden' }}>
+                <img src={physicalScanImg} alt="" className="scan-page-card-icon" style={SCANNER_STYLES.cardIcon} />
+                <div className="scan-line-overlay" style={{ position: 'absolute', left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.9), transparent)', borderRadius: 2, animation: 'scanSweep 2s ease-in-out infinite', pointerEvents: 'none' }} />
+              </div>
+              <div className="scan-page-card-body" style={SCANNER_STYLES.cardBody}>
+                <div style={{ ...SCANNER_STYLES.cardTitle, color: ORANGE }}>Physical Device Scan</div>
+                <Form onSubmit={handleSubmit}>
+                  <Form.Control
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Waiting for handheld input..."
+                    value={scanValue}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    autoComplete="off"
+                    disabled={submitting}
+                    className="physical-card-input"
+                    style={{ ...SCANNER_STYLES.input, ...SCANNER_STYLES.inputPhysical }}
+                    aria-label="Participant ID"
+                  />
+                </Form>
+                <div className="physical-card-status-line" style={{ ...SCANNER_STYLES.statusLine }}>
+                  <span style={{ ...SCANNER_STYLES.statusDot, background: ORANGE }} />
+                  <span>{scanValue ? 'Ready to receive' : 'Waiting for handheld input...'}</span>
+                </div>
+              </div>
             </div>
-            <div id="camera-scan-box" style={{ width: '100%', minHeight: 280 }} />
-            <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0 12px' }}>
+
+            {/* Mobile Camera Scan button - card ke niche, right side */}
+            <div className="scan-content-width" style={{ width: '100%', maxWidth: 560, marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"
                 style={{
-                  ...SCANNER_STYLES.backLink,
-                  background: 'rgba(0, 212, 170, 0.25)',
-                  borderColor: 'rgba(0, 212, 170, 0.6)',
-                  color: '#5eead4',
+                  padding: '10px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  background: 'rgba(0, 212, 170, 0.12)',
+                  border: '1px solid rgba(13, 148, 136, 0.6)',
+                  borderRadius: 10,
+                  color: '#0d9488',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s, border-color 0.2s',
+                }}
+                onClick={() => setShowMobileSection(true)}
+              >
+                <img src={mobileScanImg} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                <span>Mobile Camera Scan</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Mobile Camera: scan UI - icon left, field/scan zone right */}
+            <div className={`scan-page-card scan-page-card-mobile${!cameraScanActive ? ' scan-page-card-mobile-idle' : ''}`} style={{ ...SCANNER_STYLES.card, ...SCANNER_STYLES.cardAccentTeal }}>
+                {!cameraScanActive && (
+                  <div className="scan-icon-wrap scan-overlay-teal" style={{ position: 'relative', overflow: 'hidden' }}>
+                    <img src={mobileScanImg} alt="" className="scan-page-card-icon" style={SCANNER_STYLES.cardIcon} />
+                    <div className="scan-line-overlay" style={{ position: 'absolute', left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.9), transparent)', borderRadius: 2, animation: 'scanSweep 2s ease-in-out infinite', pointerEvents: 'none' }} />
+                  </div>
+                )}
+                <div className="scan-page-card-body" style={SCANNER_STYLES.cardBody}>
+                  {!cameraScanActive ? (
+                    <>
+                      <button
+                        type="button"
+                        style={{ ...SCANNER_STYLES.scanNowBtn, marginTop: 12 }}
+                        onClick={() => {
+                          setError(null);
+                          if (Html5QrcodeLib) setCameraScanActive(true);
+                          else setError('Camera scanning not available. Run: npm install html5-qrcode');
+                        }}
+                      >
+                        Scan now
+                      </button>
+                      <div style={SCANNER_STYLES.alignHint}>Align code within frame</div>
+                    </>
+                  ) : (
+                    <div style={{ width: '100%', maxWidth: '100%', position: 'relative', borderRadius: 12, overflow: 'hidden', border: '2px solid rgba(0, 212, 170, 0.5)', background: '#0a0a0a' }}>
+                      <div style={{ padding: '8px 12px', background: '#1a1a1a', color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>
+                        Show QR or barcode in front of the camera
+                      </div>
+                      <div id="camera-scan-box" style={{ width: '100%', minHeight: 240 }} />
+                      <div style={{ display: 'flex', gap: 8, padding: 10, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          style={{ ...SCANNER_STYLES.backLink, background: TEAL, color: '#fff', border: 'none' }}
+                          onClick={() => {
+                            if (html5QrRef.current) {
+                              html5QrRef.current.stop().catch(() => {}).then(() => { html5QrRef.current = null; setCameraFacing((p) => (p === 'user' ? 'environment' : 'user')); });
+                            } else setCameraFacing((p) => (p === 'user' ? 'environment' : 'user'));
+                          }}
+                        >
+                          {cameraFacing === 'user' ? '🔄 Back camera' : '🔄 Front camera'}
+                        </button>
+                        <button
+                          type="button"
+                          style={{ ...SCANNER_STYLES.backLink, background: 'rgba(239,68,68,0.25)', borderColor: 'rgba(239,68,68,0.5)', color: '#f87171' }}
+                          onClick={() => { setCameraScanActive(false); if (html5QrRef.current) { html5QrRef.current.stop().catch(() => {}); html5QrRef.current = null; } }}
+                        >
+                          Stop camera
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            {/* Physical Device button - card ke niche, right side */}
+            <div className="scan-content-width" style={{ width: '100%', maxWidth: 560, marginBottom: 20, marginTop: 0, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                style={{
+                  padding: '10px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  background: 'rgba(249, 115, 22, 0.12)',
+                  border: '1px solid rgba(234, 88, 12, 0.6)',
+                  borderRadius: 10,
+                  color: '#c2410c',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s, border-color 0.2s',
                 }}
                 onClick={() => {
-                  if (html5QrRef.current) {
-                    html5QrRef.current.stop().catch(() => {}).then(() => {
-                      html5QrRef.current = null;
-                      setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
-                    });
-                  } else {
-                    setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
+                  setShowMobileSection(false);
+                  setShowMobileCard(false);
+                  if (cameraScanActive && html5QrRef.current) {
+                    html5QrRef.current.stop().catch(() => {});
+                    html5QrRef.current = null;
+                    setCameraScanActive(false);
                   }
                 }}
               >
-                {cameraFacing === 'user' ? '🔄 Back camera' : '🔄 Front camera'}
-              </button>
-              <button
-                type="button"
-                style={{
-                  ...SCANNER_STYLES.backLink,
-                  background: 'rgba(239, 68, 68, 0.9)',
-                  borderColor: '#ef4444',
-                  color: '#fff',
-                }}
-                onClick={() => { setCameraScanActive(false); if (html5QrRef.current) { html5QrRef.current.stop().catch(() => {}); html5QrRef.current = null; } }}
-              >
-                Stop camera
+                <img src={physicalScanImg} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                <span>Physical Device</span>
               </button>
             </div>
-          </div>
+          </>
         )}
-
-        <div style={{ ...SCANNER_STYLES.statusBox, ...status.style }}>
-          <span style={{ marginRight: '8px', opacity: 0.95 }}>{status.icon}</span>
-          {status.text}
-        </div>
-
-        <div style={{ marginTop: 12, textAlign: 'center', fontSize: '12px', color: '#64748b', letterSpacing: '0.06em' }}>
-          Scan barcode or QR · Auto check-in 3s after scan
         </div>
       </main>
     </div>
