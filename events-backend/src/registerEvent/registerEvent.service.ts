@@ -46,6 +46,7 @@ import { EventRegistrationShareLink } from './event-registration-share-link.enti
 import * as crypto from 'crypto';
 import { EventAttendance, AttendanceStatus } from '../attendance/attendance.entity';
 import { AttendanceGateway } from '../attendance/attendance.gateway';
+import { AttendanceService } from '../attendance/attendance.service';
 import { ChatService } from '../chat/chat.service';
 import { Response } from 'express';
 import archiver from 'archiver';
@@ -131,6 +132,7 @@ export class RegisterEventService implements OnModuleInit {
     @Inject(forwardRef(() => ChatService))
     private readonly chatService: ChatService,
     @Optional() private readonly attendanceGateway?: AttendanceGateway,
+    @Optional() private readonly attendanceService?: AttendanceService,
   ) {}
 
   onModuleInit() {
@@ -2209,5 +2211,21 @@ export class RegisterEventService implements OnModuleInit {
       eventName: event.name ?? '',
       participants,
     };
+  }
+
+  /**
+   * Check-in a participant by share token (public). Validates share token and that user is registered, then records attendance.
+   */
+  async checkInByShareToken(shareToken: string, userId: string): Promise<{ eventId: string; success: true }> {
+    const result = await this.getParticipantsByShareToken(shareToken);
+    const participantIds = new Set(result.participants.map((p) => p.id));
+    if (!participantIds.has(userId)) {
+      throw new BadRequestException('User is not a participant of this event.');
+    }
+    if (!this.attendanceService) {
+      throw new BadRequestException('Attendance service not available.');
+    }
+    await this.attendanceService.checkInByShareLink(userId, result.eventId);
+    return { eventId: result.eventId, success: true };
   }
 }

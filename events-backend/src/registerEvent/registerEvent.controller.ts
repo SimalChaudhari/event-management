@@ -426,6 +426,32 @@ export class PublicRegisterEventController {
     }
   }
 
+  @Post('share/:shareToken/check-in')
+  async checkInByShareToken(
+    @Param('shareToken') shareToken: string,
+    @Body('userId') userId: string,
+    @Res() response: Response,
+  ) {
+    try {
+      if (!userId || typeof userId !== 'string') {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'userId is required',
+        });
+      }
+      const result = await this.registerEventService.checkInByShareToken(shareToken, userId.trim());
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Checked in successfully',
+        data: result,
+        metadata: { timestamp: new Date().toISOString() },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Check-in by share token');
+      throw error;
+    }
+  }
+
   @Get(':eventId/participants')
   async getPublicParticipants(
     @Param('eventId') eventId: string,

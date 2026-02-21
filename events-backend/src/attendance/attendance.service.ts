@@ -353,6 +353,16 @@ export class AttendanceService {
   }
 
   /**
+   * Check-in via share link (public, no admin). Same as manual check-in with checkedInBy = userId.
+   */
+  async checkInByShareLink(userId: string, eventId: string): Promise<EventAttendance> {
+    return this.manualCheckIn(
+      { userId, eventId, checkInMethod: CheckInMethod.Manual },
+      userId,
+    );
+  }
+
+  /**
    * Check out user from event
    */
   async checkOut(
