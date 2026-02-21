@@ -129,6 +129,7 @@ const RegistrationListCheckInScanPage = () => {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [cameraScanActive, setCameraScanActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState('user');
   const inputRef = useRef(null);
   const submitTimeoutRef = useRef(null);
   const submittingRef = useRef(false);
@@ -221,7 +222,8 @@ const RegistrationListCheckInScanPage = () => {
     const html5Qr = new Html5QrcodeLib('camera-scan-box');
     html5QrRef.current = html5Qr;
     const config = { fps: 8, qrbox: { width: 280, height: 280 } };
-    html5Qr.start({ facingMode: 'user' }, config, (decodedText) => {
+    const facingMode = cameraFacing === 'environment' ? 'environment' : 'user';
+    html5Qr.start({ facingMode }, config, (decodedText) => {
       html5Qr.stop().catch(() => {}).then(() => {
         html5QrRef.current = null;
         setCameraScanActive(false);
@@ -237,7 +239,7 @@ const RegistrationListCheckInScanPage = () => {
         html5QrRef.current.stop().catch(() => {}).then(() => { html5QrRef.current = null; });
       }
     };
-  }, [cameraScanActive, eventId, handleSubmit]);
+  }, [cameraScanActive, cameraFacing, eventId, handleSubmit]);
 
   const handleInputChange = useCallback((e) => {
     const value = e.target.value;
@@ -388,22 +390,41 @@ const RegistrationListCheckInScanPage = () => {
               Show your mobile&apos;s QR or barcode in front of the camera
             </div>
             <div id="camera-scan-box" style={{ width: '100%', minHeight: 280 }} />
-            <button
-              type="button"
-              style={{
-                position: 'absolute',
-                bottom: 12,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                ...SCANNER_STYLES.backLink,
-                background: 'rgba(239, 68, 68, 0.9)',
-                borderColor: '#ef4444',
-                color: '#fff',
-              }}
-              onClick={() => { setCameraScanActive(false); if (html5QrRef.current) { html5QrRef.current.stop().catch(() => {}); html5QrRef.current = null; } }}
-            >
-              Stop camera
-            </button>
+            <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0 12px' }}>
+              <button
+                type="button"
+                style={{
+                  ...SCANNER_STYLES.backLink,
+                  background: 'rgba(0, 212, 170, 0.25)',
+                  borderColor: 'rgba(0, 212, 170, 0.6)',
+                  color: '#5eead4',
+                }}
+                onClick={() => {
+                  if (html5QrRef.current) {
+                    html5QrRef.current.stop().catch(() => {}).then(() => {
+                      html5QrRef.current = null;
+                      setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
+                    });
+                  } else {
+                    setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
+                  }
+                }}
+              >
+                {cameraFacing === 'user' ? '🔄 Back camera' : '🔄 Front camera'}
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...SCANNER_STYLES.backLink,
+                  background: 'rgba(239, 68, 68, 0.9)',
+                  borderColor: '#ef4444',
+                  color: '#fff',
+                }}
+                onClick={() => { setCameraScanActive(false); if (html5QrRef.current) { html5QrRef.current.stop().catch(() => {}); html5QrRef.current = null; } }}
+              >
+                Stop camera
+              </button>
+            </div>
           </div>
         )}
 
