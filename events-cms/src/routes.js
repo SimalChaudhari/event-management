@@ -65,6 +65,7 @@ const eventComponents = {
     // Attendance Tracking
     Attendance: React.lazy(() => import('./Pages/Events/attendance/AttendancePage.jsx')),
     RegistrationListShare: React.lazy(() => import('./Pages/Events/registered-events/RegistrationListSharePage.jsx')),
+    RegistrationListCheckInScan: React.lazy(() => import('./Pages/Events/registered-events/RegistrationListCheckInScanPage.jsx')),
 };
 
 const MediaManagerComponents = {
@@ -948,6 +949,12 @@ const publicQnaShareRoutes = [
         exact: true,
         name: 'Registration List Share',
         component: eventComponents.RegistrationListShare
+    },
+    {
+        path: EVENT_PATHS.REGISTRATION_LIST_SHARE_CHECKIN,
+        exact: true,
+        name: 'Registration List Share Check-in Scan',
+        component: eventComponents.RegistrationListCheckInScan
     }
 ];
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import {
   Container,
@@ -19,6 +19,7 @@ import { API_URL } from '../../../configs/env';
 
 const RegistrationListSharePage = () => {
   const { shareToken } = useParams();
+  const navigate = useNavigate();
   const [eventName, setEventName] = useState('');
   const [eventId, setEventId] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -156,7 +157,8 @@ const RegistrationListSharePage = () => {
               className="py-3 d-flex align-items-center justify-content-between flex-wrap"
               style={{ backgroundColor: '#0d9488', color: 'white' }}
             >
-              <div>
+              <div className="d-flex align-items-center flex-wrap">
+                <div>
                 <h5 className="mb-0 d-flex align-items-center">
                   <i className="feather icon-users mr-2"></i>
                   Registration List
@@ -197,6 +199,16 @@ const RegistrationListSharePage = () => {
                     {eventName}
                   </small>
                 )}
+                </div>
+                <Button
+                  variant="outline-light"
+                  size="sm"
+                  className="ml-3 mt-2 mt-md-0"
+                  onClick={() => navigate(`/events/registrations/share/${shareToken}/check-in`)}
+                >
+                  <i className="feather icon-user-check mr-1"></i>
+                  Check-in by scan
+                </Button>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
