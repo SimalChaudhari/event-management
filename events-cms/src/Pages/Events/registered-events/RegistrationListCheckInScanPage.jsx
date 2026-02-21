@@ -192,6 +192,7 @@ const RegistrationListCheckInScanPage = () => {
   const [showMobileCard, setShowMobileCard] = useState(false);
   const [cameraScanActive, setCameraScanActive] = useState(false);
   const [cameraFacing, setCameraFacing] = useState('user');
+  const [isManualEntry, setIsManualEntry] = useState(false);
   const inputRef = useRef(null);
   const submitTimeoutRef = useRef(null);
   const submittingRef = useRef(false);
@@ -235,7 +236,7 @@ const RegistrationListCheckInScanPage = () => {
     if (!loading && eventId) inputRef.current?.focus();
   }, [loading, eventId, successMsg]);
 
-  const handleSubmit = useCallback(async (e, valueOverride) => {
+  const handleSubmit = useCallback(async (e, valueOverride, checkInMethodOverride) => {
     e?.preventDefault();
     if (submittingRef.current) return;
     const userId = (valueOverride !== undefined ? valueOverride : scanValue || '').trim();
@@ -247,6 +248,7 @@ const RegistrationListCheckInScanPage = () => {
       setError('Event not loaded.');
       return;
     }
+    const method = checkInMethodOverride ?? (isManualEntry ? 'manual' : 'physical_device');
     if (submitTimeoutRef.current) {
       clearTimeout(submitTimeoutRef.current);
       submitTimeoutRef.current = null;
@@ -258,7 +260,7 @@ const RegistrationListCheckInScanPage = () => {
     try {
       await axiosInstance.post(
         `/attendance/check-in-qr-code/${userId}`,
-        { eventId }
+        { eventId, checkInMethod: method }
       );
       setSuccessMsg('Check-in successful.');
       setScanValue('');
@@ -275,7 +277,7 @@ const RegistrationListCheckInScanPage = () => {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [eventId, scanValue]);
+  }, [eventId, scanValue, isManualEntry]);
 
   useEffect(() => {
     if (!cameraScanActive || !eventId || !Html5QrcodeLib) return;
@@ -289,7 +291,7 @@ const RegistrationListCheckInScanPage = () => {
       html5Qr.stop().catch(() => {}).then(() => {
         html5QrRef.current = null;
         setCameraScanActive(false);
-        handleSubmit(null, decodedText.trim());
+        handleSubmit(null, decodedText.trim(), 'mobile_camera');
       });
     }, () => {}).catch((err) => {
       setError(err?.message || 'Camera access failed');
@@ -577,6 +579,14 @@ const RegistrationListCheckInScanPage = () => {
                     className="physical-card-input"
                     style={{ ...SCANNER_STYLES.input, ...SCANNER_STYLES.inputPhysical }}
                     aria-label="Participant ID"
+                  />
+                  <Form.Check
+                    type="checkbox"
+                    id="manual-entry-check"
+                    label="Manual entry (admin typed ID)"
+                    checked={isManualEntry}
+                    onChange={(e) => setIsManualEntry(e.target.checked)}
+                    style={{ marginTop: 10, color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}
                   />
                 </Form>
                 <div className="physical-card-status-line" style={{ ...SCANNER_STYLES.statusLine }}>

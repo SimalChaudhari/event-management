@@ -7,6 +7,10 @@ export class CheckInByQRCodeDto {
   eventId!: string;
 
   @IsOptional()
+  @IsEnum(CheckInMethod)
+  checkInMethod?: CheckInMethod;
+
+  @IsOptional()
   @IsString()
   checkInLocation?: string;
 

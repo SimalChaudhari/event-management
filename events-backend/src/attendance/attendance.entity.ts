@@ -21,6 +21,8 @@ export enum AttendanceStatus {
 
 export enum CheckInMethod {
   QRCode = 'qr_code',
+  PhysicalDevice = 'physical_device',
+  MobileCamera = 'mobile_camera',
   Manual = 'manual',
   Admin = 'admin',
 }

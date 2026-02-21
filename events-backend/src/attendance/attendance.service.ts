@@ -209,6 +209,7 @@ export class AttendanceService {
         );
       }
 
+      const method = checkInData.checkInMethod ?? CheckInMethod.QRCode;
       if (attendance) {
         // Update existing attendance record
         attendance.status = AttendanceStatus.CheckedIn;
@@ -216,7 +217,7 @@ export class AttendanceService {
         attendance.checkInLocation = checkInData.checkInLocation;
         attendance.checkedInBy = adminUserId;
         attendance.notes = checkInData.notes;
-        attendance.checkInMethod = CheckInMethod.QRCode;
+        attendance.checkInMethod = method;
       } else {
         // Create new attendance record
         attendance = this.attendanceRepository.create({
@@ -228,7 +229,7 @@ export class AttendanceService {
           checkInLocation: checkInData.checkInLocation,
           checkedInBy: adminUserId,
           notes: checkInData.notes,
-          checkInMethod: CheckInMethod.QRCode,
+          checkInMethod: method,
         });
       }
 
