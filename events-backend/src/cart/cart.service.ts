@@ -7,6 +7,8 @@ import { CartDto } from './cart.dto';
 import { EventService } from 'event/event.service';
 import { CouponService } from 'coupon/coupon.service';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { Status } from 'registerEvent/registerEvent.dto';
+import { Refund } from 'checkout/refund.entity';
 
 @Injectable()
 export class CartService {
@@ -17,6 +19,8 @@ export class CartService {
         private userCartPreferenceRepository: Repository<UserCartPreference>,
         @InjectRepository(RegisterEvent)
         private registerEventRepository: Repository<RegisterEvent>,
+        @InjectRepository(Refund)
+        private refundRepository: Repository<Refund>,
         @Inject(forwardRef(() => EventService))
         private eventService: EventService, // Inject EventService
         private couponService: CouponService, // Inject CouponService
@@ -258,6 +262,55 @@ export class CartService {
                 await this.couponService.recordCouponUsage(userId, coupon.id, orderId);
             }
         }
+    }
+
+    /**
+     * My events: list events the user has participated in. Returns only status, eventId, eventName.
+     * status: completed | pending | withdrawn
+     * Uses refund status (same as GET /api/checkout/refund/status/:orderId): if any refund for that order has status 'succeeded' → withdrawn (complete refund); else if any refund exists → pending.
+     */
+    async getMyParticipatedEvents(userId: string): Promise<{ status: string; eventId: string; eventName: string }[]> {
+        const registrations = await this.registerEventRepository.find({
+            where: { userId },
+            order: { createdAt: 'DESC' },
+            select: ['eventId', 'status', 'orderId'],
+        });
+        if (registrations.length === 0) return [];
+
+        const orderIds = [...new Set(registrations.map((r) => r.orderId).filter(Boolean))] as string[];
+        const orderRefundStatus = new Map<string, 'pending' | 'withdrawn'>();
+        if (orderIds.length > 0) {
+            const refunds = await this.refundRepository.find({
+                where: { orderId: In(orderIds) },
+                select: ['orderId', 'status'],
+            });
+            for (const orderId of orderIds) {
+                const orderRefunds = refunds.filter((r) => r.orderId === orderId);
+                if (orderRefunds.length === 0) continue;
+                const hasSucceeded = orderRefunds.some((r) => (r.status || '').toLowerCase() === 'succeeded');
+                orderRefundStatus.set(orderId, hasSucceeded ? 'withdrawn' : 'pending');
+            }
+        }
+
+        const result: { status: string; eventId: string; eventName: string }[] = [];
+        for (const reg of registrations) {
+            const eventId = reg.eventId!;
+            let status: string;
+            if (reg.status === Status.Withdraw) {
+                status = 'withdrawn';
+            } else if (reg.orderId && orderRefundStatus.has(reg.orderId)) {
+                status = orderRefundStatus.get(reg.orderId)!;
+            } else {
+                status = 'completed';
+            }
+            let eventName = 'Event';
+            try {
+                const event = await this.eventService.getEventById(eventId);
+                eventName = event.name ?? eventName;
+            } catch (_) {}
+            result.push({ status, eventId, eventName });
+        }
+        return result;
     }
 
     

@@ -352,6 +352,38 @@ export class CartController {
         }
     }
 
+    /** My events: only status, eventId, eventName. GET api/carts/my-events */
+    @Get('my-events')
+    async getMyParticipatedEvents(@Request() req: any, @Res() response: Response) {
+        try {
+            const userId = req.user.id;
+            const role = req.user.role;
+
+            if (role !== 'user') {
+                return response.status(403).json({
+                    success: false,
+                    message: 'Access denied. Only users can view their participated events.',
+                });
+            }
+
+            const data = await this.cartService.getMyParticipatedEvents(userId);
+
+            return response.status(200).json({
+                success: true,
+                message: 'Participated events retrieved successfully',
+                count: data.length,
+                data,
+            });
+        } catch (error: any) {
+            console.error('❌ Get my participated events failed:', error);
+            return response.status(400).json({
+                success: false,
+                message: error.message || 'Failed to retrieve participated events',
+                error: error.message
+            });
+        }
+    }
+
     @Get(':id')
     async getCartById(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
         const userId = req.user.id;

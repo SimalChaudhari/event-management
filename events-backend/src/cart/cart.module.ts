@@ -13,6 +13,7 @@ import { CheckoutModule } from 'checkout/checkout.module';
 import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
+import { Refund } from 'checkout/refund.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
@@ -35,7 +36,7 @@ import { FilterModule } from '../service/filter.module';
       SurveyResponse,    // Add this
       EventAgenda,
     
-      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth]),
+      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth,Refund]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
