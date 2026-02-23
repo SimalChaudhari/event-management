@@ -992,6 +992,66 @@ export class CheckoutService {
   }
 
   /**
+   * Invoice data from Order + Event only (no checkout). For GET api/carts/invoice/by-event/:eventId.
+   */
+  async getInvoiceDataFromOrderAndEvent(
+    userId: string,
+    orderId: string,
+    eventId: string,
+  ): Promise<{
+    orderId: string;
+    totalAmount: number;
+    createdAt: Date | undefined;
+    isCompleted: boolean;
+    paymentMethod: string | null;
+    priceBreakdown: { eventPrice: number; discount: number; tax: number; total: number; currency: string; gstRate: number };
+    items: Array<{ id: string; name: string; actualPrice: number; gstPrice: number }>;
+  }> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, user: { id: userId } },
+      relations: ['orderItems', 'orderItems.event'],
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found or you do not have access to it');
+    }
+    const orderItem = order.orderItems?.find((oi) => oi.event?.id === eventId);
+    const event = orderItem?.event;
+    if (!event) {
+      throw new NotFoundException('No event found in this order for the given eventId');
+    }
+    const totalAmount = Number(order.price) ?? 0;
+    const discount = Number(order.discount) ?? 0;
+    const basePrice = Number(event.price) ?? 0;
+    const gstRate = Number(event.gstRate) ?? 18;
+    const gstAmount = Math.round(basePrice * (gstRate / 100) * 100) / 100;
+    const eventPrice = Math.round(basePrice * 100) / 100;
+    const tax = Math.round(gstAmount * 100) / 100;
+    return {
+      orderId: order.id,
+      totalAmount,
+      createdAt: order.createdAt,
+      isCompleted: order.status === OrderStatus.Completed,
+      paymentMethod: order.paymentMethod ?? null,
+      priceBreakdown: {
+        eventPrice,
+        discount,
+        tax,
+        total: totalAmount,
+        currency: 'SGD',
+        gstRate,
+      },
+      items: [
+        {
+          id: event.id,
+          name: event.name ?? 'Event',
+          actualPrice: basePrice,
+          gstPrice: gstAmount,
+        },
+      ],
+    };
+  }
+
+  /**
    * Create a refund for an order paid via WooShPay.
    * Finds the checkout by orderId (must belong to the user), then calls WooShPay refund API.
    * @param orderId - Order UUID

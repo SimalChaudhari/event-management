@@ -384,6 +384,46 @@ export class CartController {
         }
     }
 
+    /** Invoice by event — simple: orderId, status, price breakdown, total. GET api/carts/invoice/by-event/:eventId */
+    @Get('invoice/by-event/:eventId')
+    async getInvoiceByEvent(
+        @Param('eventId') eventId: string,
+        @Request() req: any,
+        @Res() response: Response,
+    ) {
+        try {
+            const userId = req.user.id;
+            const role = req.user.role;
+            if (role !== 'user') {
+                return response.status(403).json({ success: false, message: 'Access denied.' });
+            }
+            if (!eventId) {
+                return response.status(400).json({ success: false, message: 'eventId is required.' });
+            }
+            const orderId = await this.cartService.getOrderIdByUserAndEvent(userId, eventId);
+            if (!orderId) {
+                return response.status(404).json({ success: false, message: 'No registration found for this event.' });
+            }
+            const status = await this.cartService.getOrderStatusForInvoice(userId, orderId, eventId);
+            const data = await this.checkoutService.getInvoiceDataFromOrderAndEvent(userId, orderId, eventId);
+            return response.status(200).json({
+                success: true,
+                message: 'Invoice retrieved successfully',
+                data: {
+                    orderId: data.orderId,
+                    status,
+                    priceBreakdown: data.priceBreakdown,
+                    totalAmount: data.totalAmount,
+                },
+            });
+        } catch (error: any) {
+            return response.status(error.status === 404 ? 404 : 400).json({
+                success: false,
+                message: error.message || 'Failed to retrieve invoice',
+            });
+        }
+    }
+
     @Get(':id')
     async getCartById(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
         const userId = req.user.id;

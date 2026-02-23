@@ -313,5 +313,30 @@ export class CartService {
         return result;
     }
 
+    /** Get orderId for user's registration for an event (for invoice by eventId). */
+    async getOrderIdByUserAndEvent(userId: string, eventId: string): Promise<string | null> {
+        const reg = await this.registerEventRepository.findOne({
+            where: { userId, eventId },
+            select: ['orderId', 'status'],
+        });
+        return reg?.orderId ?? null;
+    }
+
+    /** Get status for invoice: completed | pending | withdrawn (same logic as my-events). */
+    async getOrderStatusForInvoice(userId: string, orderId: string, eventId: string): Promise<'completed' | 'pending' | 'withdrawn'> {
+        const reg = await this.registerEventRepository.findOne({
+            where: { userId, eventId },
+            select: ['status'],
+        });
+        if (reg?.status === Status.Withdraw) return 'withdrawn';
+        const refunds = await this.refundRepository.find({
+            where: { orderId },
+            select: ['status'],
+        });
+        if (refunds.length === 0) return 'completed';
+        const hasSucceeded = refunds.some((r) => (r.status || '').toLowerCase() === 'succeeded');
+        return hasSucceeded ? 'withdrawn' : 'pending';
+    }
+
     
 }
