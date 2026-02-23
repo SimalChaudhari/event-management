@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Form } from 'react-bootstrap';
 import publicAxiosInstance from '../../../configs/publicAxiosInstance';
 import axiosInstance from '../../../configs/axiosInstance';
+import { getRegistrationShareCode, setRegistrationShareCode, removeRegistrationShareCode } from '../../../utils/registrationShareCookie';
 
 import physicalScanImg from '../../../assets/scan/physical.png';
 import mobileScanImg from '../../../assets/scan/mobile.png';
@@ -211,9 +212,20 @@ const RegistrationListCheckInScanPage = () => {
   const submittingRef = useRef(false);
   const html5QrRef = useRef(null);
 
-  const fetchEventInfo = useCallback(async () => {
+  const [accessCode, setAccessCode] = useState(null);
+  const [showAccessForm, setShowAccessForm] = useState(false);
+  const [accessCodeInput, setAccessCodeInput] = useState('');
+  const [accessCodeError, setAccessCodeError] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
+  const fetchEventInfo = useCallback(async (code) => {
     if (!shareToken) {
       setError('Invalid link');
+      setLoading(false);
+      return;
+    }
+    if (!code) {
+      setShowAccessForm(true);
       setLoading(false);
       return;
     }
@@ -221,29 +233,50 @@ const RegistrationListCheckInScanPage = () => {
     setError(null);
     try {
       const response = await publicAxiosInstance.get(
-        `/public/events/share/${shareToken}/participants`
+        `/public/events/share/${shareToken}/participants`,
+        { headers: { 'X-Access-Code': code } }
       );
       const data = response?.data?.data;
       if (data) {
         setEventId(data.eventId ?? null);
         setEventName(data.eventName || '');
+        setShowAccessForm(false);
       } else {
         setError('No data received');
       }
     } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Unable to load. Link may be invalid or expired.';
-      setError(msg);
+      if (err?.response?.status === 403 || err?.response?.data?.message?.toLowerCase?.().includes('access code')) {
+        removeRegistrationShareCode(shareToken);
+        setAccessCode(null);
+        setShowAccessForm(true);
+        setAccessCodeError(err?.response?.data?.message || 'Invalid or expired access code.');
+      } else {
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          'Unable to load. Link may be invalid or expired.';
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
   }, [shareToken]);
 
   useEffect(() => {
-    fetchEventInfo();
-  }, [fetchEventInfo]);
+    if (!shareToken) {
+      setError('Invalid link');
+      setLoading(false);
+      return;
+    }
+    const code = getRegistrationShareCode(shareToken);
+    if (code) {
+      setAccessCode(code);
+      fetchEventInfo(code);
+    } else {
+      setShowAccessForm(true);
+      setLoading(false);
+    }
+  }, [shareToken]);
 
   useEffect(() => {
     if (!loading && eventId) inputRef.current?.focus();
@@ -350,6 +383,30 @@ const RegistrationListCheckInScanPage = () => {
     };
   }, []);
 
+  const handleVerifyAccessCode = useCallback(async (e) => {
+    e?.preventDefault();
+    const code = (accessCodeInput || '').trim();
+    if (!code) {
+      setAccessCodeError('Please enter the access code.');
+      return;
+    }
+    if (!shareToken) return;
+    setVerifying(true);
+    setAccessCodeError('');
+    try {
+      await publicAxiosInstance.post(`/public/events/share/${shareToken}/verify-access`, { accessCode: code });
+      setRegistrationShareCode(shareToken, code);
+      setAccessCode(code);
+      setAccessCodeInput('');
+      setVerifying(false);
+      setLoading(true);
+      fetchEventInfo(code);
+    } catch (err) {
+      setVerifying(false);
+      setAccessCodeError(err?.response?.data?.message || 'Invalid access code.');
+    }
+  }, [shareToken, accessCodeInput, fetchEventInfo]);
+
   const getStatusConfig = () => {
     if (error) return { style: SCANNER_STYLES.statusError, text: error, icon: '✕' };
     if (successMsg) return { style: SCANNER_STYLES.statusSuccess, text: successMsg, icon: '✓' };
@@ -377,6 +434,38 @@ const RegistrationListCheckInScanPage = () => {
           <div style={{ width: 32, height: 32, border: '2px solid #cbd5e1', borderTopColor: TEAL, borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (showAccessForm) {
+    return (
+      <div style={SCANNER_STYLES.wrapper}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 400, background: 'rgba(255,255,255,0.95)', borderRadius: 16, padding: 24, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div style={{ background: 'linear-gradient(90deg, #0d9488 0%, #0f766e 100%)', color: 'white', padding: '16px 20px', borderRadius: '12px 12px 0 0', margin: '-24px -24px 24px -24px' }}>
+              <h5 style={{ margin: 0, fontWeight: 700 }}>Enter access code</h5>
+              <small style={{ opacity: 0.9 }}>Enter the code shared with you to use check-in.</small>
+            </div>
+            <form onSubmit={handleVerifyAccessCode}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#1e293b' }}>Access code</label>
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  value={accessCodeInput}
+                  onChange={(e) => setAccessCodeInput(e.target.value)}
+                  autoComplete="one-time-code"
+                  style={{ ...SCANNER_STYLES.input, textTransform: 'uppercase', letterSpacing: '0.15em' }}
+                />
+                {accessCodeError && <div style={{ color: '#dc2626', fontSize: 14, marginTop: 8 }}>{accessCodeError}</div>}
+              </div>
+              <button type="submit" disabled={verifying} style={{ width: '100%', padding: 14, background: '#0d9488', color: 'white', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 16 }}>
+                {verifying ? 'Verifying...' : 'Continue'}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     );
   }

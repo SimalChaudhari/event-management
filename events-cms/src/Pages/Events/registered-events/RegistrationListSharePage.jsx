@@ -13,9 +13,11 @@ import {
   Form,
   InputGroup,
   Button,
+  Modal,
 } from 'react-bootstrap';
 import publicAxiosInstance from '../../../configs/publicAxiosInstance';
 import { API_URL } from '../../../configs/env';
+import { getRegistrationShareCode, setRegistrationShareCode, removeRegistrationShareCode } from '../../../utils/registrationShareCookie';
 
 const CHECK_IN_METHOD_LABELS = {
   qr_code: 'QR code',
@@ -50,6 +52,18 @@ const RegistrationListSharePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   const socketRef = useRef(null);
+  const fetchDataRef = useRef(null);
+  const accessCodeRef = useRef(null);
+
+  const [accessCode, setAccessCode] = useState(null);
+  const [showAccessForm, setShowAccessForm] = useState(false);
+  const [accessCodeInput, setAccessCodeInput] = useState('');
+  const [accessCodeError, setAccessCodeError] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
+  const [updatingAttendanceId, setUpdatingAttendanceId] = useState(null);
+
+  const [statusModalParticipant, setStatusModalParticipant] = useState(null);
 
   const handleCopyId = useCallback((id) => {
     if (!id) return;
@@ -69,9 +83,14 @@ const RegistrationListSharePage = () => {
     return name.includes(q) || email.includes(q) || id.includes(q);
   });
 
-  const fetchData = useCallback(async (isSilentRefresh = false) => {
+  const fetchData = useCallback(async (code, isSilentRefresh = false) => {
     if (!shareToken) {
       setError('Invalid link');
+      setLoading(false);
+      return;
+    }
+    if (!code) {
+      setShowAccessForm(true);
       setLoading(false);
       return;
     }
@@ -79,7 +98,8 @@ const RegistrationListSharePage = () => {
     setError(null);
     try {
       const response = await publicAxiosInstance.get(
-        `/public/events/share/${shareToken}/participants`
+        `/public/events/share/${shareToken}/participants`,
+        { headers: { 'X-Access-Code': code } }
       );
       const data = response?.data?.data;
       if (data) {
@@ -87,6 +107,7 @@ const RegistrationListSharePage = () => {
         setEventName(data.eventName || '');
         setParticipants(data.participants || []);
         setLastUpdated(new Date());
+        setShowAccessForm(false);
         if (isSilentRefresh) {
           setShowUpdatedBadge(true);
           setTimeout(() => setShowUpdatedBadge(false), 3000);
@@ -95,23 +116,95 @@ const RegistrationListSharePage = () => {
         setError('No data received');
       }
     } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Unable to load registration list. Link may be invalid or expired.';
-      setError(msg);
-      setParticipants([]);
+      if (err?.response?.status === 403 || err?.response?.data?.message?.toLowerCase?.().includes('access code')) {
+        removeRegistrationShareCode(shareToken);
+        setAccessCode(null);
+        setShowAccessForm(true);
+        setAccessCodeError(err?.response?.data?.message || 'Invalid or expired access code.');
+      } else {
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          'Unable to load registration list. Link may be invalid or expired.';
+        setError(msg);
+        setParticipants([]);
+      }
     } finally {
       setLoading(false);
     }
   }, [shareToken]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchDataRef.current = fetchData;
+    accessCodeRef.current = accessCode;
+  }, [fetchData, accessCode]);
+
+  const handleSetAttendance = useCallback(async (participantId, status) => {
+    if (!shareToken || !accessCode) return;
+    setUpdatingAttendanceId(participantId);
+    setStatusModalParticipant(null);
+    try {
+      await publicAxiosInstance.post(
+        `/public/events/share/${shareToken}/set-attendance`,
+        { userId: participantId, status },
+        { headers: { 'X-Access-Code': accessCode } }
+      );
+      // No API refetch: backend emits attendance_updated with payload; this tab and others update via socket
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Failed to update status';
+      setError(msg);
+    } finally {
+      setUpdatingAttendanceId(null);
+    }
+  }, [shareToken, accessCode]);
+
+  const handleStatusBadgeClick = useCallback((p) => {
+    if (updatingAttendanceId) return;
+    setStatusModalParticipant(p);
+  }, [updatingAttendanceId]);
+
+  const handleVerifyAccessCode = useCallback(async (e) => {
+    e.preventDefault();
+    const code = (accessCodeInput || '').trim();
+    if (!code) {
+      setAccessCodeError('Please enter the access code.');
+      return;
+    }
+    if (!shareToken) return;
+    setVerifying(true);
+    setAccessCodeError('');
+    try {
+      await publicAxiosInstance.post(`/public/events/share/${shareToken}/verify-access`, { accessCode: code });
+      setRegistrationShareCode(shareToken, code);
+      setAccessCode(code);
+      setAccessCodeInput('');
+      setVerifying(false);
+      setLoading(true);
+      fetchData(code);
+    } catch (err) {
+      setVerifying(false);
+      setAccessCodeError(err?.response?.data?.message || 'Invalid access code.');
+    }
+  }, [shareToken, accessCodeInput, fetchData]);
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!shareToken) {
+      setError('Invalid link');
+      setLoading(false);
+      return;
+    }
+    const code = accessCode || getRegistrationShareCode(shareToken);
+    if (code) {
+      setAccessCode(code);
+      fetchData(code);
+    } else {
+      setShowAccessForm(true);
+      setLoading(false);
+    }
+  }, [shareToken]);
+
+  useEffect(() => {
+    if (!accessCode || !eventId) return;
 
     const socket = io(`${API_URL}/registration-share`, {
       transports: ['websocket', 'polling'],
@@ -130,12 +223,30 @@ const RegistrationListSharePage = () => {
       setIsLive(false);
     });
 
-    socket.on('attendance_updated', () => {
-      fetchData(true);
+    socket.on('attendance_updated', (data) => {
+      // Real-time update from socket payload only (no API call), like Track Q&A Share Link
+      if (data?.userId != null) {
+        setParticipants((prev) =>
+          prev.map((p) =>
+            String(p.id) === String(data.userId)
+              ? {
+                  ...p,
+                  attendanceStatus: data.attendanceStatus ?? p.attendanceStatus,
+                  checkInTime: data.checkInTime ?? undefined,
+                  checkInMethod: data.checkInMethod ?? undefined,
+                }
+              : p
+          )
+        );
+        setShowUpdatedBadge(true);
+        setTimeout(() => setShowUpdatedBadge(false), 3000);
+      }
     });
 
     socket.on('participants_updated', () => {
-      fetchData(true);
+      const fn = fetchDataRef.current;
+      const code = accessCodeRef.current;
+      if (fn && code) fn(code, true);
     });
 
     return () => {
@@ -146,13 +257,46 @@ const RegistrationListSharePage = () => {
         socketRef.current = null;
       }
     };
-  }, [eventId, fetchData]);
+  }, [eventId, accessCode, fetchData]);
 
   if (loading) {
     return (
       <Container fluid className="py-5 text-center">
         <Spinner animation="border" variant="primary" />
         <div className="mt-3 text-muted">Loading registration list...</div>
+      </Container>
+    );
+  }
+
+  if (showAccessForm) {
+    return (
+      <Container fluid className="py-5" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Card className="shadow-sm" style={{ maxWidth: 400, width: '100%' }}>
+          <Card.Header style={{ backgroundColor: '#0d9488', color: 'white' }}>
+            <h5 className="mb-0">Enter access code</h5>
+            <small style={{ opacity: 0.9 }}>This link is protected. Enter the code shared with you to view the registration list.</small>
+          </Card.Header>
+          <Card.Body>
+            <Form onSubmit={handleVerifyAccessCode}>
+              <Form.Group>
+                <Form.Label>Access code</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter code"
+                  value={accessCodeInput}
+                  onChange={(e) => setAccessCodeInput(e.target.value)}
+                  isInvalid={!!accessCodeError}
+                  autoComplete="one-time-code"
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                />
+                {accessCodeError && <Form.Text className="text-danger">{accessCodeError}</Form.Text>}
+              </Form.Group>
+              <Button type="submit" variant="primary" className="w-100 mt-3" disabled={verifying} style={{ backgroundColor: '#0d9488', borderColor: '#0d9488' }}>
+                {verifying ? 'Verifying...' : 'Continue'}
+              </Button>
+            </Form>
+          </Card.Body>
+        </Card>
       </Container>
     );
   }
@@ -361,6 +505,10 @@ const RegistrationListSharePage = () => {
                           <td className="text-center">
                             {p.attendanceStatus === 'Attended' ? (
                               <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => handleStatusBadgeClick(p)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleStatusBadgeClick(p)}
                                 className="badge badge-success px-3 py-2"
                                 style={{
                                   fontSize: '12px',
@@ -368,13 +516,19 @@ const RegistrationListSharePage = () => {
                                   borderRadius: '999px',
                                   backgroundColor: '#059669',
                                   boxShadow: '0 0 0 2px rgba(5,150,105,0.3)',
+                                  cursor: updatingAttendanceId ? 'default' : 'pointer',
                                 }}
+                                title="Click to change status"
                               >
                                 <i className="feather icon-check-circle mr-1" style={{ fontSize: '14px' }}></i>
                                 Attended
                               </span>
                             ) : (
                               <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => handleStatusBadgeClick(p)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleStatusBadgeClick(p)}
                                 className="badge px-3 py-2"
                                 style={{
                                   fontSize: '12px',
@@ -383,7 +537,9 @@ const RegistrationListSharePage = () => {
                                   backgroundColor: '#fef3c7',
                                   color: '#b45309',
                                   border: '1px solid #fcd34d',
+                                  cursor: updatingAttendanceId ? 'default' : 'pointer',
                                 }}
+                                title="Click to change status"
                               >
                                 <i className="feather icon-clock mr-1" style={{ fontSize: '12px' }}></i>
                                 Not Attended
@@ -391,7 +547,7 @@ const RegistrationListSharePage = () => {
                             )}
                           </td>
                           <td className="text-center">
-                            {p.checkInMethod ? (
+                            {p.checkInMethod && p.attendanceStatus === 'Attended' ? (
                               <span
                                 className="badge px-2 py-1"
                                 style={{
@@ -408,7 +564,7 @@ const RegistrationListSharePage = () => {
                             )}
                           </td>
                           <td className="text-center text-muted small">
-                            {p.checkInTime
+                            {p.attendanceStatus === 'Attended' && p.checkInTime
                               ? new Date(p.checkInTime).toLocaleString(undefined, {
                                   day: '2-digit',
                                   month: 'short',
@@ -474,6 +630,10 @@ const RegistrationListSharePage = () => {
                           <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>Status</span>
                           {p.attendanceStatus === 'Attended' ? (
                             <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleStatusBadgeClick(p)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleStatusBadgeClick(p)}
                               className="badge badge-success d-inline-flex align-items-center"
                               style={{
                                 fontSize: '11px',
@@ -482,13 +642,19 @@ const RegistrationListSharePage = () => {
                                 backgroundColor: '#059669',
                                 boxShadow: '0 0 0 1px rgba(5,150,105,0.25)',
                                 padding: '4px 10px',
+                                cursor: updatingAttendanceId ? 'default' : 'pointer',
                               }}
+                              title="Click to change status"
                             >
                               <i className="feather icon-check-circle mr-1" style={{ fontSize: '12px', flexShrink: 0 }}></i>
                               Attended
                             </span>
                           ) : (
                             <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleStatusBadgeClick(p)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleStatusBadgeClick(p)}
                               className="badge d-inline-flex align-items-center"
                               style={{
                                 fontSize: '11px',
@@ -498,7 +664,9 @@ const RegistrationListSharePage = () => {
                                 color: '#b45309',
                                 border: '1px solid #fcd34d',
                                 padding: '4px 10px',
+                                cursor: updatingAttendanceId ? 'default' : 'pointer',
                               }}
+                              title="Click to change status"
                             >
                               <i className="feather icon-clock mr-1" style={{ fontSize: '11px', flexShrink: 0 }}></i>
                               Not Attended
@@ -507,7 +675,7 @@ const RegistrationListSharePage = () => {
                         </div>
                         <div className="d-flex align-items-center mb-2">
                           <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>Check-in method</span>
-                          {p.checkInMethod ? (
+                          {p.attendanceStatus === 'Attended' && p.checkInMethod ? (
                             <span
                               className="badge d-inline-flex align-items-center"
                               style={{
@@ -527,7 +695,7 @@ const RegistrationListSharePage = () => {
                         <div className="d-flex align-items-center">
                           <span className="text-muted mr-2" style={{ fontSize: '0.8rem', minWidth: 52, flexShrink: 0 }}>Check-in</span>
                           <span style={{ fontSize: '0.8rem' }}>
-                            {p.checkInTime
+                            {p.attendanceStatus === 'Attended' && p.checkInTime
                               ? new Date(p.checkInTime).toLocaleString(undefined, {
                                   day: '2-digit',
                                   month: 'short',
@@ -563,6 +731,56 @@ const RegistrationListSharePage = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal show={!!statusModalParticipant} onHide={() => setStatusModalParticipant(null)} centered>
+        <Modal.Header style={{ backgroundColor: '#0d9488', color: 'white' }}>
+          <Modal.Title>Update status</Modal.Title>
+          <button
+            type="button"
+            onClick={() => setStatusModalParticipant(null)}
+            className="close"
+            aria-label="Close"
+            disabled={!!updatingAttendanceId}
+            style={{ color: 'white', opacity: 1, textShadow: 'none' }}
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </Modal.Header>
+        <Modal.Body>
+          {statusModalParticipant && (
+            <>
+              <p className="mb-3">
+                <strong>{[statusModalParticipant.firstName, statusModalParticipant.lastName].filter(Boolean).join(' ') || 'Participant'}</strong>
+                {statusModalParticipant.email && <span className="text-muted d-block small">{statusModalParticipant.email}</span>}
+              </p>
+              <div className="d-flex flex-wrap gap-2">
+                {statusModalParticipant.attendanceStatus === 'Attended' ? (
+                  <Button
+                    variant="outline-warning"
+                    onClick={() => handleSetAttendance(statusModalParticipant.id, 'Not Attended')}
+                    disabled={updatingAttendanceId === statusModalParticipant.id}
+                  >
+                    <i className="feather icon-clock mr-1"></i>
+                    Mark as Not Attended
+                  </Button>
+                ) : (
+                  <Button
+                    variant="success"
+                    onClick={() => handleSetAttendance(statusModalParticipant.id, 'Attended')}
+                    disabled={updatingAttendanceId === statusModalParticipant.id}
+                  >
+                    <i className="feather icon-check-circle mr-1"></i>
+                    Mark as Attended
+                  </Button>
+                )}
+              </div>
+              {updatingAttendanceId === statusModalParticipant.id && (
+                <p className="text-muted small mt-2 mb-0">Updating...</p>
+              )}
+            </>
+          )}
+        </Modal.Body>
+      </Modal>
     </Container>
   );
 };

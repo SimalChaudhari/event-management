@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus, Query, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards, HttpStatus, Query, UnauthorizedException, ForbiddenException, Headers } from '@nestjs/common';
 import { RegisterEventService } from './registerEvent.service';
 import { CreateRegisterEventDto, UpdateRegisterEventDto, AdminCreateRegisterEventDto } from './registerEvent.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
@@ -403,13 +403,41 @@ export class PublicRegisterEventController {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
-  @Get('share/:shareToken/participants')
-  async getParticipantsByShareToken(
+  @Post('share/:shareToken/verify-access')
+  async verifyShareAccess(
     @Param('shareToken') shareToken: string,
+    @Body('accessCode') accessCode: string,
     @Res() response: Response,
   ) {
     try {
-      const result = await this.registerEventService.getParticipantsByShareToken(shareToken);
+      if (!accessCode || typeof accessCode !== 'string') {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'accessCode is required',
+        });
+      }
+      await this.registerEventService.verifyShareAccessCode(shareToken, accessCode.trim());
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Access code valid',
+        data: { valid: true },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Verify share access code');
+      throw error;
+    }
+  }
+
+  @Get('share/:shareToken/participants')
+  async getParticipantsByShareToken(
+    @Param('shareToken') shareToken: string,
+    @Headers('x-access-code') accessCodeHeader: string | undefined,
+    @Query('accessCode') accessCodeQuery: string | undefined,
+    @Res() response: Response,
+  ) {
+    try {
+      const accessCode = accessCodeHeader || accessCodeQuery;
+      const result = await this.registerEventService.getParticipantsByShareToken(shareToken, accessCode);
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Participants retrieved successfully',
@@ -430,6 +458,8 @@ export class PublicRegisterEventController {
   async checkInByShareToken(
     @Param('shareToken') shareToken: string,
     @Body('userId') userId: string,
+    @Headers('x-access-code') accessCodeHeader: string | undefined,
+    @Body('accessCode') accessCodeBody: string | undefined,
     @Res() response: Response,
   ) {
     try {
@@ -439,7 +469,8 @@ export class PublicRegisterEventController {
           message: 'userId is required',
         });
       }
-      const result = await this.registerEventService.checkInByShareToken(shareToken, userId.trim());
+      const accessCode = accessCodeHeader || accessCodeBody;
+      const result = await this.registerEventService.checkInByShareToken(shareToken, userId.trim(), accessCode);
       return response.status(HttpStatus.OK).json({
         success: true,
         message: 'Checked in successfully',
@@ -448,6 +479,46 @@ export class PublicRegisterEventController {
       });
     } catch (error) {
       this.errorHandler.logError(error, 'Check-in by share token');
+      throw error;
+    }
+  }
+
+  @Post('share/:shareToken/set-attendance')
+  async setAttendanceByShareToken(
+    @Param('shareToken') shareToken: string,
+    @Body('userId') userId: string,
+    @Body('status') status: 'Attended' | 'Not Attended',
+    @Headers('x-access-code') accessCodeHeader: string | undefined,
+    @Res() response: Response,
+  ) {
+    try {
+      if (!userId || typeof userId !== 'string') {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'userId is required',
+        });
+      }
+      if (!status || !['Attended', 'Not Attended'].includes(status)) {
+        return response.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'status must be Attended or Not Attended',
+        });
+      }
+      const accessCode = accessCodeHeader;
+      const result = await this.registerEventService.setAttendanceStatusByShareToken(
+        shareToken,
+        accessCode,
+        userId.trim(),
+        status,
+      );
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Attendance status updated',
+        data: result,
+        metadata: { timestamp: new Date().toISOString() },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Set attendance by share token');
       throw error;
     }
   }

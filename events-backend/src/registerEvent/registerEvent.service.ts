@@ -2067,7 +2067,7 @@ export class RegisterEventService implements OnModuleInit {
 
   /**
    * Generate or retrieve share link for event registration list (admin).
-   * Returns dynamic URL for public page that shows name, email, basic details only.
+   * Returns dynamic URL + accessCode. Viewer must enter access code to open the share page.
    */
   async generateRegistrationShareLink(eventId: string): Promise<{
     success: boolean;
@@ -2075,6 +2075,7 @@ export class RegisterEventService implements OnModuleInit {
     data: {
       shareUrl: string;
       shareToken: string;
+      accessCode: string;
       eventId: string;
       expiresAt?: Date;
       createdAt: Date;
@@ -2105,6 +2106,7 @@ export class RegisterEventService implements OnModuleInit {
           data: {
             shareUrl,
             shareToken: shareLink.shareToken,
+            accessCode: shareLink.accessCode,
             eventId: shareLink.eventId,
             expiresAt: shareLink.expiresAt ?? undefined,
             createdAt: shareLink.createdAt,
@@ -2114,9 +2116,11 @@ export class RegisterEventService implements OnModuleInit {
     }
 
     const shareToken = crypto.randomBytes(16).toString('hex');
+    const accessCode = this.generateShareAccessCode();
     const newLink = this.eventRegistrationShareLinkRepository.create({
       eventId,
       shareToken,
+      accessCode,
       isActive: true,
     });
     const saved = await this.eventRegistrationShareLinkRepository.save(newLink);
@@ -2128,6 +2132,7 @@ export class RegisterEventService implements OnModuleInit {
       data: {
         shareUrl,
         shareToken: saved.shareToken,
+        accessCode: saved.accessCode,
         eventId: saved.eventId,
         expiresAt: saved.expiresAt ?? undefined,
         createdAt: saved.createdAt,
@@ -2135,10 +2140,38 @@ export class RegisterEventService implements OnModuleInit {
     };
   }
 
+  private generateShareAccessCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    const bytes = crypto.randomBytes(8);
+    for (let i = 0; i < 8; i++) code += chars[bytes[i]! % chars.length];
+    return code;
+  }
+
   /**
-   * Get participants by share token (public). Returns basic details plus attendance status.
+   * Verify access code for a share link (public). Used before allowing access to list/check-in.
    */
-  async getParticipantsByShareToken(shareToken: string): Promise<{
+  async verifyShareAccessCode(shareToken: string, accessCode: string): Promise<{ valid: boolean }> {
+    const shareLink = await this.eventRegistrationShareLinkRepository.findOne({
+      where: { shareToken, isActive: true },
+    });
+    if (!shareLink) {
+      throw new ResourceNotFoundException('Share link', shareToken);
+    }
+    if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
+      throw new ValidationException('This share link has expired');
+    }
+    const valid = (accessCode || '').trim().toUpperCase() === (shareLink.accessCode || '').trim().toUpperCase();
+    if (!valid) {
+      throw new ValidationException('Invalid access code');
+    }
+    return { valid: true };
+  }
+
+  /**
+   * Get participants by share token (public). Requires valid accessCode (header or passed in).
+   */
+  async getParticipantsByShareToken(shareToken: string, accessCode?: string): Promise<{
     eventId: string;
     eventName: string;
     participants: Array<{
@@ -2160,6 +2193,11 @@ export class RegisterEventService implements OnModuleInit {
     }
     if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
       throw new ValidationException('This share link has expired');
+    }
+    const code = (accessCode || '').trim().toUpperCase();
+    const expected = (shareLink.accessCode || '').trim().toUpperCase();
+    if (code !== expected) {
+      throw new ForbiddenException('Access code required or invalid');
     }
 
     const event = await this.eventRepository.findOne({
@@ -2205,10 +2243,10 @@ export class RegisterEventService implements OnModuleInit {
           email: r.user!.email ?? '',
           type: r.type ?? 'Attendee',
           attendanceStatus,
-          checkInTime: att?.checkInTime
+          checkInTime: hasAttended && att?.checkInTime
             ? att.checkInTime.toISOString()
             : undefined,
-          checkInMethod: att?.checkInMethod,
+          checkInMethod: hasAttended ? att?.checkInMethod : undefined,
         };
       });
 
@@ -2220,10 +2258,10 @@ export class RegisterEventService implements OnModuleInit {
   }
 
   /**
-   * Check-in a participant by share token (public). Validates share token and that user is registered, then records attendance.
+   * Check-in a participant by share token (public). Requires valid accessCode.
    */
-  async checkInByShareToken(shareToken: string, userId: string): Promise<{ eventId: string; success: true }> {
-    const result = await this.getParticipantsByShareToken(shareToken);
+  async checkInByShareToken(shareToken: string, userId: string, accessCode?: string): Promise<{ eventId: string; success: true }> {
+    const result = await this.getParticipantsByShareToken(shareToken, accessCode);
     const participantIds = new Set(result.participants.map((p) => p.id));
     if (!participantIds.has(userId)) {
       throw new BadRequestException('User is not a participant of this event.');
@@ -2232,6 +2270,27 @@ export class RegisterEventService implements OnModuleInit {
       throw new BadRequestException('Attendance service not available.');
     }
     await this.attendanceService.checkInByShareLink(userId, result.eventId);
+    return { eventId: result.eventId, success: true };
+  }
+
+  /**
+   * Set attendance status (Attended / Not Attended) via share link. Caller must have valid access code.
+   */
+  async setAttendanceStatusByShareToken(
+    shareToken: string,
+    accessCode: string | undefined,
+    userId: string,
+    status: 'Attended' | 'Not Attended',
+  ): Promise<{ eventId: string; success: boolean }> {
+    const result = await this.getParticipantsByShareToken(shareToken, accessCode);
+    const participantIds = new Set(result.participants.map((p) => p.id));
+    if (!participantIds.has(userId)) {
+      throw new BadRequestException('User is not a participant of this event.');
+    }
+    if (!this.attendanceService) {
+      throw new BadRequestException('Attendance service not available.');
+    }
+    await this.attendanceService.setAttendanceStatusForShare(result.eventId, userId, status);
     return { eventId: result.eventId, success: true };
   }
 }

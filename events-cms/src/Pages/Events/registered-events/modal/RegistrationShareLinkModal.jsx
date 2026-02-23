@@ -2,11 +2,18 @@ import React from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 
-const RegistrationShareLinkModal = ({ show, onHide, shareUrl }) => {
+const RegistrationShareLinkModal = ({ show, onHide, shareUrl, accessCode }) => {
     const handleCopy = () => {
         if (shareUrl) {
             navigator.clipboard.writeText(shareUrl);
             toast.success('Link copied to clipboard!');
+        }
+    };
+
+    const handleCopyCode = () => {
+        if (accessCode) {
+            navigator.clipboard.writeText(accessCode);
+            toast.success('Access code copied!');
         }
     };
 
@@ -66,9 +73,29 @@ const RegistrationShareLinkModal = ({ show, onHide, shareUrl }) => {
                         </Button>
                     </div>
                     <Form.Text className="text-muted">
-                        Share this link to allow viewing the registration list (name, email, basic details only). No login required.
+                        Share this link with the recipient. They will need the access code below to open the page.
                     </Form.Text>
                 </Form.Group>
+                {accessCode && (
+                    <Form.Group className="mb-3">
+                        <Form.Label>Access code (share with recipient)</Form.Label>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <Form.Control
+                                type="text"
+                                value={accessCode}
+                                readOnly
+                                className="bg-light font-monospace"
+                                style={{ flex: 1, letterSpacing: '0.2em', textTransform: 'uppercase' }}
+                            />
+                            <Button variant="outline-primary" onClick={handleCopyCode} style={{ whiteSpace: 'nowrap' }}>
+                                <i className="feather icon-copy mr-1"></i> Copy code
+                            </Button>
+                        </div>
+                        <Form.Text className="text-muted">
+                            Recipient must enter this code once to access the registration list and check-in pages. It is saved in their browser.
+                        </Form.Text>
+                    </Form.Group>
+                )}
             </Modal.Body>
             <Modal.Footer>
                 <Button variant="secondary" onClick={onHide}>Close</Button>

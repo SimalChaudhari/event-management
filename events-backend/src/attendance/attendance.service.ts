@@ -25,7 +25,17 @@ import { ResourceNotFoundException, DuplicateResourceException } from '../utils/
 //test
 @Injectable()
 export class AttendanceService {
-  private attendanceGateway: { emitAttendanceUpdate: (eventId: string) => void } | null = null;
+  private attendanceGateway: {
+    emitAttendanceUpdate: (
+      eventId: string,
+      payload?: {
+        userId: string;
+        attendanceStatus: 'Attended' | 'Not Attended';
+        checkInTime?: string;
+        checkInMethod?: string;
+      },
+    ) => void;
+  } | null = null;
 
   constructor(
     @InjectRepository(EventAttendance)
@@ -41,7 +51,19 @@ export class AttendanceService {
     private readonly errorHandler: ErrorHandlerService,
   ) {}
 
-  setAttendanceGateway(gateway: { emitAttendanceUpdate: (eventId: string) => void }): void {
+  setAttendanceGateway(
+    gateway: {
+      emitAttendanceUpdate: (
+        eventId: string,
+        payload?: {
+          userId: string;
+          attendanceStatus: 'Attended' | 'Not Attended';
+          checkInTime?: string;
+          checkInMethod?: string;
+        },
+      ) => void;
+    },
+  ): void {
     this.attendanceGateway = gateway;
   }
 
@@ -361,6 +383,69 @@ export class AttendanceService {
       { userId, eventId, checkInMethod: CheckInMethod.Manual },
       userId,
     );
+  }
+
+  /**
+   * Set attendance status manually (for share-link users with access). Attended = CheckedIn, Not Attended = NoShow.
+   */
+  async setAttendanceStatusForShare(
+    eventId: string,
+    userId: string,
+    status: 'Attended' | 'Not Attended',
+  ): Promise<EventAttendance> {
+    const registration = await this.registerEventRepository.findOne({
+      where: { userId, eventId, isRegister: true },
+    });
+    if (!registration) {
+      throw new BadRequestException('User is not registered for this event.');
+    }
+
+    let attendance = await this.attendanceRepository.findOne({
+      where: { userId, eventId },
+    });
+
+    if (status === 'Attended') {
+      if (attendance) {
+        attendance.status = AttendanceStatus.CheckedIn;
+        attendance.checkInMethod = CheckInMethod.Manual;
+        // Always set to current time when marking Attended so real-time UI shows "just now" time
+        attendance.checkInTime = new Date();
+      } else {
+        attendance = this.attendanceRepository.create({
+          userId,
+          eventId,
+          registerEventId: registration.id,
+          status: AttendanceStatus.CheckedIn,
+          checkInTime: new Date(),
+          checkInMethod: CheckInMethod.Manual,
+        });
+      }
+    } else {
+      if (attendance) {
+        attendance.status = AttendanceStatus.NoShow;
+        // Use null so TypeORM persists NULL and next Attended gets fresh time
+        (attendance as any).checkInTime = null;
+        (attendance as any).checkOutTime = null;
+        attendance.checkInMethod = CheckInMethod.Manual;
+      } else {
+        attendance = this.attendanceRepository.create({
+          userId,
+          eventId,
+          registerEventId: registration.id,
+          status: AttendanceStatus.NoShow,
+          checkInMethod: CheckInMethod.Manual,
+        });
+      }
+    }
+
+    const saved = await this.attendanceRepository.save(attendance);
+    this.attendanceGateway?.emitAttendanceUpdate(eventId, {
+      userId: saved.userId,
+      attendanceStatus: status,
+      checkInTime: saved.checkInTime?.toISOString(),
+      checkInMethod: saved.checkInMethod ? String(saved.checkInMethod) : undefined,
+    });
+    return saved;
   }
 
   /**

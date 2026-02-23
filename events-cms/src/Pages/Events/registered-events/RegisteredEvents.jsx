@@ -446,6 +446,7 @@ const RegisteredEvents = () => {
 
     // Registration List Share Link (dynamic from backend)
     const [registrationShareUrl, setRegistrationShareUrl] = useState('');
+    const [registrationShareAccessCode, setRegistrationShareAccessCode] = useState('');
     const [showRegistrationShareModal, setShowRegistrationShareModal] = useState(false);
     const [generatingRegistrationShareLink, setGeneratingRegistrationShareLink] = useState(false);
 
@@ -516,6 +517,7 @@ const RegisteredEvents = () => {
             const res = await axiosInstance.post('/register-events/admin/generate-registration-share-link', { eventId: selectedEventId });
             if (res?.data?.success && res?.data?.data?.shareUrl) {
                 setRegistrationShareUrl(res.data.data.shareUrl);
+                setRegistrationShareAccessCode(res.data.data.accessCode || '');
                 setShowRegistrationShareModal(true);
             } else {
                 toast.error(res?.data?.message || 'Failed to generate share link');
@@ -986,6 +988,7 @@ const RegisteredEvents = () => {
                 show={showRegistrationShareModal}
                 onHide={() => setShowRegistrationShareModal(false)}
                 shareUrl={registrationShareUrl}
+                accessCode={registrationShareAccessCode}
             />
         </>
     );

@@ -77,12 +77,21 @@ export class AttendanceGateway
 
   /**
    * Emit attendance update to all clients watching this event's registration list.
-   * Call this from AttendanceService after check-in or check-out.
+   * Payload allows real-time state update without API refetch (like Q&A share link).
    */
-  emitAttendanceUpdate(eventId: string): void {
+  emitAttendanceUpdate(
+    eventId: string,
+    payload?: {
+      userId: string;
+      attendanceStatus: 'Attended' | 'Not Attended';
+      checkInTime?: string;
+      checkInMethod?: string;
+    },
+  ): void {
     this.server.to(`registration_list:${eventId}`).emit('attendance_updated', {
       eventId,
       timestamp: new Date().toISOString(),
+      ...payload,
     });
   }
 

@@ -20,6 +20,10 @@ export class EventRegistrationShareLink {
   @Column({ type: 'varchar', length: 64, unique: true })
   shareToken!: string;
 
+  /** Access code required to view share page. Unique per event; stored in cookie after verify. */
+  @Column({ type: 'varchar', length: 16 })
+  accessCode!: string;
+
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
