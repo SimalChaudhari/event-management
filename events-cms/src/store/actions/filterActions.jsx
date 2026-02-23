@@ -12,7 +12,13 @@ import { buildUrlWithParams } from '../../utils/buildQueryParams';
  */
 export const filterUserList = async (params = {}) => {
     try {
-        const url = buildUrlWithParams('/users', params);
+        // Map 'search' to 'keyword' for users API (backend expects keyword)
+        const userParams = { ...params };
+        if (userParams.search !== undefined) {
+            userParams.keyword = userParams.search;
+            delete userParams.search;
+        }
+        const url = buildUrlWithParams('/users', userParams);
 
         const response = await axiosInstance.get(url);
 
