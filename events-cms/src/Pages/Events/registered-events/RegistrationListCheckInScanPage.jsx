@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Form } from 'react-bootstrap';
 import publicAxiosInstance from '../../../configs/publicAxiosInstance';
-import axiosInstance from '../../../configs/axiosInstance';
 import { getRegistrationShareCode, setRegistrationShareCode, removeRegistrationShareCode } from '../../../utils/registrationShareCookie';
 
 import physicalScanImg from '../../../assets/scan/physical.png';
@@ -290,11 +289,14 @@ const RegistrationListCheckInScanPage = () => {
       setError('Please scan or enter participant ID.');
       return;
     }
+    if (!shareToken || !accessCode) {
+      setError('Access required. Please enter the access code.');
+      return;
+    }
     if (!eventId) {
       setError('Event not loaded.');
       return;
     }
-    const method = checkInMethodOverride ?? (isManualEntry ? 'manual' : 'physical_device');
     if (submitTimeoutRef.current) {
       clearTimeout(submitTimeoutRef.current);
       submitTimeoutRef.current = null;
@@ -304,26 +306,34 @@ const RegistrationListCheckInScanPage = () => {
     setSuccessMsg(null);
     setSubmitting(true);
     try {
-      await axiosInstance.post(
-        `/attendance/check-in-qr-code/${userId}`,
-        { eventId, checkInMethod: method }
+      await publicAxiosInstance.post(
+        `/public/events/share/${shareToken}/check-in`,
+        { userId },
+        { headers: { 'X-Access-Code': accessCode } }
       );
       setSuccessMsg('Check-in successful.');
       setScanValue('');
       setTimeout(() => inputRef.current?.focus(), 50);
     } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Check-in failed. Please check the ID and try again.';
-      setError(msg);
+      if (err?.response?.status === 403 || err?.response?.data?.message?.toLowerCase?.().includes('access code')) {
+        removeRegistrationShareCode(shareToken);
+        setAccessCode(null);
+        setShowAccessForm(true);
+        setAccessCodeError(err?.response?.data?.message || 'Invalid or expired access code.');
+      } else {
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          'Check-in failed. Please check the ID and try again.';
+        setError(msg);
+      }
       setScanValue('');
       setTimeout(() => inputRef.current?.focus(), 50);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [eventId, scanValue, isManualEntry]);
+  }, [eventId, shareToken, accessCode, scanValue]);
 
   useEffect(() => {
     if (!cameraScanActive || !eventId || !Html5QrcodeLib) return;

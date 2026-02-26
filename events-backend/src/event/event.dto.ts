@@ -120,6 +120,21 @@ export class EventDto {
   @IsString()
   currency?: string;
 
+  /** Early Bird: price and validity (start = when available, end = expiry date) */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  earlyBirdPrice?: number;
+
+  @IsOptional()
+  @IsDateString()
+  earlyBirdStartDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  earlyBirdEndDate?: string;
+
   // Category field
   @IsOptional()
   @IsUUID()
@@ -128,11 +143,12 @@ export class EventDto {
   @IsOptional()
   exhibitorIds?: string; // Add this field
 
-  // Optional limit: only this many exhibitor stamps will be auto-created. If not set, all exhibitors get stamps.
+  /** Stamps required for reward (e.g. 8). Progress shown as e.g. 3/8 in mobile app. */
   @IsOptional()
   @IsInt()
   @Min(1)
-  numberOfStampsRequired?: number;
+  @Type(() => Number)
+  stampRequiredForReward?: number;
   
   // Floor plan - single image
   @IsOptional()

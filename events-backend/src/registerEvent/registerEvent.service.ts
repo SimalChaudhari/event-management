@@ -655,16 +655,27 @@ export class RegisterEventService implements OnModuleInit {
               documents: formattedDocuments,
               engagements: engagements,
               programmeTracks: formattedProgrammeTracks,
-              eventStamps: {
-                description: eventStampDescription || '',
-                stamps: eventStamps.map(stamp => ({
-                  id: stamp.id,
-                  boothNumber: stamp.name, // name field contains booth number
-                  exhibitorId: stamp.exhibitorId || null,
-                  image: stamp.image,
-                  isVisited: stampVisitMap.get(stamp.id) || false, // Check user-specific visit status
-                })),
-              },
+              eventStamps: (() => {
+                const requiredForReward =
+                  registerEvent.event?.stampRequiredForReward != null
+                    ? Number(registerEvent.event.stampRequiredForReward)
+                    : eventStamps.length;
+                const collectedCount = eventStamps.filter(
+                  (stamp) => stampVisitMap.get(stamp.id) === true,
+                ).length;
+                return {
+                  description: eventStampDescription || '',
+                  stampRequiredForReward: requiredForReward,
+                  collectedCount,
+                  stamps: eventStamps.map((stamp) => ({
+                    id: stamp.id,
+                    boothNumber: stamp.name,
+                    exhibitorId: stamp.exhibitorId || null,
+                    image: stamp.image,
+                    isVisited: stampVisitMap.get(stamp.id) || false,
+                  })),
+                };
+              })(),
               exhibitorsData: {
                 exhibitorDescription: exhibitorDescription || '',
                 exhibitors: await Promise.all(
@@ -1188,26 +1199,21 @@ export class RegisterEventService implements OnModuleInit {
         ? await this.eventStampService.getStampsByEventId(registerEvent.eventId)
         : [];
 
-      // Get user-specific stamp visits for this user (only for stamps in this event)
-      const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
-      const userStampVisitRepository = this.registerEventRepository.manager.getRepository(UserStampVisit);
-      
-      // Optimize: Only query visits for stamps that belong to this event
+      // Stamp visits: for the registrant (when admin views, show that user's collection; when user views, show own)
       const eventStampIds = eventStamps.map(stamp => stamp.id);
-      const userStampVisits = eventStampIds.length > 0
-        ? await userStampVisitRepository.find({
-            where: {
-              userId: userId,
-              stampId: eventStampIds.length === 1 ? eventStampIds[0] : In(eventStampIds),
-            },
-          })
-        : [];
-
-      // Create a map of stampId -> isVisited for quick lookup
-      // Include all records (both true and false) to properly track visit status
-      const stampVisitMap = new Map(
-        userStampVisits.map(visit => [visit.stampId, visit.isVisited])
-      );
+      const targetUserId = role === 'admin' ? registerEvent.userId : userId;
+      let stampVisitMap = new Map<string, boolean>();
+      if (eventStampIds.length > 0 && targetUserId) {
+        const { UserStampVisit } = await import('../event/user-stamp-visit.entity');
+        const userStampVisitRepository = this.registerEventRepository.manager.getRepository(UserStampVisit);
+        const userStampVisits = await userStampVisitRepository.find({
+          where: {
+            userId: targetUserId,
+            stampId: eventStampIds.length === 1 ? eventStampIds[0] : In(eventStampIds),
+          },
+        });
+        stampVisitMap = new Map(userStampVisits.map(visit => [visit.stampId, visit.isVisited]));
+      }
 
       // Clean up event object
       const {
@@ -1232,17 +1238,28 @@ export class RegisterEventService implements OnModuleInit {
         documents: formattedDocuments,
         programmeTracks: formattedProgrammeTracks, // Add formatted programme tracks
         engagements: engagements,
-        eventStamps: {
-          description: eventStampDescription || '',
-          stamps: eventStamps.map(stamp => ({
-            id: stamp.id,
-            name: stamp.name,
-            boothNumber: stamp.name, // name field contains booth number
-            exhibitorId: stamp.exhibitorId || null,
-            image: stamp.image,
-            isVisited: stampVisitMap.get(stamp.id) || false, // Check user-specific visit status
-          })),
-        },
+        eventStamps: (() => {
+          const requiredForReward =
+            registerEvent.event?.stampRequiredForReward != null
+              ? Number(registerEvent.event.stampRequiredForReward)
+              : eventStamps.length;
+          const collectedCount = eventStamps.filter(
+            (stamp) => stampVisitMap.get(stamp.id) === true,
+          ).length;
+          return {
+            description: eventStampDescription || '',
+            stampRequiredForReward: requiredForReward,
+            collectedCount,
+            stamps: eventStamps.map(stamp => ({
+              id: stamp.id,
+              name: stamp.name,
+              boothNumber: stamp.name,
+              exhibitorId: stamp.exhibitorId || null,
+              image: stamp.image,
+              isVisited: stampVisitMap.get(stamp.id) || false,
+            })),
+          };
+        })(),
         exhibitorsData: {
           exhibitorDescription: exhibitorDescription || '',
           exhibitors: exhibitors,

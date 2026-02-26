@@ -260,7 +260,7 @@ export class ExhibitorService {
 
   /**
    * Auto-create stamps for exhibitors when they are added to an event.
-   * Creates stamps with company name and logo. Respects numberOfStampsRequired limit.
+   * Creates stamps with company name and logo. No limit - all exhibitors get a stamp.
    * Skips exhibitors that already have a stamp (no duplicate company stamps).
    */
   async autoCreateStampsForEventExhibitors(eventId: string): Promise<void> {
@@ -288,7 +288,6 @@ export class ExhibitorService {
         where: { eventId },
         relations: ['eventStamp'],
       });
-      const currentStampCount = existingStampEvents.length;
       const exhibitorIdsWithStamps = new Set(
         existingStampEvents
           .filter((ese) => ese.eventStamp?.exhibitorId)
@@ -300,20 +299,9 @@ export class ExhibitorService {
           .map((ese) => ese.eventStamp!.name)
       );
 
-      const numberOfStampsRequired = event.numberOfStampsRequired;
-      let stampsCreated = 0;
-
       for (const eventExhibitor of eventExhibitors) {
         const exhibitor = eventExhibitor.exhibitor;
         if (!exhibitor) continue;
-
-        // Check limit
-        if (
-          numberOfStampsRequired != null &&
-          currentStampCount + stampsCreated >= numberOfStampsRequired
-        ) {
-          break;
-        }
 
         const stampName = exhibitor.boothNumber || exhibitor.companyName || 'Exhibitor Stamp';
 
@@ -338,7 +326,6 @@ export class ExhibitorService {
         });
         await this.eventStampEventRepository.save(stampEvent);
 
-        stampsCreated++;
         exhibitorIdsWithStamps.add(exhibitor.id);
         stampNamesSet.add(stampName);
       }

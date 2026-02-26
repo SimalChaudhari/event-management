@@ -318,12 +318,12 @@ export class EventService {
         await this.eventStampService.associateStampsToEvent(savedEvent.id, allStampIds);
       }
 
-      // Auto-create stamps for exhibitors (with logo and name), respecting numberOfStampsRequired
+      // Auto-create stamps for exhibitors (with logo and name)
       if (eventDto.exhibitorIds) {
         await this.exhibitorService.autoCreateStampsForEventExhibitors(savedEvent.id);
       }
 
-      return savedEvent;
+      return this.normalizeEventPrices(savedEvent);
     } catch (error) {
   
       if (
@@ -697,6 +697,7 @@ export class EventService {
           const slimEvent = {
             ...basicEvent,
             price: this.toDisplayPrice(event.price),
+            earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
             color: getEventColor(event.type),
             speakersData: speakers,
             isFavorite,
@@ -774,6 +775,7 @@ export class EventService {
           const completeEvent = {
             ...eventFilteredData,
             price: this.toDisplayPrice(event.price),
+            earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
             color: getEventColor(event.type),
             documents: formattedDocuments,
             eventStamps: {
@@ -1059,6 +1061,7 @@ export class EventService {
         return {
           ...basicEvent,
           price: this.toDisplayPrice(event.price),
+          earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
           color: getEventColor(event.type),
           speakersData: speakerSchedule,
           isFavorite,
@@ -1141,6 +1144,7 @@ export class EventService {
       const eventResponse = {
         ...eventFilteredData,
         price: this.toDisplayPrice(event.price),
+        earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
         color: getEventColor(event.type),
         speakers: speakerSchedule,
         speakersData: speakerSchedule,
@@ -1326,7 +1330,7 @@ export class EventService {
         await this.exhibitorService.autoCreateStampsForEventExhibitors(id);
       }
 
-      return updatedEvent;
+      return this.normalizeEventPrices(updatedEvent);
     } catch (error) {
       if (
         error instanceof ResourceNotFoundException ||
@@ -2210,6 +2214,16 @@ export class EventService {
       return Math.round((n / 100) * 100) / 100;
     }
     return n;
+  }
+
+  /** Ensure price and earlyBirdPrice are numbers in API responses (TypeORM decimal can return string). */
+  private normalizeEventPrices<T extends { price?: unknown; earlyBirdPrice?: unknown }>(event: T): T {
+    if (!event) return event;
+    return {
+      ...event,
+      price: this.toDisplayPrice(event.price),
+      earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+    } as T;
   }
 
   private checkGlobalSearchMatch(event: any, keyword: string): {

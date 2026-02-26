@@ -1147,7 +1147,10 @@ const ViewRegisterEventPage = () => {
 
                             {/* Event Details Tab */}
                             <Tab.Pane eventKey="details">
-                                <EventBasicComponent eventData={eventData?.event} />
+                                <EventBasicComponent
+                                    eventData={registration?.event}
+                                    showStampProgress={true}
+                                />
                             </Tab.Pane>
                         </Tab.Content>
                     </Tab.Container>

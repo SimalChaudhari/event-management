@@ -1460,8 +1460,14 @@ export class AgendaService {
       }
 
       // Validate that this is a meeting request
+      // if (!meeting.isMeetingRequest) {
+      //   throw new BadRequestException('This is not a meeting request.');
+      // }
+
       if (!meeting.isMeetingRequest) {
-        throw new BadRequestException('This is not a meeting request.');
+        throw new BadRequestException(
+          'This item may be a confirmed or rescheduled meeting. Please contact the other participant if you need to cancel it.',
+        );
       }
 
       // Validate permissions - only meeting creator can cancel

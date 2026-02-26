@@ -77,11 +77,14 @@ function AddEventPage() {
         backgroundImage: null,
         exhibitorIds: [],
         exhibitorDescription: '',
-        numberOfStampsRequired: '', // Optional limit: only this many exhibitor stamps auto-created
+        stampRequiredForReward: '', // Stamps required for reward (e.g. 8) - progress shown as 1/8, 2/8 in app
         eventStampDescription: '', // Description for event stamps
         eventStampIds: [], // Array of existing stamp IDs to associate
         newStamps: [], // Array of new stamps to create: [{ name: string, image: File }]
-        enableLuckyDrawFeature: false
+        enableLuckyDrawFeature: false,
+        earlyBirdPrice: '',
+        earlyBirdStartDate: '',
+        earlyBirdEndDate: ''
     });
     const [showMapModal, setShowMapModal] = useState(false);
 
@@ -493,11 +496,14 @@ function AddEventPage() {
                         backgroundImage: backgroundImageData,
                         exhibitorIds: exhibitorIds,
                         exhibitorDescription: exhibitorDescription,
-                        numberOfStampsRequired: editData.numberOfStampsRequired ?? '',
+                        stampRequiredForReward: editData.stampRequiredForReward ?? '',
                         eventStampDescription: editData.eventStampDescription || '',
                         eventStampIds: eventStampIdsData,
                         newStamps: [],
-                        enableLuckyDrawFeature: editData.enableLuckyDrawFeature || false
+                        enableLuckyDrawFeature: editData.enableLuckyDrawFeature || false,
+                        earlyBirdPrice: editData.earlyBirdPrice ?? '',
+                        earlyBirdStartDate: editData.earlyBirdStartDate ? editData.earlyBirdStartDate.split('T')[0] : '',
+                        earlyBirdEndDate: editData.earlyBirdEndDate ? editData.earlyBirdEndDate.split('T')[0] : ''
                     };
 
                     // Store the original event date to detect if it changes during edit
@@ -736,10 +742,14 @@ function AddEventPage() {
             backgroundImage: null,
             exhibitorIds: [],
             exhibitorDescription: '',
-            numberOfStampsRequired: '',
+            stampRequiredForReward: '',
             eventStampDescription: '',
             eventStampIds: [],
-            newStamps: []
+            newStamps: [],
+            enableLuckyDrawFeature: false,
+            earlyBirdPrice: '',
+            earlyBirdStartDate: '',
+            earlyBirdEndDate: ''
         });
         setImagePreviewUrls([]);
         setDocumentPreviewUrls([]);
@@ -873,7 +883,7 @@ function AddEventPage() {
         }
 
         // Clean up empty date strings - convert to null for optional dates
-        const dateFields = ['publishStartDate', 'publishEndDate'];
+        const dateFields = ['publishStartDate', 'publishEndDate', 'earlyBirdStartDate', 'earlyBirdEndDate'];
         dateFields.forEach(field => {
             if (dataToSend[field] === '' || dataToSend[field] === null || dataToSend[field] === undefined) {
                 dataToSend[field] = null;
@@ -892,10 +902,10 @@ function AddEventPage() {
                 formDataToSend.append('exhibitorIds', exhibitorsArray.join(','));
             } else if (key === 'exhibitorDescription') {
                 formDataToSend.append('exhibitorDescription', dataToSend[key]);
-            } else if (key === 'numberOfStampsRequired') {
+            } else if (key === 'stampRequiredForReward') {
                 const val = dataToSend[key];
                 if (val !== '' && val !== null && val !== undefined && !isNaN(Number(val))) {
-                    formDataToSend.append('numberOfStampsRequired', String(Math.max(1, parseInt(val, 10))));
+                    formDataToSend.append('stampRequiredForReward', String(Math.max(1, parseInt(val, 10))));
                 }
             } else if (key === 'eventStampDescription') {
                 formDataToSend.append('eventStampDescription', dataToSend[key] || '');
@@ -964,6 +974,10 @@ function AddEventPage() {
                 // For optional date fields, skip empty strings
                 if (dateFields.includes(key) && (dataToSend[key] === '' || !dataToSend[key])) {
                     return; // Don't send empty date strings - backend will keep existing value
+                }
+                // Skip empty Early Bird price so backend doesn't receive invalid number
+                if (key === 'earlyBirdPrice' && (dataToSend[key] === '' || dataToSend[key] === null || dataToSend[key] === undefined)) {
+                    return;
                 }
                 formDataToSend.append(key, dataToSend[key]);
             }
@@ -1623,6 +1637,65 @@ function AddEventPage() {
                                         </div>
                                     </Col>
 
+                                    <Col sm={12}>
+                                        <div className="mb-3 p-3" style={{ backgroundColor: '#f0f8ff', borderRadius: '8px', border: '1px solid #b8daff' }}>
+                                            <h6 className="mb-3" style={{ color: '#004085', fontWeight: '600' }}>
+                                                <i className="feather icon-zap mr-1" style={{ verticalAlign: 'middle' }}></i>
+                                                Early Bird
+                                            </h6>
+                                            <Row>
+                                                <Col sm={4}>
+                                                    <div className="form-group fill">
+                                                        <label className="floating-label" htmlFor="earlyBirdPrice">Early Bird Price (SGD)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            name="earlyBirdPrice"
+                                                            value={formData.earlyBirdPrice}
+                                                            onChange={handleChange}
+                                                            placeholder="0.00"
+                                                            step="0.01"
+                                                            min="0"
+                                                            title="Discounted price for early registration"
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col sm={4}>
+                                                    <div className="form-group fill">
+                                                        <label className="floating-label" htmlFor="earlyBirdStartDate">Start Date</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control"
+                                                            name="earlyBirdStartDate"
+                                                            value={formData.earlyBirdStartDate}
+                                                            onChange={handleChange}
+                                                            title="Date when Early Bird price becomes available"
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col sm={4}>
+                                                    <div className="form-group fill">
+                                                        <label className="floating-label" htmlFor="earlyBirdEndDate">End Date (Expiry)</label>
+                                                        <input
+                                                            type="date"
+                                                            className="form-control"
+                                                            name="earlyBirdEndDate"
+                                                            value={formData.earlyBirdEndDate}
+                                                            onChange={handleChange}
+                                                            title="Date when Early Bird price expires"
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                            {(formData.earlyBirdPrice || formData.earlyBirdStartDate || formData.earlyBirdEndDate) && (
+                                                <div className="mt-2 small text-muted">
+                                                    Early Bird: {formData.earlyBirdPrice && parseFloat(formData.earlyBirdPrice) >= 0 ? `${parseFloat(formData.earlyBirdPrice).toFixed(2)} SGD` : '—'} 
+                                                    {formData.earlyBirdStartDate || formData.earlyBirdEndDate ? ` • ${formData.earlyBirdStartDate || '—'} to ${formData.earlyBirdEndDate || '—'}` : ''}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Col>
+
                                     <Col sm={6}>
                                         <div className="form-group fill">
                                             <label className="floating-label" htmlFor="startDate">
@@ -2097,29 +2170,29 @@ function AddEventPage() {
 
                                     <Col sm={12}>
                                         <div className="form-group" style={{ marginTop: '10px' }}>
-                                            <label htmlFor="numberOfStampsRequired" style={{ 
+                                            <label htmlFor="stampRequiredForReward" style={{ 
                                                 display: 'block', 
                                                 marginBottom: '10px', 
                                                 fontSize: '0.875rem',
                                                 fontWeight: '500',
                                                 color: '#4680ff'
                                             }}>
-                                                Number of Stamps Required (Optional)
+                                                Stamps Required for Reward (Optional)
                                             </label>
                                             <p style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: '10px' }}>
-                                                Limit how many exhibitor stamps are auto-created. Leave empty to create stamps for all exhibitors.
+                                                Number of stamps needed to get the reward. Progress shown in app as e.g. 1/8, 2/8, ... 8/8.
                                             </p>
                                             <Form.Control
                                                 type="number"
-                                                id="numberOfStampsRequired"
+                                                id="stampRequiredForReward"
                                                 min="1"
-                                                placeholder="e.g. 10"
-                                                value={formData.numberOfStampsRequired ?? ''}
+                                                placeholder="e.g. 8"
+                                                value={formData.stampRequiredForReward ?? ''}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
                                                     setFormData((prev) => ({
                                                         ...prev,
-                                                        numberOfStampsRequired: val === '' ? '' : (parseInt(val, 10) || '')
+                                                        stampRequiredForReward: val === '' ? '' : (parseInt(val, 10) || '')
                                                     }));
                                                 }}
                                                 style={{ maxWidth: '200px' }}

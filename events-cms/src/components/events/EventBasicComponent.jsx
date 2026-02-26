@@ -2,6 +2,8 @@ import React from 'react';
 import { Row, Col, Badge, Card } from 'react-bootstrap';
 import DateTimeFormatter from '../dateTime/DateTimeFormatter';
 import { ExpandableDescription } from '../ExpandableDescription';
+import EventStampsComponent from './EventStampsComponent';
+import { API_URL } from '../../configs/env';
 
 /**
  * EventBasicComponent - Component to display basic event details with exhibitor-style UI
@@ -93,6 +95,16 @@ const EventBasicComponent = ({ eventData }) => {
         </Col>
     );
 
+
+    // Simple getImageSrc for stamp images (user-side view)
+    const getImageSrc = (image) => {
+        if (!image || typeof image !== 'string') return '';
+        if (image.startsWith('http')) return image;
+        const normalizedPath = image.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        const baseUrl = (API_URL || '').replace(/\/+$/, '');
+        return baseUrl ? `${baseUrl}/${normalizedPath}` : '';
+    };
+    const handleStampImageClick = () => {}; // No modal on user view; optional expand later
 
     const content = (
         <Row className="m-0" style={{ width: '100%', maxWidth: '100%' }}>
@@ -419,6 +431,17 @@ const EventBasicComponent = ({ eventData }) => {
                                         </React.Fragment>
                                     ))}
                                 </Row>
+                            </Col>
+                        )}
+
+                        {/* Event Stamps - show progress (e.g. 3/8) when admin set stampRequiredForReward */}
+                        {eventData?.eventStamps?.stamps?.length > 0 && (
+                            <Col xs={12} className="mt-md-4 mt-3 p-0" style={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+                                <EventStampsComponent
+                                    eventStamps={eventData.eventStamps}
+                                    getImageSrc={getImageSrc}
+                                    handleStampImageClick={handleStampImageClick}
+                                />
                             </Col>
                         )}
                     </Row>

@@ -104,6 +104,16 @@ export class Event {
   @Column({ type: 'varchar', length: 10, default: 'SGD' })
   currency?: string = 'SGD';
 
+  /** Early Bird: price and validity period (start = when it becomes available, end = expiry) */
+  @Column({ type: 'decimal', nullable: true })
+  earlyBirdPrice?: number;
+
+  @Column({ type: 'date', nullable: true })
+  earlyBirdStartDate?: Date;
+
+  @Column({ type: 'date', nullable: true })
+  earlyBirdEndDate?: Date;
+
   // Floor plan - single image
   @Column({ type: 'varchar', nullable: true })
   floorPlan?: string;
@@ -184,9 +194,9 @@ export class Event {
   })
   programmeTracks!: ProgrammeTrack[];
   
-  // Optional limit on number of stamps - if set, only this many exhibitor stamps will be auto-created
+  /** Stamps required to get reward (e.g. 8). Progress shown as collectedCount/stampRequiredForReward (e.g. 3/8) in app. */
   @Column({ type: 'int', nullable: true })
-  numberOfStampsRequired?: number;
+  stampRequiredForReward?: number;
 
   // Tab visibility configuration - JSON object to control which tabs are visible
   @Column({ type: 'json', nullable: true })

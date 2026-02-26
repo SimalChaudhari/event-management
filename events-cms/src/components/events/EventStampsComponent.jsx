@@ -9,18 +9,22 @@ import { ExpandableDescription } from '../ExpandableDescription';
  * @param {Function} handleStampImageClick - Function to handle stamp image click
  */
 const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick }) => {
-    // Handle both new structure { description, stamps: [...] } and old structure (array)
+    // Handle both new structure { description, stamps: [...], collectedCount, stampRequiredForReward } and old structure (array)
     let stamps = [];
     let description = '';
+    let collectedCount = null;
+    let stampRequiredForReward = null;
     
     if (eventStamps) {
         if (Array.isArray(eventStamps)) {
             // Old structure: array of stamps
             stamps = eventStamps;
         } else if (eventStamps.stamps && Array.isArray(eventStamps.stamps)) {
-            // New structure: object with description and stamps
+            // New structure: object with description, stamps, and optional progress
             stamps = eventStamps.stamps;
             description = eventStamps.description || '';
+            collectedCount = eventStamps.collectedCount;
+            stampRequiredForReward = eventStamps.stampRequiredForReward;
         }
     }
 
@@ -162,8 +166,42 @@ const EventStampsComponent = ({ eventStamps, getImageSrc, handleStampImageClick 
 
     // Render stamps section
     const renderStamps = () => {
+        const showProgress = stampRequiredForReward != null && stampRequiredForReward > 0;
+        const current = collectedCount != null ? Number(collectedCount) : stamps.filter((s) => s.isVisited).length;
+        const required = showProgress ? Number(stampRequiredForReward) : stamps.length;
+
         return (
             <div>
+                {/* Progress: e.g. 3/8 stamps collected (user side / mobile app) */}
+                {showProgress && (
+                    <div
+                        style={{
+                            marginBottom: '15px',
+                            padding: '12px 16px',
+                            backgroundColor: current >= required ? '#d4edda' : '#e7f3ff',
+                            borderRadius: '8px',
+                            border: `1px solid ${current >= required ? '#28a745' : '#4680ff'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '8px',
+                        }}
+                    >
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>
+                            Stamps collected
+                        </span>
+                        <span
+                            style={{
+                                fontSize: '18px',
+                                fontWeight: '700',
+                                color: current >= required ? '#28a745' : '#4680ff',
+                            }}
+                        >
+                            {current} / {required}
+                        </span>
+                    </div>
+                )}
                 <h6>Event Stamps</h6>
                 {description && description.trim().length > 0 ? (
                     <div style={{ marginBottom: '15px' }}>
