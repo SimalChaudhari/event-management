@@ -1300,6 +1300,22 @@ export class AgendaService {
         throw new ResourceNotFoundException('Event', eventId);
       }
 
+      // If both Chat and Agenda tabs are disabled, do not allow attendee search (no chat or meetup)
+      const tv = event.tabVisibility as any;
+      if (tv && tv.chat === false && tv.agenda === false) {
+        return {
+          users: [],
+          total: 0,
+          eventId,
+          searchQuery: searchQuery || '',
+          currentUser: {
+            id: currentUser.id,
+            firstName: currentUser.firstName,
+            lastName: currentUser.lastName,
+          },
+        };
+      }
+
       // Search for users who are registered for the same event
       let registrations: any[];
       

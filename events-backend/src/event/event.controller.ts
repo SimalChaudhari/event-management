@@ -322,6 +322,8 @@ export class EventController {
       agenda?: boolean;
       adminInfo?: boolean;
       engagement?: boolean;
+      programme?: boolean;
+      chat?: boolean;
     },
     @Res() response: Response,
   ) {

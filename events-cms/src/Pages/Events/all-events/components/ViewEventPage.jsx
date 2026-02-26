@@ -88,7 +88,8 @@ const ViewEventPage = () => {
         agenda: true,
         programme: true,
         engagement: true,
-        adminInfo: true
+        adminInfo: true,
+        chat: true
     });
     const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
 
@@ -168,7 +169,8 @@ const ViewEventPage = () => {
                     agenda: eventData.tabVisibility.agenda !== false,
                     programme: eventData.tabVisibility.programme !== false,
                     engagement: eventData.tabVisibility.engagement !== false,
-                    adminInfo: eventData.tabVisibility.adminInfo !== false
+                    adminInfo: eventData.tabVisibility.adminInfo !== false,
+                    chat: eventData.tabVisibility.chat !== false
                 });
             }
 
@@ -1052,6 +1054,16 @@ const ViewEventPage = () => {
                                     label="Agenda Tab"
                                     checked={tabVisibilitySettings.agenda}
                                     onChange={(e) => handleTabVisibilityChange('agenda', e.target.checked)}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-4">
+                                <Form.Check
+                                    type="checkbox"
+                                    id="chat-tab"
+                                    label="Chat Tab"
+                                    checked={tabVisibilitySettings.chat}
+                                    onChange={(e) => handleTabVisibilityChange('chat', e.target.checked)}
                                 />
                             </Form.Group>
                         </Col>

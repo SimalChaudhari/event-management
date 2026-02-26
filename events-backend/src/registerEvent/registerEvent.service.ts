@@ -973,6 +973,7 @@ export class RegisterEventService implements OnModuleInit {
 
   /**
    * Get paginated list of attendees registered for an event, with optional search (name, email).
+   * When both Chat and Agenda tabs are disabled for the event, returns empty (no attendee search).
    */
   async getEventAttendeesPaginated(
     eventId: string,
@@ -997,6 +998,18 @@ export class RegisterEventService implements OnModuleInit {
     const limit = Math.min(100, Math.max(1, options.limit ?? 20));
     const search = options.search?.trim();
     const skip = (page - 1) * limit;
+
+    const event = await this.eventRepository.findOne({ where: { id: eventId }, select: ['id', 'tabVisibility'] });
+    const tv = event?.tabVisibility as any;
+    if (tv && tv.chat === false && tv.agenda === false) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      };
+    }
 
     const qb = this.registerEventRepository
       .createQueryBuilder('re')

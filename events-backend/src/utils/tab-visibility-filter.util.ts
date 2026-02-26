@@ -10,14 +10,18 @@ export class TabVisibilityFilterUtil {
    * @returns Filtered event object
    */
   static filterEventDataByTabVisibility(event: any, userRole?: string): any {
-    // Admin users always get full data
+    // Admin users always get full data; set allowAttendeeSearch from tab visibility or default true
     if (userRole === 'admin') {
-      return event;
+      const allowAttendeeSearch =
+        event?.tabVisibility == null
+          ? true
+          : (event.tabVisibility.chat !== false || event.tabVisibility.agenda !== false);
+      return { ...event, allowAttendeeSearch };
     }
 
-    // If no tab visibility settings, return original event
+    // If no tab visibility settings, return original event (default: allow attendee search)
     if (!event?.tabVisibility) {
-      return event;
+      return { ...event, allowAttendeeSearch: true };
     }
 
     console.log('🔍 Filtering event data:', {
@@ -121,6 +125,16 @@ export class TabVisibilityFilterUtil {
       filteredEvent.categories = [];
       filteredEvent.categoriesData = [];
     }
+
+    // Remove chatroom if chat tab is disabled
+    if (event.tabVisibility.chat === false) {
+      console.log('🚫 Removing chat for event:', event.id);
+      filteredEvent.chatroom = null;
+    }
+
+    // Allow attendee search in global search only when at least one of Chat or Agenda is enabled
+    filteredEvent.allowAttendeeSearch =
+      event.tabVisibility.chat !== false || event.tabVisibility.agenda !== false;
     
     console.log('✅ Filtered event data:', {
       eventId: filteredEvent.id,

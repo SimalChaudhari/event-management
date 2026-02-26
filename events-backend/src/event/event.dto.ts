@@ -198,8 +198,9 @@ export class EventDto {
     agenda?: boolean;
     adminInfo?: boolean;
     engagement?: boolean;
+    programme?: boolean;
+    chat?: boolean;
   };
-
   originalImages: any;
   originalDocuments: any;
   originalFloorPlan: any;

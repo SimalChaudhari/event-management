@@ -213,6 +213,7 @@ export class Event {
     adminInfo?: boolean;
     engagement?: boolean;
     programme?: boolean;
+    chat?: boolean;
   };
 
 }
