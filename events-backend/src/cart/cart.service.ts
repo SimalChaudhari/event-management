@@ -9,6 +9,8 @@ import { CouponService } from 'coupon/coupon.service';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { Status } from 'registerEvent/registerEvent.dto';
 import { Refund } from 'checkout/refund.entity';
+import { Withdrawal } from './withdrawal.entity';
+import { CheckoutService } from '../checkout/checkout.service';
 
 @Injectable()
 export class CartService {
@@ -21,9 +23,13 @@ export class CartService {
         private registerEventRepository: Repository<RegisterEvent>,
         @InjectRepository(Refund)
         private refundRepository: Repository<Refund>,
+        @InjectRepository(Withdrawal)
+        private withdrawalRepository: Repository<Withdrawal>,
         @Inject(forwardRef(() => EventService))
         private eventService: EventService, // Inject EventService
         private couponService: CouponService, // Inject CouponService
+        @Inject(forwardRef(() => CheckoutService))
+        private checkoutService: CheckoutService,
     ) {}
 
     async cartExists(userId: string, eventId: string): Promise<boolean> {
@@ -265,51 +271,165 @@ export class CartService {
     }
 
     /**
-     * My events: list events the user has participated in. Returns only status, eventId, eventName.
-     * status: completed | pending | withdrawn
-     * Uses refund status (same as GET /api/checkout/refund/status/:orderId): if any refund for that order has status 'succeeded' → withdrawn (complete refund); else if any refund exists → pending.
+     * Same status derivation as my-events: real (re_*) + synthetic (withdrawal_failed_*) refunds → withdrawn | refund_refused | pending.
      */
-    async getMyParticipatedEvents(userId: string): Promise<{ status: string; eventId: string; eventName: string }[]> {
+    private deriveRefundStatusFromRefunds(refunds: { status?: string | null; wooshpayRefundId?: string | null }[]): 'withdrawn' | 'refund_refused' | 'pending' {
+        const realRefunds = refunds.filter((r) => r.wooshpayRefundId?.startsWith('re_'));
+        const syntheticRefunds = refunds.filter((r) => r.wooshpayRefundId?.startsWith('withdrawal_failed_'));
+        const hasSucceeded = realRefunds.some((r) => (r.status || '').toLowerCase() === 'succeeded');
+        const hasFailed =
+            realRefunds.some((r) => {
+                const x = (r.status || '').toLowerCase();
+                return x === 'failed' || x === 'canceled' || x === 'refused';
+            }) ||
+            syntheticRefunds.some((r) => {
+                const x = (r.status || '').toLowerCase();
+                return x === 'failed' || x === 'canceled' || x === 'refused';
+            });
+        if (hasSucceeded) return 'withdrawn';
+        if (hasFailed) return 'refund_refused';
+        return 'pending';
+    }
+
+    /**
+     * My events: full history – all events user ever participated in (including withdrawn).
+     * Includes events from RegisterEvent and events from Withdrawal (approved leave) so history is complete.
+     */
+    async getMyParticipatedEvents(userId: string): Promise<{ status: string; eventId: string; eventName: string; canRequestWithdrawal: boolean }[]> {
+        const result: { status: string; eventId: string; eventName: string; canRequestWithdrawal: boolean }[] = [];
+        const eventIdsInResult = new Set<string>();
+
         const registrations = await this.registerEventRepository.find({
             where: { userId },
             order: { createdAt: 'DESC' },
             select: ['eventId', 'status', 'orderId'],
         });
-        if (registrations.length === 0) return [];
 
-        const orderIds = [...new Set(registrations.map((r) => r.orderId).filter(Boolean))] as string[];
+        const orderIds = registrations.length > 0 ? [...new Set(registrations.map((r) => r.orderId).filter(Boolean))] as string[] : [];
         const orderRefundStatus = new Map<string, 'pending' | 'withdrawn'>();
+        for (const oid of orderIds) {
+            try {
+                await this.checkoutService.getRefundStatusForOrder(oid, userId);
+            } catch (_) {}
+        }
+        let refunds: { orderId: string; status: string; wooshpayRefundId?: string }[] = [];
         if (orderIds.length > 0) {
-            const refunds = await this.refundRepository.find({
+            refunds = await this.refundRepository.find({
                 where: { orderId: In(orderIds) },
-                select: ['orderId', 'status'],
+                select: ['orderId', 'status', 'wooshpayRefundId'],
             });
             for (const orderId of orderIds) {
                 const orderRefunds = refunds.filter((r) => r.orderId === orderId);
-                if (orderRefunds.length === 0) continue;
-                const hasSucceeded = orderRefunds.some((r) => (r.status || '').toLowerCase() === 'succeeded');
+                const realRefunds = orderRefunds.filter((r) => r.wooshpayRefundId?.startsWith('re_'));
+                if (realRefunds.length === 0) continue;
+                const hasSucceeded = realRefunds.some((r) => (r.status || '').toLowerCase() === 'succeeded');
                 orderRefundStatus.set(orderId, hasSucceeded ? 'withdrawn' : 'pending');
             }
         }
 
-        const result: { status: string; eventId: string; eventName: string }[] = [];
+        const completedRegs = registrations.filter((r) => {
+            if (r.status === Status.Withdraw) return false;
+            if (r.orderId && orderRefundStatus.has(r.orderId)) return false;
+            return true;
+        });
+        const withdrawalBlock = new Set<string>();
+        const withdrawalDisplayStatus = new Map<string, string>(); // key: orderId-eventId, value: pending | rejected | withdrawn | refund_refused
+        if (orderIds.length > 0) {
+            const withdrawals = await this.withdrawalRepository.find({
+                where: { order: { id: In(orderIds) } },
+                relations: ['order', 'event'],
+            });
+            for (const w of withdrawals) {
+                const key = `${w.order?.id}-${w.event?.id}`;
+                if (!key || !w.order?.id) continue;
+                const s = (w.status || '').toLowerCase();
+                if (s === 'pending' || s === 'approved') withdrawalBlock.add(key);
+                if (s === 'pending') {
+                    withdrawalDisplayStatus.set(key, 'pending');
+                } else if (s === 'rejected') {
+                    withdrawalDisplayStatus.set(key, 'rejected');
+                } else if (s === 'approved') {
+                    const orderRefunds = refunds.filter((r) => r.orderId === w.order?.id);
+                    const status = this.deriveRefundStatusFromRefunds(orderRefunds);
+                    withdrawalDisplayStatus.set(key, status);
+                }
+            }
+        }
+
         for (const reg of registrations) {
             const eventId = reg.eventId!;
+            eventIdsInResult.add(eventId);
+            const key = reg.orderId ? `${reg.orderId}-${eventId}` : '';
+            const withdrawalStatus = key ? withdrawalDisplayStatus.get(key) : null;
             let status: string;
-            if (reg.status === Status.Withdraw) {
+            if (withdrawalStatus) {
+                status = withdrawalStatus;
+            } else if (reg.status === Status.Withdraw) {
                 status = 'withdrawn';
             } else if (reg.orderId && orderRefundStatus.has(reg.orderId)) {
                 status = orderRefundStatus.get(reg.orderId)!;
             } else {
                 status = 'completed';
             }
+            const canRequestWithdrawal =
+                status === 'withdrawn' || status === 'pending' || status === 'rejected' || status === 'refund_refused'
+                    ? false
+                    : !(reg.orderId && withdrawalBlock.has(`${reg.orderId}-${eventId}`));
             let eventName = 'Event';
+            let isEventFuture = false;
             try {
                 const event = await this.eventService.getEventById(eventId);
                 eventName = event.name ?? eventName;
+                isEventFuture = event?.endDate
+                    ? new Date() < new Date(new Date(event.endDate).setHours(23, 59, 59, 999))
+                    : false;
             } catch (_) {}
-            result.push({ status, eventId, eventName });
+            result.push({
+                status,
+                eventId,
+                eventName,
+                canRequestWithdrawal: canRequestWithdrawal && isEventFuture,
+            });
         }
+
+        // Include events user left (withdrawal approved – RegisterEvent was deleted) so history is complete
+        const userWithdrawals = await this.withdrawalRepository.find({
+            where: { order: { user: { id: userId } } },
+            order: { request_at: 'DESC' },
+            relations: ['order', 'event'],
+        });
+        const leftOrderIds = userWithdrawals.map((w) => w.order?.id).filter(Boolean) as string[];
+        for (const oid of leftOrderIds) {
+            try {
+                await this.checkoutService.getRefundStatusForOrder(oid, userId);
+            } catch (_) {}
+        }
+        const leftRefundsByOrder =
+            leftOrderIds.length > 0
+                ? await this.refundRepository.find({
+                      where: { orderId: In(leftOrderIds) },
+                      select: ['orderId', 'status', 'wooshpayRefundId'],
+                  })
+                : [];
+        for (const w of userWithdrawals) {
+            const eventId = w.event?.id;
+            const orderId = w.order?.id;
+            if (!eventId || eventIdsInResult.has(eventId)) continue;
+            eventIdsInResult.add(eventId);
+            const eventName = w.title?.trim() || (w.event as any)?.name || 'Event';
+            let status = 'pending';
+            if (orderId) {
+                const orderRefunds = leftRefundsByOrder.filter((r) => r.orderId === orderId);
+                status = this.deriveRefundStatusFromRefunds(orderRefunds);
+            }
+            result.push({
+                status,
+                eventId,
+                eventName,
+                canRequestWithdrawal: false,
+            });
+        }
+
         return result;
     }
 
@@ -322,13 +442,57 @@ export class CartService {
         return reg?.orderId ?? null;
     }
 
-    /** Get status for invoice: completed | pending | withdrawn (same logic as my-events). */
-    async getOrderStatusForInvoice(userId: string, orderId: string, eventId: string): Promise<'completed' | 'pending' | 'withdrawn'> {
+    /** Get orderId from registration or from withdrawal (so invoice can show for withdrawn/left events too). */
+    async getOrderIdByUserAndEventOrWithdrawal(userId: string, eventId: string): Promise<string | null> {
+        const fromReg = await this.getOrderIdByUserAndEvent(userId, eventId);
+        if (fromReg) return fromReg;
+        const row = await this.withdrawalRepository
+            .createQueryBuilder('w')
+            .innerJoin('w.order', 'o')
+            .where('o.userId = :userId', { userId })
+            .andWhere('w.eventId = :eventId', { eventId })
+            .select('o.id', 'orderId')
+            .getRawOne<{ orderId: string }>();
+        return row?.orderId ?? null;
+    }
+
+    /** Get status for invoice. Withdrawal-first: pending until refund success; maintain approved/rejected. */
+    async getOrderStatusForInvoice(
+        userId: string,
+        orderId: string,
+        eventId: string,
+    ): Promise<'completed' | 'pending' | 'withdrawn' | 'rejected' | 'refund_refused'> {
+        try {
+            await this.checkoutService.getRefundStatusForOrder(orderId, userId);
+        } catch (_) {
+            // Order not found or no access – keep existing DB state
+        }
+        const withdrawal = await this.withdrawalRepository
+            .createQueryBuilder('w')
+            .innerJoin('w.order', 'o')
+            .innerJoin('w.event', 'e')
+            .where('o.id = :orderId', { orderId })
+            .andWhere('e.id = :eventId', { eventId })
+            .select(['w.status'])
+            .getOne();
+        if (withdrawal) {
+            const s = (withdrawal.status || '').toLowerCase();
+            if (s === 'pending') return 'pending';
+            if (s === 'rejected') return 'rejected';
+            if (s === 'approved') {
+                const refunds = await this.refundRepository.find({
+                    where: { orderId },
+                    select: ['status', 'wooshpayRefundId'],
+                });
+                return this.deriveRefundStatusFromRefunds(refunds);
+            }
+        }
         const reg = await this.registerEventRepository.findOne({
             where: { userId, eventId },
             select: ['status'],
         });
-        if (reg?.status === Status.Withdraw) return 'withdrawn';
+        if (!reg) return 'withdrawn';
+        if (reg.status === Status.Withdraw) return 'withdrawn';
         const refunds = await this.refundRepository.find({
             where: { orderId },
             select: ['status'],
@@ -338,5 +502,133 @@ export class CartService {
         return hasSucceeded ? 'withdrawn' : 'pending';
     }
 
-    
+    /**
+     * Withdrawal info for invoice: status/color rules.
+     * - order withdrawn → canWithdraw false, status withdrawn
+     * - order pending → canWithdraw false, color yellow
+     * - withdrawal pending → canWithdraw false, color yellow
+     * - approved + refund failed/canceled (webhook) → withdrawalStatus refund_refused, color red, canWithdraw if event future
+     * - approved + refund pending/succeeded → withdrawalStatus admin_approved, color white
+     * - rejected → canWithdraw if event future, color red
+     * - no withdrawal + event future → canWithdraw true, color green
+     */
+    async getWithdrawalInfoForInvoice(
+        orderId: string,
+        eventId: string,
+        orderStatus: 'completed' | 'pending' | 'withdrawn' | 'rejected' | 'refund_refused',
+    ): Promise<{
+        canWithdraw: boolean;
+        withdrawalStatusColor: string;
+        withdrawalStatusMessage?: string;
+    }> {
+        if (orderStatus === 'withdrawn') {
+            return {
+                canWithdraw: false,
+                withdrawalStatusColor: '#000000',
+                withdrawalStatusMessage: 'Withdrawn.',
+            };
+        }
+        if (orderStatus === 'pending') {
+            return {
+                canWithdraw: false,
+                withdrawalStatusColor: '#FFA500',
+                withdrawalStatusMessage: 'Pending review.',
+            };
+        }
+        if (orderStatus === 'rejected') {
+            return {
+                canWithdraw: false,
+                withdrawalStatusColor: '#DC3545',
+                withdrawalStatusMessage: 'Withdrawal rejected.',
+            };
+        }
+        if (orderStatus === 'refund_refused') {
+            return {
+                canWithdraw: false,
+                withdrawalStatusColor: '#DC3545',
+                withdrawalStatusMessage: 'Refund refused.',
+            };
+        }
+
+        let event: { endDate?: Date } | null = null;
+        try {
+            event = await this.eventService.getEventById(eventId);
+        } catch {
+            return {
+                canWithdraw: false,
+                withdrawalStatusColor: '#000000',
+            };
+        }
+        const isEventFuture = event?.endDate
+            ? new Date() < new Date(new Date(event.endDate).setHours(23, 59, 59, 999))
+            : false;
+
+        const withdrawal = await this.withdrawalRepository
+            .createQueryBuilder('w')
+            .where('w.orderId = :orderId', { orderId })
+            .andWhere('w.eventId = :eventId', { eventId })
+            .select(['w.status', 'w.request_at'])
+            .getOne();
+
+        const status = withdrawal?.status ?? null;
+        const statusLower = status ? String(status).toLowerCase() : null;
+        let withdrawalStatusColor = '#000000';
+        let canWithdraw = false;
+        /** Display status for user: pending | admin_approved | refund_refused | rejected */
+        let displayStatus: string | null = status;
+
+        if (statusLower === 'pending') {
+            withdrawalStatusColor = '#FFA500';
+            canWithdraw = false;
+        } else if (statusLower === 'approved') {
+            const refunds = await this.refundRepository.find({
+                where: { orderId },
+                select: ['status', 'wooshpayRefundId'],
+            });
+            const realRefunds = refunds.filter((r) => r.wooshpayRefundId?.startsWith('re_'));
+            const syntheticRefunds = refunds.filter((r) => r.wooshpayRefundId?.startsWith('withdrawal_failed_'));
+            const hasRefundRefused =
+                realRefunds.some((r) => {
+                    const s = (r.status || '').toLowerCase();
+                    return s === 'failed' || s === 'canceled' || s === 'refused';
+                }) ||
+                syntheticRefunds.some((r) => {
+                    const s = (r.status || '').toLowerCase();
+                    return s === 'failed' || s === 'canceled' || s === 'refused';
+                });
+            if (hasRefundRefused) {
+                displayStatus = 'refund_refused';
+                withdrawalStatusColor = '#DC3545';
+                canWithdraw = isEventFuture; // allow user to request again if event still future
+            } else {
+                displayStatus = 'admin_approved';
+                withdrawalStatusColor = '#000000';
+                canWithdraw = false;
+            }
+        } else if (statusLower === 'rejected') {
+            displayStatus = 'rejected';
+            withdrawalStatusColor = '#DC3545';
+            canWithdraw = isEventFuture;
+        } else {
+            canWithdraw = isEventFuture;
+            withdrawalStatusColor = isEventFuture ? '#28A745' : '#FFFFFF'; // green only when future; white when past (no withdraw)
+        }
+
+        const withdrawalStatusMessage =
+            displayStatus === 'admin_approved'
+                ? 'Admin approved your request. Refund success.'
+                : displayStatus === 'refund_refused'
+                    ? 'Refund refused.'
+                    : displayStatus === 'rejected'
+                        ? 'Withdrawal rejected.'
+                        : displayStatus === 'pending'
+                            ? 'Pending review.'
+                            : undefined;
+
+        return {
+            canWithdraw,
+            withdrawalStatusColor,
+            withdrawalStatusMessage,
+        };
+    }
 }

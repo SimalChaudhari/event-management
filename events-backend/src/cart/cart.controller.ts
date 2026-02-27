@@ -1,5 +1,5 @@
 // src/controllers/cart.controller.ts
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, Res, UseGuards, Request, forwardRef, Inject } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, Res, UseGuards, Request, forwardRef, Inject, HttpCode, HttpStatus, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
 import { CartService } from './cart.service';
 import { CartDto } from './cart.dto';
@@ -7,16 +7,20 @@ import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { EventService } from 'event/event.service';
 import { CheckoutService } from 'checkout/checkout.service';
 import { CreateCheckoutDto } from 'checkout/checkout.dto';
-
+import { CartWithdrawalService } from './withdrawal.service';
+import { CreateWithdrawalBodyDto } from './create-withdrawal.dto';
+import { WithdrawalStatus } from './withdrawal.entity';
+import { ParseUUIDPipe } from '@nestjs/common';
 
 @Controller('api/carts')
 @UseGuards(JwtAuthGuard)
 export class CartController {
     constructor(
         private readonly cartService: CartService,
+        private readonly cartWithdrawalService: CartWithdrawalService,
         @Inject(forwardRef(() => EventService))
-        private readonly eventService: EventService, // Inject EventService
-        private readonly checkoutService: CheckoutService, // Inject CheckoutService
+        private readonly eventService: EventService,
+        private readonly checkoutService: CheckoutService,
     ) {}
     
     @Post('create-checkout')
@@ -43,6 +47,71 @@ export class CartController {
             });
         }
         return this.runCreateCheckout(req, response, body, { requireCouponId: true });
+    }
+
+    // ---------- Withdrawal (under cart): request, list, get one, admin approve/reject ----------
+    /** User: create withdrawal request by event ID. Order is resolved from user's registration for this event. */
+    @Post('withdrawal/request/:eventId')
+    @HttpCode(HttpStatus.CREATED)
+    async createWithdrawalRequest(
+        @Param('eventId', new ParseUUIDPipe()) eventId: string,
+        @Body() body: CreateWithdrawalBodyDto,
+        @Request() req: any,
+    ) {
+        const userId = req.user.id;
+        await this.cartWithdrawalService.createByEventId(eventId, userId, body);
+        return { status: 'success', message: 'Withdrawal request created successfully' };
+    }
+
+    /** List withdrawals: admin gets all, user gets own. */
+    @Get('withdrawal')
+    async listWithdrawals(@Request() req: any) {
+        const user = req.user;
+        const withdrawals = user.role === 'admin' || user.role === process.env.ADMIN
+            ? await this.cartWithdrawalService.findAll()
+            : await this.cartWithdrawalService.findByUserId(user.id);
+        return {
+            status: 'success',
+            message: `Found ${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'}`,
+            length: withdrawals.length,
+            data: withdrawals,
+        };
+    }
+
+    /** Get one withdrawal by id. */
+    @Get('withdrawal/:id')
+    async getWithdrawalById(@Param('id', new ParseUUIDPipe()) id: string, @Request() req: any) {
+        const user = req.user;
+        const withdrawal = await this.cartWithdrawalService.findOne(id);
+        if (!withdrawal) throw new NotFoundException(`Withdrawal with ID ${id} not found`);
+        const withdrawalUserId = withdrawal.order?.user?.id;
+        if (user.role !== 'admin' && user.role !== process.env.ADMIN && withdrawalUserId !== user.id) {
+            throw new NotFoundException('You are not authorized to view this withdrawal');
+        }
+        return { status: 'success', message: `Withdrawal retrieved`, data: withdrawal };
+    }
+
+    /** Admin: approve or reject. Body: { status: 'approved' | 'rejected', admin_note?: string }. */
+    @Put('withdrawal/manage/:id')
+    @HttpCode(HttpStatus.OK)
+    async updateWithdrawalStatus(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() body: { status: string; admin_note?: string },
+        @Request() req: any,
+    ) {
+        const user = req.user;
+        if (user.role !== 'admin' && user.role !== process.env.ADMIN) {
+            throw new NotFoundException('You are not authorized to change status');
+        }
+        const status = body?.status;
+        if (!Object.values(WithdrawalStatus).includes(status as WithdrawalStatus)) {
+            throw new BadRequestException('Invalid status value');
+        }
+        const updated = await this.cartWithdrawalService.updateStatus(id, status as WithdrawalStatus, body.admin_note);
+        const message = status === 'approved'
+            ? 'Admin approved your request. Refund success.'
+            : 'Withdrawal rejected.';
+        return { status: 'success', message, data: updated };
     }
 
     /** Shared logic for create-checkout and apply-coupon. No duplicate code. */
@@ -97,7 +166,7 @@ export class CartController {
                 if (!couponId) {
                     return response.status(400).json({
                         success: false,
-                        message: 'couponId is required.',
+                        message: 'couponId is required.',       
                         error: 'couponId is required',
                     });
                 }
@@ -384,7 +453,7 @@ export class CartController {
         }
     }
 
-    /** Invoice by event — simple: orderId, status, price breakdown, total. GET api/carts/invoice/by-event/:eventId */
+    /** Invoice by event — orderId, status, price breakdown, total. When data.canWithdraw is true (event is future), show a green "Withdraw" button; use data.withdrawalStatusColor for button color. */
     @Get('invoice/by-event/:eventId')
     async getInvoiceByEvent(
         @Param('eventId') eventId: string,
@@ -400,12 +469,18 @@ export class CartController {
             if (!eventId) {
                 return response.status(400).json({ success: false, message: 'eventId is required.' });
             }
-            const orderId = await this.cartService.getOrderIdByUserAndEvent(userId, eventId);
+            const orderId = await this.cartService.getOrderIdByUserAndEventOrWithdrawal(userId, eventId);
             if (!orderId) {
-                return response.status(404).json({ success: false, message: 'No registration found for this event.' });
+                return response.status(404).json({ success: false, message: 'No registration or order found for this event.' });
+            }
+            try {
+                await this.checkoutService.getRefundStatusForOrder(orderId, userId);
+            } catch (_) {
+                // Keep existing DB state if sync fails
             }
             const status = await this.cartService.getOrderStatusForInvoice(userId, orderId, eventId);
             const data = await this.checkoutService.getInvoiceDataFromOrderAndEvent(userId, orderId, eventId);
+            const withdrawalInfo = await this.cartService.getWithdrawalInfoForInvoice(orderId, eventId, status);
             return response.status(200).json({
                 success: true,
                 message: 'Invoice retrieved successfully',
@@ -414,6 +489,9 @@ export class CartController {
                     status,
                     priceBreakdown: data.priceBreakdown,
                     totalAmount: data.totalAmount,
+                    canWithdraw: withdrawalInfo.canWithdraw,
+                    withdrawalStatusColor: withdrawalInfo.withdrawalStatusColor,
+                    withdrawalStatusMessage: withdrawalInfo.withdrawalStatusMessage,
                 },
             });
         } catch (error: any) {

@@ -17,7 +17,6 @@ import { RegisterEventModule } from 'registerEvent/registerEvent.module';
 import { CountriesModule } from './countries/countries.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { TokenBlacklistMiddleware } from 'middleware/tokenBlacklistMiddleware';
-import { WithdrawalModule } from 'withdrawal/withdrawal.module';
 import { SettingModule } from 'settings/setting.module';
 import { FavoriteEventModule } from 'favorite-event/favorite-event.module';
 import { FeedbackModule } from 'feedback/feedback.module';
@@ -78,7 +77,7 @@ import { join } from 'path';
     SurveyModule,
     QnaModule,
     PollingModule,
-    EventModule, AgendaModule, AgendaCategoryModule, CartModule,WithdrawalModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
+    EventModule, AgendaModule, AgendaCategoryModule, CartModule, RegisterEventModule, CountriesModule,FavoriteEventModule,FeedbackModule,CouponModule,CategoryModule,
     ChatModule, AttendanceModule, ContactInfoModule, OrderModule, CheckoutModule,
     CsvUploadLogModule,
     ProgrammeModule,

@@ -355,7 +355,12 @@ export class CheckoutController {
     }
   }
 
-  /** Refund an order paid via WooShPay. Body: { amount?: number (cents), reason?: string }. Omit amount for full refund. */
+  /**
+   * Refund an order (user self-service).
+   * For withdrawal flow: admin does NOT call this. Admin approves via PUT /api/withdrawal/manage/:id;
+   * the backend then calls createRefundForOrder internally and cancels the registration.
+   * Body: { amount?: number (cents), reason?: string }. Omit amount for full refund.
+   */
   @Post('refund/:orderId')
   @HttpCode(HttpStatus.OK)
   async createRefund(

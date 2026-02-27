@@ -1,9 +1,9 @@
-// src/modules/cart.module.ts
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Cart, UserCartPreference } from './cart.entity';
 import { CartService } from './cart.service';
 import { CartController } from './cart.controller';
+import { CartWithdrawalService } from './withdrawal.service';
 import { JwtModule } from '@nestjs/jwt';
 import { EventService } from 'event/event.service';
 import { Event, EventExhibitor } from 'event/event.entity';
@@ -14,6 +14,9 @@ import { EventCategory, EventSpeaker } from 'event/event-speaker.entity';
 import { Category } from 'category/category.entity';
 import { RegisterEvent } from 'registerEvent/registerEvent.entity';
 import { Refund } from 'checkout/refund.entity';
+import { Withdrawal } from './withdrawal.entity';
+import { Order } from 'order/order.entity';
+import { OrderItemEntity } from 'order/event.item.entity';
 import { FavoriteEvent } from 'favorite-event/favorite-event.entity';
 import { Exhibitor } from 'exhibitor/exhibitor.entity';
 import { ErrorHandlerService } from 'utils/services/error-handler.service';
@@ -29,25 +32,24 @@ import { FilterModule } from '../service/filter.module';
 
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Cart,UserCartPreference,Event,EventSpeaker,
+    imports: [TypeOrmModule.forFeature([Cart, UserCartPreference, Event, EventSpeaker,
       Survey,
       UserEntity,
-      SurveySession,    // Add this
-      SurveyResponse,    // Add this
+      SurveySession,
+      SurveyResponse,
       EventAgenda,
-    
-      EventCategory,Category,UserEntity,RegisterEvent,FavoriteEvent,EventExhibitor,Exhibitor,Survey,EventBooth,Refund]),
+      EventCategory, Category, UserEntity, RegisterEvent, FavoriteEvent, EventExhibitor, Exhibitor, Survey, EventBooth, Refund, Withdrawal, Order, OrderItemEntity]),
       UtilsModule, // Import Utils Module instead of individual services
     JwtModule.register({
       secret: process.env.JWT_SECRET, // Use your JWT secret from the .env file
       signOptions: { }, // Set your token expiration
     }),
-    forwardRef(() => EventModule), // Add EventModule here
-    CheckoutModule, // Add CheckoutModule for checkout integration
+    forwardRef(() => EventModule),
+    forwardRef(() => CheckoutModule),
     CouponModule, // Add CouponModule for coupon integration
     FilterModule, // Import FilterModule for SurveyService dependency
   ],
-    providers: [CartService,SurveyService,ErrorHandlerService,EmailService],
+    providers: [CartService, CartWithdrawalService, SurveyService, ErrorHandlerService, EmailService],
     controllers: [CartController],
     exports: [CartService], // Export CartService so CheckoutModule can use it
 })
