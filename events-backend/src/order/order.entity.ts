@@ -5,7 +5,7 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, CreateDat
 import { UserEntity } from 'user/users.entity';
 import { OrderStatus, PaymentMethod } from './order.dto';
 import { OrderItemEntity } from './event.item.entity';
-import { Withdrawal } from 'withdrawal/withdrawal.entity';
+import { Withdrawal } from 'cart/withdrawal.entity';
 
 @Entity('orders')
 export class Order {

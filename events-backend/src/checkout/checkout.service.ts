@@ -1093,6 +1093,7 @@ export class CheckoutService {
     );
 
     // Store refund so user can track status (WooShPay returns amount in cents; we store in units e.g. 144.00 SGD)
+    // Always store status as 'pending' – real status comes from webhook or getRefund sync so invoice/my-events stay correct
     const amountCents = result.amount ?? 0;
     const amountInUnits = Math.round((amountCents / 100) * 100) / 100;
     const refundEntity = this.refundRepository.create({
@@ -1100,7 +1101,7 @@ export class CheckoutService {
       wooshpayRefundId: result.id,
       amount: amountInUnits,
       currency: result.currency ?? 'SGD',
-      status: result.status ?? 'pending',
+      status: 'pending',
       reason: result.reason ?? reason ?? undefined,
     });
     await this.refundRepository.save(refundEntity);
@@ -1419,6 +1420,7 @@ export class CheckoutService {
           await this.handlePaymentLinkFailed(eventData);
           break;
         case 'charge.refund.updated':
+          console.log('[WEBHOOK] → handleRefundUpdated (real-time status update)');
           await this.handleRefundUpdated(eventData);
           break;
         case 'payout.paid':
@@ -1631,7 +1633,7 @@ export class CheckoutService {
 
   /**
    * Handle refund updated (webhook from WooShPay when refund status changes).
-   * Payload may be the refund object (data.object) or a charge containing refund; we extract refund and update our table.
+   * Updates Refund table in real time so status (refused / success / rejected) is reflected immediately.
    */
   private async handleRefundUpdated(payload: any): Promise<void> {
     const refund =
@@ -1644,7 +1646,13 @@ export class CheckoutService {
             : payload;
     const refundId =
       String(refund.id ?? refund.refund_id ?? '').trim() || null;
-    const rawStatus = refund.status ?? refund.refund_status ?? null;
+    const rawStatus =
+      refund.status ??
+      refund.refund_status ??
+      refund.result ??
+      refund.outcome?.status ??
+      refund.state ??
+      null;
     const status = this.normalizeRefundStatus(rawStatus);
 
     if (!refundId) {
@@ -1652,13 +1660,24 @@ export class CheckoutService {
       return;
     }
 
+    console.log('[WEBHOOK WooShPay] Refund status change received (real-time):', {
+      refundId,
+      rawStatusFromWooShPay: rawStatus,
+      normalizedStatus: status,
+    });
+
     const existing = await this.refundRepository.findOne({
       where: { wooshpayRefundId: refundId },
     });
     if (existing) {
-      existing.status = status ?? existing.status;
-      await this.refundRepository.save(existing);
-      console.log(`💰 Refund status updated: ${refundId} → ${existing.status}`);
+      const previousStatus = existing.status;
+      if (status != null) {
+        existing.status = status;
+        await this.refundRepository.save(existing);
+        console.log(`[WEBHOOK WooShPay] Refund status updated in DB (real-time): ${refundId} | ${previousStatus} → ${existing.status} (orderId: ${existing.orderId})`);
+      } else {
+        console.warn('[WEBHOOK handleRefundUpdated] Could not normalize status, raw:', rawStatus);
+      }
     } else {
       console.warn('[WEBHOOK handleRefundUpdated] No local refund found for wooshpayRefundId=', refundId);
     }
@@ -1675,12 +1694,12 @@ export class CheckoutService {
     }
   }
 
-  /** Map WooShPay refund status to our stored value (pending | succeeded | failed | canceled). */
+  /** Map WooShPay refund status to our stored value (pending | succeeded | failed | canceled). Real-time mapping for refused/success/rejected. */
   private normalizeRefundStatus(raw: any): string | null {
     if (raw == null || raw === '') return null;
     const s = String(raw).toLowerCase().trim();
     if (s === 'succeeded' || s === 'completed' || s === 'complete' || s === 'success') return 'succeeded';
-    if (s === 'failed' || s === 'failure') return 'failed';
+    if (s === 'failed' || s === 'failure' || s === 'refused' || s === 'rejected') return 'failed';
     if (s === 'canceled' || s === 'cancelled' || s === 'cancel') return 'canceled';
     if (s === 'pending' || s === 'processing') return 'pending';
     return s;

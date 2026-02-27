@@ -26,20 +26,14 @@ export class Withdrawal {
   @ManyToOne(() => Event, { eager: true, nullable: false })
   event?: Event;
 
-  @Column()
+  @Column({ nullable: true })
   name?: string;
 
-  @Column()
+  @Column({ nullable: true })
   title?: string;
 
-  @Column()
+  @Column({ nullable: true })
   reason?: string;
-
-  // @Column({ nullable: true })
-  // comment?: string;
-
-  // @Column()
-  // document?: string;
 
   @Column({
     type: 'enum',

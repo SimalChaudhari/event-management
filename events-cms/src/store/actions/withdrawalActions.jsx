@@ -4,7 +4,7 @@ import {  WITHDRAWAL_LIST } from "../constants/actionTypes";
 
 export const WithdrawalList = () => async (dispatch) => {
     try {
-        const response = await axiosInstance.get('/withdrawal');
+        const response = await axiosInstance.get('/carts/withdrawal');
         dispatch({
             type: WITHDRAWAL_LIST,
             payload: response.data, // Assuming response contains the customers data
@@ -20,7 +20,7 @@ export const WithdrawalList = () => async (dispatch) => {
 
 export const updateWithdrawalStatus = (id, status) => async (dispatch) => {
     try {
-       await axiosInstance.put(`/withdrawal/manage/${id}`, { status });
+       await axiosInstance.put(`/carts/withdrawal/manage/${id}`, { status });
         // Refresh the withdrawal list after status update
         dispatch(WithdrawalList());
         // toast.success('Status updated successfully');

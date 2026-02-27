@@ -56,7 +56,7 @@ import { ExhibitorLead } from '../exhibitor/exhibitor-lead.entity';
 import { EventStampService } from './event-stamp.service';
 import { EventStampEvent } from './event-stamp-event.entity';
 import { SurveyQuestion, SurveyAnswer } from '../survey/qa.entity';
-import { Withdrawal } from '../withdrawal/withdrawal.entity';
+import { Withdrawal } from '../cart/withdrawal.entity';
 import { ModeratorEvent } from '../moderator/moderator-event.entity';
 import { QnaQuestion, QnaLike } from '../qna/qna.entity';
 import { Poll, PollOption, PollVote, UserPollSession, UserPollVote } from '../polling/polling.entity';
