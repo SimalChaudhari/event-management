@@ -11,6 +11,7 @@ import {
   IsArray,
   IsNumber,
   IsInt,
+  IsBoolean,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -201,6 +202,10 @@ export class EventDto {
     programme?: boolean;
     chat?: boolean;
   };
+  /** When false, withdraw option is hidden/disabled for this event. Default true. */
+  @IsOptional()
+  @IsBoolean()
+  withdrawalEnabled?: boolean;
   originalImages: any;
   originalDocuments: any;
   originalFloorPlan: any;

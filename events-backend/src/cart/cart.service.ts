@@ -377,18 +377,20 @@ export class CartService {
                     : !(reg.orderId && withdrawalBlock.has(`${reg.orderId}-${eventId}`));
             let eventName = 'Event';
             let isEventFuture = false;
+            let withdrawalEnabled = true;
             try {
                 const event = await this.eventService.getEventById(eventId);
                 eventName = event.name ?? eventName;
                 isEventFuture = event?.endDate
                     ? new Date() < new Date(new Date(event.endDate).setHours(23, 59, 59, 999))
                     : false;
+                withdrawalEnabled = (event as any).withdrawalEnabled !== false;
             } catch (_) {}
             result.push({
                 status,
                 eventId,
                 eventName,
-                canRequestWithdrawal: canRequestWithdrawal && isEventFuture,
+                canRequestWithdrawal: canRequestWithdrawal && isEventFuture && withdrawalEnabled,
             });
         }
 
@@ -625,8 +627,9 @@ export class CartService {
                             ? 'Pending review.'
                             : undefined;
 
+        const withdrawalEnabled = (event as any).withdrawalEnabled !== false;
         return {
-            canWithdraw,
+            canWithdraw: canWithdraw && withdrawalEnabled,
             withdrawalStatusColor,
             withdrawalStatusMessage,
         };

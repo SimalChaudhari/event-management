@@ -23,43 +23,10 @@ export class EmailUtils {
         eventStartDate,
         eventVenue,
       );
-
       await emailService.sendEmail(exhibitorEmail, subject, html);
-    
     } catch (error) {
       console.error('Failed to send booth code email:', error);
-      // Don't throw error as email sending failure shouldn't break the main flow
       errorHandler.logError(error, 'Booth code email sending', undefined);
-    }
-  }
-
-  /**
-   * Send booth removal email to exhibitor
-   */
-  static async sendBoothRemovalEmail(
-    emailService: EmailService,
-    errorHandler: ErrorHandlerService,
-    exhibitorEmail: string,
-    uniqueCode: string,
-    eventName: string,
-    eventStartDate: string,
-    eventVenue: string,
-  ): Promise<void> {
-    try {
-      const subject = 'Booth Access Revoked - Event Update';
-      const html = EmailTemplateUtils.generateBoothRemovalEmail(
-        eventName,
-        eventStartDate,
-        eventVenue,
-        uniqueCode,
-      );
-
-      await emailService.sendEmail(exhibitorEmail, subject, html);
-    
-    } catch (error) {
-      console.error('Failed to send booth removal email:', error);
-      // Don't throw error as email sending failure shouldn't break the main flow
-      errorHandler.logError(error, 'Booth removal email sending', undefined);
     }
   }
 
@@ -73,27 +40,18 @@ export class EmailUtils {
   }
 
   /**
-   * Format date for email display - handles both Date objects and string dates
+   * Format date for email display: "12 Dec 2026 (Sat)"
    */
   static formatDateForEmail(date: Date | string): string {
-    if (date instanceof Date) {
-      return date.toDateString();
-    }
-    
-    // If it's a string, try to parse it and format it
-    if (typeof date === 'string') {
-      try {
-        const parsedDate = new Date(date);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toDateString();
-        }
-      } catch (error) {
-        // If parsing fails, return the original string
-        console.warn('Failed to parse date string:', date);
-      }
-      return date; // Return original string if parsing fails
-    }
-    
-    return 'Date not available';
+    const { formatEmailDate } = require('./email-templates.utils');
+    return formatEmailDate(date);
+  }
+
+  /**
+   * Format time for email display: "01:00 PM"
+   */
+  static formatTimeForEmail(time: string | Date): string {
+    const { formatEmailTime } = require('./email-templates.utils');
+    return formatEmailTime(time);
   }
 }

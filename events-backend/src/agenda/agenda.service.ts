@@ -24,7 +24,6 @@ import {
 } from '../utils/exceptions/custom-exceptions';
 import { UserEntity } from 'user/users.entity';
 import { EmailService } from '../service/email.service';
-import { MeetingEmailTemplates } from '../utils/email-templates';
 import { AgendaUtils } from '../utils/agenda.utils';
 import { ICSGenerator } from '../utils/calendar-utils/ics-generator.utils';
 import { NotificationGateway } from '../settings/notification.gateway';
@@ -1072,57 +1071,28 @@ export class AgendaService {
     rescheduleDto: RescheduleMeetingDto
   ) {
     try {
-      // Send email notification to the other party
-      if (targetUser?.email) {
-        const emailSubject = `Meeting Rescheduled: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateRescheduleEmailHTML(
-          targetUser,
-          currentUser,
-          originalMeetingData,
-          updatedMeeting,
-          rescheduleDto
-        );
-
-        await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
-      }
-
-
+      // Reschedule notifications sent via push (notificationGateway.sendMeetingRescheduleNotification) by caller; no email to avoid too many emails
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       throw new Error(`Failed to send reschedule notifications: ${errorMessage}`);
     }
   }
 
-  // Helper method to send meeting response notifications
+  // Helper method to send meeting response notifications (push only; no email)
   private async sendMeetingResponseNotification(
     meeting: EventAgenda,
     responseDto: RespondToMeetingRequestDto,
     currentUser: any
   ) {
     try {
-      // Get meeting creator details
-      const creator = await this.userRepository.findOne({ where: { id: meeting.createdBy } });
-      
-      // Send email notification to the meeting creator
-      if (creator?.email) {
-        const emailSubject = `Meeting Request ${responseDto.response === 'accepted' ? 'Accepted' : 'Rejected'}: ${meeting.title}`;
-        const emailHtml = MeetingEmailTemplates.generateMeetingResponseEmailHTML(
-          creator,
-          currentUser,
-          meeting,
-          responseDto
-        );
-
-        await this.emailService.sendEmail(creator.email, emailSubject, emailHtml);
-      }
-
+      // Notifications sent via notificationGateway.sendMeetingResponseNotification by caller
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       throw new Error(`Failed to send meeting response notification: ${errorMessage}`);
     }
   }
 
-  // Helper method to send meeting rejection notifications
+  // Helper method to send meeting rejection notifications (push only; no email)
   private async sendMeetingRejectionNotification(
     originalMeetingData: { title: string; time: string; date: Date | undefined; location: string | undefined; details: string | undefined },
     rejectedMeeting: EventAgenda,
@@ -1131,21 +1101,7 @@ export class AgendaService {
     rejectionMessage?: string
   ) {
     try {
-      // Send email notification to the meeting creator about rejection
-      if (creator?.email) {
-        const emailSubject = `Meeting Request Rejected: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateMeetingRejectionEmailHTML(
-          creator,
-          currentUser,
-          originalMeetingData,
-          rejectedMeeting,
-          rejectionMessage
-        );
-
-        await this.emailService.sendEmail(creator.email, emailSubject, emailHtml);
-      }
-
-
+      // Notifications sent via notificationGateway.sendMeetingResponseNotification by caller
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('Failed to send meeting rejection notifications:', errorMessage);
@@ -1252,26 +1208,14 @@ export class AgendaService {
     }
   }
 
-  // Helper method to send meeting request notifications
+  // Helper method to send meeting request notifications (push only; no email to avoid too many emails)
   private async sendMeetingRequestNotification(
     meeting: EventAgenda,
     currentUser: any,
     targetUser: any
   ) {
     try {
-      // Send email notification to the target user
-      if (targetUser?.email) {
-        const emailSubject = `New Meeting Request: ${meeting.title}`;
-        const emailHtml = MeetingEmailTemplates.generateMeetingRequestEmailHTML(
-          targetUser,
-          currentUser,
-          meeting
-        );
-
-        await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
-      }
-
-
+      // Notifications sent via notificationGateway.sendMeetingRequestNotification by caller
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       throw new Error(`Failed to send meeting request notification: ${errorMessage}`);
@@ -1594,20 +1538,7 @@ export class AgendaService {
     targetUser: any
   ) {
     try {
-      // Send email notification to the target user
-      if (targetUser?.email) {
-        const emailSubject = `Meeting Request Cancelled: ${originalMeetingData.title}`;
-        const emailHtml = MeetingEmailTemplates.generateCancellationEmailHTML(
-          targetUser,
-          currentUser,
-          originalMeetingData,
-          cancelledMeeting
-        );
-
-        await this.emailService.sendEmail(targetUser.email, emailSubject, emailHtml);
-      }
-
-
+      // Cancellation notifications sent via push (notificationGateway.sendMeetingCancellationNotification) by caller; no email
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('Failed to send cancellation notifications:', errorMessage);

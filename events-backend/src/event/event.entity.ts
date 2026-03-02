@@ -160,6 +160,10 @@ export class Event {
   @Column({ type: 'boolean', default: false })
   enableLuckyDrawFeature!: boolean;
 
+  /** When false, withdraw option is hidden and disabled for this event (admin panel setting). */
+  @Column({ type: 'boolean', default: true })
+  withdrawalEnabled!: boolean;
+
   // Event Stamp relationship - many-to-many through EventStampEvent
   @OneToMany(() => EventStampEvent, (eventStampEvent) => eventStampEvent.event)
   eventStampEvents!: EventStampEvent[];

@@ -82,6 +82,7 @@ function AddEventPage() {
         eventStampIds: [], // Array of existing stamp IDs to associate
         newStamps: [], // Array of new stamps to create: [{ name: string, image: File }]
         enableLuckyDrawFeature: false,
+        withdrawalEnabled: true,
         earlyBirdPrice: '',
         earlyBirdStartDate: '',
         earlyBirdEndDate: ''
@@ -501,6 +502,7 @@ function AddEventPage() {
                         eventStampIds: eventStampIdsData,
                         newStamps: [],
                         enableLuckyDrawFeature: editData.enableLuckyDrawFeature || false,
+                        withdrawalEnabled: editData.withdrawalEnabled !== false,
                         earlyBirdPrice: editData.earlyBirdPrice ?? '',
                         earlyBirdStartDate: editData.earlyBirdStartDate ? editData.earlyBirdStartDate.split('T')[0] : '',
                         earlyBirdEndDate: editData.earlyBirdEndDate ? editData.earlyBirdEndDate.split('T')[0] : ''
@@ -747,6 +749,7 @@ function AddEventPage() {
             eventStampIds: [],
             newStamps: [],
             enableLuckyDrawFeature: false,
+            withdrawalEnabled: true,
             earlyBirdPrice: '',
             earlyBirdStartDate: '',
             earlyBirdEndDate: ''
@@ -935,6 +938,8 @@ function AddEventPage() {
             } else if (key === 'enableLuckyDrawFeature') {
                 // Handle lucky draw feature toggle
                 formDataToSend.append('enableLuckyDrawFeature', dataToSend[key] ? 'true' : 'false');
+            } else if (key === 'withdrawalEnabled') {
+                formDataToSend.append('withdrawalEnabled', dataToSend[key] ? 'true' : 'false');
             } else if (key === 'floorPlan') {
                 if (dataToSend[key] instanceof File) {
                     formDataToSend.append('floorPlan', dataToSend[key]);
@@ -3233,6 +3238,55 @@ function AddEventPage() {
                                                                 }));
                                                             }}
                                                             style={{ 
+                                                                fontSize: '1rem',
+                                                                display: 'flex',
+                                                                alignItems: 'center'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+
+                                    {/* Withdraw option - visible only when enabled from Admin Panel */}
+                                    <Col sm={12}>
+                                        <div className="card">
+                                            <div className="card-body">
+                                                <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                                    <div className="flex-grow-1">
+                                                        <label className="form-label mb-1">
+                                                            <strong>Enable Withdraw Option</strong>
+                                                        </label>
+                                                        <p className="text-muted mb-0" style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                                                            When enabled, registered users can request to withdraw from this event (refund flow). When disabled, the Withdraw option is hidden in the app and API.
+                                                        </p>
+                                                    </div>
+                                                    <div className="d-flex align-items-center" style={{ minWidth: '180px', justifyContent: 'flex-end' }}>
+                                                        <Form.Check
+                                                            type="switch"
+                                                            id="withdrawalEnabled"
+                                                            label={
+                                                                <span style={{
+                                                                    fontWeight: '500',
+                                                                    color: formData.withdrawalEnabled ? '#28a745' : '#6c757d',
+                                                                    marginLeft: '8px'
+                                                                }}>
+                                                                    {formData.withdrawalEnabled ? (
+                                                                        <span><i className="fas fa-check-circle mr-1"></i>Enabled</span>
+                                                                    ) : (
+                                                                        <span><i className="fas fa-times-circle mr-1"></i>Disabled</span>
+                                                                    )}
+                                                                </span>
+                                                            }
+                                                            checked={formData.withdrawalEnabled !== false}
+                                                            onChange={(e) => {
+                                                                setFormData((prev) => ({
+                                                                    ...prev,
+                                                                    withdrawalEnabled: e.target.checked
+                                                                }));
+                                                            }}
+                                                            style={{
                                                                 fontSize: '1rem',
                                                                 display: 'flex',
                                                                 alignItems: 'center'

@@ -1854,23 +1854,6 @@ export class EventService {
             relations: ['exhibitor', 'exhibitor.boothBanners'],
           });
 
-          // Send removal emails before deleting records
-          await Promise.all(
-            boothsToRemove.map(async (booth) => {
-              if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
-                await this.sendBoothRemovalEmail(
-                  booth.exhibitor.email,
-                  booth.uniqueCode,
-                  currentEvent.name,
-                  this.formatDateForEmail(currentEvent.startDate),
-                  currentEvent.venue ||
-                    currentEvent.location ||
-                    'To be announced',
-                );
-              }
-            }),
-          );
-
           const exhibitorIdsToRemove = exhibitorsToRemove
             .map((ee) => ee.exhibitorId)
             .filter((id): id is string => id !== undefined);
@@ -1897,29 +1880,6 @@ export class EventService {
         }
       } else {
         // If no exhibitor IDs provided, remove all existing exhibitors
-        // Get booth details and exhibitor information for removal emails
-        const allBoothsToRemove = await this.eventBoothRepository.find({
-          where: { eventId },
-          relations: ['exhibitor'],
-        });
-
-        // Send removal emails before deleting records
-        await Promise.all(
-          allBoothsToRemove.map(async (booth) => {
-            if (booth.exhibitor && booth.exhibitor.email && currentEvent) {
-              await this.sendBoothRemovalEmail(
-                booth.exhibitor.email,
-                booth.uniqueCode,
-                currentEvent.name,
-                this.formatDateForEmail(currentEvent.startDate),
-                currentEvent.venue ||
-                  currentEvent.location ||
-                  'To be announced',
-              );
-            }
-          }),
-        );
-
         // Remove all exhibitor stamps from this event
         const allExhibitorIds = (
           await this.eventExhibitorRepository.find({
@@ -2122,25 +2082,6 @@ export class EventService {
     eventVenue: string,
   ): Promise<void> {
     await EmailUtils.sendBoothCodeEmail(
-      this.emailService,
-      this.errorHandler,
-      exhibitorEmail,
-      uniqueCode,
-      eventName,
-      eventStartDate,
-      eventVenue,
-    );
-  }
-
-  // Send booth removal email to exhibitor
-  private async sendBoothRemovalEmail(
-    exhibitorEmail: string,
-    uniqueCode: string,
-    eventName: string,
-    eventStartDate: string,
-    eventVenue: string,
-  ): Promise<void> {
-    await EmailUtils.sendBoothRemovalEmail(
       this.emailService,
       this.errorHandler,
       exhibitorEmail,

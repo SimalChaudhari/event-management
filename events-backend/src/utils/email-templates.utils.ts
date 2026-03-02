@@ -4,6 +4,42 @@
 const DEFAULT_APP_STORE_BADGE_IMAGE_URL =
   'https://appstorebadges.careevolutionapps.com/images/apple/black/logo-en.png';
 
+/** Format date for emails: "12 Dec 2026 (Sat)". */
+export function formatEmailDate(date: Date | string): string {
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return String(date);
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return `${String(day).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()} (${days[d.getDay()]})`;
+  } catch {
+    return String(date);
+  }
+}
+
+/** Format time for emails: "01:00 PM". Input: "HH:mm" (24h) or Date. */
+export function formatEmailTime(time: string | Date): string {
+  try {
+    if (time instanceof Date) {
+      const h = time.getHours();
+      const m = time.getMinutes();
+      const am = h < 12;
+      const h12 = h % 12 || 12;
+      return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${am ? 'AM' : 'PM'}`;
+    }
+    if (typeof time !== 'string' || !time) return String(time);
+    const [hStr, mStr] = time.trim().split(':');
+    const h = parseInt(hStr || '0', 10);
+    const m = parseInt(mStr || '0', 10);
+    const am = h < 12;
+    const h12 = h % 12 || 12;
+    return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${am ? 'AM' : 'PM'}`;
+  } catch {
+    return String(time);
+  }
+}
+
 export interface SpeakerCredentialsData {
   salutation?: string;
   email: string;
@@ -56,6 +92,28 @@ export interface RoleSwitchCodeData {
 }
 
 export class EmailTemplateUtils {
+  /** Shared block for welcome emails (admin/speaker/Salesforce): app download QR + store badges + how to log in (normal vs SSO). */
+  private static getAppDownloadAndLoginSection(): string {
+    const qrUrl = process.env.APP_DOWNLOAD_QR_IMAGE_URL;
+    const qrBlock = qrUrl
+      ? `<p style="margin: 0 0 16px 0; text-align: center;"><img src="${qrUrl}" alt="Scan to download the app" width="160" height="160" style="width: 160px; height: 160px; display: block; margin: 0 auto;" /></p><p style="color: #555; font-size: 14px; margin: 0 0 16px 0; text-align: center;">Scan the QR code with your phone to download the app</p>`
+      : '';
+    const storeBadges = (process.env.PLATFORM_URL || process.env.APP_STORE_URL)
+      ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;"><tr><td style="padding: 0 8px 0 0; vertical-align: middle;">${process.env.PLATFORM_URL ? `<a href="${process.env.PLATFORM_URL}" target="_blank" rel="noopener"><img src="${process.env.PLAY_STORE_BADGE_IMAGE_URL || 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'}" alt="GET IT ON Google Play" width="170" height="80" style="height: 80px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td><td style="padding: 0; vertical-align: middle;">${process.env.APP_STORE_URL ? `<a href="${process.env.APP_STORE_URL}" target="_blank" rel="noopener"><img src="${DEFAULT_APP_STORE_BADGE_IMAGE_URL}" alt="Download on the App Store" width="140" height="50" style="height: 50px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td></tr></table>`
+      : '<p style="color: #555;">Download the app from your device’s app store.</p>';
+    return `
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; margin: 24px 0; border-radius: 10px;">
+      <p style="color: #334155; font-size: 16px; margin: 0 0 12px 0; font-weight: 600;">📱 Download the app</p>
+      ${qrBlock}
+      <p style="margin: 0 0 16px 0;">${storeBadges}</p>
+      <p style="color: #334155; font-size: 16px; margin: 16px 0 8px 0; font-weight: 600;">How to log in</p>
+      <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 15px; line-height: 1.7;">
+        <li><strong>Normal login:</strong> Open the app, enter the email and password provided above on the login screen.</li>
+        <li><strong>SSO (Single Sign-On):</strong> If your organization uses SSO, tap &quot;Sign in with SSO&quot; (or similar) on the app login screen and use your organization credentials.</li>
+      </ul>
+    </div>`;
+  }
+
   /**
    * Generate HTML template for speaker credentials email
    * @param data Speaker credentials data
@@ -139,6 +197,8 @@ export class EmailTemplateUtils {
               </ul>
           </div>
 
+          ${this.getAppDownloadAndLoginSection()}
+
           <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
           <p style="color: #777; font-size: 12px; text-align: center;">
               If you have any questions or need assistance, please contact our support team.
@@ -206,6 +266,8 @@ export class EmailTemplateUtils {
                   <li>Use a strong, unique password for better security</li>
               </ul>
           </div>
+
+          ${this.getAppDownloadAndLoginSection()}
 
           <div style="text-align: center; margin: 30px 0;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" 
@@ -292,19 +354,13 @@ export class EmailTemplateUtils {
     
     const daysRemainingText = calculateDaysRemaining();
     
-    // Format event date for display (e.g., "12 November")
+    // Format event date for display: "12 Dec 2026 (Sat)"
     const formatEventDate = (): string => {
       if (!data.eventStartDate) {
         return 'the event day';
       }
-      
       try {
-        const eventDate = new Date(data.eventStartDate);
-        const day = eventDate.getDate();
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
-        const month = monthNames[eventDate.getMonth()];
-        return `${day} ${month}`;
+        return formatEmailDate(data.eventStartDate);
       } catch (error) {
         return 'the event day';
       }
@@ -382,6 +438,7 @@ export class EmailTemplateUtils {
               <p style="color: #334155; font-size: 16px; margin: 0 0 16px 0; font-weight: 600;">
                   Download App
               </p>
+              ${showCredentials && process.env.APP_DOWNLOAD_QR_IMAGE_URL ? `<p style="text-align: center; margin: 0 0 12px 0;"><img src="${process.env.APP_DOWNLOAD_QR_IMAGE_URL}" alt="Scan to download the app" width="140" height="140" style="width: 140px; height: 140px; display: block; margin: 0 auto;" /></p><p style="color: #555; font-size: 14px; margin: 0 0 16px 0; text-align: center;">Scan the QR code with your phone to download the app</p>` : ''}
               <p style="color: #555; font-size: 15px; margin: 0 0 20px 0; line-height: 1.5;">
                   Get the app using the badge for your device so you can access your event pass and QR code on the day.
               </p>
@@ -389,12 +446,13 @@ export class EmailTemplateUtils {
                   ${(process.env.PLATFORM_URL || process.env.APP_STORE_URL) ? `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;"><tr><td style="padding: 0 8px 0 0; vertical-align: middle;">${process.env.PLATFORM_URL ? `<a href="${process.env.PLATFORM_URL}" target="_blank" rel="noopener" style="display: inline-block; text-decoration: none;"><img src="${process.env.PLAY_STORE_BADGE_IMAGE_URL || 'https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'}" alt="GET IT ON Google Play" width="170" height="80" style="height: 80px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td><td style="padding: 0; vertical-align: middle;">${process.env.APP_STORE_URL ? `<a href="${process.env.APP_STORE_URL}" target="_blank" rel="noopener" style="display: inline-block; text-decoration: none;"><img src="${DEFAULT_APP_STORE_BADGE_IMAGE_URL}" alt="Download on the App Store" width="140" height="50" style="height: 50px; width: 180px; max-width: 180px; object-fit: contain; border: 0; border-radius: 6px; display: block;" /></a>` : '&nbsp;'}</td></tr></table>` : ''}
                   ${!(process.env.PLATFORM_URL) && !(process.env.APP_STORE_URL) ? `<a href="#" target="_blank" rel="noopener" style="display: inline-block; background-color: #0d9488; color: #fff; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px;">Download App</a>` : ''}
               </p>
+              ${showCredentials ? `<p style="color: #334155; font-size: 16px; margin: 16px 0 8px 0; font-weight: 600;">How to log in</p><ul style="margin: 0; padding-left: 20px; color: #555; font-size: 15px; line-height: 1.7;"><li><strong>Normal login:</strong> Enter the email and password provided above on the app login screen.</li><li><strong>SSO (Single Sign-On):</strong> If your organization uses SSO, tap &quot;Sign in with SSO&quot; on the app login screen and use your organization credentials.</li></ul>` : ''}
               <p style="color: #334155; font-size: 16px; margin: 0 0 12px 0; font-weight: 600;">
                   ✔ Instructions
               </p>
               <ol style="margin: 0; padding-left: 22px; color: #555; font-size: 15px; line-height: 1.9;">
                   <li style="margin-bottom: 6px;">Download the app from the link above (Android or iPhone, depending on your device).</li>
-                  <li style="margin-bottom: 6px;">Log in using the credentials provided above.</li>
+                  <li style="margin-bottom: 6px;">${showCredentials ? 'Log in using the credentials provided above (see &quot;How to log in&quot; if you use SSO).' : 'Log in with your account.'}</li>
                   <li>At the event, open the app, go to the Profile section, and show your QR code at the registration desk to participate in the event.</li>
               </ol>
           </div> 
@@ -628,6 +686,8 @@ export class EmailTemplateUtils {
                 </ul>
             </div>
 
+            ${this.getAppDownloadAndLoginSection()}
+
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             <p style="color: #777; font-size: 12px; text-align: center;">
                 If you have any questions or need assistance, please contact our support team.
@@ -809,13 +869,12 @@ export class EmailTemplateUtils {
             </div>
             
             <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-              <h3 style="color: #856404; margin-bottom: 15px;">📱 How to Activate This Code in the App</h3>
+              <h3 style="color: #856404; margin-bottom: 15px;">📱 How to use your exhibitor booth code</h3>
               <ol style="color: #856404; margin: 0; padding-left: 20px;">
-                <li>Open the event app on your mobile device</li>
-                <li>Go to the "Booth Management" or "Exhibitor" section</li>
-                <li>Enter your unique booth code: <strong>${uniqueCode}</strong></li>
-                <li>Follow the on-screen instructions to activate your booth</li>
-                <li>Once activated, you can manage your booth information and materials</li>
+                <li>Open the Evential app.</li>
+                <li>Go to Profile, select &quot;Access Code&quot;.</li>
+                <li>Enter and save your unique booth code: <strong>${uniqueCode}</strong></li>
+                <li>Once activated, you can manage your booth information and materials under &quot;Exhibitor Settings&quot;.</li>
               </ol>
             </div>
             
@@ -913,71 +972,5 @@ export class EmailTemplateUtils {
           </div>
         `;
       }
-    
-      /**
-       * Generate HTML email template for booth removal notification
-       */
-      static generateBoothRemovalEmail(
-        eventName: string,
-        eventStartDate: string,
-        eventVenue: string,
-        uniqueCode: string,
-      ): string {
-        return `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #e74c3c; margin-bottom: 10px;">Booth Access Revoked</h1>
-              <p style="color: #7f8c8d; font-size: 16px;">Your booth access for this event has been removed</p>
-            </div>
-            
-            <div style="background-color: #fdf2f2; padding: 20px; border-radius: 6px; margin-bottom: 25px; border-left: 4px solid #e74c3c;">
-              <h2 style="color: #c0392b; margin-bottom: 20px;">Important Notice</h2>
-              <p style="color: #2c3e50; margin-bottom: 15px;">Your booth access for the following event has been revoked:</p>
-            </div>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-              <h2 style="color: #2c3e50; margin-bottom: 20px;">Event Details</h2>
-              <div style="margin-bottom: 15px;">
-                <strong style="color: #34495e;">Event Name:</strong>
-                <span style="color: #2c3e50; margin-left: 10px;">${eventName}</span>
-              </div>
-              <div style="margin-bottom: 15px;">
-                <strong style="color: #34495e;">Date:</strong>
-                <span style="color: #2c3e50; margin-left: 10px;">${eventStartDate}</span>
-              </div>
-              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-                <strong style="color: #34495e;">Venue:</strong>
-                <span style="color: #2c3e50; margin-left: 10px;">${eventVenue || 'To be announced'}</span>
-              </div>
-            </div>
-            
-            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-              <h3 style="color: #856404; margin-bottom: 15px;">⚠️ Booth Code No Longer Valid</h3>
-              <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin: 15px 0; text-align: center; border: 1px solid #f5c6cb;">
-                ${uniqueCode}
-              </div>
-              <p style="color: #856404; margin: 0; text-align: center;"><strong>This booth code is no longer active and cannot be used.</strong></p>
-            </div>
-            
-            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-              <h3 style="color: #27ae60; margin-bottom: 15px;">What This Means</h3>
-              <ul style="color: #2c3e50; margin: 0; padding-left: 20px;">
-                <li>You no longer have access to a booth at this event</li>
-                <li>The booth code ${uniqueCode} is no longer valid</li>
-                <li>You cannot use this code to access booth management features</li>
-                <li>If you believe this is an error, please contact the event organizers</li>
-              </ul>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-              <p style="color: #7f8c8d; margin-bottom: 10px;">If you have any questions about this change, please contact the event organizers.</p>
-              <p style="color: #7f8c8d; font-size: 14px;">Thank you for your understanding.</p>
-            </div>
-          </div>
-        `;
-      }
+
 }
-
-
-
-  

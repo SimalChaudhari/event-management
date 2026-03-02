@@ -49,6 +49,11 @@ export class CartWithdrawalService {
     if (!orderItem) throw new NotFoundException(`Event with ID ${dto.event_id} is not part of this order`);
 
     const event = orderItem.event;
+    if (event && (event as any).withdrawalEnabled === false) {
+      throw new BadRequestException(
+        'Withdrawal is not enabled for this event. Contact the event organizer.',
+      );
+    }
     // Withdrawal only for events scheduled for a future date (compare to end of event day)
     const eventEnd = event?.endDate ? new Date(new Date(event.endDate).setHours(23, 59, 59, 999)) : null;
     if (!eventEnd || new Date() >= eventEnd) {
