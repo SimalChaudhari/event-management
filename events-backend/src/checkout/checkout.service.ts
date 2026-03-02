@@ -36,6 +36,7 @@ import { generateUniqueOrderNumber } from 'utils/order-number.utils';
 import { AddressService } from 'user/address.service';
 import type { WooShPayBillingDetails, WooShPayShippingDetails } from './wooshpay.service';
 import * as isoCountries from 'i18n-iso-countries';
+import { EventService } from 'event/event.service';
 
 // WooShPay requires ISO 2-letter country codes (e.g. IN, SG). Default to Singapore when missing/invalid.
 const WOOSHPAY_DEFAULT_COUNTRY = 'SG';
@@ -89,6 +90,7 @@ export class CheckoutService {
     private cartService: CartService,
     private orderService: OrderService,
     private addressService: AddressService,
+    private eventService: EventService,
   ) {}
 
   private async generateUniqueCheckoutId(): Promise<string> {
@@ -153,7 +155,7 @@ export class CheckoutService {
         );
       }
 
-      const basePrice = Number(event.price);
+      const basePrice = this.eventService.getEffectivePrice(event);
       const gstRate = Number(event.gstRate) || 18;
       const totalPrice = Math.round(basePrice * (1 + gstRate / 100) * 100) / 100;
 
@@ -557,11 +559,13 @@ export class CheckoutService {
         });
         if (event) {
           const invoiceNumber = await this.orderService.generateInvoiceNumberInTransaction(manager);
+          const unitPrice = this.eventService.getEffectivePrice(event);
           const orderItem = manager.create(OrderItemEntity, {
             order: savedOrder,
             event,
             status: OrderNoStatus.Completed,
             invoiceNumber,
+            unitPrice,
           });
           await manager.save(OrderItemEntity, orderItem);
 
@@ -676,7 +680,7 @@ export class CheckoutService {
         const row = cartItemsFromDb[i];
         const event = await this.eventRepository.findOne({ where: { id: row.eventId } });
         if (event) {
-          const basePrice = Number(event.price) || 0;
+          const basePrice = this.eventService.getEffectivePrice(event);
           const gstRate = Number(event.gstRate) || 18;
           itemsWithPrice.push({
             cartId: row.cartId,
@@ -817,7 +821,7 @@ export class CheckoutService {
     for (const item of items) {
       const event = await this.eventRepository.findOne({ where: { id: item.eventId } });
       if (!event) continue;
-      const price = Number(event.price ?? 0);
+      const price = this.eventService.getEffectivePrice(event);
       originalTotal += price;
       eventPrices.push({ event, price });
     }
@@ -1021,7 +1025,7 @@ export class CheckoutService {
     }
     const totalAmount = Number(order.price) ?? 0;
     const discount = Number(order.discount) ?? 0;
-    const basePrice = Number(event.price) ?? 0;
+    const basePrice = Number((orderItem as any).unitPrice) ?? this.eventService.getEffectivePrice(event);
     const gstRate = Number(event.gstRate) ?? 18;
     const gstAmount = Math.round(basePrice * (gstRate / 100) * 100) / 100;
     const eventPrice = Math.round(basePrice * 100) / 100;
@@ -1224,7 +1228,7 @@ export class CheckoutService {
         where: { id: item.eventId },
       });
       if (event) {
-        totalAmount += Number(event.price || 0);
+        totalAmount += this.eventService.getEffectivePrice(event);
       }
     }
 

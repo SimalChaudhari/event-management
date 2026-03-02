@@ -680,15 +680,32 @@ function RegisterEventModal({ show, onHide, eventData }) {
                                                             <>
                                                                 <p className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#28a745' }}>
                                                                     {(() => {
-                                                                        const base = Number(eventData.event.price);
-                                                                        const rate = Number(eventData.event.gstRate) || 18;
+                                                                        const ev = eventData.event;
+                                                                        const isEarlyBird = ev?.isEarlyBirdActive && ev?.earlyBirdPrice != null && ev?.earlyBirdPrice !== '';
+                                                                        const base = isEarlyBird ? Number(ev.earlyBirdPrice) : Number(ev.price);
+                                                                        const rate = Number(ev.gstRate) || 18;
                                                                         const gst = Math.round(base * (rate / 100) * 100) / 100;
                                                                         const total = base + gst;
-                                                                        return `${total.toFixed(2)} ${eventData.event?.currency || 'SGD'}`;
+                                                                        return (
+                                                                            <>
+                                                                                <span>{total.toFixed(2)} {ev?.currency || 'SGD'}</span>
+                                                                                {isEarlyBird && ev?.price != null && (
+                                                                                    <span style={{ textDecoration: 'line-through', color: '#6c757d', fontWeight: 'normal', marginLeft: '8px', fontSize: '0.85rem' }}>
+                                                                                        {(Number(ev.price) * (1 + rate / 100)).toFixed(2)} {ev?.currency || 'SGD'}
+                                                                                    </span>
+                                                                                )}
+                                                                            </>
+                                                                        );
                                                                     })()}
                                                                 </p>
                                                                 <small className="text-muted d-block mt-1">
-                                                                    Event: {Number(eventData.event.price).toFixed(2)} | GST ({(Number(eventData.event.gstRate) || 18)}%): {(Math.round(Number(eventData.event.price) * ((Number(eventData.event.gstRate) || 18) / 100) * 100) / 100).toFixed(2)}
+                                                                    {(() => {
+                                                                        const ev = eventData.event;
+                                                                        const isEarlyBird = ev?.isEarlyBirdActive && ev?.earlyBirdPrice != null && ev?.earlyBirdPrice !== '';
+                                                                        const base = isEarlyBird ? Number(ev.earlyBirdPrice) : Number(ev.price);
+                                                                        const rate = Number(ev.gstRate) || 18;
+                                                                        return `Event: ${base.toFixed(2)} | GST (${rate}%): ${(Math.round(base * (rate / 100) * 100) / 100).toFixed(2)}`;
+                                                                    })()}
                                                                 </small>
                                                             </>
                                                         ) : (

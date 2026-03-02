@@ -20,12 +20,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { CartModule } from 'cart/cart.module';
 import { OrderModule } from 'order/order.module';
 import { AddressModule } from 'user/address.module';
+import { EventModule } from 'event/event.module';
 
 @Module({
     imports: [
         forwardRef(() => CartModule),
         OrderModule,
         AddressModule,
+        EventModule,
         TypeOrmModule.forFeature([
             Checkout,
             CheckoutCartItem,

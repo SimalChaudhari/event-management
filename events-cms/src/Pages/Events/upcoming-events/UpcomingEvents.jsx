@@ -109,7 +109,12 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
             title: 'Price',
             render: function (data, type, row) {
                 const currencySymbol = row.currency === 'USD' ? '$' : '';
-                return `${currencySymbol}${parseFloat(data).toFixed(2)}(${row.currency})`;
+                if (row.isEarlyBirdActive && row.earlyBirdPrice != null && row.earlyBirdPrice !== '') {
+                    const earlyBird = `${currencySymbol}${parseFloat(row.earlyBirdPrice).toFixed(2)} (${row.currency})`;
+                    const regular = data != null && data !== '' ? `<span style="text-decoration: line-through; color: #6c757d;">${currencySymbol}${parseFloat(data).toFixed(2)} (${row.currency})</span>` : '';
+                    return `${earlyBird} ${regular}`.trim();
+                }
+                return `${currencySymbol}${parseFloat(data).toFixed(2)} (${row.currency})`;
             }
         },
         {

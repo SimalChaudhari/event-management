@@ -548,7 +548,7 @@ export class CartController {
                             return {
                                 id: event.id,
                                 name: event.name,
-                                price: event.price,
+                                price: this.eventService.getEffectivePrice(event),
                                 gstRate: event.gstRate != null ? Number(event.gstRate) : 18,
                                 currency: event.currency || 'USD',
                                 startDate: event.startDate,

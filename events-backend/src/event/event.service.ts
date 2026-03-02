@@ -698,6 +698,7 @@ export class EventService {
             ...basicEvent,
             price: this.toDisplayPrice(event.price),
             earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+            isEarlyBirdActive: this.getIsEarlyBirdActive(event),
             color: getEventColor(event.type),
             speakersData: speakers,
             isFavorite,
@@ -776,6 +777,7 @@ export class EventService {
             ...eventFilteredData,
             price: this.toDisplayPrice(event.price),
             earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+            isEarlyBirdActive: this.getIsEarlyBirdActive(event),
             color: getEventColor(event.type),
             documents: formattedDocuments,
             eventStamps: {
@@ -1062,6 +1064,7 @@ export class EventService {
           ...basicEvent,
           price: this.toDisplayPrice(event.price),
           earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+          isEarlyBirdActive: this.getIsEarlyBirdActive(event),
           color: getEventColor(event.type),
           speakersData: speakerSchedule,
           isFavorite,
@@ -1145,6 +1148,7 @@ export class EventService {
         ...eventFilteredData,
         price: this.toDisplayPrice(event.price),
         earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+        isEarlyBirdActive: this.getIsEarlyBirdActive(event),
         color: getEventColor(event.type),
         speakers: speakerSchedule,
         speakersData: speakerSchedule,
@@ -2217,13 +2221,38 @@ export class EventService {
   }
 
   /** Ensure price and earlyBirdPrice are numbers in API responses (TypeORM decimal can return string). */
-  private normalizeEventPrices<T extends { price?: unknown; earlyBirdPrice?: unknown }>(event: T): T {
-    if (!event) return event;
+  private normalizeEventPrices<T extends { price?: unknown; earlyBirdPrice?: unknown; earlyBirdStartDate?: Date | string; earlyBirdEndDate?: Date | string }>(event: T): T & { isEarlyBirdActive: boolean } {
+    if (!event) return { isEarlyBirdActive: false } as T & { isEarlyBirdActive: boolean };
     return {
       ...event,
       price: this.toDisplayPrice(event.price),
       earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
-    } as T;
+      isEarlyBirdActive: this.getIsEarlyBirdActive(event),
+    } as T & { isEarlyBirdActive: boolean };
+  }
+
+  /** True when today (date only) is within earlyBirdStartDate..earlyBirdEndDate and earlyBirdPrice is set. */
+  private getIsEarlyBirdActive(event: { earlyBirdPrice?: unknown; earlyBirdStartDate?: Date | string; earlyBirdEndDate?: Date | string }): boolean {
+    const price = Number(event.earlyBirdPrice ?? 0);
+    if (!event.earlyBirdStartDate || !event.earlyBirdEndDate || Number.isNaN(price) || price < 0) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(event.earlyBirdStartDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(event.earlyBirdEndDate);
+    end.setHours(0, 0, 0, 0);
+    return today >= start && today <= end;
+  }
+
+  /** Price to use for cart/checkout/order: early bird when active, otherwise regular price. */
+  getEffectivePrice(event: { price?: unknown; earlyBirdPrice?: unknown; earlyBirdStartDate?: Date | string; earlyBirdEndDate?: Date | string }): number {
+    if (!event) return 0;
+    const regular = Number(event.price ?? 0);
+    if (this.getIsEarlyBirdActive(event)) {
+      const early = Number(event.earlyBirdPrice ?? 0);
+      return Number.isNaN(early) || early < 0 ? regular : early;
+    }
+    return regular;
   }
 
   private checkGlobalSearchMatch(event: any, keyword: string): {

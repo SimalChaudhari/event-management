@@ -40,15 +40,15 @@ export class OrderService {
         private readonly couponService: CouponService,
     ) {}
 
-    /** Event fields only needed in order responses (no speakers, categories, documents, etc.) */
-    private mapEventToMinimal(event: any): any {
+    /** Event fields only needed in order responses. Use priceOverride when returning from order item (charged price). */
+    private mapEventToMinimal(event: any, priceOverride?: number): any {
         if (!event) return null;
         return {
             id: event.id,
             name: event.name,
             startDate: event.startDate,
             endDate: event.endDate,
-            price: event.price,
+            price: priceOverride != null ? priceOverride : event.price,
             gstRate: event.gstRate != null ? Number(event.gstRate) : undefined,
             currency: event.currency,
             type: event.type,
@@ -58,13 +58,13 @@ export class OrderService {
         };
     }
 
-    /** Build price breakdown for an order from its items and order discount. */
+    /** Build price breakdown for an order from its items and order discount. Uses unitPrice (charged at order time) when set. */
     private buildOrderPriceBreakdown(order: Order): { eventTotal: number; gstTotal: number; discount: number; total: number } {
         const items = order.orderItems || [];
         let eventTotal = 0;
         let gstTotal = 0;
         items.forEach((item) => {
-            const base = Number(item.event?.price) || 0;
+            const base = Number((item as any).unitPrice ?? item.event?.price) || 0;
             const rate = Number(item.event?.gstRate) || 18;
             eventTotal += base;
             gstTotal += Math.round(base * (rate / 100) * 100) / 100;
@@ -255,7 +255,7 @@ export class OrderService {
 
         const orderItems = (order.orderItems || []).map((item) => ({
             id: item.id,
-            event: this.mapEventToMinimal(item.event),
+            event: this.mapEventToMinimal(item.event, item.unitPrice != null ? Number(item.unitPrice) : undefined),
             status: item.status,
             invoiceNumber: item.invoiceNumber || null,
             createdAt: item.createdAt,
@@ -410,7 +410,7 @@ export class OrderService {
             },
             orderItems: (order.orderItems || []).map((item) => ({
                 id: item.id,
-                event: this.mapEventToMinimal(item.event),
+                event: this.mapEventToMinimal(item.event, item.unitPrice != null ? Number(item.unitPrice) : undefined),
                 status: item.status,
                 invoiceNumber: item.invoiceNumber || null,
                 createdAt: item.createdAt,
@@ -611,7 +611,7 @@ export class OrderService {
             event: {
                 id: updatedOrderItem.event.id,
                 name: updatedOrderItem.event.name,
-                price: updatedOrderItem.event.price,
+                price: Number(updatedOrderItem.unitPrice ?? updatedOrderItem.event.price),
             },
             order: {
                 id: updatedOrderItem.order.id,

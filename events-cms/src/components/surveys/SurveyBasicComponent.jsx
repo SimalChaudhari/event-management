@@ -480,7 +480,19 @@ const SurveyBasicComponent = ({ surveyData }) => {
                             label="Event Price" 
                             value={
                                 <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                    {surveyData.eventInfo?.price ? `${surveyData.eventInfo.price} ${surveyData.eventInfo.currency || 'USD'}` : 'N/A'}
+                                    {surveyData.eventInfo?.isEarlyBirdActive && surveyData.eventInfo?.earlyBirdPrice != null && surveyData.eventInfo?.earlyBirdPrice !== ''
+                                        ? (
+                                            <>
+                                                <span>{Number(surveyData.eventInfo.earlyBirdPrice).toFixed(2)} {surveyData.eventInfo.currency || 'USD'}</span>
+                                                {surveyData.eventInfo?.price != null && surveyData.eventInfo?.price !== '' && (
+                                                    <span style={{ textDecoration: 'line-through', color: '#6c757d', fontWeight: 'normal', marginLeft: '8px' }}>
+                                                        {Number(surveyData.eventInfo.price).toFixed(2)} {surveyData.eventInfo.currency || 'USD'}
+                                                    </span>
+                                                )}
+                                            </>
+                                        )
+                                        : (surveyData.eventInfo?.price ? `${surveyData.eventInfo.price} ${surveyData.eventInfo.currency || 'USD'}` : 'N/A')
+                                    }
                                 </span>
                             }
                             icon="fas fa-dollar-sign"

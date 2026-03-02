@@ -130,7 +130,19 @@ const EventBasicComponent = ({ eventData }) => {
                                     label="Ticket Price"
                                     value={
                                         <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '14px' }}>
-                                            {eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free'}
+                                            {eventData.isEarlyBirdActive && eventData.earlyBirdPrice != null && eventData.earlyBirdPrice !== ''
+                                                ? (
+                                                    <>
+                                                        <span>{Number(eventData.earlyBirdPrice).toFixed(2)} {eventData.currency || 'USD'}</span>
+                                                        {eventData.price != null && eventData.price !== '' && (
+                                                            <span style={{ textDecoration: 'line-through', color: '#6c757d', fontWeight: 'normal', marginLeft: '8px' }}>
+                                                                {Number(eventData.price).toFixed(2)} {eventData.currency || 'USD'}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                )
+                                                : (eventData.price ? `${eventData.price} ${eventData.currency || 'USD'}` : 'Free')
+                                            }
                                         </span>
                                     }
                                     icon="fas fa-dollar-sign"

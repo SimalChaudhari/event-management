@@ -25,6 +25,10 @@ export class OrderItemEntity {
     @Column({ type: 'varchar', nullable: true })
     invoiceNumber?: string;
 
+    /** Price charged for this item at order time (e.g. early bird). When null, use event.price for display. */
+    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    unitPrice?: number;
+
     @Column({ default: false })
     isDeleted!: boolean;
     

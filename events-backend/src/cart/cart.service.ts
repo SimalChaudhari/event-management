@@ -138,7 +138,7 @@ export class CartService {
         const items = await Promise.all(
             cartItems.map(async (cart) => {
                 const event = await this.eventService.getEventById(cart.eventId);
-                const basePrice = Number(event.price || 0);
+                const basePrice = this.eventService.getEffectivePrice(event);
                 const gstRate = Number(event.gstRate) || 18;
                 const itemTotal = Math.round(basePrice * (1 + gstRate / 100) * 100) / 100;
                 totalAmount += itemTotal;
