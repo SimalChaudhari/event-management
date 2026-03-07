@@ -43,6 +43,7 @@ import { ModeratorModule } from './moderator/moderator.module';
 import { ScheduledPushNotificationModule } from './scheduled-push-notification/scheduled-push-notification.module';
 import { EmailTemplateModule } from './email-template/email-template.module';
 import { JwtAuthModule } from './jwt/jwt-auth.module';
+import { SalesforceModule } from './salesforce/salesforce.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -86,6 +87,7 @@ import { join } from 'path';
     ModeratorModule,
     ScheduledPushNotificationModule,
     EmailTemplateModule,
+    SalesforceModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 24 * 60 * 60 * 1000, // 24 hours in milliseconds

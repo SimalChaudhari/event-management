@@ -3,6 +3,8 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -22,9 +24,11 @@ import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { UserUtils } from '../utils/user.utils';
 import { QRCodeUtils } from '../utils/qr-code.utils';
 import { ResourceNotFoundException, DuplicateResourceException } from '../utils/exceptions/custom-exceptions';
+import { SalesforceService } from '../salesforce/salesforce.service';
 //test
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
   private attendanceGateway: {
     emitAttendanceUpdate: (
       eventId: string,
@@ -49,6 +53,7 @@ export class AttendanceService {
     @InjectRepository(AdminInfo)
     private adminInfoRepository: Repository<AdminInfo>,
     private readonly errorHandler: ErrorHandlerService,
+    @Optional() private readonly salesforceService?: SalesforceService,
   ) {}
 
   setAttendanceGateway(
@@ -65,6 +70,23 @@ export class AttendanceService {
     },
   ): void {
     this.attendanceGateway = gateway;
+  }
+
+  /**
+   * If registration has Salesforce external ID, push attendance to Salesforce (fire-and-forget).
+   */
+  private async tryPushAttendanceToSalesforce(registration: RegisterEvent): Promise<void> {
+    if (!registration?.externalRegistrationId || !this.salesforceService) return;
+    try {
+      await this.salesforceService.postAttendance({
+        registrationNumber: registration.externalRegistrationId,
+      });
+      this.logger.log(`Salesforce attendance posted for registration ${registration.externalRegistrationName}`);
+    } catch (err: any) {
+      this.logger.warn(
+        `Salesforce attendance push failed for ${registration.externalRegistrationName}: ${err?.message || err}`,
+      );
+    }
   }
 
   /**
@@ -264,6 +286,8 @@ export class AttendanceService {
 
       this.attendanceGateway?.emitAttendanceUpdate(checkInData.eventId);
 
+      await this.tryPushAttendanceToSalesforce(registration);
+
       return savedAttendance;
     } catch (error) {
       if (
@@ -361,6 +385,8 @@ export class AttendanceService {
       }
 
       this.attendanceGateway?.emitAttendanceUpdate(checkInData.eventId);
+
+      await this.tryPushAttendanceToSalesforce(registration);
 
       return savedAttendance;
     } catch (error) {

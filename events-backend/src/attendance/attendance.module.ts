@@ -14,7 +14,7 @@ import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { AdminInfo } from '../registerEvent/admin-info.entity';
 import { UtilsModule } from '../utils/utils.module';
 import { JwtModule } from '@nestjs/jwt';
-
+import { SalesforceModule } from '../salesforce/salesforce.module';
 
 @Module({
   imports: [
@@ -33,6 +33,7 @@ import { JwtModule } from '@nestjs/jwt';
       signOptions: { },
     }),
     UtilsModule,
+    SalesforceModule,
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService, AttendanceGateway, EventQRCodeService],

@@ -282,6 +282,36 @@ export class EventController {
     }
   }
 
+  /** Public event list for mobile app (no auth). Query: upcoming=true, limit, page */
+  @Public()
+  @Get('public/mobile-list')
+  async getPublicEventListForMobile(
+    @Query('upcoming') upcoming: string,
+    @Query('limit') limitStr: string,
+    @Query('page') pageStr: string,
+    @Res() response: Response,
+  ) {
+    try {
+      const events = await this.eventService.getPublicEventListForMobile({
+        upcoming: upcoming === 'true',
+        limit: limitStr ? parseInt(limitStr, 10) : undefined,
+        page: pageStr ? parseInt(pageStr, 10) : undefined,
+      });
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Event list retrieved successfully',
+        data: events,
+        metadata: {
+          total: events.length,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Public mobile event list retrieval');
+      throw error;
+    }
+  }
+
   @Get('dropdown-list')
   async getEventDropdownList(
     @Res() response: Response,

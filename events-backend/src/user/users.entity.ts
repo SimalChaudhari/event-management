@@ -124,6 +124,10 @@ export class UserEntity {
   @Column({ default: false })
   isVerify!: boolean; // Updated field
 
+  /** True if user was synced from Salesforce (event registrations / SSO) */
+  @Column({ default: false })
+  isSalesforce!: boolean;
+
   @Column({ nullable: true })
   otp?: string; // Updated field
 

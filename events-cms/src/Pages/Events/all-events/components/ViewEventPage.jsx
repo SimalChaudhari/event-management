@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Row, Col, Badge, Nav, Tab, Modal, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
+import axiosInstance from '../../../../configs/axiosInstance';
 import { API_URL } from '../../../../configs/env';
 import EventBasicComponent from '../../../../components/events/EventBasicComponent';
 import EventLocationComponent from '../../../../components/events/EventLocationComponent';
@@ -76,6 +78,7 @@ const ViewEventPage = () => {
 
     // Tab visibility management
     const [showTabVisibilityModal, setShowTabVisibilityModal] = useState(false);
+    const [isSendingEmails, setIsSendingEmails] = useState(false);
     const [tabVisibilitySettings, setTabVisibilitySettings] = useState({
         speakers: true,
         documents: true,
@@ -466,6 +469,28 @@ const ViewEventPage = () => {
         }
     };
 
+    const handleSendRegistrationEmails = async () => {
+        if (!id) return;
+        setIsSendingEmails(true);
+        try {
+            const res = await axiosInstance.post(`/salesforce/send-registration-emails/${id}`);
+            const data = res?.data?.data;
+            if (res?.data?.success) {
+                const msg = data
+                    ? `${res.data.message} (${data.sentWithCredentials || 0} with login details, ${data.sentWithQROnly || 0} with QR only${data.failed > 0 ? `, ${data.failed} failed` : ''})`
+                    : res.data.message;
+                toast.success(msg);
+            } else {
+                toast.error(res?.data?.message || 'Failed to send emails');
+            }
+        } catch (err) {
+            const message = err?.response?.data?.message || err?.message || 'Failed to send registration emails';
+            toast.error(message);
+        } finally {
+            setIsSendingEmails(false);
+        }
+    };
+
     return (
         <>
             <div className="mt-4">
@@ -504,6 +529,30 @@ const ViewEventPage = () => {
                                 >
                                     <i className="fas fa-clipboard-check"></i>
                                     <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Attendance Tracking</span>
+                                </Button>
+                            </OverlayTrigger>
+
+                            <OverlayTrigger
+                                placement="bottom"
+                                overlay={<Tooltip id="salesforce-emails-tooltip">Send registration confirmation emails to Salesforce-registered users (login details + QR or QR only)</Tooltip>}
+                            >
+                                <Button
+                                    variant="outline-success"
+                                    onClick={handleSendRegistrationEmails}
+                                    disabled={isSendingEmails}
+                                    className="d-flex align-items-center"
+                                >
+                                    {isSendingEmails ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin"></i>
+                                            <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Sending...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-envelope"></i>
+                                            <span className="d-none d-md-inline" style={{ marginLeft: '8px' }}>Send registration emails</span>
+                                        </>
+                                    )}
                                 </Button>
                             </OverlayTrigger>
 

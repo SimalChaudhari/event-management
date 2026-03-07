@@ -347,6 +347,90 @@ export class EventService {
     return events;
   }
 
+  /**
+   * Public event list for mobile: essential fields for listing cards. No auth required.
+   */
+  async getPublicEventListForMobile(filters: {
+    upcoming?: boolean;
+    limit?: number;
+    page?: number;
+  }): Promise<{
+    id: string;
+    name: string;
+    description: string | null;
+    image: string | null;
+    images: string[] | null;
+    startDate: Date;
+    endDate: Date;
+    startTime: string;
+    endTime: string;
+    venue: string | null;
+    location: string | null;
+    price: number | null;
+    earlyBirdPrice: number | null;
+    earlyBirdEndDate: Date | null;
+    currency: string;
+    attendanceCount: number;
+  }[]> {
+    const qb = this.eventRepository
+      .createQueryBuilder('event')
+      .select([
+        'event.id',
+        'event.name',
+        'event.description',
+        'event.images',
+        'event.startDate',
+        'event.endDate',
+        'event.startTime',
+        'event.endTime',
+        'event.venue',
+        'event.location',
+        'event.price',
+        'event.earlyBirdPrice',
+        'event.earlyBirdEndDate',
+        'event.currency',
+      ])
+      .orderBy('event.startDate', 'ASC');
+
+    if (filters.upcoming) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      qb.andWhere('event.startDate >= :today', { today });
+    }
+
+    const limit = Math.min(filters.limit ?? 50, 100);
+    const page = Math.max(1, filters.page ?? 1);
+    qb.take(limit).skip((page - 1) * limit);
+
+    const events = await qb.getMany();
+    const result = [];
+
+    for (const event of events) {
+      const attendanceCount = await this.getEventAttendanceCount(event.id);
+      const imgList = event.images && Array.isArray(event.images) ? event.images : [];
+      const image = imgList.length > 0 ? imgList[0] : null;
+      result.push({
+        id: event.id,
+        name: event.name,
+        description: event.description ?? null,
+        image,
+        images: event.images ?? null,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        venue: event.venue ?? null,
+        location: event.location ?? null,
+        price: event.price != null ? Number(event.price) : null,
+        earlyBirdPrice: event.earlyBirdPrice != null ? Number(event.earlyBirdPrice) : null,
+        earlyBirdEndDate: event.earlyBirdEndDate ?? null,
+        currency: event.currency ?? 'SGD',
+        attendanceCount,
+      });
+    }
+    return result;
+  }
+
   async getAllEvents(
     filters: {
       keyword?: string;
