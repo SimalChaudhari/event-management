@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply font-sans bg-slate-50 text-slate-800 antialiased;
+  }
+  a {
+    @apply text-inherit no-underline;
+  }
+  button {
+    @apply font-sans cursor-pointer border-none bg-transparent;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
