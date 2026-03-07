@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { userService } from '../../services/userService';
 import PageLayout from '../../components/PageLayout';
-import AppDownloadQR from '../../components/AppDownloadQR';
 import { updateProfile } from '../../store/actions/authActions';
 import { profileUpdateSchema } from '../../validation/authSchemas';
 import { INDUSTRY_OPTIONS } from '../../constants/industryOptions';
@@ -98,34 +96,10 @@ function Field({ id, label, name, type = 'text', form, formErrors, onChange, pla
 export default function Profile() {
   const dispatch = useDispatch();
   const { authUser } = useSelector((s) => s.auth);
-  const [qr, setQr] = useState({ qrCodeImage: null, qrCodeId: null });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [submitLoading, setSubmitLoading] = useState(false);
-
-  useEffect(() => {
-    if (!authUser?.id) return;
-    let cancelled = false;
-    userService
-      .getMyQRCode(authUser.id)
-      .then(({ data }) => {
-        if (!cancelled && data?.data) {
-          setQr({ qrCodeImage: data.data.qrCodeImage, qrCodeId: data.data.qrCodeId });
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err.response?.data?.message || 'Failed to load QR code.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [authUser?.id]);
 
   useEffect(() => {
     if (authUser && !isEditing) {
@@ -168,14 +142,6 @@ export default function Profile() {
     const result = await dispatch(updateProfile(payload));
     setSubmitLoading(false);
     if (result?.success) setIsEditing(false);
-  };
-
-  const handleDownloadQR = () => {
-    if (!qr.qrCodeImage) return;
-    const link = document.createElement('a');
-    link.href = qr.qrCodeImage;
-    link.download = 'evential-my-qr.png';
-    link.click();
   };
 
   const fullName = [authUser?.firstName, authUser?.lastName].filter(Boolean).join(' ') || 'User';
@@ -352,46 +318,6 @@ export default function Profile() {
                 </div>
               </form>
             )}
-          </section>
-
-          {/* QR code – below profile grid */}
-          <section className="bg-slate-50 rounded-xl border border-slate-200 p-5 md:p-6">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              Your personal QR code
-            </h2>
-            <p className="text-slate-600 text-sm mb-4">
-              Show this QR at event check-in for faster registration.
-            </p>
-            {loading && (
-              <div className="flex items-center justify-center py-12 rounded-lg bg-slate-100 border border-slate-200">
-                <span className="text-slate-500 text-sm">Loading QR code…</span>
-              </div>
-            )}
-            {error && (
-              <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-            {qr.qrCodeImage && !loading && (
-              <div className="flex flex-col items-center pt-2">
-                <img
-                  src={qr.qrCodeImage}
-                  alt="Your QR code"
-                  className="w-40 h-40 rounded-lg border border-slate-200 bg-white shadow-sm"
-                />
-                <button
-                  type="button"
-                  onClick={handleDownloadQR}
-                  className="mt-4 px-5 py-2.5 text-sm font-medium text-primary bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors"
-                >
-                  Download QR
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="mt-6 pt-6 border-t border-slate-200">
-            <AppDownloadQR />
           </section>
 
           <p className="text-slate-500 text-sm mt-6 pt-4 border-t border-slate-200">
