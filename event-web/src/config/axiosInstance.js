@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { API_URL, API_CONFIG } from './env';
+import { API_URL, API_CONFIG, CACHE_CONFIG } from './env';
+import { getCookie, removeCookie } from '../utils/cookies';
 
 const envMode = (import.meta.env.VITE_API_NODE_ENV || import.meta.env.MODE || 'development').toLowerCase();
 const timeout = API_CONFIG[envMode]?.TIMEOUT ?? 15000;
@@ -13,19 +14,33 @@ const axiosInstance = axios.create({
   },
 });
 
-// Request interceptor – add auth token when available (e.g. from cookie/localStorage)
+// Request interceptor – add auth token from cookie when available
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Optional: add Bearer token from CACHE_CONFIG.TOKEN_KEY when auth is implemented
+    const token = getCookie(CACHE_CONFIG.TOKEN_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor – handle 401 globally when auth is added
+// Response interceptor – handle 401 (clear auth cookies and redirect to login)
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => {
+    if (error.response?.status === 401) {
+      removeCookie(CACHE_CONFIG.TOKEN_KEY);
+      removeCookie(CACHE_CONFIG.REFRESH_TOKEN_KEY);
+      removeCookie(CACHE_CONFIG.USER_KEY);
+      const isAuthRoute = /^\/(login|register|verify-email|forgot-password|reset-password)/.test(window.location.pathname);
+      if (!isAuthRoute && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:logout'));
+      }
+    }
+    return Promise.reject(error);
+  }
 );
 
 export default axiosInstance;

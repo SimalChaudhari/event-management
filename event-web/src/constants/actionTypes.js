@@ -7,6 +7,8 @@ export const AUTH_ERROR = 'AUTH_ERROR';
 export const EVENT_LOADING = 'EVENT_LOADING';
 export const EVENT_LIST = 'EVENT_LIST';
 export const UPCOMING_EVENT_LIST = 'UPCOMING_EVENT_LIST';
+export const MY_REGISTERED_EVENT_LIST = 'MY_REGISTERED_EVENT_LIST';
+export const MY_REGISTERED_EVENT_LOADING = 'MY_REGISTERED_EVENT_LOADING';
 export const EVENT_ERROR = 'EVENT_ERROR';
 
 // Banner (banner-events carousel)

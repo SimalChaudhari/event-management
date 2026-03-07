@@ -1,10 +1,5 @@
 import axiosInstance from "../../config/axiosInstance";
-import {
-  EVENT_LIST,
-  UPCOMING_EVENT_LIST,
-  EVENT_LOADING,
-  EVENT_ERROR,
-} from "../../constants/actionTypes";
+import { EVENT_LIST, UPCOMING_EVENT_LIST, EVENT_LOADING, EVENT_ERROR, MY_REGISTERED_EVENT_LIST, MY_REGISTERED_EVENT_LOADING } from "../../constants/actionTypes";
 
 export const fetchMobileEventList =
   (opts = {}) =>
@@ -28,8 +23,31 @@ export const fetchMobileEventList =
         type: EVENT_ERROR,
         payload: error?.message ?? "Failed to load events",
       });
-      return [];
-    } finally {
-      dispatch({ type: EVENT_LOADING, payload: false });
-    }
-  };
+    return [];
+  } finally {
+    dispatch({ type: EVENT_LOADING, payload: false });
+  }
+};
+
+export const fetchMyRegisteredEvents = (opts = {}) => async (dispatch) => {
+  const limit = opts.limit ?? 4;
+  dispatch({ type: MY_REGISTERED_EVENT_LOADING, payload: true });
+  try {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    params.set("page", "1");
+    const { data } = await axiosInstance.get(`/register-events/all?${params.toString()}`);
+    const rawList = data?.data ?? [];
+    const eventList = rawList.map((item) => item.event).filter(Boolean);
+    dispatch({ type: MY_REGISTERED_EVENT_LIST, payload: eventList });
+    return eventList;
+  } catch (error) {
+    dispatch({
+      type: EVENT_ERROR,
+      payload: error?.message ?? "Failed to load my events",
+    });
+    return [];
+  } finally {
+    dispatch({ type: MY_REGISTERED_EVENT_LOADING, payload: false });
+  }
+};

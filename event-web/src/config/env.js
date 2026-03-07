@@ -44,3 +44,5 @@ export const CACHE_CONFIG = {
 export const FEATURES = {
   ENABLE_LOGGING: getEnv('VITE_ENABLE_LOGGING') === 'true' || import.meta.env.DEV,
 };
+
+export const APP_DOWNLOAD_URL = getEnv('VITE_APP_DOWNLOAD_URL', 'https://evential.sg');

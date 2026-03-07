@@ -26,3 +26,9 @@
     scrollbar-width: none;
   }
 }
+
+/* Toast: right position + distinct colors for success, error, warning */
+.toast-container-header.Toastify__toast-container {
+  right: 10;
+  top: 0;
+}
