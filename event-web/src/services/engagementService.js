@@ -1,5 +1,10 @@
 import axiosInstance from '../config/axiosInstance';
 
+/**
+ * Engagement APIs (Q&A, polling, surveys).
+ * Backend: GET api/engagements/event/:eventId (public), api/engagements/qna/* (Q&A).
+ * Polling: api/events/polls/*. Surveys: api/events/surveys/* (not yet used here).
+ */
 export const engagementService = {
   getByEvent(eventId) {
     return axiosInstance.get(`/engagements/event/${eventId}`).then((r) => r.data?.data ?? []);

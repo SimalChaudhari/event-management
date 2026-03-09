@@ -597,7 +597,7 @@ export class UserController {
     @Request() req: any,
   ) {
     let existingUser = null;
-    
+
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -609,6 +609,11 @@ export class UserController {
 
       // Get existing user first
       existingUser = await this.userService.getById(userId);
+
+      // With multipart, body may contain profilePicture as {} for the file field – don't persist that
+      if (typeof updateData.profilePicture === 'object' && updateData.profilePicture !== null) {
+        delete updateData.profilePicture;
+      }
 
       if (file) {
         // Delete old file if it exists

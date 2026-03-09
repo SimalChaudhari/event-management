@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import Banner from '../../components/Banner';
@@ -11,16 +11,24 @@ export default function Home() {
   const { list, upcoming, myRegisteredEvents, loading, myRegisteredEventsLoading } = useSelector((state) => state.event);
   const { authenticated } = useSelector((state) => state.auth);
   const [upcomingTab, setUpcomingTab] = useState('ALL EVENTS');
+  const eventsFetched = useRef(false);
+  const registeredFetched = useRef(false);
 
   useEffect(() => {
+    if (eventsFetched.current) return;
+    eventsFetched.current = true;
     dispatch(fetchMobileEventList({ limit: 8 }));
     dispatch(fetchMobileEventList({ upcoming: true, limit: 6 }));
   }, [dispatch]);
 
   useEffect(() => {
-    if (authenticated) {
-      dispatch(fetchMyRegisteredEvents({ limit: 4 }));
+    if (!authenticated) {
+      registeredFetched.current = false;
+      return;
     }
+    if (registeredFetched.current) return;
+    registeredFetched.current = true;
+    dispatch(fetchMyRegisteredEvents({ limit: 4 }));
   }, [dispatch, authenticated]);
 
   const featured = list.slice(0, 4);

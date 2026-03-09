@@ -90,9 +90,9 @@ export const setAuthFromStorage = () => (dispatch) => {
   }
 };
 
-export const updateProfile = (payload) => async (dispatch) => {
+export const updateProfile = (payload, profilePictureFile = null) => async (dispatch) => {
   try {
-    const { data } = await userService.updateProfile(payload);
+    const { data } = await userService.updateProfile(payload, profilePictureFile);
     if (data?.success && data?.data) {
       const { token, refreshToken } = authService.getStoredAuth();
       const user = data.data;

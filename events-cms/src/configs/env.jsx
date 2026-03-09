@@ -9,10 +9,11 @@ export const API_RETRY = {
 
 
 // API Configuration using environment variables
+// In development, use relative '' so CRA proxy is used (avoids CORS when switching between event-web and event-cms).
 export const API_CONFIG = {
     // Development
     development: {
-        BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000',
+        BASE_URL: process.env.REACT_APP_API_BASE_URL ?? '',
         TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT) || 15000,
         RETRY_ATTEMPTS: parseInt(process.env.REACT_APP_API_RETRY_ATTEMPTS) || 5,
         RETRY_DELAY: parseInt(process.env.REACT_APP_API_RETRY_DELAY) || 2000
@@ -26,9 +27,9 @@ export const API_CONFIG = {
     }
 };
 
-// Current environment
-const ENV = process.env.REACT_APP_API_NODE_ENV?.toLowerCase() || 'development';
-export const API_URL = API_CONFIG[ENV]?.BASE_URL || API_CONFIG.development.BASE_URL;
+// Current environment: use NODE_ENV when building so production build always uses production API (no extra env var needed).
+const ENV = (process.env.REACT_APP_API_NODE_ENV?.toLowerCase() || process.env.NODE_ENV || 'development');
+export const API_URL = API_CONFIG[ENV]?.BASE_URL ?? API_CONFIG.development.BASE_URL;
 
 
 // Error Messages

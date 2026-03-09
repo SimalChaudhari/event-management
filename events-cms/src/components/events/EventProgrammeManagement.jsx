@@ -19,7 +19,13 @@ import { speakerList as fetchSpeakerList } from '../../store/actions/speakerActi
 import { getEventSpeakers } from '../../store/actions/eventActions';
 import DeleteConfirmationModal from '../modal/DeleteConfirmationModal';
 
-const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeDataChange = null, initialProgrammeData = null, eventSpeakers = null }) => {
+const EventProgrammeManagement = ({
+    eventId,
+    isEditMode = false,
+    onProgrammeDataChange = null,
+    initialProgrammeData = null,
+    eventSpeakers = null
+}) => {
     const dispatch = useDispatch();
     const { tracks, sessions, loading } = useSelector((state) => state.programme || { tracks: [], sessions: [], loading: false });
     const reduxSpeakers = useSelector((state) => state.speaker?.speakers || []);
@@ -139,7 +145,7 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                     return;
                 }
             }
-            
+
             // Fallback: fetch all speakers using fetchSpeakerList action
             await dispatch(fetchSpeakerList());
             // fetchSpeakerList action updates Redux store, we'll use useEffect to sync
@@ -515,7 +521,6 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
         return `${hour12}:${minutes} ${ampm}`;
     };
 
-
     // Component is always available, just in different modes
 
     return (
@@ -549,7 +554,7 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                                 <thead>
                                     <tr>
                                         <th style={{ width: '30%' }}>Track Title</th>
-                                        <th style={{ width: '20%' }}>Description</th>
+
                                         <th style={{ width: '10%' }}>Status</th>
                                         <th style={{ width: '10%' }}>Sessions</th>
                                         <th style={{ width: '30%' }}>Actions</th>
@@ -565,17 +570,7 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                                                     <td>
                                                         <strong>{track.title}</strong>
                                                     </td>
-                                                    <td>
-                                                        {track.description ? (
-                                                            <span className="text-muted">
-                                                                {track.description.length > 50
-                                                                    ? track.description.substring(0, 50) + '...'
-                                                                    : track.description}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-muted">-</span>
-                                                        )}
-                                                    </td>
+
                                                     <td>
                                                         {track.isActive ? (
                                                             <span
@@ -679,16 +674,6 @@ const EventProgrammeManagement = ({ eventId, isEditMode = false, onProgrammeData
                                                                                     <tr key={session.id}>
                                                                                         <td>
                                                                                             <strong>{session.title}</strong>
-                                                                                            {session.description && (
-                                                                                                <p className="text-muted small mb-0">
-                                                                                                    {session.description.length > 50
-                                                                                                        ? session.description.substring(
-                                                                                                              0,
-                                                                                                              50
-                                                                                                          ) + '...'
-                                                                                                        : session.description}
-                                                                                                </p>
-                                                                                            )}
                                                                                         </td>
                                                                                         <td>
                                                                                             {session.sessionDate

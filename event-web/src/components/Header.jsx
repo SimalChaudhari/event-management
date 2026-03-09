@@ -3,18 +3,27 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ROUTES } from '../routes/routeConfig';
 import { logout } from '../store/actions/authActions';
 import logo from '../assets/logo.png';
+import { API_URL } from '../config/env';
 
 const navItems = [
   { path: ROUTES.HOME, label: 'Home' },
-  { path: ROUTES.REWARDS, label: 'Rewards' },
+  { path: ROUTES.ENGAGEMENT, label: 'Engagement' },
   { path: ROUTES.SCAN, label: 'Scan QR' },
-  { path: ROUTES.GALLERY, label: 'Gallery' },
   { path: ROUTES.PROFILE, label: 'Profile' },
 ];
 
 const navItemsGuest = navItems.filter(
-  (item) => item.path !== ROUTES.SCAN && item.path !== ROUTES.PROFILE
+  (item) => item.path !== ROUTES.SCAN && item.path !== ROUTES.PROFILE && item.path !== ROUTES.ENGAGEMENT
 );
+
+function getProfilePictureUrl(user) {
+  const raw = user?.profilePicture || user?.profileImage;
+  if (!raw) return null;
+  if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://'))) return raw;
+  const base = API_URL || '';
+  const path = raw.replace(/^\//, '');
+  return base ? `${base}/${path}` : `/${path}`;
+}
 
 function getInitials(firstName, lastName, email) {
   if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
@@ -67,9 +76,9 @@ export default function Header() {
               aria-label="Profile"
             >
               <span className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-sm font-semibold text-slate-700 border border-slate-200 overflow-hidden shrink-0">
-                {authUser?.profileImage ? (
+                {getProfilePictureUrl(authUser) ? (
                   <img
-                    src={authUser.profileImage}
+                    src={getProfilePictureUrl(authUser)}
                     alt=""
                     className="w-full h-full object-cover"
                   />

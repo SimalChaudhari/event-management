@@ -13,9 +13,12 @@ export const API_RETRY = {
 
 const envMode = (getEnv('VITE_API_NODE_ENV') || getEnv('MODE', 'development')).toLowerCase();
 
+// In dev, use relative /api so Vite proxy is used (avoids browser connection limit when Admin + Vendor run together)
+const devBaseUrl = import.meta.env.DEV ? '' : getEnv('VITE_API_BASE_URL', 'http://localhost:5000');
+
 export const API_CONFIG = {
   development: {
-    BASE_URL: getEnv('VITE_API_BASE_URL', 'http://localhost:5000'),
+    BASE_URL: getEnv('VITE_API_BASE_URL', devBaseUrl),
     TIMEOUT: API_TIMEOUT,
   },
   production: {
@@ -24,8 +27,8 @@ export const API_CONFIG = {
   },
 };
 
-export const API_URL = API_CONFIG[envMode]?.BASE_URL || API_CONFIG.development.BASE_URL;
-export const UPLOADS_URL = getEnv('VITE_UPLOADS_URL', API_URL);
+export const API_URL = API_CONFIG[envMode]?.BASE_URL ?? API_CONFIG.development.BASE_URL;
+export const UPLOADS_URL = getEnv('VITE_UPLOADS_URL', import.meta.env.DEV ? '' : API_URL);
 
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Network connection issue. Please check your internet connection.',

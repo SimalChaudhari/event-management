@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { UPLOADS_URL } from '../config';
 import { fetchBannerEvents } from '../store/actions/bannerActions';
@@ -10,8 +10,11 @@ export default function Banner() {
   const dispatch = useDispatch();
   const { data: bannerData, loading } = useSelector((state) => state.banner);
   const [activeIndex, setActiveIndex] = useState(0);
+  const fetched = useRef(false);
 
   useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
     dispatch(fetchBannerEvents());
   }, [dispatch]);
 
