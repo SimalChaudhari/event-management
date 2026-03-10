@@ -12,22 +12,27 @@ import EventDetail from '../pages/events/EventDetail';
 import NotFound from '../pages/NotFound';
 import ProtectedRoute from '../components/ProtectedRoute';
 import MainLayout from '../components/MainLayout';
+import AuthLayout from '../components/AuthLayout';
 import { ROUTES } from '../routes/routeConfig';
 
 /**
  * All app routes – single place to add/change routes.
  * Routes under MainLayout get the shared PageLayout (card + optional hero via usePageHero).
+ * Auth routes use AuthLayout (PageLayout + spacing so footer does not overflow on scroll).
  */
 export function AppRoutes() {
   return (
     <Routes>
       <Route path={ROUTES.HOME} element={<Home />} />
-      <Route path={ROUTES.LOGIN} element={<Login />} />
-      <Route path={ROUTES.REGISTER} element={<Register />} />
-      <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
-      <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
-      <Route path={ROUTES.VERIFY_EMAIL} element={<VerifyEmail />} />
       <Route path="/event/:id" element={<EventDetail />} />
+
+      <Route element={<AuthLayout />}>
+        <Route path={ROUTES.LOGIN} element={<Login />} />
+        <Route path={ROUTES.REGISTER} element={<Register />} />
+        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+        <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
+        <Route path={ROUTES.VERIFY_EMAIL} element={<VerifyEmail />} />
+      </Route>
 
       <Route element={<MainLayout />}>
         <Route path="/engagement" element={<Engagement />} />

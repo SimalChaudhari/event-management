@@ -12,10 +12,6 @@ const navItems = [
   { path: ROUTES.PROFILE, label: 'Profile' },
 ];
 
-const navItemsGuest = navItems.filter(
-  (item) => item.path !== ROUTES.SCAN && item.path !== ROUTES.PROFILE && item.path !== ROUTES.ENGAGEMENT
-);
-
 function getProfilePictureUrl(user) {
   const raw = user?.profilePicture || user?.profileImage;
   if (!raw) return null;
@@ -51,9 +47,10 @@ export default function Header() {
       <Link to={ROUTES.HOME} className="flex items-center gap-2">
         <img src={logo} alt="EVENTIAL" className="h-8 w-auto object-contain md:bg-white md:rounded-lg md:p-1 md:border md:border-slate-200" />
       </Link>
+      {authenticated && (
       <nav className="hidden md:flex items-center gap-2 ml-8" aria-label="Main">
-        {(authenticated ? navItems : navItemsGuest).map(({ path, label }) => (
-          <NavLink
+        {navItems.map(({ path, label }) => (
+            <NavLink
             key={path}
             to={path}
             className={({ isActive }) =>
@@ -64,9 +61,10 @@ export default function Header() {
             end={path === ROUTES.HOME}
           >
             {label}
-          </NavLink>
-        ))}
+            </NavLink>
+          ))}
       </nav>
+      )}
       <div className="flex items-center gap-1">
         {authenticated ? (
           <>
@@ -125,7 +123,7 @@ export default function Header() {
             <NavLink
               to={ROUTES.REGISTER}
               className={({ isActive }) =>
-                `px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                `max-[329px]:hidden px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                   isActive
                     ? 'bg-[#71C0BB] text-white md:bg-white md:text-black'
                     : 'bg-[#71C0BB] text-white md:bg-transparent md:text-slate-800 md:hover:bg-white/20'

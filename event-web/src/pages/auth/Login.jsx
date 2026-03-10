@@ -5,7 +5,6 @@ import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { login } from '../../store/actions/authActions';
 import PasswordInput from '../../components/PasswordInput';
-import AuthCard from '../../components/AuthCard';
 import { loginSchema } from '../../validation/authSchemas';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -30,11 +29,10 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-8 px-4 min-h-[60vh] flex flex-col justify-center">
-      <AuthCard noCardOnMobile>
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">Welcome!</h1>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-slate-800 mb-6">Welcome!</h1>
 
-        <Formik
+      <Formik
           initialValues={{ email: '', password: '' }}
           validationSchema={loginSchema}
           onSubmit={handleSubmit}
@@ -107,7 +105,6 @@ export default function Login() {
             <button type="button" className="w-11 h-11 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-lg font-bold hover:opacity-90" aria-label="Facebook">f</button>
           </div>
         </div>
-      </AuthCard>
     </div>
   );
 }

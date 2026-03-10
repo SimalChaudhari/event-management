@@ -5,7 +5,7 @@ const qrImageUrl = `${QR_API}?size=120x120&data=${encodeURIComponent(APP_DOWNLOA
 
 export default function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-slate-50/80 mt-auto">
+    <footer className="border-t border-slate-200 bg-slate-50/80 mt-auto flex-shrink-0">
       <div className="max-w-app mx-auto md:max-w-[1200px] px-4 py-6 md:px-6 md:py-8">
         <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-center gap-4">

@@ -5,7 +5,6 @@ import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { register } from '../../store/actions/authActions';
 import PasswordInput from '../../components/PasswordInput';
-import AuthCard from '../../components/AuthCard';
 import { signupSchema } from '../../validation/authSchemas';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -42,13 +41,11 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem-3rem)] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-      <AuthCard noCardOnMobile>
-        <h1 className="text-2xl font-bold text-slate-800 mb-1">Sign up</h1>
-        <p className="text-slate-600 text-sm mb-6">Create an account to get started</p>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-slate-800 mb-1">Sign up</h1>
+      <p className="text-slate-600 text-sm mb-6">Create an account to get started</p>
 
-        <Formik
+      <Formik
           initialValues={{
             firstName: '',
             lastName: '',
@@ -179,8 +176,6 @@ export default function Register() {
         <p className="mt-6 text-center text-slate-600 text-sm">
           Already have an account? <Link to={ROUTES.LOGIN} className="text-primary font-medium hover:underline">Log in</Link>
         </p>
-      </AuthCard>
-      </div>
     </div>
   );
 }

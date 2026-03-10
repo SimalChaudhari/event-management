@@ -10,7 +10,8 @@ export async function getMobileEventList(opts = {}) {
   return data?.data ?? [];
 }
 
-export async function getEventById(id) {
-  const { data } = await axiosInstance.get(`/events/${id}`);
+export async function getEventById(id, opts = {}) {
+  const { signal } = opts;
+  const { data } = await axiosInstance.get(`/events/${id}`, { signal });
   return data?.data ?? data;
 }

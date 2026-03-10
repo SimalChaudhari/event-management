@@ -1,10 +1,26 @@
 import { Link } from 'react-router-dom';
 import { UPLOADS_URL } from '../config';
 import { getEventDetailPath } from '../routes/routeConfig';
+import { ROUTES } from '../routes/routeConfig';
 
-export default function EventCard({ event, compact }) {
-  const imageUrl = event.image
-    ? (event.image.startsWith('http') ? event.image : `${UPLOADS_URL}/${event.image}`)
+/** True if event has ended (end date+time or start date+time is in the past) */
+export function isPastEvent(event) {
+  if (!event) return false;
+  const dateStr = event.endDate || event.startDate;
+  const timeStr = event.endTime || event.startTime;
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (timeStr) {
+    const [h, m, s] = timeStr.split(':').map(Number);
+    d.setHours(h ?? 0, m ?? 0, s ?? 0);
+  }
+  return d.getTime() < Date.now();
+}
+
+export default function EventCard({ event, compact, clickable = true, registrationId }) {
+  const e = event?.event ?? event;
+  const imageUrl = e.image
+    ? (e.image.startsWith('http') ? e.image : `${UPLOADS_URL}/${e.image}`)
     : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=240&fit=crop';
 
   const formatDate = (d) => {
@@ -13,18 +29,27 @@ export default function EventCard({ event, compact }) {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', weekday: 'short' });
   };
 
-  const displayPrice = event.earlyBirdPrice != null ? event.earlyBirdPrice : event.price;
-  const hasDiscount = event.earlyBirdPrice != null && event.price != null && event.earlyBirdPrice < event.price;
-  const currency = event.currency || 'SGD';
+  const currency = e.currency || 'SGD';
+  const priceRaw = e.price != null && e.price !== '' ? Number(e.price) : null;
+  const earlyBirdRaw = e.earlyBirdPrice != null && e.earlyBirdPrice !== '' ? Number(e.earlyBirdPrice) : null;
+  const hasValidPrice = priceRaw !== null && !Number.isNaN(priceRaw) && priceRaw > 0;
+  const hasRealEarlyBird = earlyBirdRaw !== null && !Number.isNaN(earlyBirdRaw) && earlyBirdRaw > 0;
+  const hasDiscount = hasRealEarlyBird && hasValidPrice && earlyBirdRaw < priceRaw;
+  const displayPriceNum = hasDiscount ? earlyBirdRaw : priceRaw;
+  const priceLabel =
+    displayPriceNum === null || displayPriceNum === undefined || Number.isNaN(displayPriceNum) || displayPriceNum === 0
+      ? 'Free'
+      : `${currency} ${Number(displayPriceNum).toLocaleString()}`;
+  const regularPriceLabel = hasDiscount && hasValidPrice ? `${currency} ${Number(priceRaw).toLocaleString()}` : null;
 
   if (compact) {
-    return (
+    return clickable ? (
       <Link
-        to={getEventDetailPath(event.id)}
+        to={registrationId ? getEventDetailPath(registrationId, { byRegistration: true }) : getEventDetailPath(e.id)}
         className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 active:scale-[0.98] active:shadow transition-all"
       >
         <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-          <img src={imageUrl} alt={event.name} className="w-full h-full object-cover" />
+          <img src={imageUrl} alt={e.name} className="w-full h-full object-cover" />
           <button
             type="button"
             className="absolute top-2.5 right-2.5 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-slate-800 shadow-md"
@@ -35,18 +60,33 @@ export default function EventCard({ event, compact }) {
             </svg>
           </button>
         </div>
-        <p className="text-base font-semibold text-slate-800 px-3 py-3">{event.name}</p>
+        <p className="text-base font-semibold text-slate-800 px-3 py-3">{e.name}</p>
       </Link>
+    ) : (
+      <div className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+        <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+          <img src={imageUrl} alt={e.name} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Link
+              to={ROUTES.LOGIN}
+              className="text-white text-sm font-medium bg-primary px-3 py-1.5 rounded-full hover:opacity-90"
+            >
+              Log in to view
+            </Link>
+          </div>
+        </div>
+        <p className="text-base font-semibold text-slate-800 px-3 py-3">{e.name}</p>
+      </div>
     );
   }
 
-  return (
+  return clickable ? (
     <Link
-      to={getEventDetailPath(event.id)}
+      to={registrationId ? getEventDetailPath(registrationId, { byRegistration: true }) : getEventDetailPath(e.id)}
       className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 active:scale-[0.98] active:shadow transition-all"
     >
       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-        <img src={imageUrl} alt={event.name} className="w-full h-full object-cover" />
+        <img src={imageUrl} alt={e.name} className="w-full h-full object-cover" />
         <div className="absolute top-2.5 right-2.5 flex gap-2">
           <button
             type="button"
@@ -71,27 +111,58 @@ export default function EventCard({ event, compact }) {
         </div>
       </div>
       <div className="px-3 pb-3">
-        <h3 className="text-base font-semibold text-slate-800 pt-3 mb-1">{event.name}</h3>
-        {event.description && (
-          <p className="text-[13px] text-slate-500 mb-1.5 leading-snug">
-            {event.description.slice(0, 50)}{event.description.length > 50 ? '…' : ''}
-          </p>
-        )}
-        <p className="text-[13px] text-slate-500 mb-1.5">Event: {formatDate(event.startDate)}</p>
-        <div className="flex items-center gap-2 mb-1">
-          {hasDiscount && (
+        <h3 className="text-base font-semibold text-slate-800 pt-3 mb-1">{e.name}</h3>
+        <p className="text-[13px] text-slate-500 mb-1.5">Event: {formatDate(e.startDate)}</p>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          {hasDiscount && regularPriceLabel && (
             <span className="text-[13px] text-slate-500 line-through">
-              {currency} {Number(event.price).toLocaleString()}
+              {regularPriceLabel}
             </span>
           )}
           <span className="text-base font-bold text-primary">
-            {currency} {displayPrice != null ? Number(displayPrice).toLocaleString() : 'Free'}
+            {priceLabel}
           </span>
         </div>
-        {event.attendanceCount != null && event.attendanceCount > 0 && (
-          <p className="text-xs text-slate-500">Attendance: {Number(event.attendanceCount).toLocaleString()}</p>
+        {e.attendanceCount != null && e.attendanceCount > 0 && (
+          <p className="text-xs text-slate-500">Attendance: {Number(e.attendanceCount).toLocaleString()}</p>
         )}
       </div>
     </Link>
+  ) : (
+    <div className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+        <img src={imageUrl} alt={e.name} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          <Link
+            to={ROUTES.LOGIN}
+            className="text-white text-sm font-medium bg-primary px-3 py-1.5 rounded-full hover:opacity-90"
+          >
+            Log in to view
+          </Link>
+        </div>
+      </div>
+      <div className="px-3 pb-3">
+        <h3 className="text-base font-semibold text-slate-800 pt-3 mb-1">{e.name}</h3>
+        <p className="text-[13px] text-slate-500 mb-1.5">Event: {formatDate(e.startDate)}</p>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          {hasDiscount && regularPriceLabel && (
+            <span className="text-[13px] text-slate-500 line-through">
+              {regularPriceLabel}
+            </span>
+          )}
+          <span className="text-base font-bold text-primary">
+            {priceLabel}
+          </span>
+        </div>
+        {e.attendanceCount != null && e.attendanceCount > 0 && (
+          <p className="text-xs text-slate-500">Attendance: {Number(e.attendanceCount).toLocaleString()}</p>
+        )}
+      </div>
+      <div className="px-3 pb-3 pt-0">
+        <Link to={ROUTES.LOGIN} className="text-sm font-medium text-primary hover:underline">
+          Log in to view event details
+        </Link>
+      </div>
+    </div>
   );
 }

@@ -5,7 +5,6 @@ import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { resetPassword } from '../../store/actions/authActions';
 import PasswordInput from '../../components/PasswordInput';
-import AuthCard from '../../components/AuthCard';
 import { resetPasswordSchema } from '../../validation/authSchemas';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -32,12 +31,10 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center py-8 px-4">
-      <div className="w-full max-w-md">
-        <AuthCard noCardOnMobile>
-          <h1 className="text-2xl font-bold text-slate-800 mb-6">Reset Password</h1>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-slate-800 mb-6">Reset Password</h1>
 
-          <Formik
+      <Formik
             initialValues={{
               email: emailFromQuery,
               otp: '',
@@ -136,12 +133,10 @@ export default function ResetPassword() {
               </Form>
             )}
           </Formik>
-        </AuthCard>
 
-        <p className="mt-4 text-center">
-          <Link to={ROUTES.LOGIN} className="text-sm text-primary hover:underline">← Back to log in</Link>
-        </p>
-      </div>
+      <p className="mt-4 text-center">
+        <Link to={ROUTES.LOGIN} className="text-sm text-primary hover:underline">← Back to log in</Link>
+      </p>
     </div>
   );
 }

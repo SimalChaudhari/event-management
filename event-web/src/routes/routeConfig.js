@@ -74,4 +74,8 @@ export function getDocumentTitle(pathname) {
   return pageTitle === 'Home' ? `${SITE_NAME} – Events` : `${pageTitle} – ${SITE_NAME}`;
 }
 
-export const getEventDetailPath = (id) => `/event/${id}`;
+/** Event detail URL: use eventId for Featured/Upcoming, or registerEventId with byRegistration for My Registered */
+export const getEventDetailPath = (id, opts = {}) => {
+  if (opts.byRegistration) return `/event/${id}?by=registration`;
+  return `/event/${id}`;
+};

@@ -9,10 +9,6 @@ const navItems = [
   { path: ROUTES.PROFILE, label: 'Profile', icon: 'profile' },
 ];
 
-const navItemsGuest = navItems.filter(
-  (item) => item.path !== ROUTES.SCAN && item.path !== ROUTES.PROFILE && item.path !== ROUTES.ENGAGEMENT
-);
-
 function NavIcon({ name }) {
   if (name === 'home') {
     return (
@@ -53,7 +49,8 @@ function NavIcon({ name }) {
 
 export default function BottomNav() {
   const { authenticated } = useSelector((s) => s.auth);
-  const items = authenticated ? navItems : navItemsGuest;
+  if (!authenticated) return null;
+  const items = navItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 w-full h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] flex items-center justify-around bg-white border-t border-slate-200 z-10 md:hidden">

@@ -107,6 +107,7 @@ export class UserUtils {
         ? `${user.firstName} ${user.lastName}`.trim() 
         : user.firstName || 'Unknown Speaker',
       email: user.email || '',
+      mobile: user.mobile || '',
       position: user.speakerProfile?.position || '',
       companyName: user.speakerProfile?.companyName || '',
       description: user.speakerProfile?.description || '',

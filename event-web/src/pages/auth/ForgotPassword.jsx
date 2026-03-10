@@ -4,7 +4,6 @@ import { useDispatch } from 'react-redux';
 import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { forgotPassword } from '../../store/actions/authActions';
-import AuthCard from '../../components/AuthCard';
 import { forgotPasswordSchema } from '../../validation/authSchemas';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -32,13 +31,11 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem-3rem)] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-      <AuthCard noCardOnMobile>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Forgot Password</h1>
-        <p className="text-slate-600 text-sm mb-6">Enter your email and we&apos;ll send an OTP to reset your password.</p>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-slate-800 mb-2">Forgot Password</h1>
+      <p className="text-slate-600 text-sm mb-6">Enter your email and we&apos;ll send an OTP to reset your password.</p>
 
-        <Formik
+      <Formik
           initialValues={{ email: '' }}
           validationSchema={forgotPasswordSchema}
           onSubmit={handleSubmit}
@@ -69,7 +66,6 @@ export default function ForgotPassword() {
             </Form>
           )}
         </Formik>
-      </AuthCard>
 
       <p className="mt-6 text-center">
         <Link to={ROUTES.LOGIN} className="text-sm text-primary hover:underline">← Back to log in</Link>
@@ -104,7 +100,6 @@ export default function ForgotPassword() {
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 }

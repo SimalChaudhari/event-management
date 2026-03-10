@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { getBreadcrumbs } from '../routes/routeConfig';
 
 export default function Breadcrumb() {
   const { pathname } = useLocation();
+  const { authenticated } = useSelector((s) => s.auth);
   const items = getBreadcrumbs(pathname);
 
-  if (items.length <= 1) return null;
+  if (!authenticated || items.length <= 1) return null;
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4 md:mb-6">

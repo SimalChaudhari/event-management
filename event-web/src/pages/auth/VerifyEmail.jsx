@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ROUTES } from '../../routes/routeConfig';
 import { verifyEmail } from '../../store/actions/authActions';
-import AuthCard from '../../components/AuthCard';
 
 const CODE_LENGTH = 4;
 
@@ -64,31 +63,27 @@ export default function VerifyEmail() {
 
   if (!email) {
     return (
-      <div className="min-h-[calc(100vh-3.5rem-3rem)] flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md text-center">
-          <p className="text-slate-600 mb-4">No email found. Please register first.</p>
-          <Link to={ROUTES.REGISTER} className="text-primary font-medium hover:underline">Go to Sign up</Link>
-        </div>
+      <div className="w-full max-w-md mx-auto text-center py-8">
+        <p className="text-slate-600 mb-4">No email found. Please register first.</p>
+        <Link to={ROUTES.REGISTER} className="text-primary font-medium hover:underline">Go to Sign up</Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem-3rem)] md:min-h-0 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <AuthCard noCardOnMobile>
-          <Link
-            to={ROUTES.LOGIN}
-            className="inline-flex items-center text-slate-600 hover:text-slate-800 mb-6"
-            aria-label="Back"
-          >
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </Link>
+    <div className="w-full max-w-md mx-auto">
+      <Link
+        to={ROUTES.LOGIN}
+        className="inline-flex items-center text-slate-600 hover:text-slate-800 mb-6"
+        aria-label="Back"
+      >
+        <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back
+      </Link>
 
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Verification Code</h1>
+      <h1 className="text-2xl font-bold text-slate-800 mb-2">Verification Code</h1>
           {messageFromLogin && (
             <p className="text-slate-600 text-sm mb-4 p-3 rounded-lg bg-slate-100">{messageFromLogin}</p>
           )}
@@ -130,8 +125,6 @@ export default function VerifyEmail() {
               Resend
             </button>
           </p>
-        </AuthCard>
-      </div>
     </div>
   );
 }
