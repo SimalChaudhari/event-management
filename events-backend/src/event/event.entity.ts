@@ -36,10 +36,6 @@ export class Event {
   @Column({ type: 'varchar' })
   name!: string;
 
-  // Event code from Salesforce/external system - used for SSO sync
-  @Column({ type: 'varchar', nullable: true, unique: true })
-  eventCode?: string;
-
   @Column({ type: 'text', nullable: true })
   description?: string;
 
@@ -103,6 +99,24 @@ export class Event {
 
   @Column({ type: 'varchar', length: 10, default: 'SGD' })
   currency?: string = 'SGD';
+
+  // Event code from Salesforce/external system - used for SSO sync
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  eventCode?: string;
+
+  /** Salesforce EventInfo: course code (e.g. PS2603). Used for reference/sync. */
+  @Column({ type: 'varchar', nullable: true })
+  courseCode?: string;
+
+  /** Salesforce EventInfo: pricing options (Corporate CA, Member, Non Member, etc.) stored as JSON. */
+  @Column({ type: 'json', nullable: true })
+  salesforcePricingOptions?: Array<{
+    id: string;
+    name: string;
+    courseInstance: string;
+    baseValue: number;
+    defaultValue: number;
+  }>;
 
   /** Early Bird: price and validity period (start = when it becomes available, end = expiry) */
   @Column({ type: 'decimal', nullable: true })
@@ -178,26 +192,26 @@ export class Event {
   // Add this new field for document names
   @Column('simple-array', { nullable: true })
   documentNames?: string[];
-  
+
   // Event booths relationship
   @OneToMany(() => EventBooth, (eventBooth) => eventBooth.event)
   eventBooths!: EventBooth[];
-  
+
   // Event staff relationship (users who switched to exhibitor role for this event)
   @OneToMany(() => EventStaff, (eventStaff) => eventStaff.event)
   eventStaffs!: EventStaff[];
-  
+
   // Event agendas relationship
   @OneToMany(() => EventAgenda, (eventAgenda) => eventAgenda.event)
   eventAgendas!: EventAgenda[];
-  
+
   // Programme tracks relationship
   @OneToMany(() => ProgrammeTrack, (programmeTrack) => programmeTrack.event, {
     cascade: true,
     eager: false,
   })
   programmeTracks!: ProgrammeTrack[];
-  
+
   /** Stamps required to get reward (e.g. 8). Progress shown as collectedCount/stampRequiredForReward (e.g. 3/8) in app. */
   @Column({ type: 'int', nullable: true })
   stampRequiredForReward?: number;
@@ -219,7 +233,6 @@ export class Event {
     programme?: boolean;
     chat?: boolean;
   };
-
 }
 
 @Entity('event_exhibitor')
@@ -242,6 +255,4 @@ export class EventExhibitor {
     onDelete: 'CASCADE',
   })
   exhibitor!: Exhibitor;
-
-  
 }

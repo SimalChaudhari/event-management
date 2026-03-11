@@ -83,6 +83,10 @@ export class SalesforceSyncService {
           const venueName = item.venue?.name || null;
           const images = item.imageUrl ? [item.imageUrl] : undefined;
 
+          const defaultPrice = this.getDefaultPriceFromPricingOptions(
+            item.pricingOptions,
+          );
+
           const eventData: Partial<Event> = {
             name,
             description: description ?? undefined,
@@ -95,9 +99,19 @@ export class SalesforceSyncService {
             type: venueName && venueName.toLowerCase().includes('e-learning')
               ? EventType.Virtual
               : EventType.Physical,
-            price: undefined,
+            price: defaultPrice,
             currency: 'SGD',
             images,
+            courseCode: item.courseCode ?? undefined,
+            salesforcePricingOptions: item.pricingOptions?.length
+              ? item.pricingOptions.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  courseInstance: p.courseInstance,
+                  baseValue: Number(p.baseValue),
+                  defaultValue: Number(p.defaultValue),
+                }))
+              : undefined,
           };
 
           if (!event) {
@@ -108,10 +122,25 @@ export class SalesforceSyncService {
             await this.eventRepository.save(event);
             result.created++;
           } else {
+            const pricingOptsJson = JSON.stringify(
+              item.pricingOptions?.map((p) => ({
+                id: p.id,
+                name: p.name,
+                courseInstance: p.courseInstance,
+                baseValue: Number(p.baseValue),
+                defaultValue: Number(p.defaultValue),
+              })) ?? [],
+            );
+            const existingPricingOptsJson = JSON.stringify(
+              event.salesforcePricingOptions ?? [],
+            );
             const hasChanges =
               event.name !== name ||
               (event.description ?? '') !== (description ?? '') ||
-              (event.venue ?? '') !== (venueName ?? '');
+              (event.venue ?? '') !== (venueName ?? '') ||
+              (event.courseCode ?? '') !== (item.courseCode ?? '') ||
+              (event.price ?? 0) !== (defaultPrice ?? 0) ||
+              existingPricingOptsJson !== pricingOptsJson;
             if (hasChanges) {
               Object.assign(event, eventData);
               await this.eventRepository.save(event);
@@ -250,6 +279,28 @@ export class SalesforceSyncService {
       this.logger.error(result.message, err?.stack);
       return result;
     }
+  }
+
+  /**
+   * Use "Non Member" pricing option as event default price; fallback to first option with a value.
+   */
+  private getDefaultPriceFromPricingOptions(
+    options: Array<{ name: string; baseValue: number; defaultValue: number }> | undefined,
+  ): number | undefined {
+    if (!options?.length) return undefined;
+    const nonMember = options.find(
+      (p) => p.name?.toLowerCase().replace(/\s+/g, ' ') === 'non member',
+    );
+    if (nonMember != null) {
+      const val = nonMember.defaultValue ?? nonMember.baseValue;
+      return Number(val);
+    }
+    const withValue = options.find(
+      (p) => (p.defaultValue ?? p.baseValue) != null && Number(p.defaultValue ?? p.baseValue) > 0,
+    );
+    if (withValue != null)
+      return Number(withValue.defaultValue ?? withValue.baseValue);
+    return undefined;
   }
 
   private mapRegistrationStatus(status: string): Status {
