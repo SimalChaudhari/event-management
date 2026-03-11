@@ -26,11 +26,11 @@ export const authService = {
   },
 
   verifyEmail(payload) {
-    return axiosInstance.post(`${AUTH}/verify-email`, payload);
+    return axiosInstance.post(`${AUTH}/verify-otp`, payload);
   },
 
   resendVerificationCode(email) {
-    return axiosInstance.post(`${AUTH}/resend-verification`, { email });
+    return axiosInstance.post(`${AUTH}/resend-otp`, { email });
   },
 
   refreshToken(refreshToken) {

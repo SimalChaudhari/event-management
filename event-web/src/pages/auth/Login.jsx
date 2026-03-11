@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
@@ -13,8 +13,10 @@ const inputErrorClass = 'w-full px-3 py-2.5 border border-red-500 rounded-lg foc
 export default function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading } = useSelector((s) => s.auth);
   const [apiError, setApiError] = useState('');
+  const successMessage = location.state?.message;
 
   const handleSubmit = async (values) => {
     setApiError('');
@@ -22,7 +24,9 @@ export default function Login() {
     if (result.success) {
       navigate(ROUTES.HOME);
     } else if (result.requiresVerification) {
-      setApiError(result.data?.message || 'Please verify your email.');
+      navigate(ROUTES.VERIFY_EMAIL, {
+        state: { email: values.email, message: result.message },
+      });
     } else {
       setApiError(result.payload || result.message || 'Invalid email or password.');
     }
@@ -39,6 +43,9 @@ export default function Login() {
         >
           {({ errors, touched }) => (
             <Form className="space-y-4">
+              {successMessage && (
+                <div className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">{successMessage}</div>
+              )}
               {apiError && (
                 <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{apiError}</div>
               )}

@@ -14,7 +14,7 @@ export const login = (payload) => async (dispatch) => {
     if (data.requiresVerification) {
       const message = data.message || "Email verification required";
       dispatch({ type: AUTH_ERROR, payload: message });
-      return { success: false, requiresVerification: true, data };
+      return { success: false, requiresVerification: true, message, data };
     }
     if (data.success && data.accessToken) {
       authService.setStoredAuth({
@@ -30,8 +30,18 @@ export const login = (payload) => async (dispatch) => {
     dispatch({ type: AUTH_ERROR, payload: message });
     return { success: false, payload: message };
   } catch (err) {
+    const status = err.response?.status;
+    const data = err.response?.data;
+
+    // Backend may return 307 with requiresVerification – treat as verification required, not error
+    if ((status === 307 || status === 200) && data?.requiresVerification) {
+      const message = data.message || "Email verification required";
+      dispatch({ type: AUTH_ERROR, payload: message });
+      return { success: false, requiresVerification: true, message, data };
+    }
+
     const message =
-      err.response?.data?.message || err.message || "Login failed";
+      data?.message || err.message || "Login failed";
     dispatch({ type: AUTH_ERROR, payload: message });
     dispatch({ type: AUTH_LOADING, payload: false });
     return { success: false, payload: message };
@@ -155,12 +165,17 @@ export const verifyEmail = (payload) => async (dispatch) => {
       toast.success(data.message || "Account verified successfully");
       return { success: true, message: data.message };
     }
+    if (data.success) {
+      toast.success(data.message || "Account verified. You can now log in.");
+      return { success: true, message: data.message };
+    }
     const message = data.message || "Verification failed";
     dispatch({ type: AUTH_ERROR, payload: message });
     return { success: false, payload: message };
   } catch (err) {
+    const errData = err.response?.data;
     const message =
-      err.response?.data?.message || err.message || "Verification failed";
+      errData?.message || err.message || "Verification failed";
     dispatch({ type: AUTH_ERROR, payload: message });
     return { success: false, payload: message };
   } finally {
