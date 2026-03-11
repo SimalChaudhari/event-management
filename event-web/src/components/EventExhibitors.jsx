@@ -1,5 +1,6 @@
 import { sanitizeHtml } from "../utils/sanitizeHtml";
 import pdfIcon from "../assets/pdf/pdf.png";
+import InfoNotAvailable from "./InfoNotAvailable";
 
 function fullUrl(path, uploadsUrl) {
   if (!path || String(path).trim() === "") return null;
@@ -197,7 +198,7 @@ export default function EventExhibitors({ exhibitorsData = {}, uploadsUrl = "", 
   if (exhibitors.length === 0 && !description) {
     return (
       <div className="p-5 sm:p-6">
-        <p className="text-slate-500 text-sm">No exhibitors listed.</p>
+        <InfoNotAvailable title="Exhibitors" message="No exhibitors listed." variant="tab" />
       </div>
     );
   }
@@ -665,7 +666,7 @@ export default function EventExhibitors({ exhibitorsData = {}, uploadsUrl = "", 
       )}
 
       {exhibitors.length === 0 && description && (
-        <p className="text-slate-500 text-sm">No exhibitors listed.</p>
+        <InfoNotAvailable title="Exhibitors" message="No exhibitors listed." />
       )}
     </div>
   );

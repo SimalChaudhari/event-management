@@ -14,6 +14,7 @@ import ImageLightbox from "../../components/ImageLightbox";
 import EventSurveyDetails from "../../components/EventSurveyDetails";
 import EventExhibitors from "../../components/EventExhibitors";
 import EventRegistrationDetails from "../../components/EventRegistrationDetails";
+import InfoNotAvailable from "../../components/InfoNotAvailable";
 
 /**
  * EventDetail — Single event view with tabbed sections.
@@ -378,9 +379,7 @@ export default function EventDetail() {
                           />
                         </>
                       ) : (
-                        <p className="text-sm text-slate-500">
-                          No description.
-                        </p>
+                        <p className="text-sm text-slate-500">Description not available.</p>
                       )}
                     </div>
                     {/* Documents — PDF/list with card layout */}
@@ -435,7 +434,7 @@ export default function EventDetail() {
                           })}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500">No documents available.</p>
+                        <InfoNotAvailable title="Documents" message="No documents available." />
                       )}
                     </div>
                     {/* Floor plan — image or placeholder */}
@@ -467,7 +466,7 @@ export default function EventDetail() {
                           />
                         </button>
                       ) : (
-                        <p className="text-sm text-slate-500">No floor plan available.</p>
+                        <InfoNotAvailable title="Floor plan" message="No floor plan available." />
                       )}
                     </div>
                     {/* Event stamps — collectible stamps / booths */}
@@ -552,7 +551,7 @@ export default function EventDetail() {
                           })}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500">No event stamps available.</p>
+                        <InfoNotAvailable title="Event stamps" message="No event stamps available." />
                       )}
                     </div>
                   </div>
@@ -573,9 +572,7 @@ export default function EventDetail() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 py-4">
-                        No speakers listed.
-                      </p>
+                      <InfoNotAvailable message="No speakers listed." variant="tab" />
                     )}
                   </div>
                 )}

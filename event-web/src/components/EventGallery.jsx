@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ImageLightbox from "./ImageLightbox";
+import InfoNotAvailable from "./InfoNotAvailable";
 
 /**
  * Resolve full image URL from item (string path or object with url).
@@ -36,7 +37,7 @@ export default function EventGallery({ galleries = [], uploadsUrl = "" }) {
   if (galleries.length === 0) {
     return (
       <div className="p-5 sm:p-6">
-        <p className="text-slate-500 text-sm">No gallery images available.</p>
+        <InfoNotAvailable title="Gallery" message="No gallery images available." variant="tab" />
       </div>
     );
   }

@@ -5,6 +5,8 @@
  * Shows all adminInfo and checkout fields; null/empty values display as "—".
  * @param {{ registrationDetails: any, currency: string, section?: 'all' | 'admin' | 'checkout' }} props
  */
+import InfoNotAvailable from "./InfoNotAvailable";
+
 export default function EventRegistrationDetails({ registrationDetails, currency, section = "all" }) {
   if (!registrationDetails) {
     return null;
@@ -55,7 +57,7 @@ export default function EventRegistrationDetails({ registrationDetails, currency
         )}
 
         {showAdmin && section === "admin" && !registrationDetails.adminInfo && (
-          <EmptyState message="No event info available." />
+          <InfoNotAvailable title="Event info" message="No event info available." variant="tab" />
         )}
 
         {showCheckout && registrationDetails.checkout && (
@@ -95,11 +97,11 @@ export default function EventRegistrationDetails({ registrationDetails, currency
         )}
 
         {showCheckout && section === "checkout" && !registrationDetails.checkout && (
-          <EmptyState message="No checkout or registration details available." />
+          <InfoNotAvailable title="Checkout" message="No checkout or registration details available." variant="tab" />
         )}
 
         {section === "all" && !registrationDetails.adminInfo && !registrationDetails.checkout && (
-          <EmptyState message="No register info available." />
+          <InfoNotAvailable message="No register info available." variant="tab" />
         )}
       </div>
     </div>
@@ -118,14 +120,6 @@ function formatDate(value) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function EmptyState({ message }) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 sm:px-5 py-12 text-center">
-      <p className="text-sm text-slate-500">{message}</p>
-    </div>
-  );
 }
 
 /** Icon: calendar / info (event) */

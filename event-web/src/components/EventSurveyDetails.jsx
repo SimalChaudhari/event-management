@@ -1,4 +1,5 @@
 import { sanitizeHtml } from "../utils/sanitizeHtml";
+import InfoNotAvailable from "./InfoNotAvailable";
 
 /** Convert 24h time string (e.g. "14:50:00") to 12h format ("2:50 PM"). */
 function to12h(timeStr) {
@@ -37,7 +38,7 @@ export default function EventSurveyDetails({ surveyDetails }) {
   if (!surveyDetails) {
     return (
       <div className="p-5 sm:p-6">
-        <p className="text-slate-500 text-sm">No survey available.</p>
+        <InfoNotAvailable title="Survey" message="No survey available." variant="tab" />
       </div>
     );
   }
@@ -214,7 +215,7 @@ export default function EventSurveyDetails({ surveyDetails }) {
       )}
 
       {!hasUrls && !hasSessions && (
-        <p className="text-slate-500 text-sm">No survey links or sessions.</p>
+        <InfoNotAvailable title="Survey" message="No survey links or sessions." />
       )}
     </div>
   );
