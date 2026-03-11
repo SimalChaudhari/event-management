@@ -37,7 +37,7 @@ export default function Login() {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="flex justify-start md:justify-center mb-6">
-        <img src={logo} alt="Logo" className="object-contain" />
+        <img src={logo} alt="Logo" className="h-auto w-auto object-contain" />
       </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Welcome!</h1>
 

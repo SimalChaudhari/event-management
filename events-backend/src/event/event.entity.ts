@@ -57,10 +57,10 @@ export class Event {
 
   // Publish dates - determines when event is visible on the app
   @Column({ type: 'date', nullable: true })
-  publishStartDate?: Date;
+  publishStartDate?: Date | null;
 
   @Column({ type: 'date', nullable: true })
-  publishEndDate?: Date;
+  publishEndDate?: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
   location?: string;

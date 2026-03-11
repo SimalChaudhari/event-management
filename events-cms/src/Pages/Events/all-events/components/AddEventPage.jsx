@@ -972,13 +972,18 @@ function AddEventPage() {
                     });
                 }
             } else if (key !== 'speakersData') {
-                // Skip empty/null/undefined values
+                // Skip empty/null/undefined values (except optional date fields - we send empty to clear)
                 if (dataToSend[key] === null || dataToSend[key] === undefined) {
+                    // For optional date fields, still send empty string so backend clears the value
+                    if (dateFields.includes(key)) {
+                        formDataToSend.append(key, '');
+                    }
                     return;
                 }
-                // For optional date fields, skip empty strings
+                // For optional date fields when empty string, send empty so backend clears publish dates
                 if (dateFields.includes(key) && (dataToSend[key] === '' || !dataToSend[key])) {
-                    return; // Don't send empty date strings - backend will keep existing value
+                    formDataToSend.append(key, '');
+                    return;
                 }
                 // Skip empty Early Bird price so backend doesn't receive invalid number
                 if (key === 'earlyBirdPrice' && (dataToSend[key] === '' || dataToSend[key] === null || dataToSend[key] === undefined)) {

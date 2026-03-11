@@ -632,26 +632,25 @@ export class EventService {
       // Filter out past events only for non-admin users
       // Admins can see all events including past events
       let filteredEvents = events;
-      
+
       if (userRole !== UserRole.Admin) {
-        // Filter out past events (only exclude events where endDate < today)
-        // Include all events that are today or upcoming
+        // Use local date for "today" and event date comparison
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         filteredEvents = events.filter((event) => {
           // First check publish dates if they exist
           if (event.publishStartDate || event.publishEndDate) {
             const publishStart = event.publishStartDate ? new Date(event.publishStartDate) : null;
             const publishEnd = event.publishEndDate ? new Date(event.publishEndDate) : null;
-            
+
             if (publishStart) {
               publishStart.setHours(0, 0, 0, 0);
               if (today < publishStart) {
                 return false; // Event not yet published
               }
             }
-            
+
             if (publishEnd) {
               publishEnd.setHours(0, 0, 0, 0);
               if (today > publishEnd) {
@@ -659,20 +658,28 @@ export class EventService {
               }
             }
           }
-          
-          // Also filter out past events (only exclude events where endDate < today)
-          // Include all events from today onwards (today's events should be shown)
+
+          // Filter out past events: exclude only when endDate < today (local date)
           const eventEndDate = new Date(event.endDate);
           eventEndDate.setHours(0, 0, 0, 0);
-          
-          // Only exclude events where endDate < today (past events)
-          // Include all events from today onwards (today's events should be shown)
           if (eventEndDate < today) {
             return false; // Past event - exclude
           }
-          
-          return true; // Include today's events and upcoming events
+
+          return true;
         });
+      }
+
+      // For non-admin users: exclude events they have already registered for from Featured/Upcoming list
+      if (userRole !== UserRole.Admin && userId) {
+        const registeredEventIds = await this.registerEventRepository.find({
+          where: { userId, isRegister: true },
+          select: ['eventId'],
+        }).then((rows) => rows.map((r) => r.eventId).filter(Boolean));
+        if (registeredEventIds.length > 0) {
+          const registeredSet = new Set(registeredEventIds);
+          filteredEvents = filteredEvents.filter((event) => !registeredSet.has(event.id));
+        }
       }
 
       // Only re-sort if we filtered past events (which changes the order) or using globalSearch
@@ -1326,8 +1333,21 @@ export class EventService {
 
       // Remove stamp-related fields from eventDto before assigning
       const { eventStampIds, newStamps, ...eventDtoWithoutStamps } = eventDto;
-      
+
       Object.assign(event, eventDtoWithoutStamps);
+
+      // When optional date fields are empty string or null, set to null so DB gets NULL (not "")
+      const optionalDateFields = ['publishStartDate', 'publishEndDate', 'earlyBirdStartDate', 'earlyBirdEndDate'] as const;
+      for (const field of optionalDateFields) {
+        if (field in eventDto) {
+          const val = eventDto[field];
+          const isEmpty = val === '' || val === null || val === undefined || (typeof val === 'string' && val.trim() === '');
+          if (isEmpty) {
+            (event as any)[field] = null;
+          }
+        }
+      }
+
       const updatedEvent = await this.eventRepository.save(event);
 
       // Update associations if provided
