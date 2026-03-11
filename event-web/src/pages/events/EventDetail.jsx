@@ -13,36 +13,22 @@ import EventGallery from "../../components/EventGallery";
 import ImageLightbox from "../../components/ImageLightbox";
 import EventSurveyDetails from "../../components/EventSurveyDetails";
 import EventExhibitors from "../../components/EventExhibitors";
+import EventRegistrationDetails from "../../components/EventRegistrationDetails";
 
-function OverviewRow({ label, value, link }) {
-  const v = value ?? "—";
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-2.5 border-b border-slate-100 last:border-b-0">
-      <span className="text-sm text-slate-500 shrink-0">{label}</span>
-      <span className="text-sm text-slate-800 text-right font-medium break-words min-w-0">
-        {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            {v}
-          </a>
-        ) : (
-          v
-        )}
-      </span>
-    </div>
-  );
-}
-
+/**
+ * EventDetail — Single event view with tabbed sections.
+ * Fetches event by ID (or by registration ID when ?by=registration).
+ * Tabs: Details (overview, about, documents, floor plan, stamps), Speakers, Gallery, Survey, Exhibitors, Register Info.
+ * Scrolls to top and resets tab when event ID changes.
+ */
 export default function EventDetail() {
+  // ——— Router & auth ———
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const byRegistration = searchParams.get("by") === "registration";
   const { authenticated } = useSelector((s) => s.auth);
 
+  // ——— State ———
   const [event, setEvent] = useState(null);
   const [registrationDetails, setRegistrationDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +36,7 @@ export default function EventDetail() {
   const [activeTab, setActiveTab] = useState("details");
   const [lightbox, setLightbox] = useState({ src: null, alt: "" });
 
+  // ——— Effects: fetch event (by id or registration), reset tab + scroll on id change ———
   useEffect(() => {
     if (!id || !authenticated) {
       setLoading(false);
@@ -101,10 +88,13 @@ export default function EventDetail() {
     return () => ac.abort();
   }, [id, authenticated, byRegistration]);
 
+  // On event id change: reset to Details tab and scroll page to top
   useEffect(() => {
     setActiveTab("details");
+    window.scrollTo(0, 0);
   }, [id]);
 
+  // ——— Format helpers ———
   const formatDate = (d, time) => {
     if (!d) return "—";
     const date = new Date(d);
@@ -128,10 +118,10 @@ export default function EventDetail() {
     });
   };
 
+  // ——— Derived data: event slices, registration flag, tab config, hero image ———
   const currency = event?.currency || "SGD";
 
   const galleries = event?.galleries ?? [];
-  const programmeTracks = event?.programmeTracks ?? [];
   const hasRegistration =
     registrationDetails &&
     (registrationDetails.adminInfo ||
@@ -142,21 +132,28 @@ export default function EventDetail() {
   const eventStamps = event?.eventStamps?.stamps ?? [];
   const exhibitorsData = event?.exhibitorsData ?? {};
   const exhibitors = exhibitorsData?.exhibitors ?? [];
-  const engagements = event?.engagements ?? null;
+
+  const hasSpeakers = speakers.length > 0;
+  const hasGallery = galleries.length > 0;
+  const hasSurvey = event?.surveyDetails != null;
+  const hasExhibitors = exhibitors.length > 0;
 
   const tabs = [
     { id: "details", label: "Details" },
-    { id: "speakers", label: "Speakers" },
-    { id: "gallery", label: "Gallery" },
-    { id: "survey", label: "Survey" },
-    { id: "exhibitors", label: "Exhibitors" },
-    { id: "programme", label: "Programme" },
-    { id: "engagement", label: "Engagement" },
+    ...(hasSpeakers ? [{ id: "speakers", label: "Speakers" }] : []),
+    ...(hasGallery ? [{ id: "gallery", label: "Gallery" }] : []),
+    ...(hasSurvey ? [{ id: "survey", label: "Survey" }] : []),
+    ...(hasExhibitors ? [{ id: "exhibitors", label: "Exhibitors" }] : []),
     ...(hasRegistration
-      ? [{ id: "registration", label: "My Registration" }]
+      ? [{ id: "register-info", label: "Register Info" }]
       : []),
   ];
 
+  const visibleTabIds = tabs.map((t) => t.id);
+  const activeTabValid = visibleTabIds.includes(activeTab);
+  const currentTab = activeTabValid ? activeTab : (tabs[0]?.id ?? "details");
+
+  // Hero image: event image, background, first gallery image, or placeholder
   const imageUrl = event?.images?.[0]
     ? event.images[0].startsWith("http")
       ? event.images[0]
@@ -171,8 +168,10 @@ export default function EventDetail() {
           : `${UPLOADS_URL}/${galleries[0].galleryImages[0]}`
         : "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&h=600&fit=crop";
 
+  // ——— Render ———
   return (
     <div className="min-h-screen bg-slate-50 pb-10">
+      {/* Auth gate: require login to view event */}
       {!authenticated && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
           <p className="text-amber-800 mb-4">Log in to view this event.</p>
@@ -187,23 +186,26 @@ export default function EventDetail() {
 
       {authenticated && (
         <>
+          {/* Loading state */}
           {loading && (
             <div className="rounded-2xl bg-white border border-slate-200 p-10 text-center text-slate-500">
               Loading event…
             </div>
           )}
 
+          {/* Error state (after load) */}
           {error && !loading && (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800 text-sm">
               {error}
             </div>
           )}
 
+          {/* Main content: header, tab bar, tab panels */}
           {event && !loading && (
             <>
               <EventDetailHeader event={event} />
 
-              {/* Tab bar */}
+              {/* Tab bar — only tabs with data are shown */}
               <div className="border-b border-slate-200 mb-5">
                 <nav
                   className="flex gap-1 overflow-x-auto scrollbar-hide -mb-px"
@@ -215,7 +217,7 @@ export default function EventDetail() {
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                        activeTab === tab.id
+                        currentTab === tab.id
                           ? "border-primary text-primary"
                           : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
                       }`}
@@ -226,11 +228,12 @@ export default function EventDetail() {
                 </nav>
               </div>
 
-              {/* Tab panels */}
+              {/* Tab panels — one visible at a time via currentTab */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {activeTab === "details" && (
+                {/* Tab: Details — overview, about, documents, floor plan, event stamps */}
+                {currentTab === "details" && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50/30 overflow-hidden">
-                    {/* Combined: image + badges */}
+                    {/* Hero: cover image + date badges */}
                     <div className="relative w-full rounded-t-xl overflow-hidden border-b border-slate-200 aspect-[2/1] sm:aspect-[3/1] max-h-48 sm:max-h-56 bg-slate-200">
                       <button
                         type="button"
@@ -257,7 +260,7 @@ export default function EventDetail() {
                         )}
                       </div>
                     </div>
-                    {/* Event details: two-column label-value (professional UI) */}
+                    {/* Details grid: type, location, country, venue, dates, map link */}
                     <div className="px-4 sm:px-5 pt-4 pb-4 border-t border-slate-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
                         {/* Left column */}
@@ -359,7 +362,7 @@ export default function EventDetail() {
                         </a>
                       )}
                     </div>
-                    {/* About */}
+                    {/* About — event description (HTML) */}
                     <div className="px-4 sm:px-5 pb-4 pt-4 border-t border-slate-200">
                       {event.description &&
                       String(event.description).trim() !== "" ? (
@@ -380,7 +383,7 @@ export default function EventDetail() {
                         </p>
                       )}
                     </div>
-                    {/* Documents - card layout with bigger PDF image */}
+                    {/* Documents — PDF/list with card layout */}
                     <div className="px-4 sm:px-5 pb-4 pt-4 border-t border-slate-200">
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
                         Documents
@@ -435,7 +438,7 @@ export default function EventDetail() {
                         <p className="text-sm text-slate-500">No documents available.</p>
                       )}
                     </div>
-                    {/* Floor Plan */}
+                    {/* Floor plan — image or placeholder */}
                     <div className="px-4 sm:px-5 pb-4 pt-4 border-t border-slate-200">
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
                         Floor Plan
@@ -467,7 +470,7 @@ export default function EventDetail() {
                         <p className="text-sm text-slate-500">No floor plan available.</p>
                       )}
                     </div>
-                    {/* Event Stamps */}
+                    {/* Event stamps — collectible stamps / booths */}
                     <div className="px-4 sm:px-5 pb-4 pt-4 border-t border-slate-200">
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
                         Event Stamps
@@ -555,7 +558,8 @@ export default function EventDetail() {
                   </div>
                 )}
 
-                {activeTab === "speakers" && (
+                {/* Tab: Speakers — list of SpeakerCard */}
+                {currentTab === "speakers" && (
                   <div className="p-5">
                     {speakers.length > 0 ? (
                       <div className="space-y-6">
@@ -576,11 +580,13 @@ export default function EventDetail() {
                   </div>
                 )}
 
-                {activeTab === "gallery" && (
+                {/* Tab: Gallery — EventGallery */}
+                {currentTab === "gallery" && (
                   <EventGallery galleries={galleries} uploadsUrl={UPLOADS_URL} />
                 )}
 
-                {activeTab === "exhibitors" && (
+                {/* Tab: Exhibitors — EventExhibitors */}
+                {currentTab === "exhibitors" && (
                   <EventExhibitors
                     exhibitorsData={exhibitorsData}
                     uploadsUrl={UPLOADS_URL}
@@ -588,222 +594,21 @@ export default function EventDetail() {
                   />
                 )}
 
-                {activeTab === "programme" && (
-                  <div className="p-5">
-                    {programmeTracks.length > 0 ? (
-                      <ul className="space-y-5">
-                        {programmeTracks.map((track) => (
-                          <li
-                            key={track.id}
-                            className="border-b border-slate-100 last:border-b-0 pb-5 last:pb-0"
-                          >
-                            <h3 className="text-sm font-semibold text-slate-800 mb-2">
-                              {track.title}
-                            </h3>
-                            {track.description && (
-                              <div
-                                className="text-sm text-slate-600 mb-3 prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{
-                                  __html: sanitizeHtml(track.description),
-                                }}
-                              />
-                            )}
-                            <ul className="space-y-2">
-                              {(track.sessions ?? []).map((session) => (
-                                <li
-                                  key={session.id}
-                                  className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-700"
-                                >
-                                  <span className="font-medium">
-                                    {session.title}
-                                  </span>
-                                  <span className="text-slate-500">
-                                    {session.sessionDate &&
-                                      formatDate(session.sessionDate)}
-                                    {session.startTime &&
-                                      ` · ${session.startTime}`}
-                                    {session.venue && ` · ${session.venue}`}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-slate-500 py-4">
-                        No programme available.
-                      </p>
-                    )}
-                  </div>
+                {/* Tab: Register Info — EventRegistrationDetails (when user has registration) */}
+                {currentTab === "register-info" && hasRegistration && (
+                  <EventRegistrationDetails
+                    registrationDetails={registrationDetails}
+                    currency={currency}
+                    section="all"
+                  />
                 )}
 
-                {activeTab === "engagement" && (
-                  <div className="p-5">
-                    {engagements?.programmeTracks?.length > 0 ? (
-                      <ul className="space-y-5">
-                        {engagements.programmeTracks.map((track) => (
-                          <li
-                            key={track.id}
-                            className="border-b border-slate-100 last:border-b-0 pb-5 last:pb-0"
-                          >
-                            <h3 className="text-sm font-semibold text-slate-800 mb-2">
-                              {track.title}
-                            </h3>
-                            <ul className="space-y-2">
-                              {(track.sessions ?? []).map((session) => (
-                                <li
-                                  key={session.id}
-                                  className="text-sm text-slate-700"
-                                >
-                                  <span className="font-medium">
-                                    {session.title}
-                                  </span>
-                                  {session.startTime && (
-                                    <span className="text-slate-500">
-                                      {" "}
-                                      · {session.startTime}
-                                    </span>
-                                  )}
-                                  {session.statistics && (
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                      Q&A:{" "}
-                                      {session.statistics.questionsCount ?? 0} ·
-                                      Polls:{" "}
-                                      {session.statistics.pollsCount ?? 0}
-                                    </p>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : engagements?.event ? (
-                      <p className="text-sm text-slate-600">
-                        Engagement data for this event. Join during the event
-                        for Q&A and polling.
-                      </p>
-                    ) : (
-                      <p className="text-sm text-slate-500 py-4">
-                        No engagement data available.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "registration" && hasRegistration && (
-                  <div className="p-5 space-y-6">
-                    {registrationDetails.adminInfo && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                          Your registration details
-                        </h3>
-                        <div className="space-y-0">
-                          {registrationDetails.adminInfo.tableNumber && (
-                            <OverviewRow
-                              label="Table"
-                              value={registrationDetails.adminInfo.tableNumber}
-                            />
-                          )}
-                          {registrationDetails.adminInfo.hall && (
-                            <OverviewRow
-                              label="Hall"
-                              value={registrationDetails.adminInfo.hall}
-                            />
-                          )}
-                          {registrationDetails.adminInfo.dressCode && (
-                            <OverviewRow
-                              label="Dress code"
-                              value={registrationDetails.adminInfo.dressCode}
-                            />
-                          )}
-                          {registrationDetails.adminInfo
-                            .additionalInformation && (
-                            <OverviewRow
-                              label="Notes"
-                              value={
-                                registrationDetails.adminInfo
-                                  .additionalInformation
-                              }
-                            />
-                          )}
-                          {registrationDetails.adminInfo.luckyDrawNumber && (
-                            <OverviewRow
-                              label="Lucky draw no."
-                              value={
-                                registrationDetails.adminInfo.luckyDrawNumber
-                              }
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {registrationDetails.checkout && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                          Order
-                        </h3>
-                        <div className="space-y-0">
-                          <OverviewRow
-                            label="Order no."
-                            value={registrationDetails.checkout.orderNo}
-                          />
-                          <OverviewRow
-                            label="Status"
-                            value={
-                              registrationDetails.checkout.orderStatus ||
-                              registrationDetails.checkout.status
-                            }
-                          />
-                          {registrationDetails.checkout.thisEventName && (
-                            <OverviewRow
-                              label="Event"
-                              value={registrationDetails.checkout.thisEventName}
-                            />
-                          )}
-                          {registrationDetails.checkout.thisEventAmountPaid !=
-                            null && (
-                            <OverviewRow
-                              label="Amount paid"
-                              value={`${currency} ${Number(registrationDetails.checkout.thisEventAmountPaid).toLocaleString()}`}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {registrationDetails.user && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                          Registered as
-                        </h3>
-                        <p className="text-sm font-medium text-slate-800">
-                          {[
-                            registrationDetails.user.firstName,
-                            registrationDetails.user.lastName,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                        </p>
-                        {registrationDetails.user.email && (
-                          <p className="text-sm text-slate-600 mt-0.5">
-                            {registrationDetails.user.email}
-                          </p>
-                        )}
-                        {registrationDetails.user.mobile && (
-                          <p className="text-sm text-slate-600">
-                            {registrationDetails.user.mobile}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "survey" && (
+                {/* Tab: Survey — EventSurveyDetails */}
+                {currentTab === "survey" && (
                   <EventSurveyDetails surveyDetails={event?.surveyDetails} />
                 )}
               </div>
+              {/* Full-screen image lightbox (shared across tabs) */}
               {lightbox.src && (
                 <ImageLightbox
                   src={lightbox.src}

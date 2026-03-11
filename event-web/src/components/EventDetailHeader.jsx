@@ -1,4 +1,4 @@
-/** Event name and code only; price/early bird in header when set. */
+/** Event name and price in header; early bird only when it's a non-free discount. */
 export default function EventDetailHeader({ event }) {
   if (!event) return null;
 
@@ -10,13 +10,12 @@ export default function EventDetailHeader({ event }) {
       : `${currency} ${Number(priceNum).toLocaleString()}`;
 
   const earlyBirdNum = event.earlyBirdPrice != null && event.earlyBirdPrice !== '' ? Number(event.earlyBirdPrice) : null;
-  const hasEarlyBird = earlyBirdNum !== null && !Number.isNaN(earlyBirdNum) && earlyBirdNum >= 0;
+  const hasEarlyBird = earlyBirdNum !== null && !Number.isNaN(earlyBirdNum) && earlyBirdNum > 0;
   const earlyBirdLabel = hasEarlyBird
-    ? (earlyBirdNum === 0 ? 'Free' : `${currency} ${Number(earlyBirdNum).toLocaleString()}`)
+    ? `${currency} ${Number(earlyBirdNum).toLocaleString()}`
     : null;
 
   const isEarlyBirdActive = event.isEarlyBirdActive === true;
-  // When early bird price is available and lower than regular: show both — original line-through, early bird bold
   const showBothPrices = hasEarlyBird && priceNum != null && priceNum > 0 && earlyBirdNum < priceNum;
 
   return (
@@ -26,13 +25,7 @@ export default function EventDetailHeader({ event }) {
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">
             {event.name}
           </h1>
-      
         </div>
-        {event.eventCode && (
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded shrink-0">
-            {event.eventCode}
-          </span>
-        )}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {showBothPrices ? (
@@ -46,7 +39,18 @@ export default function EventDetailHeader({ event }) {
           </span>
         ) : (
           <>
-            <span className="text-sm font-semibold text-slate-800">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold shadow-sm ${
+                regularLabel === 'Free'
+                  ? 'bg-emerald-500/15 text-emerald-700 border border-emerald-200'
+                  : 'bg-primary/10 text-primary border border-primary/20'
+              }`}
+            >
+              {regularLabel === 'Free' && (
+                <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              )}
               {regularLabel}
             </span>
             {earlyBirdLabel != null && (

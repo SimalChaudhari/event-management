@@ -32,12 +32,12 @@ export const fetchUpcomingEvents = (opts = {}) => async (dispatch) => {
   }
 };
 
-/** Fetch both featured and upcoming (auth required). Keeps loading true until both complete. */
-export const fetchFeaturedAndUpcomingEvents = (featuredOpts = {}) => async (dispatch) => {
+/** Fetch both featured and upcoming (auth required). Featured: all events (no pagination). */
+export const fetchFeaturedAndUpcomingEvents = () => async (dispatch) => {
   dispatch({ type: EVENT_LOADING, payload: true });
   try {
     const [featured, upcoming] = await Promise.all([
-      axiosInstance.get(`/events?page=${featuredOpts.page ?? 1}&limit=${featuredOpts.limit ?? 10}`).then((r) => r.data?.events ?? r.data?.data ?? []),
+      axiosInstance.get(`/events`).then((r) => r.data?.events ?? r.data?.data ?? []),
       axiosInstance.get(`/events?upcoming=true`).then((r) => r.data?.events ?? r.data?.data ?? []),
     ]);
     dispatch({ type: EVENT_LIST, payload: Array.isArray(featured) ? featured : [] });
@@ -77,16 +77,11 @@ export const fetchMobileEventList =
   }
 };
 
-/** My events: GET /api/register-events/all?page=1&limit=10 (auth required). Store full items so detail can use register-event id. */
-export const fetchMyRegisteredEvents = (opts = {}) => async (dispatch) => {
-  const limit = opts.limit ?? 10;
-  const page = opts.page ?? 1;
+/** My events: GET /api/register-events/all (auth required). All events, no pagination. */
+export const fetchMyRegisteredEvents = () => async (dispatch) => {
   dispatch({ type: MY_REGISTERED_EVENT_LOADING, payload: true });
   try {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("limit", String(limit));
-    const { data } = await axiosInstance.get(`/register-events/all?${params.toString()}`);
+    const { data } = await axiosInstance.get(`/register-events/all`);
     const rawList = data?.data ?? [];
     dispatch({ type: MY_REGISTERED_EVENT_LIST, payload: rawList });
     return rawList;
