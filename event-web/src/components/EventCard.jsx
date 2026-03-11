@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { UPLOADS_URL } from '../config';
 import { getEventDetailPath } from '../routes/routeConfig';
 import { ROUTES } from '../routes/routeConfig';
@@ -18,6 +19,7 @@ export function isPastEvent(event) {
 }
 
 export default function EventCard({ event, compact, clickable = true, registrationId }) {
+  const { authenticated } = useSelector((s) => s.auth);
   const e = event?.event ?? event;
   const imageUrl = e.image
     ? (e.image.startsWith('http') ? e.image : `${UPLOADS_URL}/${e.image}`)
@@ -123,7 +125,7 @@ export default function EventCard({ event, compact, clickable = true, registrati
             {priceLabel}
           </span>
         </div>
-        {e.attendanceCount != null && e.attendanceCount > 0 && (
+        {authenticated && e.attendanceCount != null && e.attendanceCount > 0 && (
           <p className="text-xs text-slate-500">Attendance: {Number(e.attendanceCount).toLocaleString()}</p>
         )}
       </div>
@@ -154,7 +156,7 @@ export default function EventCard({ event, compact, clickable = true, registrati
             {priceLabel}
           </span>
         </div>
-        {e.attendanceCount != null && e.attendanceCount > 0 && (
+        {authenticated && e.attendanceCount != null && e.attendanceCount > 0 && (
           <p className="text-xs text-slate-500">Attendance: {Number(e.attendanceCount).toLocaleString()}</p>
         )}
       </div>

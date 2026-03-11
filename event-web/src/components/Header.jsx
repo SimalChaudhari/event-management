@@ -1,9 +1,12 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ROUTES } from '../routes/routeConfig';
 import { logout } from '../store/actions/authActions';
 import logo from '../assets/logo.png';
 import { API_URL } from '../config/env';
+
+/** Paths that count as "login flow" for highlighting the Login nav button */
+const LOGIN_FLOW_PATHS = [ROUTES.LOGIN, ROUTES.FORGOT_PASSWORD, ROUTES.RESET_PASSWORD, ROUTES.VERIFY_EMAIL];
 
 const navItems = [
   { path: ROUTES.HOME, label: 'Home' },
@@ -31,7 +34,9 @@ function getInitials(firstName, lastName, email) {
 export default function Header() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { authenticated, authUser } = useSelector((s) => s.auth);
+  const isLoginFlow = LOGIN_FLOW_PATHS.includes(location.pathname);
   const initials = getInitials(authUser?.firstName, authUser?.lastName, authUser?.email);
   const displayName = [authUser?.firstName, authUser?.lastName].filter(Boolean).join(' ') || authUser?.email || 'Profile';
 
@@ -45,7 +50,7 @@ export default function Header() {
       <div className="h-14 px-4 flex items-center justify-between max-w-app mx-auto md:max-w-[1200px] md:px-6">
     
       <Link to={ROUTES.HOME} className="flex items-center gap-2">
-        <img src={logo} alt="EVENTIAL" className="h-8 w-auto object-contain md:bg-white md:rounded-lg md:p-1 md:border md:border-slate-200" />
+        <img src={logo} alt="EVENTIAL" className="h-auto w-auto object-contain md:bg-white md:rounded-lg md:p-1 md:border md:border-slate-200" />
       </Link>
       {authenticated && (
       <nav className="hidden md:flex items-center gap-2 ml-8" aria-label="Main">
@@ -110,13 +115,14 @@ export default function Header() {
           <>
             <NavLink
               to={ROUTES.LOGIN}
-              className={({ isActive }) =>
-                `px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  isActive
+              className={({ isActive }) => {
+                const active = isActive || isLoginFlow;
+                return `px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  active
                     ? 'bg-[#71C0BB] text-white md:bg-white md:text-black'
                     : 'bg-[#71C0BB] text-white md:bg-transparent md:text-slate-800 md:hover:bg-white/20'
-                }`
-              }
+                }`;
+              }}
             >
               Log in
             </NavLink>

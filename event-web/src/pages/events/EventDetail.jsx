@@ -305,16 +305,18 @@ export default function EventDetail() {
                         </div>
                         {/* Right column */}
                         <div className="space-y-0">
-                          <div className="flex items-center justify-between gap-4 py-2.5 border-b border-slate-200">
-                            <span className="text-sm text-blue-600 font-medium shrink-0">
-                              Attendance Count:
-                            </span>
-                            <span className="text-sm text-slate-800 text-right">
-                              {event.attendanceCount != null
-                                ? Number(event.attendanceCount).toLocaleString()
-                                : "—"}
-                            </span>
-                          </div>
+                          {authenticated && (
+                            <div className="flex items-center justify-between gap-4 py-2.5 border-b border-slate-200">
+                              <span className="text-sm text-blue-600 font-medium shrink-0">
+                                Attendance Count:
+                              </span>
+                              <span className="text-sm text-slate-800 text-right">
+                                {event.attendanceCount != null
+                                  ? Number(event.attendanceCount).toLocaleString()
+                                  : "—"}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-4 py-2.5 border-b border-slate-200">
                             <span className="text-sm text-blue-600 font-medium shrink-0">
                               Venue:

@@ -7,6 +7,12 @@ import {
 import { authService } from "../../services/authService";
 import { userService } from "../../services/userService";
 
+/**
+ * Auth actions. Security note: For forgot-password and reset-password flows,
+ * the backend must validate OTP, email, and apply rate limiting. Route guards
+ * (AuthFlowGuard) only enforce the intended UX flow; they are not the security boundary.
+ */
+
 export const login = (payload) => async (dispatch) => {
   dispatch({ type: AUTH_LOADING, payload: true });
   try {

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { resetPassword } from '../../store/actions/authActions';
 import PasswordInput from '../../components/PasswordInput';
 import { resetPasswordSchema } from '../../validation/authSchemas';
+
+import logo from '../../assets/logo.png';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
 const inputErrorClass = 'w-full px-3 py-2.5 border border-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-500';
@@ -14,8 +16,9 @@ export default function ResetPassword() {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [apiError, setApiError] = useState('');
-  const emailFromQuery = searchParams.get('email') || '';
+  const emailFromFlow = location.state?.email || searchParams.get('email') || '';
 
   const handleSubmit = async (values) => {
     const result = await dispatch(resetPassword({
@@ -32,11 +35,14 @@ export default function ResetPassword() {
 
   return (
     <div className="w-full max-w-md mx-auto">
+        <div className="flex justify-start md:justify-center mb-6">
+        <img src={logo} alt="Logo" className="h-auto w-auto object-contain" />
+      </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Reset Password</h1>
 
       <Formik
             initialValues={{
-              email: emailFromQuery,
+              email: emailFromFlow,
               otp: '',
               newPassword: '',
               confirmPassword: '',
@@ -57,7 +63,8 @@ export default function ResetPassword() {
                     name="email"
                     type="email"
                     placeholder="name@email.com"
-                    className={touched.email && errors.email ? inputErrorClass : inputClass}
+                    readOnly
+                    className={`${touched.email && errors.email ? inputErrorClass : inputClass} bg-slate-100 cursor-not-allowed`}
                   />
                   {touched.email && errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
                 </div>

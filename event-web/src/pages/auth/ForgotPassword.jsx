@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Formik, Form, Field } from 'formik';
 import { ROUTES } from '../../routes/routeConfig';
 import { forgotPassword } from '../../store/actions/authActions';
 import { forgotPasswordSchema } from '../../validation/authSchemas';
+
+import logo from '../../assets/logo.png';
 
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
 const inputErrorClass = 'w-full px-3 py-2.5 border border-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-500';
@@ -12,6 +14,7 @@ const inputErrorClass = 'w-full px-3 py-2.5 border border-red-500 rounded-lg foc
 export default function ForgotPassword() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [apiError, setApiError] = useState('');
@@ -32,6 +35,9 @@ export default function ForgotPassword() {
 
   return (
     <div className="w-full max-w-md mx-auto">
+       <div className="flex justify-start md:justify-center mb-6">
+        <img src={logo} alt="Logo" className="h-auto w-auto object-contain" />
+      </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-2">Forgot Password</h1>
       <p className="text-slate-600 text-sm mb-6">Enter your email and we&apos;ll send an OTP to reset your password.</p>
 
@@ -84,7 +90,8 @@ export default function ForgotPassword() {
               We&apos;ve sent an OTP to your email. Enter it on the next page along with your new password.
             </p>
             <Link
-              to={`${ROUTES.RESET_PASSWORD}${submittedEmail ? `?email=${encodeURIComponent(submittedEmail)}` : ''}`}
+              to={ROUTES.RESET_PASSWORD}
+              state={{ fromForgotPassword: true, email: submittedEmail }}
               className="block w-full py-3 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 mb-2"
               onClick={() => setShowSuccessModal(false)}
             >

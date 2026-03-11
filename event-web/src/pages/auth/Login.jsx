@@ -7,6 +7,8 @@ import { login } from '../../store/actions/authActions';
 import PasswordInput from '../../components/PasswordInput';
 import { loginSchema } from '../../validation/authSchemas';
 
+import logo from '../../assets/logo.png';
+
 const inputClass = 'w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
 const inputErrorClass = 'w-full px-3 py-2.5 border border-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-500';
 
@@ -34,6 +36,9 @@ export default function Login() {
 
   return (
     <div className="w-full max-w-md mx-auto">
+      <div className="flex justify-start md:justify-center mb-6">
+        <img src={logo} alt="Logo" className="object-contain" />
+      </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Welcome!</h1>
 
       <Formik
@@ -83,7 +88,7 @@ export default function Login() {
                 </Field>
               </div>
               <div className="text-right">
-                <Link to={ROUTES.FORGOT_PASSWORD} className="text-sm text-primary hover:underline">Forgot password?</Link>
+                <Link to={ROUTES.FORGOT_PASSWORD} state={{ fromAuth: true }} className="text-sm text-primary hover:underline">Forgot password?</Link>
               </div>
               <button
                 type="submit"
