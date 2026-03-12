@@ -1,2 +1,9 @@
 config.bat
 node_modules
+
+# Environment / secrets (do not commit)
+.env
+.env.local
+.env.*.local
+events-cms/.env
+events-backend/.env
