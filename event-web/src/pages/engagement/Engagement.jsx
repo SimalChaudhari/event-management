@@ -19,7 +19,7 @@ export default function Engagement() {
   }, [dispatch, authenticated]);
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 min-h-[50vh]">
       <p className="text-primary/90 text-sm mb-6">
         Participate in <strong>Q&A</strong>, <strong>polling</strong> and <strong>surveys</strong> for events you’re registered for. Open an event below to view engagements and ask questions.
       </p>

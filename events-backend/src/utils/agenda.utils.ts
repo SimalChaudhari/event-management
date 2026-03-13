@@ -97,14 +97,18 @@ export class AgendaUtils {
   }
 
   /**
-   * Validate if a date is in the future
-   * @param dateString Date string to validate
-   * @returns boolean True if date is in the future
+   * Validate if a date is in the future (or today).
+   * Compares calendar date only so that "today's date + future time" is accepted
+   * when meetingDate is sent without time (e.g. "2026-03-12").
+   * @param dateString Date string to validate (e.g. "2026-03-12" or ISO with time)
+   * @returns boolean True if the date is today or in the future
    */
   static isFutureDate(dateString: string): boolean {
     const date = new Date(dateString);
     const now = new Date();
-    return date > now;
+    const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return dateDay >= today;
   }
 
   /**
@@ -142,6 +146,35 @@ export class AgendaUtils {
     }
 
     return { isValid: true };
+  }
+
+  /**
+   * Validate and normalize meeting time (HH:MM or HH:MM:SS, 24-hour).
+   * Trims input, accepts optional seconds, returns normalized HH:MM.
+   * @param timeString Time string (e.g. "21:00", "21:00:00", " 9:00 ")
+   * @returns { valid: true, normalizedTime: "HH:MM" } or { valid: false, errorMessage: string }
+   */
+  static normalizeMeetingTime(
+    timeString: string,
+  ): { valid: true; normalizedTime: string } | { valid: false; errorMessage: string } {
+    const raw = String(timeString ?? '').trim();
+    const timeRegex = /^\s*([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\s*$/;
+    const match = raw.match(timeRegex);
+    if (!match) {
+      return {
+        valid: false,
+        errorMessage: 'Meeting time must be in HH:MM or HH:MM:SS format (24-hour), e.g. 09:00 or 21:00.',
+      };
+    }
+    const hours = parseInt(match[1], 10);
+    if (hours > 23) {
+      return {
+        valid: false,
+        errorMessage: 'Meeting time must be in 24-hour format (00:00 to 23:59).',
+      };
+    }
+    const normalizedTime = `${hours.toString().padStart(2, '0')}:${match[2]}`;
+    return { valid: true, normalizedTime };
   }
 
   /**

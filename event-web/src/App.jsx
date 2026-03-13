@@ -36,7 +36,7 @@ function App() {
         className="toast-container-header"
       />
       <Header />
-      <main id="main-content" tabIndex={-1} className="px-4 py-6 max-w-app mx-auto md:max-w-[1200px] md:px-6 md:py-12 md:pb-12 flex-1 w-full min-w-0 min-h-0 flex flex-col">
+      <main id="main-content" tabIndex={-1} className="px-4 py-6 max-w-app mx-auto md:max-w-[1200px] md:px-6 md:py-12 md:pb-12 flex-1 w-full min-w-0 min-h-0 flex flex-col overflow-x-hidden">
         <PageLayoutProvider>
           <Breadcrumb />
           <div className="flex-1 min-h-0 flex flex-col">

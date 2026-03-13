@@ -259,13 +259,14 @@ export class AgendaService {
         throw new BadRequestException('Meeting duration must be between 15 minutes and 8 hours.');
       }
 
-      // Validate meeting time format (already validated in DTO, but double-check)
-      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-      if (!timeRegex.test(createMeetingDto.time)) {
-        throw new BadRequestException('Meeting time must be in HH:MM format (24-hour).');
+      // Validate meeting time format (reusable: trim, accept HH:MM or HH:MM:SS, normalize to HH:MM)
+      const timeResult = AgendaUtils.normalizeMeetingTime(createMeetingDto.time);
+      if (!timeResult.valid) {
+        throw new BadRequestException(timeResult.errorMessage);
       }
+      createMeetingDto.time = timeResult.normalizedTime;
 
-      // Validate meeting location is provided (optional but recommended)
+      // Validate meeting location is provided
       if (!createMeetingDto.location || createMeetingDto.location.trim() === '') {
         console.warn(NotificationTextUtil.getLocationNotProvidedWarning());
       }
@@ -625,11 +626,12 @@ export class AgendaService {
         throw new BadRequestException(NotificationTextUtil.getNewTimeTooCloseMessage());
       }
 
-      // Validate meeting time format
-      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-      if (!timeRegex.test(rescheduleDto.newTime)) {
-        throw new BadRequestException('Meeting time must be in HH:MM format (24-hour).');
+      // Validate meeting time format (reusable: same as create meeting)
+      const newTimeResult = AgendaUtils.normalizeMeetingTime(rescheduleDto.newTime);
+      if (!newTimeResult.valid) {
+        throw new BadRequestException(newTimeResult.errorMessage);
       }
+      rescheduleDto.newTime = newTimeResult.normalizedTime;
 
       // Validate that new date/time is different from current
       const currentMeetingDate = meeting.meetingDate;

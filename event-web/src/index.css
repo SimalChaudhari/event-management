@@ -6,8 +6,13 @@
   html, body, #root {
     @apply h-full;
   }
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
   body {
     @apply font-sans bg-slate-50 text-slate-800 antialiased;
+    overflow-x: hidden;
   }
   a {
     @apply text-inherit no-underline;
