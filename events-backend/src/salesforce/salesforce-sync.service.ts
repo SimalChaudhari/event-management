@@ -139,7 +139,7 @@ export class SalesforceSyncService {
               (event.description ?? '') !== (description ?? '') ||
               (event.venue ?? '') !== (venueName ?? '') ||
               (event.courseCode ?? '') !== (item.courseCode ?? '') ||
-              (event.price ?? 0) !== (defaultPrice ?? 0) ||
+              Number(event.price ?? 0) !== Number(defaultPrice ?? 0) ||
               existingPricingOptsJson !== pricingOptsJson;
             if (hasChanges) {
               Object.assign(event, eventData);

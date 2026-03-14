@@ -48,6 +48,7 @@ import {
   EventQueryBuilderUtils,
   GlobalSearchUtils,
 } from '../utils/searchEvent';
+import { toDisplayPrice } from '../utils/price.util';
 import { QnaUtils } from '../utils/qna.utils';
 import { FilterService } from '../service/filter.service';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
@@ -695,7 +696,7 @@ export class EventService {
             if (field === 'publishStartDate' || field === 'event.publishStartDate') return event.publishStartDate;
             if (field === 'location' || field === 'event.location') return event.location;
             if (field === 'type' || field === 'event.type') return event.type;
-            if (field === 'price' || field === 'event.price') return event.price;
+            if (field === 'price' || field === 'event.price') return Number(event.price ?? 0);
             if (field === 'createdAt' || field === 'event.createdAt') return event.createdAt;
             if (field === 'updatedAt' || field === 'event.updatedAt') return event.updatedAt;
             return event.startDate; // default
@@ -787,8 +788,8 @@ export class EventService {
           const { eventSpeakers: _s, category: _c, eventExhibitors: _e, documents: _d, documentNames: _dn, programmeTracks: _pt, exhibitorDescription: _ed, surveys: _sv, eventStampDescription: _esd, ...basicEvent } = event;
           const slimEvent = {
             ...basicEvent,
-            price: this.toDisplayPrice(event.price),
-            earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+            price: toDisplayPrice(event.price),
+            earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice),
             isEarlyBirdActive: this.getIsEarlyBirdActive(event),
             color: getEventColor(event.type),
             speakersData: speakers,
@@ -866,8 +867,8 @@ export class EventService {
 
           const completeEvent = {
             ...eventFilteredData,
-            price: this.toDisplayPrice(event.price),
-            earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+            price: toDisplayPrice(event.price),
+            earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice),
             isEarlyBirdActive: this.getIsEarlyBirdActive(event),
             color: getEventColor(event.type),
             documents: formattedDocuments,
@@ -1153,8 +1154,8 @@ export class EventService {
         const { eventSpeakers: _s, category: _c, eventExhibitors: _e, documents: _d, documentNames: _dn, programmeTracks: _pt, exhibitorDescription: _ed, surveys: _sv, eventStampDescription: _esd, ...basicEvent } = event;
         return {
           ...basicEvent,
-          price: this.toDisplayPrice(event.price),
-          earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+          price: toDisplayPrice(event.price),
+          earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice),
           isEarlyBirdActive: this.getIsEarlyBirdActive(event),
           color: getEventColor(event.type),
           speakersData: speakerSchedule,
@@ -1237,8 +1238,8 @@ export class EventService {
 
       const eventResponse = {
         ...eventFilteredData,
-        price: this.toDisplayPrice(event.price),
-        earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+        price: toDisplayPrice(event.price),
+        earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice),
         isEarlyBirdActive: this.getIsEarlyBirdActive(event),
         color: getEventColor(event.type),
         speakers: speakerSchedule,
@@ -2257,21 +2258,13 @@ export class EventService {
    * Set EVENT_PRICE_IN_CENTS=true if price is stored in cents (e.g. 12000 → 120.00 SGD).
    * Then 9000 in DB → 90, 12000 in DB → 120.
    */
-  private toDisplayPrice(price: unknown): number {
-    const n = Number(price ?? 0);
-    if (process.env.EVENT_PRICE_IN_CENTS === 'true') {
-      return Math.round((n / 100) * 100) / 100;
-    }
-    return n;
-  }
-
   /** Ensure price and earlyBirdPrice are numbers in API responses (TypeORM decimal can return string). */
   private normalizeEventPrices<T extends { price?: unknown; earlyBirdPrice?: unknown; earlyBirdStartDate?: Date | string; earlyBirdEndDate?: Date | string }>(event: T): T & { isEarlyBirdActive: boolean } {
     if (!event) return { isEarlyBirdActive: false } as T & { isEarlyBirdActive: boolean };
     return {
       ...event,
-      price: this.toDisplayPrice(event.price),
-      earlyBirdPrice: this.toDisplayPrice(event.earlyBirdPrice),
+      price: toDisplayPrice(event.price),
+      earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice),
       isEarlyBirdActive: this.getIsEarlyBirdActive(event),
     } as T & { isEarlyBirdActive: boolean };
   }

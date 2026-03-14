@@ -18,6 +18,7 @@ import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { EventStampService } from '../event/event-stamp.service';
 import { forwardRef, Inject } from '@nestjs/common';
+import { toDisplayPrice } from '../utils/price.util';
 
 @Injectable()
 export class FavoriteEventService {
@@ -246,6 +247,8 @@ export class FavoriteEventService {
           createdAt: favorite.createdAt,
           event: {
             ...eventData,
+            price: toDisplayPrice(eventData.price),
+            earlyBirdPrice: eventData.earlyBirdPrice !== undefined ? toDisplayPrice(eventData.earlyBirdPrice) : undefined,
             color: getEventColor(favorite.event.type),
             documents: formattedDocuments, // Use formatted documents
             speakers:

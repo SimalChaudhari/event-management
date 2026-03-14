@@ -149,6 +149,38 @@ export class AgendaUtils {
   }
 
   /**
+   * Build meeting start datetime from date + time (HH:MM). Use for comparing with "now" or for ICS.
+   * @param meetingDate Date (or date-only)
+   * @param timeHHMM Time string e.g. "11:30"
+   */
+  static getMeetingStartDate(meetingDate: Date, timeHHMM: string): Date {
+    const d = meetingDate;
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return new Date(`${dateStr}T${timeHHMM}:00`);
+  }
+
+  /**
+   * Check that meeting date + time is in the future (not in the past).
+   * Use after validating date and normalizing time. Interprets date and time as local.
+   */
+  static isMeetingDateTimeInFuture(
+    dateString: string,
+    timeHHMM: string,
+  ): { isValid: boolean; errorMessage?: string } {
+    const meetingDt = new Date(`${dateString}T${timeHHMM}:00`);
+    if (Number.isNaN(meetingDt.getTime())) {
+      return { isValid: false, errorMessage: 'Invalid meeting date or time.' };
+    }
+    if (meetingDt <= new Date()) {
+      return {
+        isValid: false,
+        errorMessage: 'Meeting date and time cannot be in the past. Please choose a future time.',
+      };
+    }
+    return { isValid: true };
+  }
+
+  /**
    * Validate and normalize meeting time (HH:MM or HH:MM:SS, 24-hour).
    * Trims input, accepts optional seconds, returns normalized HH:MM.
    * @param timeString Time string (e.g. "21:00", "21:00:00", " 9:00 ")

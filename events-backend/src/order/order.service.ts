@@ -17,6 +17,7 @@ import { Not, IsNull } from 'typeorm';
 import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { CheckoutUtils } from '../utils/checkout.utils';
+import { toDisplayPrice } from '../utils/price.util';
 
 @Injectable()
 export class OrderService {
@@ -48,7 +49,7 @@ export class OrderService {
             name: event.name,
             startDate: event.startDate,
             endDate: event.endDate,
-            price: priceOverride != null ? priceOverride : event.price,
+            price: priceOverride != null ? priceOverride : toDisplayPrice(event.price),
             gstRate: event.gstRate != null ? Number(event.gstRate) : undefined,
             currency: event.currency,
             type: event.type,

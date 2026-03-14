@@ -266,6 +266,15 @@ export class AgendaService {
       }
       createMeetingDto.time = timeResult.normalizedTime;
 
+      // Reject if meeting date + time is in the past (e.g. today at 09:46 when it is already 10:48)
+      const dateTimeValidation = AgendaUtils.isMeetingDateTimeInFuture(
+        createMeetingDto.meetingDate,
+        createMeetingDto.time,
+      );
+      if (!dateTimeValidation.isValid) {
+        throw new BadRequestException(dateTimeValidation.errorMessage);
+      }
+
       // Validate meeting location is provided
       if (!createMeetingDto.location || createMeetingDto.location.trim() === '') {
         console.warn(NotificationTextUtil.getLocationNotProvidedWarning());
@@ -600,9 +609,12 @@ export class AgendaService {
         }
       }
 
-      // Check if the meeting is already in progress or completed
-      if (meeting.meetingDate && meeting.meetingDate <= new Date()) {
-        throw new BadRequestException(NotificationTextUtil.getCannotRescheduleStartedMeetingMessage());
+      // Block reschedule only if the meeting start (date + time) has already passed
+      if (meeting.meetingDate && meeting.time) {
+        const meetingStart = AgendaUtils.getMeetingStartDate(meeting.meetingDate, meeting.time);
+        if (!Number.isNaN(meetingStart.getTime()) && meetingStart <= new Date()) {
+          throw new BadRequestException(NotificationTextUtil.getCannotRescheduleStartedMeetingMessage());
+        }
       }
 
       // Check if current user is registered for the event
@@ -617,21 +629,30 @@ export class AgendaService {
         throw new BadRequestException(dateValidation.errorMessage);
       }
 
-      // Validate that new date/time is not too close to current time (minimum 1 hour notice)
-      const newMeetingDate = new Date(rescheduleDto.newDate);
-      const now = new Date();
-      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-      
-      if (newMeetingDate <= oneHourFromNow) {
-        throw new BadRequestException(NotificationTextUtil.getNewTimeTooCloseMessage());
-      }
-
       // Validate meeting time format (reusable: same as create meeting)
       const newTimeResult = AgendaUtils.normalizeMeetingTime(rescheduleDto.newTime);
       if (!newTimeResult.valid) {
         throw new BadRequestException(newTimeResult.errorMessage);
       }
       rescheduleDto.newTime = newTimeResult.normalizedTime;
+
+      // New date + time cannot be in the past (same as create meeting)
+      const newDateTimeValidation = AgendaUtils.isMeetingDateTimeInFuture(
+        rescheduleDto.newDate,
+        rescheduleDto.newTime,
+      );
+      if (!newDateTimeValidation.isValid) {
+        throw new BadRequestException(newDateTimeValidation.errorMessage);
+      }
+
+      // New date/time must be at least 1 hour from now
+      const newMeetingDateTime = new Date(`${rescheduleDto.newDate}T${rescheduleDto.newTime}:00`);
+      const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+      if (newMeetingDateTime <= oneHourFromNow) {
+        throw new BadRequestException(NotificationTextUtil.getNewTimeTooCloseMessage());
+      }
+
+      const newMeetingDate = new Date(rescheduleDto.newDate);
 
       // Validate that new date/time is different from current
       const currentMeetingDate = meeting.meetingDate;

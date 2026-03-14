@@ -24,6 +24,7 @@ import {
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 import { QRCodeUtils } from '../utils/qr-code.utils';
 import { ResourceNotFoundException, DuplicateResourceException } from '../utils/exceptions/custom-exceptions';
+import { toDisplayPrice } from '../utils/price.util';
 
 @Injectable()
 export class EventQRCodeService {
@@ -554,7 +555,7 @@ export class EventQRCodeService {
         endDate: event.endDate,
         location: event.location,
         isFree: !event.price || event.price === 0,
-        price: event.price || 0,
+        price: toDisplayPrice(event.price ?? 0),
         type: event.type,
       };
 
@@ -599,7 +600,7 @@ export class EventQRCodeService {
         endDate: event.endDate,
         location: event.location,
         isFree: !event.price || event.price === 0,
-        price: event.price || 0,
+        price: toDisplayPrice(event.price ?? 0),
         type: event.type,
         qrCodeId,
         scanTime: new Date().toISOString(),

@@ -1,9 +1,13 @@
+import { AgendaUtils } from '../agenda.utils';
+
 export class ICSGenerator {
   /**
    * Generate .ics content for a single meeting
    */
   static generateMeetingICS(meeting: any, creator: any, targetUser: any): string {
-    const startDate = new Date(meeting.meetingDate);
+    const startDate = meeting.time
+      ? AgendaUtils.getMeetingStartDate(new Date(meeting.meetingDate), meeting.time)
+      : new Date(meeting.meetingDate);
     const endDate = new Date(startDate.getTime() + (meeting.duration * 60 * 1000));
     
     const icsContent = [
@@ -44,7 +48,9 @@ export class ICSGenerator {
    */
   static generateMultipleMeetingsICS(meetings: any[], currentUser: any): string {
     const icsEvents = meetings.map(meeting => {
-      const startDate = new Date(meeting.meetingDate);
+      const startDate = meeting.time
+        ? AgendaUtils.getMeetingStartDate(new Date(meeting.meetingDate), meeting.time)
+        : new Date(meeting.meetingDate);
       const endDate = new Date(startDate.getTime() + (meeting.duration * 60 * 1000));
       
       return [

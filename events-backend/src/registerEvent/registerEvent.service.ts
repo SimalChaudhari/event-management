@@ -38,6 +38,7 @@ import { EngagementService } from '../engagement/engagement.service';
 import { Checkout } from '../checkout/checkout.entity';
 import { CheckoutCartItem } from '../checkout/checkout-cart-item.entity';
 import { CheckoutUtils } from '../utils/checkout.utils';
+import { toDisplayPrice } from '../utils/price.util';
 import { EventStaff } from '../event/event-staff.entity';
 import { ExhibitorRating } from '../exhibitor/exhibitor-rating.entity';
 import { EventStampService } from '../event/event-stamp.service';
@@ -506,7 +507,7 @@ export class RegisterEventService implements OnModuleInit {
                   venue: registerEvent.event.venue,
                   country: registerEvent.event.country,
                   type: registerEvent.event.type,
-                  price: registerEvent.event.price,
+                  price: registerEvent.event?.price != null ? toDisplayPrice(registerEvent.event.price) : undefined,
                   currency: registerEvent.event.currency,
                   registerEventId: registerEvent.id,
                   attendanceCount: attendanceCount,

@@ -1,4 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { toDisplayPrice } from './price.util';
+
+function coercePrices(event: any): any {
+  if (!event) return event;
+  const out: any = { ...event };
+  if (event.price !== undefined) out.price = toDisplayPrice(event.price);
+  if (event.earlyBirdPrice !== undefined) out.earlyBirdPrice = toDisplayPrice(event.earlyBirdPrice);
+  return out;
+}
 
 @Injectable()
 export class TabVisibilityFilterUtil {
@@ -16,12 +25,12 @@ export class TabVisibilityFilterUtil {
         event?.tabVisibility == null
           ? true
           : (event.tabVisibility.chat !== false || event.tabVisibility.agenda !== false);
-      return { ...event, allowAttendeeSearch };
+      return coercePrices({ ...event, allowAttendeeSearch });
     }
 
     // If no tab visibility settings, return original event (default: allow attendee search)
     if (!event?.tabVisibility) {
-      return { ...event, allowAttendeeSearch: true };
+      return coercePrices({ ...event, allowAttendeeSearch: true });
     }
 
     console.log('🔍 Filtering event data:', {
@@ -35,7 +44,7 @@ export class TabVisibilityFilterUtil {
       originalProgrammeTracks: event.programmeTracks?.length || 0
     });
 
-    const filteredEvent = { ...event };
+    const filteredEvent = coercePrices({ ...event });
     
     // Remove galleries if gallery tab is disabled
     if (event.tabVisibility.gallery === false) {

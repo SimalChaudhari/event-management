@@ -2,6 +2,7 @@
 import { UserUtils } from '../user.utils';
 import { ExhibitorUtils } from '../exhibitor.utils';
 import { getEventColor } from 'utils/event-color.util';
+import { toDisplayPrice } from '../price.util';
 
 export class GlobalSearchUtils {
   /**
@@ -119,7 +120,8 @@ export class GlobalSearchUtils {
       location: event.location,
       venue: event.venue,
       type: event.type,
-      price: event.price,
+      price: toDisplayPrice(event.price),
+      ...(event.earlyBirdPrice !== undefined && { earlyBirdPrice: toDisplayPrice(event.earlyBirdPrice) }),
       currency: event.currency,
       images: event.images,
       color: getEventColor(event.type),
@@ -344,7 +346,8 @@ export class GlobalSearchUtils {
       matchedEvent.country = event.country;
       matchedEvent.images = event.images;
       matchedEvent.type = event.type;
-      matchedEvent.price = event.price;
+      matchedEvent.price = toDisplayPrice(event.price);
+      if (event.earlyBirdPrice !== undefined) matchedEvent.earlyBirdPrice = toDisplayPrice(event.earlyBirdPrice);
       matchedEvent.currency = event.currency;
       matchedEvent.floorPlan = event.floorPlan;
       matchedEvent.createdAt = event.createdAt;
