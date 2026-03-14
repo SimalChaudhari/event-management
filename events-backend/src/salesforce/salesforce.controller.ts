@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   Param,
   Query,
@@ -20,6 +21,7 @@ import { SalesforceEmailService } from './salesforce-email.service';
 import {
   SalesforceCreateRegistrationDto,
   SalesforceAttendanceDto,
+  UpdateSalesforceSyncSettingsDto,
 } from './salesforce.dto';
 import { ErrorHandlerService } from '../utils/services/error-handler.service';
 
@@ -81,6 +83,39 @@ export class SalesforceController {
       });
     } catch (error) {
       this.errorHandler.logError(error, 'Salesforce sync events', undefined);
+      throw error;
+    }
+  }
+
+  @Get('sync/settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async getSyncSettings(@Res() res: Response) {
+    try {
+      const settings = await this.syncService.getSyncSettings();
+      return res.status(HttpStatus.OK).json({ success: true, data: settings });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Salesforce get sync settings', undefined);
+      throw error;
+    }
+  }
+
+  @Put('sync/settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  async updateSyncSettings(
+    @Body() dto: UpdateSalesforceSyncSettingsDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const settings = await this.syncService.updateSyncSettings(dto);
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Sync settings updated.',
+        data: settings,
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Salesforce update sync settings', undefined);
       throw error;
     }
   }

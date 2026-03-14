@@ -1,13 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
 import * as bcrypt from 'bcrypt';
 import { Event, EventType } from '../event/event.entity';
 import { UserEntity, UserRole } from '../user/users.entity';
 import { RegisterEvent } from '../registerEvent/registerEvent.entity';
 import { Status, Type } from '../registerEvent/registerEvent.dto';
 import { SalesforceService } from './salesforce.service';
+import { SalesforceSyncSetting } from './salesforce-sync-setting.entity';
+import { SalesforceSyncSettingsDto, UpdateSalesforceSyncSettingsDto } from './salesforce.dto';
 
 export interface SalesforceSyncEventsResult {
   success: boolean;
@@ -28,19 +31,96 @@ export interface SalesforceSyncRegistrationsResult {
   errors: string[];
 }
 
+const SALESFORCE_SYNC_CRON_JOB_NAME = 'salesforce-sync-events';
+const DEFAULT_CRON_SCHEDULE = '0 */6 * * *'; // Every 6 hours
+
 @Injectable()
-export class SalesforceSyncService {
+export class SalesforceSyncService implements OnModuleInit {
   private readonly logger = new Logger(SalesforceSyncService.name);
 
   constructor(
     private readonly salesforceService: SalesforceService,
+    private readonly schedulerRegistry: SchedulerRegistry,
     @InjectRepository(Event)
     private readonly eventRepository: Repository<Event>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(RegisterEvent)
     private readonly registerEventRepository: Repository<RegisterEvent>,
+    @InjectRepository(SalesforceSyncSetting)
+    private readonly syncSettingRepository: Repository<SalesforceSyncSetting>,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const setting = await this.getOrCreateSetting();
+      if (setting.enabled) {
+        this.registerCronJob(setting.cronSchedule);
+        this.logger.log(`Salesforce event sync cron registered: ${setting.cronSchedule}`);
+      }
+    } catch (err) {
+      this.logger.warn('Could not init Salesforce sync cron from settings', err);
+    }
+  }
+
+  private async getOrCreateSetting(): Promise<SalesforceSyncSetting> {
+    let setting = await this.syncSettingRepository.findOne({ where: {} });
+    if (!setting) {
+      setting = this.syncSettingRepository.create({
+        enabled: false,
+        cronSchedule: DEFAULT_CRON_SCHEDULE,
+      });
+      setting = await this.syncSettingRepository.save(setting);
+    }
+    return setting;
+  }
+
+  private registerCronJob(cronSchedule: string): void {
+    try {
+      this.schedulerRegistry.deleteCronJob(SALESFORCE_SYNC_CRON_JOB_NAME);
+    } catch {
+      // ignore if not exists
+    }
+    const job = new CronJob(cronSchedule, () => {
+      this.logger.log('Running scheduled Salesforce event sync');
+      this.syncEvents().catch((err) => this.logger.error('Scheduled sync failed', err));
+    });
+    this.schedulerRegistry.addCronJob(SALESFORCE_SYNC_CRON_JOB_NAME, job);
+    job.start();
+  }
+
+  async getSyncSettings(): Promise<SalesforceSyncSettingsDto> {
+    const setting = await this.getOrCreateSetting();
+    return {
+      enabled: setting.enabled,
+      cronSchedule: setting.cronSchedule,
+      updatedAt: setting.updatedAt?.toISOString(),
+    };
+  }
+
+  async updateSyncSettings(dto: UpdateSalesforceSyncSettingsDto): Promise<SalesforceSyncSettingsDto> {
+    const setting = await this.getOrCreateSetting();
+    if (dto.enabled !== undefined) setting.enabled = dto.enabled;
+    if (dto.cronSchedule !== undefined) {
+      const trimmed = dto.cronSchedule.trim();
+      if (trimmed) setting.cronSchedule = trimmed;
+    }
+    const saved = await this.syncSettingRepository.save(setting);
+    try {
+      this.schedulerRegistry.deleteCronJob(SALESFORCE_SYNC_CRON_JOB_NAME);
+    } catch {
+      // ignore
+    }
+    if (saved.enabled) {
+      this.registerCronJob(saved.cronSchedule);
+      this.logger.log(`Salesforce sync cron updated: ${saved.cronSchedule}`);
+    }
+    return {
+      enabled: saved.enabled,
+      cronSchedule: saved.cronSchedule,
+      updatedAt: saved.updatedAt?.toISOString(),
+    };
+  }
 
   /**
    * Sync events from Salesforce EventInfo to local database.
@@ -315,13 +395,4 @@ export class SalesforceSyncService {
     }
   }
 
-  /**
-   * Cron: sync events from Salesforce every 6 hours (when SALESFORCE_SYNC_CRON_ENABLED=true)
-   */
-  @Cron(CronExpression.EVERY_6_HOURS)
-  async handleCronSyncEvents(): Promise<void> {
-    if (process.env.SALESFORCE_SYNC_CRON_ENABLED !== 'true') return;
-    this.logger.log('Running scheduled Salesforce event sync');
-    await this.syncEvents();
-  }
 }

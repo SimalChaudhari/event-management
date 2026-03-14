@@ -19,7 +19,8 @@ const FilterComponent = ({
     onStartDateChange,
     onEndDateChange,
     activeFilters = {},
-    actionButtons = null
+    actionButtons = null,
+    headerActions = null
 }) => {
     const handleApplyFilters = () => {
         if (onApplyFilters) {
@@ -75,25 +76,28 @@ const FilterComponent = ({
                     borderRadius: '8px 8px 0 0'
                 }}
             >
-                <div className="d-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center justify-content-between flex-wrap">
                     <div className="d-flex align-items-center">
                         <i className="feather icon-filter mr-2" style={{ color: '#4680ff', fontSize: '18px' }}></i>
                         <h6 className="mb-0" style={{ fontWeight: '600', color: '#495057' }}>
                             Filter Options
                         </h6>
                     </div>
-                    {Object.keys(activeFilters).length > 0 && (
-                        <span
-                            className="badge badge-primary"
-                            style={{
-                                backgroundColor: '#4680ff',
-                                fontSize: '11px',
-                                padding: '4px 8px'
-                            }}
-                        >
-                            {Object.keys(activeFilters).length} Active
-                        </span>
-                    )}
+                    <div className="d-flex align-items-center">
+                        {Object.keys(activeFilters).length > 0 && (
+                            <span
+                                className="badge badge-primary mr-2"
+                                style={{
+                                    backgroundColor: '#4680ff',
+                                    fontSize: '11px',
+                                    padding: '4px 8px'
+                                }}
+                            >
+                                {Object.keys(activeFilters).length} Active
+                            </span>
+                        )}
+                        {headerActions}
+                    </div>
                 </div>
             </Card.Header>
             <Card.Body style={{ padding: '20px' }}>

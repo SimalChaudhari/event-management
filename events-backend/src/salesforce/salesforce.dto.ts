@@ -108,3 +108,16 @@ export interface SalesforceCreateRegistrationDto {
 export interface SalesforceAttendanceDto {
   registrationNumber: string;
 }
+
+/** Response for GET sync settings */
+export interface SalesforceSyncSettingsDto {
+  enabled: boolean;
+  cronSchedule: string;
+  updatedAt?: string;
+}
+
+/** Body for PUT sync settings */
+export interface UpdateSalesforceSyncSettingsDto {
+  enabled?: boolean;
+  cronSchedule?: string;
+}
