@@ -338,14 +338,15 @@ export class EventService {
   }
 
   /**
-   * Public event list: id and name only. No auth required.
+   * Public event list: id and name only. No auth required. Excludes private events.
    */
   async getPublicEventList(): Promise<{ id: string; name: string }[]> {
-    const events = await this.eventRepository.find({
-      select: ['id', 'name'],
-      order: { name: 'ASC' },
-    });
-    return events;
+    return this.eventRepository
+      .createQueryBuilder('event')
+      .select(['event.id', 'event.name'])
+      .where('(event.isPrivate = :isPrivate OR event.isPrivate IS NULL)', { isPrivate: false })
+      .orderBy('event.name', 'ASC')
+      .getMany();
   }
 
   /**
@@ -398,6 +399,9 @@ export class EventService {
       today.setHours(0, 0, 0, 0);
       qb.andWhere('event.startDate >= :today', { today });
     }
+
+    // Exclude private events from public list (only show in "Registered events" if already registered)
+    qb.andWhere('(event.isPrivate = :isPrivate OR event.isPrivate IS NULL)', { isPrivate: false });
 
     const limit = Math.min(filters.limit ?? 50, 100);
     const page = Math.max(1, filters.page ?? 1);
@@ -575,6 +579,16 @@ export class EventService {
         }
       }
 
+      // Exclude private events for non-admin (featured/upcoming lists). Private events only show under "Registered events" if already registered.
+      if (userRole !== UserRole.Admin) {
+        if (whereClauseSet) {
+          queryBuilder.andWhere('(event.isPrivate = :isPrivate OR event.isPrivate IS NULL)', { isPrivate: false });
+        } else {
+          queryBuilder.where('(event.isPrivate = :isPrivate OR event.isPrivate IS NULL)', { isPrivate: false });
+          whereClauseSet = true;
+        }
+      }
+
       if (filters.eventName) {
         // Trim eventName to handle leading/trailing spaces
         // If empty after trimming, skip the filter
@@ -620,6 +634,8 @@ export class EventService {
           orderByField = 'event.createdAt';
         } else if (sortBy === 'updatedAt' || sortBy === 'event.updatedAt') {
           orderByField = 'event.updatedAt';
+        } else if (sortBy === 'isPrivate' || sortBy === 'event.isPrivate') {
+          orderByField = 'event.isPrivate';
         } else {
           // Default to startDate if unknown field
           orderByField = 'event.startDate';
@@ -1051,13 +1067,12 @@ export class EventService {
         'event.venue',
       ]);
 
-    // Only filter out past events for non-admin users
-    // Admins can see all events including past events
+    // Only filter out past events and private events for non-admin users
+    // Admins can see all events including past and private (for dropdown)
     if (userRole !== UserRole.Admin) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       queryBuilder.where('event.endDate >= :today', { today });
-      // Also filter by publish dates if they exist
       queryBuilder.andWhere(
         '(event.publishStartDate IS NULL OR event.publishStartDate <= :today)',
         { today }
@@ -1066,6 +1081,8 @@ export class EventService {
         '(event.publishEndDate IS NULL OR event.publishEndDate >= :today)',
         { today }
       );
+      // Exclude private events from registration dropdown (only visible in "Registered events" if already registered)
+      queryBuilder.andWhere('(event.isPrivate = :isPrivate OR event.isPrivate IS NULL)', { isPrivate: false });
     }
 
     const events = await queryBuilder
@@ -1733,6 +1750,21 @@ export class EventService {
     }
   }
 
+  async updateIsPrivate(id: string, isPrivate: boolean): Promise<Partial<Event>> {
+    try {
+      const event = await this.eventRepository.findOne({ where: { id } });
+      if (!event) {
+        throw new ResourceNotFoundException('Event', id);
+      }
+      event.isPrivate = isPrivate;
+      return await this.eventRepository.save(event);
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        throw error;
+      }
+      throw this.errorHandler.handleDatabaseError(error, 'Event isPrivate update');
+    }
+  }
 
   async updateEventFloorPlan(
     id: string,

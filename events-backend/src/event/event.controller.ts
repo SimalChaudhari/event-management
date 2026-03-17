@@ -4,6 +4,7 @@ import {
   Post,
   Get,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -380,6 +381,28 @@ export class EventController {
     } catch (error:any) {
       console.error('❌ Error updating tab visibility:', error);
       this.errorHandler.logError(error, 'Tab visibility update');
+      throw error;
+    }
+  }
+
+  @Put(':id/is-private')
+  @Roles(UserRole.Admin)
+  async updateEventIsPrivate(
+    @Param('id') id: string,
+    @Body() body: { isPrivate: boolean },
+    @Res() response: Response,
+  ) {
+    try {
+      const isPrivate = body?.isPrivate === true;
+      const updatedEvent = await this.eventService.updateIsPrivate(id, isPrivate);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Event private status updated successfully',
+        data: updatedEvent,
+        metadata: { timestamp: new Date().toISOString() },
+      });
+    } catch (error) {
+      this.errorHandler.logError(error, 'Event isPrivate update');
       throw error;
     }
   }

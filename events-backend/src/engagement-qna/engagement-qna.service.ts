@@ -308,14 +308,15 @@ export class EngagementQnaService {
         questions = await queryBuilder.getMany();
       }
 
-      // Get user's likes for these questions
+      // Get user's likes for these questions (userId may be string or number from JWT sub)
       let userLikes: EngagementQnaLike[] = [];
-      if (userId && questions.length > 0) {
+      if (userId != null && userId !== '' && questions.length > 0) {
         const questionIds = questions.map((q) => q.id);
+        const uid = String(userId);
         userLikes = await this.engagementQnaLikeRepository.find({
           where: {
             questionId: In(questionIds),
-            userId: userId,
+            userId: uid,
           },
         });
       }

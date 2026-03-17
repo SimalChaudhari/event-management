@@ -112,30 +112,6 @@ function eventTable(
             }
         },
         {
-            data: 'type',
-            title: 'User Type',
-            orderable: true,
-            render: function (data, type, row) {
-                // Return raw type value for sorting
-                if (type === 'sort' || type === 'type') {
-                    return row.type || '';
-                }
-                // Return formatted HTML for display
-                let bgColor = '';
-                if (row.type?.toLowerCase() === 'physical') {
-                    bgColor =
-                        'background-color:rgb(162, 209, 231); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
-                } else if (row.type?.toLowerCase() === 'virtual') {
-                    bgColor =
-                        'background-color:rgb(223, 228, 165); padding: 6px 12px; border-radius: 4px; color:rgb(14, 13, 13); font-weight: 500;';
-                }
-                return `<div class="text-wrap" style="margin-top: 10px; max-width: 200px;"><span style="${bgColor}">${
-                    row.type || 'N/A'
-                }</span></div>`;
-            }
-        },
-
-        {
             data: 'price',
             title: 'Price',
             orderable: true,
@@ -196,6 +172,31 @@ function eventTable(
                 }
                 // Return formatted HTML for display
                 return renderPublishDates(row);
+            }
+        },
+        {
+            data: 'isPrivate',
+            title: 'Is Private',
+            orderable: true,
+            render: function (data, type, row) {
+                const isPrivate = row && (row.isPrivate === true || row.isPrivate === 'true');
+                if (type === 'sort' || type === 'type') {
+                    return isPrivate ? 1 : 0;
+                }
+                const id = (row && row.id) ? String(row.id) : '';
+                const checked = isPrivate ? 'checked' : '';
+                const label = isPrivate ? 'Yes' : 'No';
+                // Bootstrap 4 doesn't support .form-switch; use a standard checkbox + badge-like label.
+                return `
+                    <div class="d-inline-flex align-items-center">
+                        <input class="is-private-toggle" type="checkbox"
+                            style="width: 18px; height: 18px; cursor: pointer;"
+                            data-id="${id}" data-is-private="${isPrivate}"
+                            ${checked}
+                            title="Private events are hidden from registration (upcoming/featured). Only visible under Registered events if already registered.">
+                        <span class="ml-2 badge ${isPrivate ? 'badge-secondary' : 'badge-light'}">${label}</span>
+                    </div>
+                `;
             }
         },
         {
@@ -376,6 +377,30 @@ function eventTable(
                             handleQA({ id });
                         }
                     }
+                });
+
+            // Is Private toggle: update event and refresh row
+            $(tableZero + ' tbody')
+                .off('change', '.is-private-toggle')
+                .on('change', '.is-private-toggle', function () {
+                    const checkbox = $(this);
+                    const id = checkbox.data('id');
+                    const newValue = checkbox.prop('checked');
+                    const table = $(tableZero).DataTable();
+                    const row = table.row(checkbox.closest('tr'));
+                    const rowData = row.data();
+                    if (!id || !rowData) return;
+                    axiosInstance
+                        .put(`/events/${id}/is-private`, { isPrivate: newValue })
+                        .then(() => {
+                            rowData.isPrivate = newValue;
+                            row.data(rowData).invalidate().draw(false);
+                            toast.success(newValue ? 'Event set as private.' : 'Event set as public.');
+                        })
+                        .catch((err) => {
+                            checkbox.prop('checked', !newValue);
+                            toast.error(err.response?.data?.message || 'Failed to update private status');
+                        });
                 });
         },
         dom:

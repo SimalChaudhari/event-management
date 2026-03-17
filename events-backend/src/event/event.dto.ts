@@ -202,6 +202,11 @@ export class EventDto {
     programme?: boolean;
     chat?: boolean;
   };
+  /** When true, event is hidden from registration lists (upcoming/featured); only visible in "Registered events" if already registered. */
+  @IsOptional()
+  @IsBoolean()
+  isPrivate?: boolean;
+
   /** When false, withdraw option is hidden/disabled for this event. Default true. */
   @IsOptional()
   @IsBoolean()

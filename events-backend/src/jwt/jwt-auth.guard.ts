@@ -27,7 +27,33 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
             context.getClass(),
         ]);
         
+        const request: Request = context.switchToHttp().getRequest();
+
+        // For public routes: still attach user if valid token is sent (e.g. for userLiked in Q&A)
         if (isPublic) {
+            const token = this.extractTokenFromHeader(request);
+            if (token) {
+                try {
+                    if (!this.jwtService) {
+                        this.jwtService = this.moduleRef.get(JwtService, { strict: false });
+                    }
+                    if (!this.userService) {
+                        this.userService = this.moduleRef.get(UserService, { strict: false });
+                    }
+                    const decoded = this.jwtService.verify(token, { secret: process.env.JWT_SECRET });
+                    if (decoded && (decoded.sub || decoded.id) && decoded.email) {
+                        const userId = decoded.sub || decoded.id;
+                        try {
+                            await this.userService.getById(userId);
+                            request.user = decoded;
+                        } catch {
+                            // User not found, leave request.user unset
+                        }
+                    }
+                } catch {
+                    // Invalid token, leave request.user unset
+                }
+            }
             return true;
         }
 
@@ -39,9 +65,7 @@ export class JwtAuthGuard implements CanActivate, OnModuleInit {
             this.userService = this.moduleRef.get(UserService, { strict: false });
         }
 
-        const request: Request = context.switchToHttp().getRequest();
         const token = this.extractTokenFromHeader(request);
-    
         if (!token) throw new UnauthorizedException('Token is required for authentication');
 
         try {

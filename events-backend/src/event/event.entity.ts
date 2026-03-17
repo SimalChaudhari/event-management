@@ -174,6 +174,10 @@ export class Event {
   @Column({ type: 'boolean', default: false })
   enableLuckyDrawFeature!: boolean;
 
+  /** When true, event is not shown on front-end for registration (upcoming/featured). Only visible under "Registered events" if user is already registered. */
+  @Column({ type: 'boolean', default: false })
+  isPrivate!: boolean;
+
   /** When false, withdraw option is hidden and disabled for this event (admin panel setting). */
   @Column({ type: 'boolean', default: true })
   withdrawalEnabled!: boolean;

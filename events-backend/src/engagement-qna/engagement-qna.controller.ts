@@ -55,7 +55,8 @@ export class EngagementQnaController {
     if (!req?.user) {
       return undefined;
     }
-    return req.user.id ?? req.user.sub ?? req.user.userId ?? req.user._id;
+    const raw = req.user.id ?? req.user.sub ?? req.user.userId ?? req.user._id;
+    return raw != null ? String(raw) : undefined;
   }
 
   // Real-Time Q&A Dashboard (Public Access)
