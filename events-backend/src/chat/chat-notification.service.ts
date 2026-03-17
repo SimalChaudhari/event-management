@@ -54,19 +54,49 @@ export class ChatNotificationService {
 
       // Send push notification to all receiver's devices
       for (const deviceToken of receiverTokens) {
-        await FirebaseUtil.sendPushNotification(deviceToken, {
-          title: notificationTitle,
-          body: notificationBody,
-          data: {
-            type: 'chat',
-            senderId: senderId,
-            receiverId: receiverId,
-            message: message,
-            messageType: messageType,
-            senderName: senderName,
-            timestamp: new Date().toISOString()
+        try {
+          console.log(
+            '📨 Sending chat push to token',
+            deviceToken,
+            'for user',
+            receiverId,
+          );
+          await FirebaseUtil.sendPushNotification(deviceToken, {
+            title: notificationTitle,
+            body: notificationBody,
+            data: {
+              type: 'chat',
+              senderId: senderId,
+              receiverId: receiverId,
+              message: message,
+              messageType: messageType,
+              senderName: senderName,
+              timestamp: new Date().toISOString()
+            }
+          }, 'android'); // You can determine platform from device token if needed
+        } catch (error: any) {
+          const code = error?.errorInfo?.code;
+          if (
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/third-party-auth-error'
+          ) {
+            console.warn(
+              `🧹 Cleaning up invalid token for user ${receiverId}:`,
+              deviceToken,
+              'code:',
+              code,
+            );
+            await this.pushNotificationRepository.delete({
+              userId: receiverId,
+              deviceToken,
+            });
+          } else {
+            console.error(
+              `❌ Failed to send chat notification to token ${deviceToken}:`,
+              error,
+            );
           }
-        }, 'android'); // You can determine platform from device token if needed
+        }
       }
 
       console.log(`📱 Chat notification sent to user ${receiverId} from ${senderName}`);
@@ -114,20 +144,44 @@ export class ChatNotificationService {
         const receiverTokens = await this.getUserDeviceTokens(receiverId);
         
         for (const deviceToken of receiverTokens) {
-          await FirebaseUtil.sendPushNotification(deviceToken, {
-            title: notificationTitle,
-            body: notificationBody,
-            data: {
-              type: 'group_chat',
-              senderId: senderId,
-              receiverId: receiverId,
-              message: message,
-              messageType: messageType,
-              senderName: senderName,
-              groupName: groupName,
-              timestamp: new Date().toISOString()
+          try {
+            await FirebaseUtil.sendPushNotification(deviceToken, {
+              title: notificationTitle,
+              body: notificationBody,
+              data: {
+                type: 'group_chat',
+                senderId: senderId,
+                receiverId: receiverId,
+                message: message,
+                messageType: messageType,
+                senderName: senderName,
+                groupName: groupName,
+                timestamp: new Date().toISOString()
+              }
+            }, 'android');
+          } catch (error: any) {
+            const code = error?.errorInfo?.code;
+            if (
+              code === 'messaging/registration-token-not-registered' ||
+              code === 'messaging/third-party-auth-error'
+            ) {
+              console.warn(
+                `🧹 Cleaning up invalid token for user ${receiverId}:`,
+                deviceToken,
+                'code:',
+                code,
+              );
+              await this.pushNotificationRepository.delete({
+                userId: receiverId,
+                deviceToken,
+              });
+            } else {
+              console.error(
+                `❌ Failed to send group chat notification to token ${deviceToken}:`,
+                error,
+              );
             }
-          }, 'android');
+          }
         }
       }
 
@@ -157,8 +211,11 @@ export class ChatNotificationService {
         console.log(`⚠️  No device tokens found for user ${userId}. User needs to register device token.`);
         return [];
       }
-      
-      return deviceTokens.map(token => token.deviceToken);
+      // Skip empty tokens and dedupe so same FCM token from multiple rows gets one send
+      const valid = deviceTokens
+        .map((t) => t.deviceToken)
+        .filter((t): t is string => t != null && String(t).trim() !== '');
+      return [...new Set(valid)];
     } catch (error) {
       console.error('❌ Error getting user device tokens:', error);
       return [];
@@ -216,18 +273,42 @@ export class ChatNotificationService {
         const receiverTokens = await this.getUserDeviceTokens(receiverId);
         
         for (const deviceToken of receiverTokens) {
-          await FirebaseUtil.sendPushNotification(deviceToken, {
-            title: notificationTitle,
-            body: '',
-            data: {
-              type: 'typing',
-              senderId: senderId,
-              receiverId: receiverId,
-              isTyping: isTyping,
-              senderName: senderName,
-              timestamp: new Date().toISOString()
+          try {
+            await FirebaseUtil.sendPushNotification(deviceToken, {
+              title: notificationTitle,
+              body: '',
+              data: {
+                type: 'typing',
+                senderId: senderId,
+                receiverId: receiverId,
+                isTyping: isTyping,
+                senderName: senderName,
+                timestamp: new Date().toISOString()
+              }
+            }, 'android');
+          } catch (error: any) {
+            const code = error?.errorInfo?.code;
+            if (
+              code === 'messaging/registration-token-not-registered' ||
+              code === 'messaging/third-party-auth-error'
+            ) {
+              console.warn(
+                `🧹 Cleaning up invalid token for user ${receiverId}:`,
+                deviceToken,
+                'code:',
+                code,
+              );
+              await this.pushNotificationRepository.delete({
+                userId: receiverId,
+                deviceToken,
+              });
+            } else {
+              console.error(
+                `❌ Failed to send typing notification to token ${deviceToken}:`,
+                error,
+              );
             }
-          }, 'android');
+          }
         }
       }
     } catch (error) {

@@ -1259,28 +1259,91 @@ export class PushNotificationService {
     deviceData: RegisterDeviceTokenDto,
   ): Promise<{ message: string }> {
     try {
-      // Check if device token already exists for this user
-      const existingToken = await this.pushNotificationRepository.findOne({
-        where: { userId, deviceToken: deviceData.deviceToken },
-      });
-
-      if (existingToken) {
-        // Update existing token
-        existingToken.platform = deviceData.platform || 'android';
-        existingToken.isActive = true;
-        await this.pushNotificationRepository.save(existingToken);
-        return { message: 'Device token updated successfully' };
-      } else {
-        // Create new token
+      // When clientId is provided (e.g. web), treat each browser as a separate device so Edge and Firefox don't overwrite each other
+      if (deviceData.clientId) {
+        const existingByClient = await this.pushNotificationRepository.findOne({
+          where: { userId, clientId: deviceData.clientId },
+        });
+        if (existingByClient) {
+          existingByClient.deviceToken = deviceData.deviceToken;
+          existingByClient.platform = deviceData.platform || 'web';
+          existingByClient.isActive = true;
+          await this.pushNotificationRepository.save(existingByClient);
+          return { message: 'Device token updated successfully' };
+        }
         const newToken = this.pushNotificationRepository.create({
           userId,
           deviceToken: deviceData.deviceToken,
-          platform: deviceData.platform || 'android',
+          platform: deviceData.platform || 'web',
+          clientId: deviceData.clientId,
           isActive: true,
         });
         await this.pushNotificationRepository.save(newToken);
         return { message: 'Device token registered successfully' };
       }
+
+      // Legacy: key by (userId, deviceToken) so same token from same user updates one row
+                    const existingToken = await this.pushNotificationRepository.findOne({
+        where: { userId, deviceToken: deviceData.deviceToken },
+      });
+
+      if (existingToken) {
+        existingToken.platform = deviceData.platform || 'android';
+        existingToken.isActive = true;
+        await this.pushNotificationRepository.save(existingToken);
+        return { message: 'Device token updated successfully' };
+      }
+      const newToken = this.pushNotificationRepository.create({
+        userId,
+        deviceToken: deviceData.deviceToken,
+        platform: deviceData.platform || 'android',
+        isActive: true,
+      });
+      await this.pushNotificationRepository.save(newToken);
+      return { message: 'Device token registered successfully' };
+    } catch (error: any) {
+      ErrorHandlerUtil.handleError(error);
+    }
+  }
+
+  // Get all device tokens for current user
+  async getMyDeviceTokens(
+    userId: string,
+  ): Promise<{ deviceToken: string; platform: string }[]> {
+    try {
+      const tokens = await this.pushNotificationRepository.find({
+        where: { userId },
+        select: ['deviceToken', 'platform'],
+      });
+
+      return tokens
+        .filter((t) => t.deviceToken != null && String(t.deviceToken).trim() !== '')
+        .map((t) => ({
+          deviceToken: t.deviceToken,
+          platform: t.platform,
+        }));
+    } catch (error: any) {
+      ErrorHandlerUtil.handleError(error);
+    }
+  }
+
+  // Remove all device tokens for the user (e.g. on logout)
+  async cleanupMyTokens(userId: string): Promise<{ message: string; deleted: number }> {
+    try {
+      const tokens = await this.pushNotificationRepository.find({
+        where: { userId },
+      });
+
+      if (!tokens.length) {
+        return { message: 'No tokens to cleanup', deleted: 0 };
+      }
+
+      await this.pushNotificationRepository.remove(tokens);
+
+      return {
+        message: 'All device tokens removed successfully',
+        deleted: tokens.length,
+      };
     } catch (error: any) {
       ErrorHandlerUtil.handleError(error);
     }
@@ -2049,7 +2112,7 @@ export class AdvertNotificationService {
     }
   }
 
-  // Helper method to send push notification to user
+  // Helper method to send push notification to user (dedupe by token so same token from multiple rows sends once)
   private async sendPushNotificationToUser(userId: string, notification: any): Promise<void> {
     try {
       const deviceTokens = await this.pushNotificationRepository.find({
@@ -2061,8 +2124,12 @@ export class AdvertNotificationService {
         return;
       }
 
-      for (const deviceToken of deviceTokens) {
-        await FirebaseUtil.sendPushNotification(deviceToken.deviceToken, notification, deviceToken.platform);
+      const seen = new Set<string>();
+      for (const row of deviceTokens) {
+        const token = row.deviceToken?.trim();
+        if (!token || seen.has(token)) continue;
+        seen.add(token);
+        await FirebaseUtil.sendPushNotification(row.deviceToken, notification, row.platform);
       }
     } catch (error: any) {
       console.error(`Failed to send advert push notification to user ${userId}:`, error);

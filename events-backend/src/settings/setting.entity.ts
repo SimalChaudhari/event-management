@@ -175,6 +175,9 @@ export class PushNotification {
   @Column({ default: 'android' })
   platform!: string; // 'android' or 'ios'
 
+  @Column({ type: 'varchar', nullable: true })
+  clientId!: string | null; // Per-browser/client identifier so same FCM token from different browsers stays separate
+
   @Column({ default: true })
   isActive!: boolean; // Whether this device token is active
 

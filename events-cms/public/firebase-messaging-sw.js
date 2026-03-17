@@ -1,22 +1,24 @@
 // Firebase Cloud Messaging Service Worker
 // This file must be in the public directory for proper service worker registration
+// FCM token is per-origin + per service worker; each browser (Edge, Firefox, Chrome) gets its own token.
+// If you see the same token in different browsers, the app now sends clientId so each browser gets a separate registration.
 
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 // Initialize Firebase in the service worker
 const firebaseConfig = {
-  apiKey: "AIzaSyB-jL5NGhUvYWWlwooVWBvMgby35dyY-WI",
-  authDomain: "react-native-apps-11b65.firebaseapp.com",
-  projectId: "react-native-apps-11b65",
-  storageBucket: "react-native-apps-11b65.firebasestorage.app",
-  messagingSenderId: "899849144398",
-  appId: "1:899849144398:web:a0add6895682e67ceddb1f",
-  measurementId: "G-1STZ7L4GPP"
+  apiKey: "AIzaSyCsBBDF20-j6NzDfiXB-dCyt_4n0YDNUXw",
+  authDomain: "event-isca.firebaseapp.com",
+  projectId: "event-isca",
+  storageBucket: "event-isca.firebasestorage.app",
+  messagingSenderId: "605029586603",
+  appId: "1:605029586603:web:dd95a393f1f9a93f1d89ee",
+  measurementId: "G-ERBPXED94S"
 };
 
 // VAPID Key - Replace with your actual VAPID key from Firebase Console
-const VAPID_KEY = 'BL3ve9MA8jNcVVlRfkcDDTxetKf4fQzUGrA3YgKpOxgnN0DfWfpHYOEFL0Mrm458t1eFC0rjG5FID1jflQ7w_Lg';
+const VAPID_KEY = 'BBwhJls4uYIXwBEleP1ysB2WP8xVw421YSKmuRAObNCNSPlJM0wSm7OwTgKC7GC4foGYtEkZhPK4ftUFfyShADY';
 
 firebase.initializeApp(firebaseConfig);
 
@@ -25,6 +27,7 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
+  console.log('🔔 [SW] Background FCM message received:', payload);
   const notificationTitle = payload.notification?.title || 'New Message';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new message',

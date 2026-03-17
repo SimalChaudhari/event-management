@@ -1,0 +1,175 @@
+ANDROID PUSH NOTIFICATIONS - STEP BY STEP (SHURUAT SE)
+=====================================================
+Agar aapko kuch nahi aata, ye steps follow karo. Ek ek karke karo.
+
+
+STEP 1: FIREBASE CONSOLE MEIN ANDROID APP ADD KARO
+--------------------------------------------------
+1. Browser me jaao: https://console.firebase.google.com
+2. Apna project select karo: event-isca (agar nahi hai to pehle create karo)
+3. Project settings (gear icon) ke paas "Add app" ya "+ Add app" pe click karo
+4. Android icon pe click karo
+5. Android package name daalo - ye wo hai jo tumhare app/build.gradle me hai
+   Example: com.yourapp.eventmobile
+   (Package name backend wale ko batao, wo bhi same use karenge)
+6. "Register app" pe click karo
+7. "Download google-services.json" pe click karo - ye file download hogi
+8. Is file ko copy karo apne Android project me: app/google-services.json
+   (app folder ke andar, build.gradle ke saath)
+9. "Next" -> "Next" -> "Continue to console"
+
+
+STEP 2: ANDROID PROJECT MEIN FIREBASE ADD KARO
+----------------------------------------------
+1. Project ke root build.gradle (Project level) open karo
+2. dependencies block me ye add karo:
+   classpath 'com.google.gms:google-services:4.4.0'
+   (Agar already hai to skip)
+
+3. app/build.gradle (Module level) open karo
+4. File ke END me ye line add karo:
+   apply plugin: 'com.google.gms.google-services'
+
+5. dependencies block me ye add karo:
+   implementation 'com.google.firebase:firebase-messaging:23.4.0'
+
+6. Sync Now click karo (Gradle sync)
+
+
+STEP 3: FIREBASEMESSAGINGSERVICE BANAO (token lene ke liye)
+-----------------------------------------------------------
+1. Package ke andar naya Java/Kotlin class banao
+   Example: com.yourapp.eventmobile.MyFirebaseMessagingService
+
+2. Ye class FirebaseMessagingService extend kare:
+
+Kotlin:
+-------
+import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
+
+class MyFirebaseMessagingService : FirebaseMessagingService() {
+
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        // Jab token change ho (reinstall, etc), yahan aata hai
+        // Is token ko save karo aur register-device API ko bhejo
+        sendTokenToServer(token)
+    }
+
+    override fun onMessageReceived(message: RemoteMessage) {
+        super.onMessageReceived(message)
+        // Jab notification aaye, yahan handle karo
+        message.notification?.let {
+            // Show notification, open screen, etc.
+        }
+    }
+
+    private fun sendTokenToServer(token: String) {
+        // Step 4 me ye function complete karenge
+    }
+}
+
+3. AndroidManifest.xml me register karo (application tag ke andar):
+   <service
+       android:name=".MyFirebaseMessagingService"
+       android:exported="false">
+       <intent-filter>
+           <action android:name="com.google.firebase.MESSAGING_EVENT" />
+       </intent-filter>
+   </service>
+
+
+STEP 4: FCM TOKEN KAISE LO AUR API KO KAISE BHEJO
+-------------------------------------------------
+Pehle token chahiye. Ye 2 jagah milega:
+- App start pe (pehli baar)
+- onNewToken me (jab refresh ho)
+
+Token lene ke liye ek helper banao:
+
+Kotlin:
+-------
+import com.google.firebase.messaging.FirebaseMessaging
+
+fun getFCMTokenAndRegister() {
+    FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+        if (!task.isSuccessful) return@addOnCompleteListener
+        val token = task.result  // ye hai deviceToken
+        callRegisterDeviceAPI(token)
+    }
+}
+
+fun callRegisterDeviceAPI(deviceToken: String) {
+    val jwt = "YOUR_USER_JWT_TOKEN"  // Login ke baad user ka JWT
+    val apiUrl = "https://your-api.com/api/notifications/register-device"
+    
+    val json = """{"deviceToken":"$deviceToken","platform":"android"}"""
+    
+    // Retrofit/OkHttp/HttpURLConnection use karke:
+    // POST apiUrl
+    // Header: Authorization: Bearer $jwt
+    // Header: Content-Type: application/json
+    // Body: json
+}
+
+
+STEP 5: KAHAN PE REGISTER KARNA HAI (Kab call karo)
+---------------------------------------------------
+Ye 2 jagah zaroor call karo:
+
+1. User LOGIN ke turant baad:
+   - Login success hone ke baad
+   - JWT milte hi getFCMTokenAndRegister() call karo
+   - JWT ko store karo (SharedPref/keystore) taake call kar sako
+
+2. onNewToken me (FirebaseMessagingService me):
+   - Jab Firebase token refresh kare
+   - sendTokenToServer(token) me callRegisterDeviceAPI(token) call karo
+   - Is time bhi JWT chahiye - agar user logged in hai to saved JWT use karo
+
+
+STEP 6: API CALL KA SIMPLE CODE (Retrofit se)
+---------------------------------------------
+Agar Retrofit use kar rahe ho:
+
+interface Api {
+    @POST("api/notifications/register-device")
+    suspend fun registerDevice(
+        @Header("Authorization") auth: String,
+        @Body body: RegisterDeviceRequest
+    ): Response<MessageResponse>
+}
+
+data class RegisterDeviceRequest(
+    val deviceToken: String,
+    val platform: String = "android"
+)
+
+// Call:
+api.registerDevice(
+    "Bearer $jwt",
+    RegisterDeviceRequest(deviceToken = token, platform = "android")
+)
+
+
+STEP 7: NOTIFICATION PERMISSION (Android 13+)
+---------------------------------------------
+Android 13 se pehle notification permission request karo:
+
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 123)
+}
+
+
+SUMMARY - ORDER ME KYA KARNA HAI
+--------------------------------
+1. Firebase Console -> Add Android app -> Download google-services.json
+2. google-services.json ko app/ folder me rakho
+3. build.gradle me Firebase + firebase-messaging dependency add karo
+4. MyFirebaseMessagingService banao, AndroidManifest me add karo
+5. getFCMTokenAndRegister() helper banao
+6. Login success -> getFCMTokenAndRegister() call karo
+7. onNewToken me bhi register-device call karo
+
+Bas. Backend baaki sab handle karega.

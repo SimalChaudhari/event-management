@@ -124,6 +124,16 @@ export class RegisterDeviceTokenDto {
     @IsOptional()
     @IsString()
     readonly platform?: string; // 'android' or 'ios'
+
+    @IsOptional()
+    @IsString()
+    readonly clientId?: string; // Per-browser id so Edge/Firefox get separate rows even if FCM returns same token
+}
+
+export class CleanupTokensDto {
+    @IsNotEmpty()
+    @IsString()
+    readonly keepToken!: string;
 }
 
 export class SendNotificationDto {

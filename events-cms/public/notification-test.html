@@ -137,24 +137,39 @@
     <script>
         // Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyB-jL5NGhUvYWWlwooVWBvMgby35dyY-WI",
-            authDomain: "react-native-apps-11b65.firebaseapp.com",
-            projectId: "react-native-apps-11b65",
-            storageBucket: "react-native-apps-11b65.firebasestorage.app",
-            messagingSenderId: "899849144398",
-            appId: "1:899849144398:web:a0add6895682e67ceddb1f",
-            measurementId: "G-1STZ7L4GPP"
-        };
+  apiKey: "AIzaSyCsBBDF20-j6NzDfiXB-dCyt_4n0YDNUXw",
+  authDomain: "event-isca.firebaseapp.com",
+  projectId: "event-isca",
+  storageBucket: "event-isca.firebasestorage.app",
+  messagingSenderId: "605029586603",
+  appId: "1:605029586603:web:dd95a393f1f9a93f1d89ee",
+  measurementId: "G-ERBPXED94S"
+};
 
         let messaging = null;
-        
+        let swRegistration = null; // So getToken uses this SW and each browser gets its own token
+
         // VAPID Key - Set directly in code
-        const vapidKey = 'BL3ve9MA8jNcVVlRfkcDDTxetKf4fQzUGrA3YgKpOxgnN0DfWfpHYOEFL0Mrm458t1eFC0rjG5FID1jflQ7w_Lg';
+        const vapidKey = 'BBwhJls4uYIXwBEleP1ysB2WP8xVw421YSKmuRAObNCNSPlJM0wSm7OwTgKC7GC4foGYtEkZhPK4ftUFfyShADY';
         let deviceToken = '';
         let jwtToken = '';
-        let apiBaseUrl = 'http://localhost:5000';
+        // Use same origin in production; localhost for local dev (override via query: ?api=http://localhost:5000)
+        let apiBaseUrl = (typeof window !== 'undefined' && window.location.origin !== 'file://') ? window.location.origin : 'http://localhost:5000';
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('api')) apiBaseUrl = params.get('api');
+        } catch (e) {}
 
-        // VAPID Key is pre-configured in code
+        // Per-browser client id so Edge and Firefox get separate registrations even if FCM token were the same
+        function getOrCreateClientId() {
+            const key = 'fcm_client_id';
+            let id = localStorage.getItem(key);
+            if (!id) {
+                id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'web_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                localStorage.setItem(key, id);
+            }
+            return id;
+        }
 
         // Step 2: Initialize Firebase and get device token
         function initFirebase() {
@@ -162,11 +177,33 @@
                 try {
                     firebase.initializeApp(firebaseConfig);
                     messaging = firebase.messaging();
+
+                    // Log and show foreground messages to help debug notifications
+                    messaging.onMessage((payload) => {
+                        console.log('🔔 Foreground FCM message received:', payload);
+                        const n = payload.notification || {};
+                        console.log('🔔 Notification title:', n.title, 'body:', n.body, 'data:', payload.data);
+
+                        // Try to show a browser notification when the tab is in foreground
+                        if ('Notification' in window) {
+                            if (Notification.permission === 'granted') {
+                                new Notification(n.title || 'New message', {
+                                    body: n.body || '',
+                                    data: payload.data || {},
+                                });
+                            } else {
+                                console.log('🔔 Notification permission is', Notification.permission);
+                            }
+                        } else {
+                            console.log('🔔 Notification API not supported in this browser');
+                        }
+                    });
                     
-                    // Register service worker
+                    // Register service worker and keep reference so getToken uses this SW (per-browser token)
                     if ('serviceWorker' in navigator) {
                         navigator.serviceWorker.register('/firebase-messaging-sw.js')
                             .then((registration) => {
+                                swRegistration = registration;
                                 showStatus('firebase-status', 'Firebase initialized successfully!', 'success');
                                 resolve();
                             })
@@ -201,7 +238,9 @@
                     return;
                 }
 
-                messaging.getToken({ vapidKey: vapidKey })
+                const opts = { vapidKey: vapidKey };
+                if (swRegistration) opts.serviceWorkerRegistration = swRegistration;
+                messaging.getToken(opts)
                     .then((token) => {
                         if (token) {
                             deviceToken = token;
@@ -265,7 +304,8 @@
                     },
                     body: JSON.stringify({
                         deviceToken: deviceToken,
-                        platform: 'web'
+                        platform: 'web',
+                        clientId: getOrCreateClientId()
                     })
                 });
 
@@ -301,7 +341,8 @@
                     },
                     body: JSON.stringify({
                         deviceToken: deviceToken,
-                        platform: 'web'
+                        platform: 'web',
+                        clientId: getOrCreateClientId()
                     })
                 });
 
@@ -440,6 +481,14 @@
                 
                 // Get device token automatically
                 await getDeviceToken();
+
+                // Request browser notification permission (Chrome/Firefox)
+                if ('Notification' in window) {
+                    const permission = await Notification.requestPermission();
+                    console.log('🔔 Notification permission result:', permission);
+                } else {
+                    console.log('🔔 Notification API not supported in this browser');
+                }
                 
                 // Show status in JWT area
                 showStatus('jwt-status', '✅ System ready! Enter JWT token to start chatting.', 'success');

@@ -10,41 +10,96 @@ export class FirebaseUtil {
    */
   static initializeFirebase(): admin.app.App | null {
     try {
-      // Check if Firebase is already initialized
-      if (!admin.apps.length) {
+      // Use a dedicated named app for FCM so it doesn't conflict
+      // with other firebase-admin initializations (e.g. storage).
+      const appName = 'event-isca-messaging';
+
+      // If app already exists, just reuse it
+      let existing: admin.app.App | undefined;
+      for (const a of admin.apps) {
+        if (a && a.name === appName) {
+          existing = a;
+          break;
+        }
+      }
+      if (existing) {
+        this.fcmApp = existing;
+        return this.fcmApp;
+      }
+
+      // Prefer environment variables for production (no secrets in code)
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+      const privateKeyId = process.env.FIREBASE_PRIVATE_KEY_ID;
+      const clientId = process.env.FIREBASE_CLIENT_ID;
+
+      const useEnvCreds =
+        projectId &&
+        clientEmail &&
+        privateKey &&
+        privateKeyId &&
+        clientId;
+
+      if (useEnvCreds) {
         const serviceAccount = {
           type: 'service_account',
-          project_id: 'react-native-apps-11b65',
-          private_key_id: 'dd2c7c805236e973476b8e7e5c3af727940be4ee',
-          private_key:
-            '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDImYtFCZiOQn/R\nLIY6e9w7QtLBegHjRwhhpsScXrYMsdsfxVOy54yx6NxuZrQR1MkjkTe/xLMDdHct\nF93lO6Q2+cOoDhS9rRdvMXQb7CkzofSVJnZcPGS/ZrDTlgjFNZEwUrbvK+UpaWWN\nJRS5qBNp5QI9eD5YYwBgfFp9m4nGThIUYpFK9oOdwCS+qgnrTfnYcqKXL8wtbhNY\n4soZQU1T9QAKRoyd6P2pF1XD8ZV4qTC9nURUpRcEzkxaRNF55FHvGUfLnGYlya4c\n8iWL2hAP1jCJhdkQwbI/htUbIsmvuT0AtAW58iuPhkRUXE/fX9uPnUi/vn6isJ1W\nlZQa8EE/AgMBAAECggEADGG3Ksc5Wd/j6M2BPtSMrEG8etcPjRpCJljh/i7gY280\n8cSUcntVVVk6Becj9TfM7yY+/9YMdfRMiNrWG5iZ/boJPXMaYkzFS1viPqOjNWh+\njW2Rf7GgnFR31KTdnLfo4sfa5RoGAToxW6FuzTjWc0JV6Dpm9Witn3GoL47tVZvk\nXxyzIDlzSEQWUcQZD1s5SSdVBIdiVZn/bMupEPLTlNMr+FyB4ErlikOqX1HifvYK\nAd7rvYIKmKrOmgFE8N4xjHA4jo92NKto4+mBx3XIZMjS5kw06P+iFju8WX9UQ44Q\nxg2rMhoPywBlYvKB2U5qL7rkjPpEZyx3TZt8vpCn4QKBgQDnHfCuwZO/E9011wH8\nX0wvOh9DrmkQegicMHKRUk6pAwGRz2r9GMMPe6o5Z7EGiJP1n2lBIZVQUsdOV7gJ\nBzIxeTSSxMZO7fl6ok3OYVsjCkzpEjUlBr1U//RZNHkXmps7vL8KeiVcOdNG6lUD\nu8zoIpz0E3Zq+18UnihvMwGfoQKBgQDeMnzW3YTYs9JAirS7R13Xdm1kK7el9pA2\ni801FB7gYAHiF8RvlY2v1MV9oYXbYsOwj2+UAD8o5rKKvKjM/vLnmc0k6HVHYWUh\nAtFK7B/GZGXZSf8FM0Fa/TJxcbXvdKAsOo1bX4gsSVYFKn8m2sTBx574MIcl8mId\nxiQRx6m03wKBgHBiArM3thxoEF0p2/FYdbdRT/qdSMGWVbF9bXh0yYMtzwmUDrZb\n4B4bSD75yP8gUrJRfeEJ741Lc1cJGJhrQ2EDSylDPhsLZRDY83SzqplzXMrI68bB\nbDd07uChv3BW4b0+nrb9hkU+aRpGwGg8XftTOXcGL8L90NI5xfesmdGBAoGAEFd+\nPv9DyfxPtld9O1jgWfxnxzo/44Di0mAt032LV8031j0RQXOqXAg2DitXAO+enNmv\nxx7NhmCROQrvD0Sg8M+q+s/t8DYFjgv7AJulKp4vr291xhgi8mI014sZamcVcKtN\nwi6ggUFThkW93Emytt3Ln01SY0QUW0Q7WuNoY9kCgYEAzl0TKFASqLupBKkPwjFL\nRZxTnYX/CC2vnAqmvvbMsrszkEuBR5l6c1RiKY0yPJmIvx/xKRLuZ6MByZO1kT6k\ng+3z0WYNLQJXU2X3DcphQiC2kiugsc97S6yswddroYWrt7i/5t/mg2lr2bNNpuvL\nKEKGdAWBSUj7GQ2sJ+j2jTE=\n-----END PRIVATE KEY-----\n',
-          client_email:
-            'firebase-adminsdk-fbsvc@react-native-apps-11b65.iam.gserviceaccount.com',
-          client_id: '112164696025317365926',
+          project_id: projectId,
+          private_key_id: privateKeyId,
+          private_key: privateKey,
+          client_email: clientEmail,
+          client_id: clientId,
           auth_uri: 'https://accounts.google.com/o/oauth2/auth',
           token_uri: 'https://oauth2.googleapis.com/token',
           auth_provider_x509_cert_url:
             'https://www.googleapis.com/oauth2/v1/certs',
-          client_x509_cert_url:
-            'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40react-native-apps-11b65.iam.gserviceaccount.com',
+          client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(clientEmail)}`,
           universe_domain: 'googleapis.com',
-        };
-
-        this.fcmApp = admin.initializeApp({
-          credential: admin.credential.cert(
-            serviceAccount as admin.ServiceAccount,
-          ),
-          projectId: process.env.FIREBASE_PROJECT_ID,
-        });
-
-      } else {
-        this.fcmApp = admin.apps[0];
-       
+        } as admin.ServiceAccount;
+        this.fcmApp = admin.initializeApp(
+          { credential: admin.credential.cert(serviceAccount) },
+          appName,
+        );
+        return this.fcmApp;
       }
+
+      // Fallback for local development only; production must use env vars
+      if (process.env.NODE_ENV === 'production') {
+        console.error(
+          '❌ Firebase Admin: Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_PRIVATE_KEY_ID, FIREBASE_CLIENT_ID in production.',
+        );
+        return null;
+      }
+
+      const devServiceAccount = {
+        type: 'service_account',
+        project_id: 'event-isca',
+        private_key_id: '18e18a0ce754d65b593d7a23ea829c5bee3c0aac',
+        private_key:
+          '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCczbptFHau5E/D\nqRYf/XFD+HYZCYRi1/M8miPXkhJy9kN4o8etmsNc5HiOALKGT8Zjjb4RGPhK+Lnw\nXkrK6rDedP+i3LfkRWXFpgjQUaTU+Isy65F4++6YzAiKNroz1H7CmK/XIvE7Ztvy\nX/eO35AjIHBkMMxB5dlmGjPXBmA9KAXqyjOwHf77zyEDNjx1uxde7BCAGfQr8WIM\nAz/W47aQQwnqdE3KN6JhmBsjpkYIQ/Kmhdx7daY4Yk1M9H40pphCZZeyaXsiDfzm\nuZq6Uarb4rA62gAPTESGAgHkFPjYj/dp6nt6M/Fm5sYAtoGOU3VUN9IcvHfHLsn8\njY/lvMdtAgMBAAECggEABGpgrRCt9OfV/S8GQflblqvo+3SCp1vobBT1HG1vGpCn\nvr5x8YgRp0yBvpHzdQfLEOOdbhLTbx0I82VcWtF4EJOf3UC05vczUfkGd4NNDng/\nRzxN+OezRNc+CFJZNPtvZGBzVy4TN/aCDBW6vWm7P9n6gD/FiLeFwzPKsOvrit1J\n3+ryXspdO1ClqInkUq2T9CXe7xou7YMj5ft36jZONr9XWNOC+e+V25qjxmfgKlXn\n2wD+holFAgY4XmjDpJhAmVWVgVoTS1T0/H7tZGXakWX6+qbV/9sOtS+PCGdTD6Xm\nBNqXN9DgWRCXciHhNdiUdQzAyFsxO/S0b0E2q7fscQKBgQDM+sVOZg1gV47hADKB\ndoJTlqowzBLm77T8H+cJp3L9zcVBQAQrtR4FBU1RV8Uod8aIS9JVCx3RufLajf6U\n7iy2gk/lEaFI93Bf3i1bTIcU9S3f9qlwZuGglM0a2pj94+DRGx8+evi10yDDxtSE\npd6eQ806lhWwI9mhYUMeMCPh6QKBgQDD1TPPneLXJLf3KQQG7yT6wHG4LEciXMFe\nn2s5fUx1MqKrTd1mMvwYypJQIucSBY5hsnW6Ip8N82kVBoT9RRp85FVj/C891Nq+\nMWlgVCoG2akKKXF1jX9wYCRvMRuCI14dz6VKHlwnrf/IR/yS5dmTNs+9LBLTr4xQ\nNy/SMhTi5QKBgF068eLmp87aBDJyVIZt0HkUXfQz3aUMAdVq7TqG3tZxcPZsl3kJ\nt82wy6njsdjmIXZ8hf4IQFfTq5GcY955Nf0M6CnYCvOVF5eDBj4wYIA3w9XJ6uck\n5BqVk3RTWKKhsu9o1p0kcVrB3HUvShnLF6YEUKQE/3hN1f6ArnZcjvWBAoGACN2j\nHdghB+pypa7mrsWu3+dMfrEKe2TFoFoJSa4BgyDKuoSo7FKMlTa+jwA1g9xaiNPC\nfq3Ik6IcdMY5yRmSzGqt7vvgy6TSTmAATEsjJ/I8s+gSaecBCP5hR+NqQmcFgMYA\nzq03MNiwxslzhtb/Faoal47iP1EoQg1tjc+UoH0CgYEAwlGB1sAXCi9FkBiUU2oz\nxos1GxairPnxkOfzxpvFiNV5LBWpPW80Iy1NZj5z3/jf6tStZKujLDda6xCzMu+g\n53Cd2WMOBNKo2CeKZsrITUutHIaBLLArL55ksJ3Z8QmInBa80kHaDYZ9+HEzDdHs\nQn6Cj1T2jVhaAchM8e1+9KM=\n-----END PRIVATE KEY-----\n',
+        client_email:
+          'firebase-adminsdk-fbsvc@event-isca.iam.gserviceaccount.com',
+        client_id: '101497557548185792969',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oauth2.googleapis.com/token',
+        auth_provider_x509_cert_url:
+          'https://www.googleapis.com/oauth2/v1/certs',
+        client_x509_cert_url:
+          'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40event-isca.iam.gserviceaccount.com',
+        universe_domain: 'googleapis.com',
+      };
+
+      this.fcmApp = admin.initializeApp(
+        {
+          credential: admin.credential.cert(
+            devServiceAccount as admin.ServiceAccount,
+          ),
+        },
+        appName,
+      );
 
       return this.fcmApp;
     } catch (error) {
-     
       return null;
     }
   }
@@ -77,48 +132,51 @@ export class FirebaseUtil {
     },
     platform: string = 'android',
   ): Promise<void> {
-    try {
-      const app = this.getFirebaseApp();
+    const app = this.getFirebaseApp();
 
-      if (!app) {
-     
-        return;
-      }
-
-      const message = {
-        token: deviceToken,
-        notification: {
-          title: notificationData.title,
-          body: notificationData.body,
-        },
-        data: {
-          ...notificationData.data,
-          type: notificationData.type || GeneralNotificationType.GENERAL,
-          timestamp: new Date().toISOString(),
-        },
-        android: {
-          notification: {
-            icon: 'ic_notification',
-            color: '#FF6B6B',
-            sound: 'default',
-            channelId: 'default_channel',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-            },
-          },
-        },
-      };
-
-      const response = await admin.messaging().send(message);
-     
-    } catch (error) {
-      console.error(`❌ Failed to send FCM notification:`, error);
+    if (!app) {
+      console.error('❌ Firebase messaging app not initialized');
+      return;
     }
+
+    // Do not log full token in production (security)
+    if (process.env.NODE_ENV !== 'production') {
+      const mask = deviceToken.length > 8 ? `...${deviceToken.slice(-6)}` : '***';
+      console.log('📌 FirebaseUtil.sendPushNotification token:', mask);
+    }
+
+    const message = {
+      token: deviceToken,
+      notification: {
+        title: notificationData.title,
+        body: notificationData.body,
+      },
+      data: {
+        ...notificationData.data,
+        type: notificationData.type || GeneralNotificationType.GENERAL,
+        timestamp: new Date().toISOString(),
+      },
+      android: {
+        notification: {
+          icon: 'ic_notification',
+          color: '#FF6B6B',
+          sound: 'default',
+          channelId: 'default_channel',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    // Use messaging instance from our dedicated app
+    const messaging = (app as admin.app.App).messaging();
+    await messaging.send(message);
   }
 
   /**
@@ -149,7 +207,13 @@ export class FirebaseUtil {
         );
         successCount++;
       } catch (error) {
-        console.error(`Failed to send to device ${deviceToken}:`, error);
+        const mask =
+          process.env.NODE_ENV === 'production'
+            ? '***'
+            : deviceToken.length > 8
+              ? `...${deviceToken.slice(-6)}`
+              : '***';
+        console.error(`Failed to send to device ${mask}:`, error);
       }
     }
 

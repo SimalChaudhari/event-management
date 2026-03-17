@@ -494,6 +494,22 @@ export class PushNotificationController {
     };
   }
 
+  // Get current user's registered device tokens
+  @Get('my-tokens')
+  async getMyTokens(
+    @GetUser() user: UserEntity,
+  ): Promise<{ deviceToken: string; platform: string }[]> {
+    return this.pushNotificationService.getMyDeviceTokens(user.id);
+  }
+
+  // Remove all device tokens for the current user (e.g. on logout)
+  @Post('cleanup-tokens')
+  async cleanupTokens(
+    @GetUser() user: UserEntity,
+  ): Promise<{ message: string; deleted: number }> {
+    return this.pushNotificationService.cleanupMyTokens(user.id);
+  }
+
   // Mark event notification as read
   @Put('mark-event-read/:eventNotificationId')
   async markEventNotificationAsRead(

@@ -378,7 +378,11 @@ export class NotificationUtil {
         return;
       }
 
+      const seen = new Set<string>();
       for (const deviceToken of deviceTokens) {
+        const token = deviceToken.deviceToken?.trim();
+        if (!token || seen.has(token)) continue;
+        seen.add(token);
         console.log(`📤 Sending push notification to ${deviceToken.platform} device`);
         await FirebaseUtil.sendPushNotification(deviceToken.deviceToken, notification, deviceToken.platform);
         console.log(`✅ Push notification sent successfully`);

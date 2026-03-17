@@ -1,0 +1,65 @@
+PUSH NOTIFICATIONS - WHAT MOBILE DEVELOPER MUST DO
+=================================================
+Backend handles everything. You only do this in the app.
+
+
+WHAT YOU GET FROM US
+--------------------
+1. API base URL (e.g. https://api.yourapp.com)
+2. Firebase project: event-isca (same for Android and iOS)
+   - Android: we give you google-services.json
+   - iOS: we give you GoogleService-Info.plist (and APNs is set in Firebase)
+
+
+HOW TO GET FCM TOKEN (deviceToken)
+----------------------------------
+Android (Kotlin):
+  FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+    if (task.isSuccessful) {
+      val token = task.result   // this is your deviceToken
+      // now call register-device API with this token
+    }
+  }
+  // When token refreshes: override onNewToken() in FirebaseMessagingService
+  // and call register-device again with the new token.
+
+iOS (Swift):
+  Messaging.messaging().token { token, error in
+    if let token = token {
+      // this is your deviceToken - call register-device API with it
+    }
+  }
+  // When token refreshes: implement messaging(_:didReceiveRegistrationToken:)
+  // and call register-device again with the new token.
+
+(Add Firebase Messaging dependency / pod in your project first.)
+
+
+WHAT YOU DO IN THE APP
+----------------------
+1. Get FCM token as above (that string is "deviceToken").
+
+2. After user logs in, call this API once:
+   POST {API_BASE_URL}/api/notifications/register-device
+   Header: Authorization: Bearer {user_jwt_token}
+   Header: Content-Type: application/json
+   Body: {"deviceToken": "your_fcm_token_here", "platform": "android"}
+   (Use "platform": "ios" for iOS app)
+
+3. When FCM token changes (e.g. reinstall app), call the same API again with new token.
+
+Done. Backend will send push to this device when we need to.
+
+
+EXAMPLE
+-------
+POST https://your-api.com/api/notifications/register-device
+Authorization: Bearer eyJhbGciOiJIUzI1...
+Content-Type: application/json
+
+{"deviceToken": "dXYZ123:APA91b...", "platform": "android"}
+
+
+TAP ON NOTIFICATION
+-------------------
+We send title, body and data (e.g. type, eventId). Use that to open the correct screen when user taps the notification.

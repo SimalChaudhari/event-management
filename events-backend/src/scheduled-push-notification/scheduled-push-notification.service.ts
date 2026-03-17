@@ -606,7 +606,11 @@ export class ScheduledPushNotificationService {
             hasDeviceTokens = deviceTokens.length > 0;
 
             if (hasDeviceTokens) {
+              const seenTokens = new Set<string>();
               for (const deviceToken of deviceTokens) {
+                const token = deviceToken.deviceToken?.trim();
+                if (!token || seenTokens.has(token)) continue;
+                seenTokens.add(token);
                 try {
                   await FirebaseUtil.sendPushNotification(
                     deviceToken.deviceToken,
