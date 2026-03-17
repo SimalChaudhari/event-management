@@ -3,9 +3,68 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { fetchMyRegisteredEvents } from '../../store/actions/eventActions';
 import { ROUTES } from '../../routes/routeConfig';
+import { UPLOADS_URL } from '../../config';
 import EngagementQnA from '../../components/engagement/EngagementQnA';
 import EngagementPolling from '../../components/engagement/EngagementPolling';
 import EngagementSurveys from '../../components/engagement/EngagementSurveys';
+
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=240&fit=crop';
+
+function EngagementEventCard({ ev, isSelected, onSelect }) {
+  const e = ev?.event ?? ev;
+  const imgPath = e?.images?.[0] ?? e?.image;
+  const imageUrl = imgPath
+    ? (String(imgPath).startsWith('http') ? imgPath : `${UPLOADS_URL}/${String(imgPath).replace(/^\//, '')}`)
+    : PLACEHOLDER_IMAGE;
+  const formatDate = (d) => {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', weekday: 'short' });
+  };
+  const currency = e?.currency || 'SGD';
+  const priceRaw = e?.price != null && e?.price !== '' ? Number(e.price) : null;
+  const earlyBirdRaw = e?.earlyBirdPrice != null && e?.earlyBirdPrice !== '' ? Number(e.earlyBirdPrice) : null;
+  const hasValidPrice = priceRaw !== null && !Number.isNaN(priceRaw) && priceRaw > 0;
+  const hasRealEarlyBird = earlyBirdRaw !== null && !Number.isNaN(earlyBirdRaw) && earlyBirdRaw > 0;
+  const hasDiscount = hasRealEarlyBird && hasValidPrice && earlyBirdRaw < priceRaw;
+  const displayPriceNum = hasDiscount ? earlyBirdRaw : priceRaw;
+  const priceLabel =
+    displayPriceNum == null || Number.isNaN(displayPriceNum) || displayPriceNum === 0
+      ? 'Free'
+      : `${currency} ${Number(displayPriceNum).toLocaleString()}`;
+  const regularPriceLabel = hasDiscount && hasValidPrice ? `${currency} ${Number(priceRaw).toLocaleString()}` : null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(ev)}
+      className={`block w-full text-left bg-white rounded-2xl overflow-hidden shadow-sm border transition-all active:scale-[0.98] active:shadow ${
+        isSelected
+          ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
+          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+      }`}
+    >
+      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+        <img src={imageUrl} alt={e?.name} className="w-full h-full object-cover" />
+      </div>
+      <div className="px-3 pb-3">
+        <h3 className="text-base font-semibold text-slate-800 pt-3 mb-1">{e?.name ?? 'Event'}</h3>
+        <p className="text-[13px] text-slate-500 mb-1.5">Event: {formatDate(e?.startDate)}</p>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          {hasDiscount && regularPriceLabel && (
+            <span className="text-[13px] text-slate-500 line-through">{regularPriceLabel}</span>
+          )}
+          <span className="text-base font-bold text-primary">{priceLabel}</span>
+        </div>
+        {e?.attendanceCount != null && e.attendanceCount > 0 && (
+          <p className="text-xs text-slate-500">Attendance: {Number(e.attendanceCount).toLocaleString()}</p>
+        )}
+        {isSelected && (
+          <p className="text-xs font-medium text-primary mt-1.5">Selected — use tabs below</p>
+        )}
+      </div>
+    </button>
+  );
+}
 
 const TABS = [
   { id: 'qna', label: 'Q&A' },
@@ -97,33 +156,22 @@ export default function Engagement() {
       ) : (
         <>
           <section className="mb-6">
-            <h2 className="text-sm font-semibold text-slate-600 mb-2">Your events</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <h2 className="text-lg font-bold text-slate-800 mb-3">Your events</h2>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
               {myRegisteredEvents.map((ev) => {
                 const e = ev.event ?? ev;
                 const id = e?.id ?? ev.eventId ?? ev.id;
                 const isSelected = selectedEvent?.event?.id === id || selectedEvent?.eventId === id;
                 return (
-                  <button
+                  <EngagementEventCard
                     key={ev.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedEvent(ev);
+                    ev={ev}
+                    isSelected={isSelected}
+                    onSelect={(item) => {
+                      setSelectedEvent(item);
                       setActiveTab('qna');
                     }}
-                    className={`rounded-xl border p-4 text-left transition-all ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <p className="font-medium text-slate-800 line-clamp-2">{e?.name ?? 'Event'}</p>
-                    {e?.startDate && (
-                      <p className="text-slate-500 text-xs mt-1">
-                        {new Date(e.startDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </button>
+                  />
                 );
               })}
             </div>

@@ -21,8 +21,9 @@ export function isPastEvent(event) {
 export default function EventCard({ event, compact, clickable = true, registrationId }) {
   const { authenticated } = useSelector((s) => s.auth);
   const e = event?.event ?? event;
-  const imageUrl = e.image
-    ? (e.image.startsWith('http') ? e.image : `${UPLOADS_URL}/${e.image}`)
+  const imgPath = e?.images?.[0] ?? e?.image;
+  const imageUrl = imgPath
+    ? (String(imgPath).startsWith('http') ? imgPath : `${UPLOADS_URL}/${String(imgPath).replace(/^\//, '')}`)
     : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=240&fit=crop';
 
   const formatDate = (d) => {

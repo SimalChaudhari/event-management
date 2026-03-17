@@ -48,4 +48,8 @@ export const FEATURES = {
   ENABLE_LOGGING: getEnv('VITE_ENABLE_LOGGING') === 'true' || import.meta.env.DEV,
 };
 
-export const APP_DOWNLOAD_URL = getEnv('VITE_APP_DOWNLOAD_URL', 'https://evential.sg');
+export const GOOGLE_PLAY_DOWNLOAD_URL = getEnv('VITE_GOOGLE_PLAY_DOWNLOAD_URL', 'https://play.google.com/store/apps/details?id=app.isca.evential');
+export const APPLE_DOWNLOAD_URL = getEnv('VITE_APPLE_DOWNLOAD_URL', 'https://apps.apple.com/app/id6690337682');
+
+export const APP_STORE_URL = getEnv('VITE_APP_STORE_URL', APPLE_DOWNLOAD_URL);
+export const PLAY_STORE_URL = getEnv('VITE_PLAY_STORE_URL', GOOGLE_PLAY_DOWNLOAD_URL);
