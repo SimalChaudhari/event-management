@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { eventById, updateEventTabVisibility } from '../../../../store/actions/eventActions';
 import axiosInstance from '../../../../configs/axiosInstance';
 import { API_URL } from '../../../../configs/env';
+import { getEventImageUrl } from '../../../../utils/eventImageUtils';
 import EventBasicComponent from '../../../../components/events/EventBasicComponent';
 import EventLocationComponent from '../../../../components/events/EventLocationComponent';
 import EventSpeakersComponent from '../../../../components/events/EventSpeakersComponent';
@@ -96,37 +97,8 @@ const ViewEventPage = () => {
     });
     const [isUpdatingTabVisibility, setIsUpdatingTabVisibility] = useState(false);
 
-    // Get image source - defined before useEffect to avoid hoisting issues
-    const getImageSrc = (image) => {
-        
-        if (!image) {
-            console.log('⚠️ getImageSrc - No image provided');
-            return '';
-        }
-        
-        if (typeof image === 'string') {
-            if (image.startsWith('http')) {
-                console.log('✅ getImageSrc - Already a full URL:', image);
-                return image;
-            } else {
-                // Normalize path: remove leading/trailing slashes and backslashes
-                let normalizedPath = image.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-                
-                // Backend stores paths as "uploads/eventStamps/xxx.png"
-                // Backend serves static files from "uploads" folder with prefix "/uploads/"
-                // So "uploads/eventStamps/xxx.png" should be accessed as "/uploads/eventStamps/xxx.png"
-                // We don't need to remove the "uploads/" prefix, just use it as is
-                
-                // Ensure API_URL doesn't have trailing slash
-                const baseUrl = API_URL.replace(/\/+$/, '');
-                const finalUrl = `${baseUrl}/${normalizedPath}`;
-              
-                return finalUrl;
-            }
-        }
-        
-        return '';
-    };
+    // Get image source – uses shared util (Salesforce/external URL + local paths)
+    const getImageSrc = (image) => getEventImageUrl(image, { apiUrl: API_URL, fallback: '' });
 
     // Gallery download URLs (single image and all images ZIP) for event listing
     const baseUrl = API_URL.replace(/\/+$/, '');

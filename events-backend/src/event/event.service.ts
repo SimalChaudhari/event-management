@@ -2241,12 +2241,18 @@ export class EventService {
 
   private async deleteEventFiles(event: Event) {
     try {
-      // Delete multiple images if they exist
+      // Delete multiple images if they exist (skip external URLs e.g. Salesforce)
       if (event.images && event.images.length > 0) {
         event.images.forEach((imagePath) => {
-          const filePath = path.resolve(imagePath);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+          if (
+            typeof imagePath === 'string' &&
+            !imagePath.startsWith('http://') &&
+            !imagePath.startsWith('https://')
+          ) {
+            const filePath = path.resolve(imagePath);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
           }
         });
       }

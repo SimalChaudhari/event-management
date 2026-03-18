@@ -16,6 +16,7 @@ import SalesforceSyncSettingsModal from '../../../components/modal/SalesforceSyn
 import SyncConfirmationModal from '../../../components/modal/SyncConfirmationModal';
 import { toast } from 'react-toastify';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import { getEventImageUrl } from '../../../utils/eventImageUtils';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import { EVENT_PATHS } from '../../../utils/constants';
 import FilterComponent from '../../../components/common/FilterComponent';
@@ -85,8 +86,8 @@ function eventTable(
                     statusText = `in ${daysUntilEvent} days`;
                 }
 
-                // Return formatted HTML for display
-                const eventImageUrl = row.images ? `${API_URL}/${row.images[0]}` : imageUrl;
+                // Return formatted HTML for display (support Salesforce/external URL via shared util)
+                const eventImageUrl = getEventImageUrl(row.images?.[0], { apiUrl: API_URL, fallback: imageUrl });
                 return `
                         <div class="d-inline-block align-middle">
                             <span class="event-image-clickable" data-image-url="${eventImageUrl}" title="Click to view image">

@@ -167,6 +167,7 @@ export class SalesforceSyncService implements OnModuleInit {
             item.pricingOptions,
           );
 
+          const isPrivate = item.privateEvent === true;
           const eventData: Partial<Event> = {
             name,
             description: description ?? undefined,
@@ -183,6 +184,7 @@ export class SalesforceSyncService implements OnModuleInit {
             currency: 'SGD',
             images,
             courseCode: item.courseCode ?? undefined,
+            isPrivate,
             salesforcePricingOptions: item.pricingOptions?.length
               ? item.pricingOptions.map((p) => ({
                   id: p.id,
@@ -220,6 +222,7 @@ export class SalesforceSyncService implements OnModuleInit {
               (event.venue ?? '') !== (venueName ?? '') ||
               (event.courseCode ?? '') !== (item.courseCode ?? '') ||
               Number(event.price ?? 0) !== Number(defaultPrice ?? 0) ||
+              Boolean(event.isPrivate) !== isPrivate ||
               existingPricingOptsJson !== pricingOptsJson;
             if (hasChanges) {
               Object.assign(event, eventData);

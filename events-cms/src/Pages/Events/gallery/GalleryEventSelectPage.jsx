@@ -3,7 +3,8 @@ import { Row, Col, Card, Table, Button, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../configs/axiosInstance';
 import { EVENT_PATHS } from '../../../utils/constants';
-import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import { DUMMY_PATH } from '../../../configs/env';
+import EventImage from '../../../components/events/EventImage';
 import '../../../assets/css/event.css';
 
 const GalleryEventSelectPage = () => {
@@ -71,9 +72,6 @@ const GalleryEventSelectPage = () => {
                                         </tr>
                                     ) : (
                                         events.map((ev) => {
-                                            const imgSrc = ev.images?.[0]
-                                                ? `${API_URL}/${ev.images[0]}`
-                                                : DUMMY_PATH;
                                             const startDate = ev.startDate
                                                 ? new Date(ev.startDate).toLocaleDateString('en-GB', {
                                                     day: '2-digit',
@@ -85,8 +83,8 @@ const GalleryEventSelectPage = () => {
                                                 <tr key={ev.id}>
                                                     <td>
                                                         <div className="d-flex align-items-center">
-                                                            <img
-                                                                src={imgSrc}
+                                                            <EventImage
+                                                                image={ev.images?.[0]}
                                                                 alt=""
                                                                 style={{
                                                                     width: 48,
