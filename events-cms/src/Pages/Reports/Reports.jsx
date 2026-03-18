@@ -13,6 +13,7 @@ import useFilterLogic from '../../hooks/useFilterLogic';
 import { getAllEventsForFilter } from '../../store/actions/eventActions';
 import ImageViewModal from '../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../configs/env';
+import { getEventImageUrl } from '../../utils/eventImageUtils';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -109,7 +110,7 @@ const Reports = () => {
                             return row.name || '';
                         }
                         const imageUrl = DUMMY_PATH;
-                        const eventImageUrl = row.images && row.images.length > 0 ? `${API_URL}/${row.images[0]}` : imageUrl;
+                        const eventImageUrl = getEventImageUrl(row.images?.[0], { apiUrl: API_URL, fallback: imageUrl });
                         return `
                             <div class="d-inline-block align-middle">
                                 <span class="event-image-clickable" data-image-url="${eventImageUrl}" title="Click to view image">

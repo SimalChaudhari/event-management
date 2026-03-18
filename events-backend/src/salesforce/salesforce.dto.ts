@@ -46,6 +46,8 @@ export interface SalesforceEventInfoItem {
   venue: SalesforceVenue;
   trainers: SalesforceTrainer[];
   pricingOptions: SalesforcePricingOption[];
+  /** When true, event is private (not shown in public listing). */
+  privateEvent?: boolean;
 }
 
 /** Course master from EventRegistrations */

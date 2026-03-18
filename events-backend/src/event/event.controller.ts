@@ -740,10 +740,12 @@ export class EventController {
         throw new ResourceNotFoundException('Image', 'in this event');
       }
 
-      // Remove image from filesystem
-      const fullPath = path.join(__dirname, '..', '..', imagePath);
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+      // Remove image from filesystem only if it is a local path (not Salesforce/external URL)
+      if (!imagePath.startsWith('http://') && !imagePath.startsWith('https://')) {
+        const fullPath = path.join(__dirname, '..', '..', imagePath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
       }
 
       const updatedImages = event.images.filter(img => img !== imagePath);

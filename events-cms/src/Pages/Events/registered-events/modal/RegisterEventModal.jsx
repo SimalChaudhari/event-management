@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Row, Col, Card, Badge, Nav, Tab } from 'react-bootstrap';
 import { API_URL, DUMMY_PATH_USER } from '../../../../configs/env';
+import { getEventImageUrl } from '../../../../utils/eventImageUtils';
 import DateTimeFormatter from '../../../../components/dateTime/DateTimeFormatter';
 
 function RegisterEventModal({ show, onHide, eventData }) {
@@ -213,17 +214,8 @@ function RegisterEventModal({ show, onHide, eventData }) {
         );
     };
 
-    // Get image source
-    const getImageSrc = (image) => {
-        if (typeof image === 'string') {
-            if (image.startsWith('http')) {
-                return image;
-            } else {
-                return `${API_URL}/${image.replace(/\\/g, '/')}`;
-            }
-        }
-        return '';
-    };
+    // Get image source – uses shared util (Salesforce/external URL + local paths)
+    const getImageSrc = (image) => getEventImageUrl(image, { apiUrl: API_URL, fallback: '' });
 
     // Navigation functions for modal
     const goToPreviousImage = () => {

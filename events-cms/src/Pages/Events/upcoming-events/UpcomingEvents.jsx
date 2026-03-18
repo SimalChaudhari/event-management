@@ -12,6 +12,7 @@ import '../../../assets/css/event.css';
 import DeleteConfirmationModal from '../../../components/modal/DeleteConfirmationModal';
 import ImageViewModal from '../../../components/modal/ImageViewModal';
 import { API_URL, DUMMY_PATH } from '../../../configs/env';
+import { getEventImageUrl } from '../../../utils/eventImageUtils';
 import { formatDateTimeForTable } from '../../../components/dateTime/dateTimeUtils';
 import FilterComponent from '../../../components/common/FilterComponent';
 import { EVENT_PATHS } from '../../../utils/constants';
@@ -66,8 +67,8 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
                     statusText = `in ${daysUntilEvent} days`;
                 }
 
-                // Return formatted HTML for display
-                const eventImageUrl = row.images ? `${API_URL}/${row.images[0]}` : imageUrl;
+                // Return formatted HTML for display (support Salesforce/external URL via shared util)
+                const eventImageUrl = getEventImageUrl(row.images?.[0], { apiUrl: API_URL, fallback: imageUrl });
                 return `
                     <div class="d-inline-block align-middle">
                         <span class="event-image-clickable" data-image-url="${eventImageUrl}" title="Click to view image">
