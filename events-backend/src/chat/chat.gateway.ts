@@ -137,7 +137,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.stopTyping(message.threadID, userId);
 
       // Send new_message to receiver (real-time delivery via WebSocket)
-      this.server.to(`user:${message.receiverID}`).emit('new_message', message);
+      // this.server.to(`user:${message.receiverID}`).emit('new_message', message);
 
       // Send delivery confirmation immediately if receiver is online
       const receiverSocketId = this.connectedUsers.get(message.receiverID);
