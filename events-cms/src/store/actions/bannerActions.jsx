@@ -279,6 +279,54 @@ export const clearAllBanners = () => async (dispatch) => {
     return false;
 };
 
+// Reorder login page banners (imageUrls order = display order)
+export const reorderBanners = (imageUrls) => async (dispatch) => {
+    try {
+        dispatch(setBannerLoading(true));
+        const response = await axiosInstance.put('/auth/banners/reorder', {
+            imageUrls,
+        });
+        dispatch({
+            type: GET_BANNERS,
+            payload: response.data.data,
+        });
+        toast.success(response.data.message || 'Banner order updated');
+        return true;
+    } catch (error) {
+        const errorMessage =
+            error?.response?.data?.message || 'Failed to reorder banners';
+        dispatch(setBannerError(errorMessage));
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        dispatch(setBannerLoading(false));
+    }
+};
+
+// Reorder event (home) banners
+export const reorderBannerEvents = (imageUrls) => async (dispatch) => {
+    try {
+        dispatch(setBannerLoading(true));
+        const response = await axiosInstance.put('/banner-events/reorder', {
+            imageUrls,
+        });
+        dispatch({
+            type: GET_BANNER_EVENTS,
+            payload: response.data.data,
+        });
+        toast.success(response.data.message || 'Banner order updated');
+        return true;
+    } catch (error) {
+        const errorMessage =
+            error?.response?.data?.message || 'Failed to reorder banner events';
+        dispatch(setBannerError(errorMessage));
+        toast.error(errorMessage);
+        return false;
+    } finally {
+        dispatch(setBannerLoading(false));
+    }
+};
+
 // Clear All Banner Events
 export const clearAllBannerEvents = () => async (dispatch) => {
     try {

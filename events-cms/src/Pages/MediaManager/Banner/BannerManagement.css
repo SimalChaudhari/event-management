@@ -1,0 +1,832 @@
+/* Banner management — scoped to avoid leaking globals */
+.banner-management-page {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.banner-management-page .upload-section{
+                    height: 100%;
+                }
+
+.banner-management-page .banner-type-selector{
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
+.banner-management-page .banner-type-option{
+                    display: flex;
+                    align-items: center;
+                    padding: 20px;
+                    border: 2px solid #e9ecef;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    position: relative;
+                }
+
+.banner-management-page .banner-type-option:hover{
+                    border-color: #007bff;
+                    background-color: #f8f9fa;
+                }
+
+.banner-management-page .banner-type-option.active{
+                    border-color: #007bff;
+                    background-color: #e7f3ff;
+                }
+
+.banner-management-page .banner-type-icon{
+                    width: 56px;
+                    height: 56px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 24px;
+                    margin-right: 20px;
+                }
+
+.banner-management-page .banner-type-content{
+                    flex: 1;
+                }
+
+.banner-management-page .banner-type-content h6{
+                    margin-bottom: 4px;
+                    font-weight: 600;
+                }
+
+.banner-management-page .banner-type-content small{
+                    font-size: 13px;
+                }
+
+.banner-management-page .banner-type-check{
+                    width: 28px;
+                    height: 28px;
+                    background: #007bff;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 14px;
+                }
+
+.banner-management-page .upload-zone{
+                    border: 2px dashed #dee2e6;
+                    border-radius: 12px;
+                    padding: 40px;
+                    text-align: center;
+                    transition: all 0.3s ease;
+                    min-height: 200px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                }
+
+.banner-management-page .upload-zone:hover{
+                    border-color: #007bff;
+                    background-color: #f8f9fa;
+                }
+
+.banner-management-page .upload-zone.drag-active{
+                    border-color: #007bff;
+                    background-color: #e7f3ff;
+                }
+
+.banner-management-page .upload-zone.has-files{
+                    padding: 20px;
+                    min-height: auto;
+                }
+
+.banner-management-page .file-input{
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    opacity: 0;
+                    cursor: pointer;
+                    pointer-events: auto;
+                }
+
+.banner-management-page .file-input-hidden{
+                    position: absolute;
+                    top: -9999px;
+                    left: -9999px;
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+.banner-management-page .upload-placeholder{
+                    pointer-events: none;
+                }
+
+.banner-management-page .upload-icon{
+                    font-size: 48px;
+                    color: #6c757d;
+                    margin-bottom: 16px;
+                }
+
+.banner-management-page .selected-files{
+                    width: 100%;
+                    pointer-events: auto;
+                }
+
+.banner-management-page .selected-files-header{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 16px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid #dee2e6;
+                    pointer-events: auto;
+                }
+
+.banner-management-page .files-grid{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 12px;
+                    pointer-events: auto;
+                    margin-bottom: 16px;
+                }
+
+.banner-management-page .add-more-files{
+                    text-align: center;
+                    padding-top: 16px;
+                    border-top: 1px solid #dee2e6;
+                }
+
+.banner-management-page .file-preview{
+                    position: relative;
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    background: white;
+                }
+
+.banner-management-page .file-preview-image{
+                    width: 100%;
+                    height: 120px;
+                    overflow: hidden;
+                }
+
+.banner-management-page .file-preview-image img{
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+
+.banner-management-page .file-preview-info{
+                    padding: 8px 12px;
+                }
+
+.banner-management-page .file-name{
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: #495057;
+                    margin-bottom: 2px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+.banner-management-page .file-size{
+                    font-size: 11px;
+                    color: #6c757d;
+                }
+
+.banner-management-page .file-hyperlink-input{
+                    padding: 8px 12px;
+                    background-color: #f8f9fa;
+                    border-top: 1px solid #dee2e6;
+                }
+
+.banner-management-page .file-hyperlink-input .form-control{
+                    font-size: 12px;
+                    padding: 6px 10px;
+                    border-radius: 6px;
+                }
+
+.banner-management-page .file-hyperlink-input label{
+                    color: #495057;
+                    font-size: 12px;
+                }
+
+.banner-management-page .file-hyperlink-input .form-text{
+                    font-size: 11px;
+                    margin-top: 4px;
+                }
+
+.banner-management-page .file-remove{
+                    position: absolute;
+                    top: 4px;
+                    right: 4px;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                }
+
+.banner-management-page .upload-actions{
+                    text-align: center;
+                    padding-left: 0.25rem;
+                    padding-right: 0.25rem;
+                }
+
+.banner-management-page .upload-btn{
+                    width: 100%;
+                    max-width: 100%;
+                    padding: 12px 1.25rem;
+                    font-weight: 600;
+                    border-radius: 8px;
+                    font-size: clamp(0.875rem, 2.5vw, 1rem);
+                    white-space: normal;
+                    line-height: 1.35;
+                }
+
+
+
+                @media (min-width: 576px) {.banner-management-page .upload-btn{
+                        width: auto;
+                        min-width: 200px;
+                        max-width: 100%;
+                        padding: 12px 32px;
+                    }}
+
+.banner-management-page .empty-state{
+                    padding: 40px 20px;
+                }
+
+.banner-management-page .card{
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+
+.banner-management-page .card-header{
+                    border-bottom: none;
+                }
+
+.banner-management-page .badge{
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                }
+
+.banner-management-page .banner-list-header-title{
+                    font-size: clamp(1rem, 4vw, 1.25rem);
+                    font-weight: 600;
+                    line-height: 1.3;
+                }
+
+.banner-management-page .banner-list-header-desc{
+                    font-size: clamp(0.8125rem, 2.8vw, 0.9375rem);
+                    line-height: 1.55;
+                    opacity: 0.92;
+                    max-width: 42rem;
+                }
+
+.banner-management-page .banner-header-actions-row{
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: stretch;
+                    gap: 12px;
+                    flex-shrink: 0;
+                    width: 100%;
+                    max-width: 440px;
+                }
+
+
+
+                @media (min-width: 768px) {.banner-management-page .banner-header-actions-row{
+                        width: auto;
+                        margin-left: auto;
+                    }}
+
+
+
+                @media (max-width: 767.98px) {.banner-management-page .banner-header-actions-row{
+                        max-width: none;
+                    }}
+
+.banner-management-page .banner-header-actions-row--pair > .banner-header-tile{
+                    flex: 1 1 0;
+                    min-width: 148px;
+                }
+
+.banner-management-page .banner-header-actions-row:not(.banner-header-actions-row--pair)
+                    > .banner-header-tile{
+                    flex: 0 1 auto;
+                    min-width: 120px;
+                    max-width: 200px;
+                }
+
+.banner-management-page .banner-header-tile{
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 44px;
+                    padding: 8px 14px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.8125rem;
+                    line-height: 1.2;
+                    box-sizing: border-box;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+                }
+
+.banner-management-page .banner-header-tile-stat{
+                    flex-direction: column;
+                    gap: 0;
+                    background: #ffffff;
+                    color: #212529;
+                    border: 2px solid rgba(255, 255, 255, 0.95);
+                }
+
+.banner-management-page .banner-header-tile-value{
+                    font-size: 1.125rem;
+                    font-weight: 800;
+                    color: #2f8f89;
+                    line-height: 1.1;
+                    font-variant-numeric: tabular-nums;
+                }
+
+.banner-management-page .banner-header-tile-label{
+                    font-size: 0.625rem;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    color: #495057;
+                    margin-top: 2px;
+                }
+
+.banner-management-page .banner-header-tile-clear.btn{
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 0.45rem;
+                    white-space: nowrap !important;
+                    background: #c92a2a !important;
+                    border: 2px solid #a61e1e !important;
+                    color: #ffffff !important;
+                    padding: 10px 16px;
+                    line-height: 1.25 !important;
+                    text-align: center;
+                }
+
+.banner-management-page .banner-header-tile-clear.btn .banner-header-clear-text{
+                    white-space: nowrap;
+                }
+
+.banner-management-page .banner-header-tile-clear.btn:hover, .banner-management-page .banner-header-tile-clear.btn:focus{
+                    background: #a61e1e !important;
+                    border-color: #862e2e !important;
+                    color: #ffffff !important;
+                }
+
+.banner-management-page .banner-header-tile-clear.btn:active{
+                    background: #862e2e !important;
+                }
+
+.banner-management-page .banner-header-tile-icon{
+                    font-size: 0.875rem;
+                }
+
+.banner-management-page .banner-drag-handle{
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    z-index: 5;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    background: rgba(255, 255, 255, 0.95);
+                    border: 1px solid #dee2e6;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: grab;
+                    color: #6c757d;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+                }
+
+.banner-management-page .banner-drag-handle:active{
+                    cursor: grabbing;
+                }
+
+.banner-management-page .banner-card-body{
+                    padding: 1rem 1rem 1.125rem;
+                }
+
+
+
+                @media (min-width: 576px) {.banner-management-page .banner-card-body{
+                        padding: 1.125rem 1.25rem 1.25rem;
+                    }}
+
+.banner-management-page .banner-card-title-row{
+                    row-gap: 0.5rem;
+                }
+
+.banner-management-page .banner-card-title{
+                    min-width: 0;
+                    font-weight: 600;
+                    color: #495057 !important;
+                    font-size: clamp(0.8125rem, 2.4vw, 0.9375rem);
+                    line-height: 1.45;
+                    word-break: break-word;
+                    overflow-wrap: anywhere;
+                }
+
+.banner-management-page .banner-remove-compact{
+                    width: 2.25rem;
+                    height: 2.25rem;
+                    padding: 0 !important;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 8px;
+                    line-height: 1;
+                }
+
+.banner-management-page .banner-remove-compact i{
+                    font-size: 0.8rem;
+                }
+
+.banner-management-page .banner-link-section{
+                    border: 1px solid #e9ecef;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: #fff;
+                }
+
+.banner-management-page .banner-link-section-head{
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 8px;
+                    row-gap: 10px;
+                    padding: 10px 12px;
+                    background: #f8f9fa;
+                    border-bottom: 1px solid #e9ecef;
+                }
+
+.banner-management-page .banner-link-section-head .banner-link-section-title{
+                    flex: 1 1 auto;
+                    min-width: 0;
+                }
+
+.banner-management-page .banner-link-section-head .banner-link-head-btn{
+                    flex-shrink: 0;
+                }
+
+.banner-management-page .banner-link-section-title{
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 0.6875rem;
+                    font-weight: 700;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                    color: #6c757d;
+                }
+
+.banner-management-page .banner-link-section-title i{
+                    font-size: 0.75rem;
+                    color: #71c0bb;
+                }
+
+.banner-management-page .banner-link-head-btn{
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    padding: 0.25rem 0.65rem;
+                    border: 1px solid #dee2e6;
+                    border-radius: 6px;
+                    color: #495057;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+.banner-management-page .banner-link-head-btn:hover{
+                    background: #fff !important;
+                    border-color: #ced4da;
+                    color: #212529;
+                }
+
+.banner-management-page .banner-link-head-btn-add{
+                    color: #0d6efd;
+                    border-color: #b6d4fe;
+                    background: #f0f7ff !important;
+                }
+
+.banner-management-page .banner-link-section-body{
+                    padding: 12px;
+                }
+
+.banner-management-page .banner-link-field-label{
+                    display: block;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: #495057;
+                    margin-bottom: 6px;
+                }
+
+.banner-management-page .banner-link-field-control{
+                    border-radius: 8px;
+                    border: 1px solid #ced4da;
+                    font-size: 0.875rem;
+                    padding: 0.45rem 0.65rem;
+                }
+
+.banner-management-page .banner-link-field-control:focus{
+                    border-color: #71c0bb;
+                    box-shadow: 0 0 0 0.2rem rgba(113, 192, 187, 0.22);
+                }
+
+.banner-management-page .banner-link-field-hint{
+                    font-size: 0.75rem;
+                    color: #868e96;
+                    margin: 8px 0 0 0;
+                    line-height: 1.45;
+                }
+
+.banner-management-page .banner-link-edit-actions{
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 8px;
+                    margin-top: 14px;
+                    flex-wrap: wrap;
+                }
+
+.banner-management-page .banner-link-action-btn{
+                    min-width: 5rem;
+                    font-weight: 600;
+                    border-radius: 8px;
+                    padding: 0.35rem 0.85rem;
+                }
+
+.banner-management-page .banner-link-save-btn{
+                    background: #71c0bb !important;
+                    border-color: #71c0bb !important;
+                    color: #fff !important;
+                }
+
+.banner-management-page .banner-link-save-btn:hover:not(:disabled){
+                    background: #5ea8a3 !important;
+                    border-color: #5ea8a3 !important;
+                    color: #fff !important;
+                }
+
+.banner-management-page .banner-link-display{
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 12px;
+                    row-gap: 8px;
+                    padding: 12px 14px;
+                    background: #f8fafb;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    color: #0d6efd;
+                    transition: background 0.15s ease, border-color 0.15s ease;
+                }
+
+.banner-management-page .banner-link-display:hover{
+                    background: #f1f3f5;
+                    border-color: #dee2e6;
+                    color: #0a58ca;
+                    text-decoration: none;
+                }
+
+.banner-management-page .banner-link-display-text{
+                    font-size: 0.8125rem;
+                    line-height: 1.4;
+                    word-break: break-word;
+                    min-width: 0;
+                    text-align: left;
+                }
+
+.banner-management-page .banner-link-display-meta{
+                    flex-shrink: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    color: #6c757d;
+                }
+
+.banner-management-page .banner-link-empty{
+                    text-align: center;
+                    padding: 1.25rem 1rem;
+                    border: 1px dashed #dee2e6;
+                    border-radius: 8px;
+                    background: #fafbfc;
+                }
+
+.banner-management-page .banner-link-empty-icon{
+                    font-size: 1.25rem;
+                    color: #adb5bd;
+                    margin-bottom: 0.5rem;
+                    display: block;
+                }
+
+.banner-management-page .banner-link-empty-title{
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    color: #495057;
+                    margin: 0 0 0.35rem 0;
+                }
+
+.banner-management-page .banner-link-empty-text{
+                    font-size: 0.75rem;
+                    color: #868e96;
+                    margin: 0;
+                    line-height: 1.45;
+                    max-width: 240px;
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+
+.banner-management-page .banner-card{
+                    transition: transform 0.2s ease;
+                }
+
+.banner-management-page .banner-card:hover{
+                    transform: translateY(-2px);
+                }
+
+.banner-management-page .banner-image{
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+
+.banner-management-page .banner-image-responsive{
+                    width: 100%;
+                    height: 160px;
+                    object-fit: cover;
+                }
+
+
+
+                @media (min-width: 576px) {.banner-management-page .banner-image-responsive{
+                        height: 180px;
+                    }}
+
+
+
+                @media (min-width: 1200px) {.banner-management-page .banner-image-responsive{
+                        height: 196px;
+                    }}
+
+.banner-management-page .banner-image:hover{
+                    opacity: 0.8;
+                }
+
+.banner-management-page .banner-overlay{
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+
+.banner-management-page .banner-card:hover .banner-overlay{
+                    opacity: 1;
+                }
+
+.banner-management-page .zoom-btn{
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                }
+
+/* Mobile: drop “boxed” section cards — less padding, full-width sections */
+@media (max-width: 575.98px) {
+  .banner-management-page {
+    padding: 8px 0 16px;
+    border-radius: 0;
+    background: #f1f3f5;
+  }
+
+  .banner-management-page > .alert,
+  .banner-management-page > .d-flex.mb-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Top-level upload + list sections only (not grid banner tiles) */
+  .banner-management-page > .card {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .banner-management-page > .card > .card-header {
+    border-radius: 0 !important;
+    padding: 0.65rem 1rem !important;
+  }
+
+  .banner-management-page > .card > .card-body {
+    padding: 0.5rem 1rem 0.75rem !important;
+    background: transparent;
+  }
+
+  .banner-management-page .row.g-4 {
+    --bs-gutter-x: 0.75rem;
+    --bs-gutter-y: 0.75rem;
+  }
+
+  .banner-management-page .upload-zone {
+    padding: 1rem;
+    min-height: 140px;
+  }
+
+  .banner-management-page .upload-zone.has-files {
+    padding: 0.75rem;
+  }
+
+  .banner-management-page .banner-type-option {
+    padding: 12px;
+  }
+
+  .banner-management-page .banner-type-icon {
+    width: 48px;
+    height: 48px;
+    margin-right: 12px;
+    font-size: 20px;
+  }
+
+  .banner-management-page .empty-state {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .banner-management-page .banner-header-actions-row {
+    max-width: none;
+    width: 100%;
+  }
+
+  /* Grid item: light tile so banners stay readable */
+  .banner-management-page .banner-card {
+    background: #fff !important;
+    border: 1px solid #e9ecef !important;
+    box-shadow: none !important;
+    border-radius: 10px !important;
+  }
+
+  .banner-management-page .banner-card-body {
+    padding: 0.75rem 0.75rem 0.875rem !important;
+  }
+
+  .banner-management-page .selected-files-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .banner-management-page .files-grid {
+    gap: 8px;
+  }
+}
+
+/* Portaled modals — not under .banner-management-page in DOM */
+.banner-mgmt-modal-lightbox.modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.banner-mgmt-modal-shell.modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.banner-mgmt-modal-shell .modal-header {
+  border-bottom: 1px solid #dee2e6;
+  padding: 20px 24px;
+}

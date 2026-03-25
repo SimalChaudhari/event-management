@@ -289,6 +289,14 @@ export class TermsConditionsService {
   }
 }
 
+function normalizeBannerStorageUrl(url: string): string {
+  return url.replace(/^.*\/uploads\//, 'uploads/');
+}
+
+function sequentialBannerOrder(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => i);
+}
+
 // Banner
 
 @Injectable()
@@ -361,6 +369,7 @@ export class BannerService {
 
         banner.imageUrls = updatedImageUrls;
         banner.hyperlinks = updatedHyperlinks;
+        banner.bannerOrder = sequentialBannerOrder(updatedImageUrls.length);
         const result = await this.bannerRepository.save(banner);
         return { message: 'Banner added successfully', data: result };
       } else {
@@ -377,6 +386,7 @@ export class BannerService {
         const newBanner = this.bannerRepository.create({
           imageUrls: createBannerDto.imageUrls,
           hyperlinks: hyperlinksArray,
+          bannerOrder: sequentialBannerOrder(createBannerDto.imageUrls.length),
         });
         const result = await this.bannerRepository.save(newBanner);
         return { message: 'Banner created successfully', data: result };
@@ -384,6 +394,71 @@ export class BannerService {
     } catch (error: any) {
       throw new InternalServerErrorException(
         'Error creating or updating banner',
+        error.message,
+      );
+    }
+  }
+
+  async reorderImageUrls(
+    orderedImageUrls: string[],
+  ): Promise<{ message: string; data: Banner }> {
+    try {
+      if (!orderedImageUrls?.length) {
+        throw new BadRequestException('imageUrls must be a non-empty array');
+      }
+      const [banner] = await this.bannerRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+      if (!banner) {
+        throw new NotFoundException('No banners found');
+      }
+      const oldUrls = [...banner.imageUrls];
+      const normOld = oldUrls.map((u) => normalizeBannerStorageUrl(u));
+      const normNew = orderedImageUrls.map((u) => normalizeBannerStorageUrl(u));
+      if (normOld.length !== normNew.length) {
+        throw new BadRequestException(
+          'Ordered list must contain every current banner image exactly once',
+        );
+      }
+      const a = [...normOld].sort();
+      const b = [...normNew].sort();
+      if (a.length !== b.length || a.some((v, i) => v !== b[i])) {
+        throw new BadRequestException(
+          'Ordered list must match the current set of banner images',
+        );
+      }
+      let oldHyperlinks = [...(banner.hyperlinks || [])];
+      while (oldHyperlinks.length < oldUrls.length) {
+        oldHyperlinks.push('');
+      }
+      oldHyperlinks = oldHyperlinks.slice(0, oldUrls.length);
+      const urlToHyperlink = new Map<string, string>();
+      oldUrls.forEach((url, i) => {
+        urlToHyperlink.set(normalizeBannerStorageUrl(url), oldHyperlinks[i]);
+      });
+      banner.imageUrls = normNew.map((n) => {
+        const idx = normOld.indexOf(n);
+        if (idx === -1) {
+          throw new BadRequestException('Invalid banner URL in order payload');
+        }
+        return oldUrls[idx];
+      });
+      banner.hyperlinks = banner.imageUrls.map(
+        (url) => urlToHyperlink.get(normalizeBannerStorageUrl(url)) ?? '',
+      );
+      banner.bannerOrder = sequentialBannerOrder(banner.imageUrls.length);
+      const result = await this.bannerRepository.save(banner);
+      return { message: 'Banner order updated successfully', data: result };
+    } catch (error: any) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error reordering banners',
         error.message,
       );
     }
@@ -407,6 +482,7 @@ export class BannerService {
       // Clear the imageUrls array and hyperlinks array with empty values instead of null
       banner.imageUrls = [];
       banner.hyperlinks = [];
+      banner.bannerOrder = [];
       await this.bannerRepository.save(banner);
 
       return { message: 'Banner cleared successfully' };
@@ -449,6 +525,7 @@ export class BannerService {
       if (banner.hyperlinks && banner.hyperlinks.length > imageIndex) {
         banner.hyperlinks.splice(imageIndex, 1);
       }
+      banner.bannerOrder = sequentialBannerOrder(banner.imageUrls.length);
       const result = await this.bannerRepository.save(banner);
 
       return { message: 'Banner image deleted successfully', data: result };
@@ -616,6 +693,7 @@ export class BannerEventService {
 
         bannerEvent.imageUrls = updatedImageUrls;
         bannerEvent.hyperlinks = updatedHyperlinks;
+        bannerEvent.bannerOrder = sequentialBannerOrder(updatedImageUrls.length);
         const result = await this.bannerEventRepository.save(bannerEvent);
         return { message: 'Banner events added successfully', data: result };
       } else {
@@ -630,6 +708,9 @@ export class BannerEventService {
         const newBannerEvent = this.bannerEventRepository.create({
           imageUrls: createBannerEventDto.imageUrls,
           hyperlinks: hyperlinksArray,
+          bannerOrder: sequentialBannerOrder(
+            createBannerEventDto.imageUrls.length,
+          ),
         });
         const result = await this.bannerEventRepository.save(newBannerEvent);
         return { message: 'Banner events created successfully', data: result };
@@ -637,6 +718,73 @@ export class BannerEventService {
     } catch (error: any) {
       throw new InternalServerErrorException(
         'Error creating or updating banners',
+        error.message,
+      );
+    }
+  }
+
+  async reorderImageUrls(
+    orderedImageUrls: string[],
+  ): Promise<{ message: string; data: BannerEvent }> {
+    try {
+      if (!orderedImageUrls?.length) {
+        throw new BadRequestException('imageUrls must be a non-empty array');
+      }
+      const [bannerEvent] = await this.bannerEventRepository.find({
+        take: 1,
+        order: { id: 'ASC' },
+      });
+      if (!bannerEvent) {
+        throw new NotFoundException('No banner events found');
+      }
+      const oldUrls = [...bannerEvent.imageUrls];
+      const normOld = oldUrls.map((u) => normalizeBannerStorageUrl(u));
+      const normNew = orderedImageUrls.map((u) => normalizeBannerStorageUrl(u));
+      if (normOld.length !== normNew.length) {
+        throw new BadRequestException(
+          'Ordered list must contain every current banner image exactly once',
+        );
+      }
+      const a = [...normOld].sort();
+      const b = [...normNew].sort();
+      if (a.length !== b.length || a.some((v, i) => v !== b[i])) {
+        throw new BadRequestException(
+          'Ordered list must match the current set of banner images',
+        );
+      }
+      let oldHyperlinks = [...(bannerEvent.hyperlinks || [])];
+      while (oldHyperlinks.length < oldUrls.length) {
+        oldHyperlinks.push('');
+      }
+      oldHyperlinks = oldHyperlinks.slice(0, oldUrls.length);
+      const urlToHyperlink = new Map<string, string>();
+      oldUrls.forEach((url, i) => {
+        urlToHyperlink.set(normalizeBannerStorageUrl(url), oldHyperlinks[i]);
+      });
+      bannerEvent.imageUrls = normNew.map((n) => {
+        const idx = normOld.indexOf(n);
+        if (idx === -1) {
+          throw new BadRequestException('Invalid banner URL in order payload');
+        }
+        return oldUrls[idx];
+      });
+      bannerEvent.hyperlinks = bannerEvent.imageUrls.map(
+        (url) => urlToHyperlink.get(normalizeBannerStorageUrl(url)) ?? '',
+      );
+      bannerEvent.bannerOrder = sequentialBannerOrder(
+        bannerEvent.imageUrls.length,
+      );
+      const result = await this.bannerEventRepository.save(bannerEvent);
+      return { message: 'Banner order updated successfully', data: result };
+    } catch (error: any) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Error reordering banner events',
         error.message,
       );
     }
@@ -669,6 +817,9 @@ export class BannerEventService {
       if (bannerEvent.hyperlinks && bannerEvent.hyperlinks.length > imageIndex) {
         bannerEvent.hyperlinks.splice(imageIndex, 1);
       }
+      bannerEvent.bannerOrder = sequentialBannerOrder(
+        bannerEvent.imageUrls.length,
+      );
       const result = await this.bannerEventRepository.save(bannerEvent);
 
       return {
@@ -758,6 +909,7 @@ export class BannerEventService {
 
       bannerEvent.imageUrls = [];
       bannerEvent.hyperlinks = [];
+      bannerEvent.bannerOrder = [];
       await this.bannerEventRepository.save(bannerEvent);
 
       return { message: 'All banner events cleared successfully' };

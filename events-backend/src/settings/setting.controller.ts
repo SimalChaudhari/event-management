@@ -52,6 +52,7 @@ import {
   UpdateAdvertNotificationFormDto,
   UpdateAppVersionDto,
   AppVersionResponseDto,
+  ReorderBannerDto,
 } from './setting.dto';
 import { PrivacyPolicy, TermsConditions, Banner, BannerEvent, Logo, UserPermissions, PermissionTemplate, NotificationHistory } from './setting.entity';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -199,6 +200,13 @@ export class BannerController {
     return this.bannerService.clearBanner();
   }
 
+  @Put('reorder')
+  async reorderBanners(
+    @Body() dto: ReorderBannerDto,
+  ): Promise<{ message: string; data: Banner }> {
+    return this.bannerService.reorderImageUrls(dto.imageUrls);
+  }
+
   @Delete('delete-image')
   async deleteSpecificImage(@Body('imageUrl') imageUrl: string): Promise<{ message: string; data: Banner }> {
     return this.bannerService.deleteBannerImage(imageUrl);
@@ -284,6 +292,13 @@ export class BannerEventController {
   @Delete('clear-all')
   async clearAllBannerEvents(): Promise<{ message: string }> {
     return this.bannerEventService.clearAllBannerEvents();
+  }
+
+  @Put('reorder')
+  async reorderBannerEvents(
+    @Body() dto: ReorderBannerDto,
+  ): Promise<{ message: string; data: BannerEvent }> {
+    return this.bannerEventService.reorderImageUrls(dto.imageUrls);
   }
 
   @Delete('delete-image')

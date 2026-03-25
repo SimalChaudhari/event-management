@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button, Form, Alert, Badge, Modal } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './BannerManagement.css';
 import { 
     getBanners, 
     getBannerEvents, 
@@ -12,7 +13,9 @@ import {
     clearAllBanners,
     clearAllBannerEvents,
     updateBannerEventHyperlink,
-    updateBannerHyperlink
+    updateBannerHyperlink,
+    reorderBanners,
+    reorderBannerEvents
 } from '../../../store/actions/bannerActions';
 
 const BannerManagement = () => {
@@ -171,15 +174,79 @@ const BannerManagement = () => {
         setTempHyperlink('');
     };
 
-    const renderBannerCard = (banner, type) => (
-        <Col key={banner.id} md={4} lg={3} className="mb-4">
+    const handleBannerOrderDragStart = (e, sortIndex, type) => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData(
+            'text/plain',
+            JSON.stringify({ sortIndex, type }),
+        );
+    };
+
+    const handleBannerOrderDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleBannerOrderDrop = async (e, dropIndex, type) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let payload;
+        try {
+            payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+        } catch {
+            return;
+        }
+        const { sortIndex: fromIndex, type: fromType } = payload;
+        if (fromType !== type || fromIndex === dropIndex) return;
+
+        const urls =
+            type === 'event'
+                ? [...(bannerEvents?.imageUrls || [])]
+                : [...(banners?.imageUrls || [])];
+        if (!urls.length) return;
+
+        const next = [...urls];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(dropIndex, 0, moved);
+
+        if (type === 'event') {
+            await dispatch(reorderBannerEvents(next));
+        } else {
+            await dispatch(reorderBanners(next));
+        }
+    };
+
+    const renderBannerCard = (banner, type, sortIndex) => (
+        <Col
+            key={`${type}-${banner.imageUrl}`}
+            xs={12}
+            sm={6}
+            md={6}
+            lg={4}
+            xl={3}
+            className="mb-4"
+            onDragOver={handleBannerOrderDragOver}
+            onDrop={(e) => handleBannerOrderDrop(e, sortIndex, type)}
+        >
             <Card className="h-100 shadow-sm border-0 banner-card">
                 <div className="position-relative">
+                    <div
+                        className="banner-drag-handle"
+                        draggable
+                        onDragStart={(e) =>
+                            handleBannerOrderDragStart(e, sortIndex, type)
+                        }
+                        title="Drag to reorder"
+                        role="button"
+                        aria-label="Drag to reorder banner"
+                    >
+                        <i className="fas fa-grip-vertical" />
+                    </div>
                     <Card.Img 
                         variant="top" 
                         src={`${process.env.REACT_APP_API_URL}/${banner.imageUrl}`} 
-                        style={{ height: '180px', objectFit: 'cover' }}
-                        className="banner-image"
+                        className="banner-image banner-image-responsive"
                         onClick={() => handleImageClick(banner.imageUrl, banner.filename)}
                     />
                     <div className="banner-overlay">
@@ -199,122 +266,177 @@ const BannerManagement = () => {
                         {type === 'event' ? 'Event(Home)' : 'Login Page'}
                     </Badge>
                 </div>
-                <Card.Body className="d-flex flex-column">
-                    <Card.Text className="text-muted small mb-2 text-truncate">
-                        {banner.filename || 'Banner Image'}
-                    </Card.Text>
-                    
-                    {/* Editable Hyperlink Section */}
-                    <div className="mb-2 p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
-                        {editingHyperlink === banner.imageUrl ? (
-                            <div className="d-flex flex-column gap-2">
-                                <Form.Label className="small fw-bold mb-0 d-flex align-items-center">
-                                    <i className="fas fa-link text-primary" style={{ marginRight: '6px' }}></i>
-                                    Hyperlink URL
-                                </Form.Label>
-                                <Form.Control
-                                    type="url"
-                                    size="sm"
-                                    placeholder="https://example.com"
-                                    value={tempHyperlink}
-                                    onChange={(e) => setTempHyperlink(e.target.value)}
-                                    className="border-primary"
-                                />
-                                <Form.Text className="text-muted small mb-0 d-flex align-items-center">
-                                    <i className="fas fa-info-circle" style={{ marginRight: '6px' }}></i>
-                                    This link will open when the banner is clicked
-                                </Form.Text>
-                                <div className="d-flex gap-2 mt-1">
-                                    <Button
-                                        variant="success"
-                                        size="sm"
-                                        onClick={() => handleSaveHyperlink(banner.imageUrl, type)}
-                                        disabled={loading}
-                                        className="flex-fill"
-                                    >
-                                        <i className="fas fa-check" style={{ marginRight: '8px' }}></i>
-                                        Save Link
-                                    </Button>
-                                    <Button
-                                        variant="outline-secondary"
-                                        size="sm"
-                                        onClick={handleCancelEdit}
-                                        className="flex-fill"
-                                    >
-                                        <i className="fas fa-times" style={{ marginRight: '8px' }}></i>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="d-flex flex-column gap-2">
-                                <div className="d-flex align-items-center justify-content-between">
-                                    <Form.Label className="small fw-bold mb-0 d-flex align-items-center">
-                                        <i className="fas fa-link" style={{ marginRight: '6px' }}></i>
-                                        Hyperlink
-                                    </Form.Label>
+                <Card.Body className="d-flex flex-column banner-card-body">
+                    <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3 banner-card-title-row">
+                        <Card.Text className="mb-0 flex-grow-1 min-w-0 banner-card-title" as="div">
+                            {banner.filename || 'Banner Image'}
+                        </Card.Text>
+                        <Button
+                            variant="outline-danger"
+                            size="sm"
+                            className="banner-remove-compact flex-shrink-0"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBanner(banner.imageUrl, type);
+                            }}
+                            disabled={loading}
+                            title="Remove this banner"
+                            aria-label="Remove this banner"
+                        >
+                            <i className="fas fa-trash-alt" aria-hidden />
+                        </Button>
+                    </div>
+
+                    {/* Click-through URL */}
+                    <div className="banner-link-section">
+                        <div className="banner-link-section-head">
+                            <span className="banner-link-section-title">
+                                <i className="fas fa-link" aria-hidden />
+                                Click-through URL
+                            </span>
+                            {editingHyperlink !== banner.imageUrl && (
+                                <>
                                     {banner.hyperlink ? (
                                         <Button
-                                            variant="outline-primary"
+                                            variant="light"
                                             size="sm"
-                                            onClick={() => handleEditHyperlink(banner.imageUrl, banner.hyperlink)}
-                                            title="Edit hyperlink"
+                                            className="banner-link-head-btn"
+                                            onClick={() =>
+                                                handleEditHyperlink(
+                                                    banner.imageUrl,
+                                                    banner.hyperlink,
+                                                )
+                                            }
+                                            title="Edit URL"
                                         >
-                                            <i className="fas fa-edit" style={{ marginRight: '8px' }}></i>
-                                            Edit
+                                            <i className="fas fa-edit" aria-hidden />
+                                            <span>Edit</span>
                                         </Button>
                                     ) : (
                                         <Button
-                                            variant="outline-success"
+                                            variant="light"
                                             size="sm"
-                                            onClick={() => handleEditHyperlink(banner.imageUrl, '')}
-                                            title="Add hyperlink"
+                                            className="banner-link-head-btn banner-link-head-btn-add"
+                                            onClick={() =>
+                                                handleEditHyperlink(banner.imageUrl, '')
+                                            }
+                                            title="Add URL"
                                         >
-                                            <i className="fas fa-plus" style={{ marginRight: '8px' }}></i>
-                                            Add Link
+                                            <i className="fas fa-plus" aria-hidden />
+                                            <span>Add URL</span>
                                         </Button>
                                     )}
-                                </div>
-                                {banner.hyperlink ? (
-                                    <div className="p-2 bg-white rounded border">
-                                        <a 
-                                            href={banner.hyperlink} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer" 
-                                            className="text-decoration-none text-primary small d-flex align-items-center"
-                                            title={banner.hyperlink}
+                                </>
+                            )}
+                        </div>
+                        <div className="banner-link-section-body">
+                            {editingHyperlink === banner.imageUrl ? (
+                                <div className="banner-link-edit">
+                                    <Form.Label
+                                        htmlFor={`banner-url-${type}-${sortIndex}`}
+                                        className="banner-link-field-label"
+                                    >
+                                        Destination URL
+                                    </Form.Label>
+                                    <Form.Control
+                                        id={`banner-url-${type}-${sortIndex}`}
+                                        type="url"
+                                        size="sm"
+                                        placeholder="https://example.com/page"
+                                        value={tempHyperlink}
+                                        onChange={(e) =>
+                                            setTempHyperlink(e.target.value)
+                                        }
+                                        className="banner-link-field-control"
+                                    />
+                                    <p className="banner-link-field-hint">
+                                        Opens in a new tab when attendees tap this
+                                        banner (optional).
+                                    </p>
+                                    <div className="banner-link-edit-actions">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleCancelEdit}
+                                            disabled={loading}
+                                            className="banner-link-action-btn"
                                         >
-                                            <i className="fas fa-external-link-alt" style={{ marginRight: '8px' }}></i>
-                                            <span className="text-truncate">{banner.hyperlink}</span>
-                                        </a>
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                handleSaveHyperlink(
+                                                    banner.imageUrl,
+                                                    type,
+                                                )
+                                            }
+                                            disabled={loading}
+                                            className="banner-link-action-btn banner-link-save-btn"
+                                        >
+                                            {loading ? (
+                                                <>
+                                                    <span
+                                                        className="spinner-border spinner-border-sm me-1"
+                                                        role="status"
+                                                    />
+                                                    Saving
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i
+                                                        className="fas fa-check me-1"
+                                                        aria-hidden
+                                                    />
+                                                    Save
+                                                </>
+                                            )}
+                                        </Button>
                                     </div>
-                                ) : (
-                                    <div className="p-2 bg-light rounded text-muted small text-center">
-                                        <i className="fas fa-link-slash" style={{ marginRight: '6px' }}></i>
-                                        No hyperlink set
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                </div>
+                            ) : banner.hyperlink ? (
+                                <a
+                                    href={banner.hyperlink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="banner-link-display"
+                                    title={banner.hyperlink}
+                                >
+                                    <span className="banner-link-display-text">
+                                        {banner.hyperlink}
+                                    </span>
+                                    <span className="banner-link-display-meta">
+                                        <i
+                                            className="fas fa-external-link-alt"
+                                            aria-hidden
+                                        />
+                                        Open
+                                    </span>
+                                </a>
+                            ) : (
+                                <div className="banner-link-empty">
+                                    <i
+                                        className="fas fa-mouse-pointer banner-link-empty-icon"
+                                        aria-hidden
+                                    />
+                                    <p className="banner-link-empty-title">
+                                        No destination URL
+                                    </p>
+                                    <p className="banner-link-empty-text">
+                                        Add a link if this banner should open a
+                                        page when tapped.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    
-                    <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => handleDeleteBanner(banner.imageUrl, type)}
-                        className="mt-auto"
-                        disabled={loading}
-                    >
-                        <i className="fas fa-trash me-1" style={{ marginRight: '8px' }}></i>
-                        Delete
-                    </Button>
                 </Card.Body>
             </Card>
         </Col>
     );
 
     return (
-        <div style={{ background: '#fff', borderRadius: 10, padding: 24 }}>
+        <div className="banner-management-page">
             {error && (
                 <Alert variant="danger" className="mb-4">
                     {error}
@@ -549,23 +671,49 @@ const BannerManagement = () => {
 
             {/* Event(Home) Banners Section */}
             <Card className="mb-4 border-0 shadow">
-                <Card.Header className="text-white py-3" style={{ backgroundColor: '#71C0BB' }}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <div className="d-flex align-items-center">
-                            <div>
-                                <h5 className="mb-1">Event(Home) Banners</h5>
-                                <small className="opacity-75">Manage your home page banners</small>
-                            </div>
+                <Card.Header className="text-white py-3 banner-list-card-header" style={{ backgroundColor: '#71C0BB' }}>
+                    <div className="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
+                        <div className="banner-list-header-copy flex-grow-1 min-w-0">
+                            <h5 className="banner-list-header-title text-white mb-2">
+                                Event (Home) Banners
+                            </h5>
+                            <p className="banner-list-header-desc text-white mb-0">
+                                Manage your home page banners. Drag the grip icon on a card to reorder.
+                            </p>
                         </div>
-                        <div className="d-flex align-items-center" style={{ gap: '0.2rem' }}>
-                            <Badge bg="light" text="dark" className="fs-6" style={{ cursor: 'pointer' }}>
-                                {bannerEvents?.imageUrls?.length || 0} banners
-                            </Badge>
-                            {bannerEvents?.imageUrls?.length > 0 && (
-                                <Badge bg="light" text="danger" className="fs-6" onClick={() => handleClearAll('event')} style={{ cursor: 'pointer' }}>                     
-                                    <i className="fas fa-trash me-1" style={{ marginRight: '8px' }}></i>
-                                    Clear All
-                                </Badge>
+                        <div
+                            className={`banner-header-actions-row${
+                                (bannerEvents?.imageUrls?.length || 0) > 0
+                                    ? ' banner-header-actions-row--pair'
+                                    : ''
+                            }`}
+                        >
+                            <div
+                                className="banner-header-tile banner-header-tile-stat"
+                                role="status"
+                            >
+                                <span className="banner-header-tile-value">
+                                    {bannerEvents?.imageUrls?.length || 0}
+                                </span>
+                                <span className="banner-header-tile-label">
+                                    Banners
+                                </span>
+                            </div>
+                            {(bannerEvents?.imageUrls?.length || 0) > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    className="banner-header-tile banner-header-tile-clear"
+                                    onClick={() => handleClearAll('event')}
+                                >
+                                    <i
+                                        className="fas fa-trash-alt banner-header-tile-icon"
+                                        aria-hidden
+                                    />
+                                    <span className="banner-header-clear-text">
+                                        Clear all
+                                    </span>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -589,7 +737,7 @@ const BannerManagement = () => {
                                     hyperlink: bannerEvents.hyperlinks && bannerEvents.hyperlinks[index] 
                                         ? bannerEvents.hyperlinks[index] 
                                         : undefined
-                                }, 'event')
+                                }, 'event', index)
                             )}
                         </Row>
                     )}
@@ -598,23 +746,49 @@ const BannerManagement = () => {
 
             {/* Login Page Banners Section */}
             <Card className="border-0 shadow">
-                <Card.Header className="text-white py-3" style={{ backgroundColor: '#71C0BB' }}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <div className="d-flex align-items-center">
-                            <div>
-                                <h5 className="mb-1">Login Page Banners</h5>
-                                <small className="opacity-75">Manage your login page banners</small>
-                            </div>
+                <Card.Header className="text-white py-3 banner-list-card-header" style={{ backgroundColor: '#71C0BB' }}>
+                    <div className="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
+                        <div className="banner-list-header-copy flex-grow-1 min-w-0">
+                            <h5 className="banner-list-header-title text-white mb-2">
+                                Login Page Banners
+                            </h5>
+                            <p className="banner-list-header-desc text-white mb-0">
+                                Manage your login page banners. Drag the grip icon on a card to reorder.
+                            </p>
                         </div>
-                        <div className="d-flex align-items-center" style={{ gap: '0.2rem' }}>
-                            <Badge bg="light" text="dark" className="fs-6" style={{ cursor: 'pointer' }}>
-                                {banners?.imageUrls?.length || 0} banners
-                            </Badge>
+                        <div
+                            className={`banner-header-actions-row${
+                                banners?.imageUrls?.length > 0
+                                    ? ' banner-header-actions-row--pair'
+                                    : ''
+                            }`}
+                        >
+                            <div
+                                className="banner-header-tile banner-header-tile-stat"
+                                role="status"
+                            >
+                                <span className="banner-header-tile-value">
+                                    {banners?.imageUrls?.length || 0}
+                                </span>
+                                <span className="banner-header-tile-label">
+                                    Banners
+                                </span>
+                            </div>
                             {banners?.imageUrls && banners.imageUrls.length > 0 && (
-                                <Badge bg="light" text="danger" className="fs-6" onClick={() => handleClearAll('home')} style={{ cursor: 'pointer' }}>
-                                    <i className="fas fa-trash me-1" style={{ marginRight: '8px' }}></i>
-                                    Clear All
-                                </Badge>
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    className="banner-header-tile banner-header-tile-clear"
+                                    onClick={() => handleClearAll('home')}
+                                >
+                                    <i
+                                        className="fas fa-trash-alt banner-header-tile-icon"
+                                        aria-hidden
+                                    />
+                                    <span className="banner-header-clear-text">
+                                        Clear all
+                                    </span>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -638,7 +812,7 @@ const BannerManagement = () => {
                                     hyperlink: banners.hyperlinks && banners.hyperlinks[index] 
                                         ? banners.hyperlinks[index] 
                                         : undefined
-                                }, 'home')
+                                }, 'home', index)
                             )}
                         </Row>
                     )}
@@ -651,7 +825,7 @@ const BannerManagement = () => {
                 onHide={() => setShowImageModal(false)}
                 size="xl"
                 centered
-                contentClassName="bg-dark border-0"
+                contentClassName="bg-dark border-0 banner-mgmt-modal-lightbox"
             >
                 <Modal.Body className="p-0 position-relative" style={{ minHeight: '90vh', backgroundColor: 'rgba(0,0,0,0.95)' }}>
                     {/* Close Button */}
@@ -735,6 +909,7 @@ const BannerManagement = () => {
                 show={showClearModal} 
                 onHide={() => setShowClearModal(false)}
                 centered
+                contentClassName="banner-mgmt-modal-shell"
             >
                 <Modal.Header>
                     <Modal.Title>
@@ -789,6 +964,7 @@ const BannerManagement = () => {
                 show={showDeleteModal} 
                 onHide={() => setShowDeleteModal(false)}
                 centered
+                contentClassName="banner-mgmt-modal-shell"
             >
                 <Modal.Header>
                     <Modal.Title>
@@ -837,337 +1013,6 @@ const BannerManagement = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
-
-            <style jsx>{`
-                .bg-gradient-primary {
-                    background: #71C0BB;
-                }
-                
-                .bg-gradient-success {
-                    background: #71C0BB;
-                }
-                
-                .bg-gradient-info {
-                    background: #71C0BB;
-                }
-
-                .upload-section {
-                    height: 100%;
-                }
-
-                .banner-type-selector {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
-
-                .banner-type-option {
-                    display: flex;
-                    align-items: center;
-                    padding: 20px;
-                    border: 2px solid #e9ecef;
-                    border-radius: 12px;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    position: relative;
-                }
-
-                .banner-type-option:hover {
-                    border-color: #007bff;
-                    background-color: #f8f9fa;
-                }
-
-                .banner-type-option.active {
-                    border-color: #007bff;
-                    background-color: #e7f3ff;
-                }
-
-                .banner-type-icon {
-                    width: 56px;
-                    height: 56px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 24px;
-                    margin-right: 20px;
-                }
-
-                .banner-type-content {
-                    flex: 1;
-                }
-
-                .banner-type-content h6 {
-                    margin-bottom: 4px;
-                    font-weight: 600;
-                }
-
-                .banner-type-content small {
-                    font-size: 13px;
-                }
-
-                .banner-type-check {
-                    width: 28px;
-                    height: 28px;
-                    background: #007bff;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 14px;
-                }
-
-                .upload-zone {
-                    border: 2px dashed #dee2e6;
-                    border-radius: 12px;
-                    padding: 40px;
-                    text-align: center;
-                    transition: all 0.3s ease;
-                    min-height: 200px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    position: relative;
-                }
-
-                .upload-zone:hover {
-                    border-color: #007bff;
-                    background-color: #f8f9fa;
-                }
-
-                .upload-zone.drag-active {
-                    border-color: #007bff;
-                    background-color: #e7f3ff;
-                }
-
-                .upload-zone.has-files {
-                    padding: 20px;
-                    min-height: auto;
-                }
-
-                .file-input {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    opacity: 0;
-                    cursor: pointer;
-                    pointer-events: auto;
-                }
-
-                .file-input-hidden {
-                    position: absolute;
-                    top: -9999px;
-                    left: -9999px;
-                    opacity: 0;
-                    pointer-events: none;
-                }
-
-                .upload-placeholder {
-                    pointer-events: none;
-                }
-
-                .upload-icon {
-                    font-size: 48px;
-                    color: #6c757d;
-                    margin-bottom: 16px;
-                }
-
-                .selected-files {
-                    width: 100%;
-                    pointer-events: auto;
-                }
-
-                .selected-files-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 16px;
-                    padding-bottom: 12px;
-                    border-bottom: 1px solid #dee2e6;
-                    pointer-events: auto;
-                }
-
-                .files-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                    gap: 12px;
-                    pointer-events: auto;
-                    margin-bottom: 16px;
-                }
-
-                .add-more-files {
-                    text-align: center;
-                    padding-top: 16px;
-                    border-top: 1px solid #dee2e6;
-                }
-
-                .file-preview {
-                    position: relative;
-                    border: 1px solid #dee2e6;
-                    border-radius: 8px;
-                    overflow: hidden;
-                    background: white;
-                }
-
-                .file-preview-image {
-                    width: 100%;
-                    height: 120px;
-                    overflow: hidden;
-                }
-
-                .file-preview-image img {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                }
-
-                .file-preview-info {
-                    padding: 8px 12px;
-                }
-
-                .file-name {
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #495057;
-                    margin-bottom: 2px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .file-size {
-                    font-size: 11px;
-                    color: #6c757d;
-                }
-
-                .file-hyperlink-input {
-                    padding: 8px 12px;
-                    background-color: #f8f9fa;
-                    border-top: 1px solid #dee2e6;
-                }
-
-                .file-hyperlink-input .form-control {
-                    font-size: 12px;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                }
-
-                .file-hyperlink-input label {
-                    color: #495057;
-                    font-size: 12px;
-                }
-
-                .file-hyperlink-input .form-text {
-                    font-size: 11px;
-                    margin-top: 4px;
-                }
-
-                .file-remove {
-                    position: absolute;
-                    top: 4px;
-                    right: 4px;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    padding: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 10px;
-                }
-
-                .upload-actions {
-                    text-align: center;
-                }
-
-                .upload-btn {
-                    padding: 12px 32px;
-                    font-weight: 600;
-                    border-radius: 8px;
-                }
-
-                .empty-state {
-                    padding: 40px 20px;
-                }
-
-                .card {
-                    border-radius: 12px;
-                    overflow: hidden;
-                }
-
-                .card-header {
-                    border-bottom: none;
-                }
-
-                .badge {
-                    padding: 8px 16px;
-                    border-radius: 20px;
-                }
-
-                .banner-card {
-                    transition: transform 0.2s ease;
-                }
-
-                .banner-card:hover {
-                    transform: translateY(-2px);
-                }
-
-                .banner-image {
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                }
-
-                .banner-image:hover {
-                    opacity: 0.8;
-                }
-
-                .banner-overlay {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
-                }
-
-                .banner-card:hover .banner-overlay {
-                    opacity: 1;
-                }
-
-                .zoom-btn {
-                    border-radius: 50%;
-                    width: 40px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 14px;
-                }
-
-                .modal-content {
-                    border-radius: 12px;
-                    overflow: hidden;
-                }
-
-                .modal-header {
-                    border-bottom: 1px solid #dee2e6;
-                    padding: 20px 24px;
-                }
-
-                .modal-body {
-                    padding: 0;
-                }
-            `}</style>
         </div>
     );
 };

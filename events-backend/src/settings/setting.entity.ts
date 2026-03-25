@@ -65,6 +65,10 @@ export class Banner {
     @Column('simple-array', { nullable: true })
     hyperlinks?: string[]; // Array of hyperlinks, one per image
 
+    /** 0-based display sequence: bannerOrder[i] matches display position of imageUrls[i] (here 0..n-1 in order). */
+    @Column('json', { nullable: true })
+    bannerOrder?: number[];
+
     @CreateDateColumn()
     createdAt!: Date;
 
@@ -82,6 +86,9 @@ export class BannerEvent {
 
     @Column('simple-array', { nullable: true })
     hyperlinks?: string[]; // Array of hyperlinks, one per image
+
+    @Column('json', { nullable: true })
+    bannerOrder?: number[];
 
     @CreateDateColumn()
     createdAt!: Date;

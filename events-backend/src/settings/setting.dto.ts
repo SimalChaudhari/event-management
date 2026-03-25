@@ -49,6 +49,12 @@ export class CreateBannerEventDto {
     readonly hyperlinks?: string[];
 }
 
+export class ReorderBannerDto {
+    @IsArray()
+    @IsString({ each: true })
+    readonly imageUrls!: string[];
+}
+
 export class CreateLogoDto {
     @IsString()
     readonly id?: string;
