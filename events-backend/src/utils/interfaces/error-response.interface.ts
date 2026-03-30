@@ -23,5 +23,7 @@ export interface SuccessResponse<T = any> {
     hasNext?: boolean;
     hasPrev?: boolean;
     timestamp?: string;
+    /** Absolute URL to download full event gallery ZIP (public view API). */
+    downloadAllUrl?: string;
   };
 } 

@@ -181,6 +181,130 @@ export class GalleryController {
     }
   }
 
+  /**
+   * Public: gallery for an event by track. Each track includes `downloadUrl` (ZIP); metadata has `downloadAllUrl`.
+   */
+  @Get('view/event/:eventId')
+  @Public()
+  async getViewGalleryByEvent(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.galleryService.getGalleryTracksByEvent(eventId);
+      const baseUrl = this.galleryPublicBaseUrl(req);
+      const tracksWithLinks = result.tracks.map((t) => ({
+        ...t,
+        downloadUrl: `${baseUrl}/api/gallery/view/track/${t.id}/download`,
+      }));
+      const successResponse: SuccessResponse = {
+        success: true,
+        message: 'Gallery retrieved successfully',
+        data: tracksWithLinks,
+        metadata: {
+          total: result.tracks.length,
+          timestamp: new Date().toISOString(),
+          downloadAllUrl: `${baseUrl}/api/gallery/view/event/${eventId}/download/all`,
+        },
+      };
+      return response.status(HttpStatus.OK).json(successResponse);
+    } catch (error) {
+      this.errorHandler.logError(
+        error,
+        'Public gallery view by event',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  /** Public: JSON with absolute `downloadUrl` for the full-event ZIP (use as href). */
+  @Get('view/event/:eventId/download-all-link')
+  @Public()
+  async getViewEventDownloadAllLink(
+    @Param('eventId') eventId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.galleryService.getGalleryTracksByEvent(eventId);
+    let imageCount = 0;
+    for (const t of result.tracks) {
+      imageCount += (t.galleryImages || []).length;
+    }
+    if (imageCount === 0) {
+      throw new BadRequestException('No images found to download for this event');
+    }
+    const baseUrl = this.galleryPublicBaseUrl(req);
+    return {
+      success: true,
+      downloadUrl: `${baseUrl}/api/gallery/view/event/${eventId}/download/all`,
+      message: 'Use downloadUrl as link or window.location to start ZIP download',
+    };
+  }
+
+  /**
+   * Public: ZIP of all images in every track for this event (one folder per track: 1_TrackName/…).
+   */
+  @Get('view/event/:eventId/download/all')
+  @Public()
+  async downloadViewEventAllTracksZip(
+    @Param('eventId') eventId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      await this.streamEventGalleryAllTracksAsZip(eventId, response);
+    } catch (error) {
+      this.errorHandler.logError(
+        error,
+        'Gallery download all tracks for event',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
+  /** Public: JSON with absolute `downloadUrl` for this track’s ZIP (use as href). */
+  @Get('view/track/:galleryId/download-link')
+  @Public()
+  async getViewTrackDownloadLink(
+    @Param('galleryId') galleryId: string,
+    @Request() req: any,
+  ) {
+    const gallery = await this.galleryService.getGalleryById(galleryId);
+    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
+      throw new BadRequestException('No images found to download');
+    }
+    const baseUrl = this.galleryPublicBaseUrl(req);
+    return {
+      success: true,
+      downloadUrl: `${baseUrl}/api/gallery/view/track/${galleryId}/download`,
+      message: 'Use downloadUrl as link or window.location to start ZIP download',
+    };
+  }
+
+  /**
+   * Public: ZIP of all images for one track. `galleryId` is the track row `id` from the view API (no event id in URL).
+   */
+  @Get('view/track/:galleryId/download')
+  @Public()
+  async downloadViewTrackZip(
+    @Param('galleryId') galleryId: string,
+    @Res() response: Response,
+    @Request() req: any,
+  ) {
+    try {
+      await this.streamAllGalleryImagesAsZip(galleryId, response);
+    } catch (error) {
+      this.errorHandler.logError(
+        error,
+        'Gallery download single track',
+        req.user?.id,
+      );
+      throw error;
+    }
+  }
+
   // For Event Gallery
 
   @Post('create-or-update/:eventId')
@@ -351,15 +475,19 @@ export class GalleryController {
     if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
       throw new BadRequestException('No images found to download');
     }
-    const protocol = req.protocol || 'https';
-    const host = req.get?.('host') || req.headers?.host || '';
-    const baseUrl = `${protocol}://${host}`;
-    const downloadUrl = `${baseUrl}/api/gallery/download/all/${galleryId}`;
+    const baseUrl = this.galleryPublicBaseUrl(req);
+    const downloadUrl = `${baseUrl}/api/gallery/view/track/${galleryId}/download`;
     return {
       success: true,
       downloadUrl,
       message: 'Use this URL as link – when user clicks, ZIP will download',
     };
+  }
+
+  private galleryPublicBaseUrl(req: any): string {
+    const protocol = req.protocol || 'https';
+    const host = req.get?.('host') || req.headers?.host || '';
+    return `${protocol}://${host}`;
   }
 
   private async streamAllGalleryImagesAsZip(galleryId: string, response: Response): Promise<void> {
@@ -384,6 +512,38 @@ export class GalleryController {
     }
     if (added === 0) {
       throw new BadRequestException('No valid image files found to download');
+    }
+    await archive.finalize();
+  }
+
+  /** ZIP every track for an event; each track’s files go under `1_SafeTitle/image_N.ext`. */
+  private async streamEventGalleryAllTracksAsZip(
+    eventId: string,
+    response: Response,
+  ): Promise<void> {
+    const result = await this.galleryService.getGalleryTracksByEvent(eventId);
+    const archiver = require('archiver');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const safeEvent = eventId.replace(/[^a-zA-Z0-9-_]/g, '_');
+    response.attachment(`event-gallery-${safeEvent}.zip`);
+    archive.pipe(response);
+    let added = 0;
+    result.tracks.forEach((track, t) => {
+      const safeTitle = (track.trackTitle || 'Default').replace(/[^a-zA-Z0-9-_]/g, '_');
+      const folder = `${t + 1}_${safeTitle}`;
+      const images = track.galleryImages || [];
+      for (let i = 0; i < images.length; i++) {
+        const relPath = images[i];
+        const fullPath = path.join(process.cwd(), relPath);
+        if (fs.existsSync(fullPath)) {
+          const ext = path.extname(relPath);
+          archive.file(fullPath, { name: `${folder}/image_${i + 1}${ext}` });
+          added++;
+        }
+      }
+    });
+    if (added === 0) {
+      throw new BadRequestException('No images found to download for this event');
     }
     await archive.finalize();
   }
