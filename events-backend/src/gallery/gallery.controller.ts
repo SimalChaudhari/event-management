@@ -182,7 +182,7 @@ export class GalleryController {
   }
 
   /**
-   * Public: gallery for an event by track. Each track includes `downloadUrl` (ZIP); metadata has `downloadAllUrl`.
+   * Public: gallery by track. `downloadUrl` / `metadata.downloadAllUrl` only when at least one file exists on disk.
    */
   @Get('view/event/:eventId')
   @Public()
@@ -194,10 +194,16 @@ export class GalleryController {
     try {
       const result = await this.galleryService.getGalleryTracksByEvent(eventId);
       const baseUrl = this.galleryPublicBaseUrl(req);
-      const tracksWithLinks = result.tracks.map((t) => ({
-        ...t,
-        downloadUrl: `${baseUrl}/api/gallery/view/track/${t.id}/download`,
-      }));
+      const tracksWithLinks = result.tracks.map((t) => {
+        const row = { ...t };
+        if (this.galleryPathsExistOnDisk(t.galleryImages)) {
+          Object.assign(row, {
+            downloadUrl: `${baseUrl}/api/gallery/view/track/${t.id}/download`,
+          });
+        }
+        return row;
+      });
+      const eventHasDownloadableFiles = this.eventGalleryHasAnyFileOnDisk(result.tracks);
       const successResponse: SuccessResponse = {
         success: true,
         message: 'Gallery retrieved successfully',
@@ -205,7 +211,11 @@ export class GalleryController {
         metadata: {
           total: result.tracks.length,
           timestamp: new Date().toISOString(),
-          downloadAllUrl: `${baseUrl}/api/gallery/view/event/${eventId}/download/all`,
+          ...(eventHasDownloadableFiles
+            ? {
+                downloadAllUrl: `${baseUrl}/api/gallery/view/event/${eventId}/download/all`,
+              }
+            : {}),
         },
       };
       return response.status(HttpStatus.OK).json(successResponse);
@@ -227,12 +237,8 @@ export class GalleryController {
     @Request() req: any,
   ) {
     const result = await this.galleryService.getGalleryTracksByEvent(eventId);
-    let imageCount = 0;
-    for (const t of result.tracks) {
-      imageCount += (t.galleryImages || []).length;
-    }
-    if (imageCount === 0) {
-      throw new BadRequestException('No images found to download for this event');
+    if (!this.eventGalleryHasAnyFileOnDisk(result.tracks)) {
+      throw new BadRequestException('No images available to download for this event');
     }
     const baseUrl = this.galleryPublicBaseUrl(req);
     return {
@@ -272,8 +278,8 @@ export class GalleryController {
     @Request() req: any,
   ) {
     const gallery = await this.galleryService.getGalleryById(galleryId);
-    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
-      throw new BadRequestException('No images found to download');
+    if (!this.galleryPathsExistOnDisk(gallery.galleryImages)) {
+      throw new BadRequestException('No images available to download');
     }
     const baseUrl = this.galleryPublicBaseUrl(req);
     return {
@@ -472,8 +478,8 @@ export class GalleryController {
     @Request() req: any,
   ) {
     const gallery = await this.galleryService.getGalleryById(galleryId);
-    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
-      throw new BadRequestException('No images found to download');
+    if (!this.galleryPathsExistOnDisk(gallery.galleryImages)) {
+      throw new BadRequestException('No images available to download');
     }
     const baseUrl = this.galleryPublicBaseUrl(req);
     const downloadUrl = `${baseUrl}/api/gallery/view/track/${galleryId}/download`;
@@ -490,28 +496,47 @@ export class GalleryController {
     return `${protocol}://${host}`;
   }
 
+  /** At least one gallery path exists on disk (safe paths only). */
+  private galleryPathsExistOnDisk(relativePaths: string[] | undefined | null): boolean {
+    if (!relativePaths?.length) return false;
+    return relativePaths.some((rel) => {
+      if (!rel || rel.includes('..')) return false;
+      return fs.existsSync(path.join(process.cwd(), rel));
+    });
+  }
+
+  private eventGalleryHasAnyFileOnDisk(
+    tracks: Array<{ galleryImages?: string[] }>,
+  ): boolean {
+    return tracks.some((t) => this.galleryPathsExistOnDisk(t.galleryImages));
+  }
+
   private async streamAllGalleryImagesAsZip(galleryId: string, response: Response): Promise<void> {
     const gallery = await this.galleryService.getGalleryById(galleryId);
-    if (!gallery.galleryImages || gallery.galleryImages.length === 0) {
-      throw new BadRequestException('No images found to download');
+    const paths = gallery.galleryImages || [];
+    const filesToZip: { fullPath: string; entryName: string }[] = [];
+    for (let i = 0; i < paths.length; i++) {
+      const relPath = paths[i];
+      if (!relPath || relPath.includes('..')) continue;
+      const fullPath = path.join(process.cwd(), relPath);
+      if (fs.existsSync(fullPath)) {
+        const ext = path.extname(relPath);
+        filesToZip.push({
+          fullPath,
+          entryName: `image_${filesToZip.length + 1}${ext}`,
+        });
+      }
+    }
+    if (filesToZip.length === 0) {
+      throw new BadRequestException('No images available to download');
     }
     const archiver = require('archiver');
     const archive = archiver('zip', { zlib: { level: 9 } });
     const safeTitle = (gallery.trackTitle || 'gallery').replace(/[^a-zA-Z0-9-_]/g, '_');
     response.attachment(`gallery-${safeTitle}-${galleryId}.zip`);
     archive.pipe(response);
-    let added = 0;
-    for (let i = 0; i < gallery.galleryImages.length; i++) {
-      const relPath = gallery.galleryImages[i];
-      const fullPath = path.join(process.cwd(), relPath);
-      if (fs.existsSync(fullPath)) {
-        const ext = path.extname(relPath);
-        archive.file(fullPath, { name: `image_${i + 1}${ext}` });
-        added++;
-      }
-    }
-    if (added === 0) {
-      throw new BadRequestException('No valid image files found to download');
+    for (const f of filesToZip) {
+      archive.file(f.fullPath, { name: f.entryName });
     }
     await archive.finalize();
   }
@@ -522,28 +547,34 @@ export class GalleryController {
     response: Response,
   ): Promise<void> {
     const result = await this.galleryService.getGalleryTracksByEvent(eventId);
-    const archiver = require('archiver');
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    const safeEvent = eventId.replace(/[^a-zA-Z0-9-_]/g, '_');
-    response.attachment(`event-gallery-${safeEvent}.zip`);
-    archive.pipe(response);
-    let added = 0;
+    const filesToZip: { fullPath: string; zipName: string }[] = [];
     result.tracks.forEach((track, t) => {
       const safeTitle = (track.trackTitle || 'Default').replace(/[^a-zA-Z0-9-_]/g, '_');
       const folder = `${t + 1}_${safeTitle}`;
       const images = track.galleryImages || [];
       for (let i = 0; i < images.length; i++) {
         const relPath = images[i];
+        if (!relPath || relPath.includes('..')) continue;
         const fullPath = path.join(process.cwd(), relPath);
         if (fs.existsSync(fullPath)) {
           const ext = path.extname(relPath);
-          archive.file(fullPath, { name: `${folder}/image_${i + 1}${ext}` });
-          added++;
+          filesToZip.push({
+            fullPath,
+            zipName: `${folder}/image_${i + 1}${ext}`,
+          });
         }
       }
     });
-    if (added === 0) {
-      throw new BadRequestException('No images found to download for this event');
+    if (filesToZip.length === 0) {
+      throw new BadRequestException('No images available to download for this event');
+    }
+    const archiver = require('archiver');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const safeEvent = eventId.replace(/[^a-zA-Z0-9-_]/g, '_');
+    response.attachment(`event-gallery-${safeEvent}.zip`);
+    archive.pipe(response);
+    for (const f of filesToZip) {
+      archive.file(f.fullPath, { name: f.zipName });
     }
     await archive.finalize();
   }
