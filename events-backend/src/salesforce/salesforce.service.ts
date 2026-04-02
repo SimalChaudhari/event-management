@@ -22,39 +22,41 @@ export class SalesforceService {
 
   private getLoginUrl(): string {
     return (
-      this.config.get<string>('SALESFORCE_LOGIN_URL') ||
-      'https://test.salesforce.com'
+      this.config.get<string>('SALESFORCE_LOGIN_URL_EVENT') ||
+      'https://login.salesforce.com'
     ).replace(/\/$/, '');
   }
 
   private getBaseUrl(): string {
-    const url = this.config.get<string>('SALESFORCE_BASE_URL');
+    const url =
+      this.config.get<string>('SALESFORCE_BASE_URL_EVENT') ||
+      this.config.get<string>('SALESFORCE_BASE_URL');
     if (!url) {
-      throw new Error('SALESFORCE_BASE_URL is not configured');
+      throw new Error('SALESFORCE_BASE_URL_EVENT is not configured');
     }
-    return url.replace(/\/$/, '');
+    return url.trim().replace(/\/$/, '');
   }
 
   private getClientId(): string {
-    const id = this.config.get<string>('SALESFORCE_CLIENT_ID');
+    const id = this.config.get<string>('SALESFORCE_CLIENT_ID_EVENT');
     if (!id) throw new Error('SALESFORCE_CLIENT_ID is not configured');
-    return id;
+    return id.trim();
   }
 
   private getClientSecret(): string {
-    return this.config.get<string>('SALESFORCE_CLIENT_SECRET') || '';
+    return (this.config.get<string>('SALESFORCE_CLIENT_SECRET_EVENT') || '').trim();
   }
 
   private getUsername(): string {
-    const u = this.config.get<string>('SALESFORCE_USERNAME');
+    const u = this.config.get<string>('SALESFORCE_USERNAME_EVENT');
     if (!u) throw new Error('SALESFORCE_USERNAME is not configured');
-    return u;
+    return u.trim();
   }
 
   private getPassword(): string {
-    const p = this.config.get<string>('SALESFORCE_PASSWORD');
+    const p = this.config.get<string>('SALESFORCE_PASSWORD_EVENT');
     if (!p) throw new Error('SALESFORCE_PASSWORD is not configured');
-    return p;
+    return p.trim();
   }
 
   /**
@@ -71,27 +73,65 @@ export class SalesforceService {
     }
 
     const loginUrl = this.getLoginUrl();
+    const clientId = this.getClientId();
+    const username = this.getUsername();
+    let passwordForOAuth = this.getPassword();
+    if (passwordForOAuth.includes('%')) {
+      try {
+        passwordForOAuth = decodeURIComponent(passwordForOAuth);
+      } catch {
+        // keep raw password if decode fails
+      }
+    }
     const params = new URLSearchParams({
       grant_type: 'password',
-      client_id: this.getClientId(),
+      client_id: clientId,
       client_secret: this.getClientSecret(),
-      username: this.getUsername(),
-      password: this.getPassword(),
+      username,
+      password: passwordForOAuth,
     });
 
-    const url = `${loginUrl}/services/oauth2/token?${params.toString()}`;
-    const response = await axios.post<SalesforceTokenResponse>(url, null, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 15000,
+    const url = `${loginUrl}/services/oauth2/token`;
+    this.logger.log('Salesforce OAuth request started', {
+      loginUrl,
+      username,
+      clientIdPrefix: clientId.slice(0, 8),
+      clientIdSuffix: clientId.slice(-6),
     });
+    try {
+      const response = await axios.post<SalesforceTokenResponse>(
+        url,
+        params.toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 15000,
+        },
+      );
 
-    const data = response.data;
-    this.accessToken = data.access_token;
-    this.instanceUrl = data.instance_url;
-    const expiresIn = 7200;
-    this.tokenExpiry = Date.now() + expiresIn * 1000;
-    this.logger.log('Salesforce OAuth token obtained successfully');
-    return this.accessToken;
+      const data = response.data;
+      this.accessToken = data.access_token;
+      this.instanceUrl = data.instance_url;
+      const expiresIn = 7200;
+      this.tokenExpiry = Date.now() + expiresIn * 1000;
+      this.logger.log('Salesforce OAuth token obtained successfully');
+      return this.accessToken;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const body = error?.response?.data;
+      this.logger.error('Salesforce OAuth request context', {
+        loginUrl,
+        username,
+        clientIdPrefix: clientId.slice(0, 8),
+        clientIdSuffix: clientId.slice(-6),
+      });
+      this.logger.error('Salesforce OAuth token request failed', {
+        loginUrl,
+        status,
+        body,
+      });
+      throw error;
+    }
+
   }
 
   /** Axios client with Bearer token; baseURL = SALESFORCE_BASE_URL for Apex REST */
