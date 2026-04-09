@@ -161,7 +161,8 @@ export class SalesforceSyncService implements OnModuleInit {
           const description =
             item.description || item.outline || null;
           const venueName = item.venue?.name || null;
-          const images = item.imageUrl ? [item.imageUrl] : undefined;
+          const salesforceImageUrl = item.imageUrl?.trim() || null;
+          const images = salesforceImageUrl ? [salesforceImageUrl] : undefined;
 
           const defaultPrice = this.getDefaultPriceFromPricingOptions(
             item.pricingOptions,
@@ -216,6 +217,8 @@ export class SalesforceSyncService implements OnModuleInit {
             const existingPricingOptsJson = JSON.stringify(
               event.salesforcePricingOptions ?? [],
             );
+            const incomingImagesJson = JSON.stringify(images ?? []);
+            const existingImagesJson = JSON.stringify(event.images ?? []);
             const hasChanges =
               event.name !== name ||
               (event.description ?? '') !== (description ?? '') ||
@@ -223,6 +226,7 @@ export class SalesforceSyncService implements OnModuleInit {
               (event.courseCode ?? '') !== (item.courseCode ?? '') ||
               Number(event.price ?? 0) !== Number(defaultPrice ?? 0) ||
               Boolean(event.isPrivate) !== isPrivate ||
+              existingImagesJson !== incomingImagesJson ||
               existingPricingOptsJson !== pricingOptsJson;
             if (hasChanges) {
               Object.assign(event, eventData);
