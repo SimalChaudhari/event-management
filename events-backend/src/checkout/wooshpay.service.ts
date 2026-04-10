@@ -148,6 +148,23 @@ export class WooShPayService {
   }
 
   /**
+   * Extract readable error message from WooShPay/axios payloads.
+   */
+  private extractApiMessage(error: any): string {
+    const data = error?.response?.data;
+    if (!data) return error?.message || 'Unknown error';
+    if (typeof data === 'string') return data;
+    return (
+      data.message ||
+      data.error_description ||
+      data.error?.message ||
+      data.error ||
+      error?.message ||
+      'Unknown error'
+    );
+  }
+
+  /**
    * Make authenticated API request to WooShPay
    */
   private async makeApiRequest<T>(
@@ -156,7 +173,7 @@ export class WooShPayService {
     data?: any,
   ): Promise<T> {
     const config = this.getConfig();
-    const basicAuth = this.createAuthHeader(process.env.WOOSHPay_SECRET_KEY || '');
+    const basicAuth = this.createAuthHeader(config.secretKey);
 
     const requestConfig = {
       method,
@@ -184,46 +201,51 @@ export class WooShPayService {
 
       return response.data;
     } catch (error: any) {
+      const apiMessage = this.extractApiMessage(error);
       this.logger.error(`API request failed`, {
         endpoint,
         status: error.response?.status,
         statusText: error.response?.statusText,
         error: error.response?.data,
+        readableError: apiMessage,
       });
 
       if (error.response?.status === 401) {
         throw new BadRequestException(
-          'WooShPay authentication failed. Check API key.',
+          'Payment service authentication failed. Please contact support or try again later.',
         );
       } else if (error.response?.status === 403) {
         throw new BadRequestException(
-          'WooShPay access denied. Check permissions.',
+          'Payment service access denied. Please contact support.',
         );
       } else if (error.response?.status === 400) {
         throw new BadRequestException(
-          `WooShPay validation error: ${error.response?.data?.message || 'Invalid request'}`,
+          `Invalid payment request: ${apiMessage}`,
         );
       } else if (error.response?.status === 422) {
         throw new BadRequestException(
-          `WooShPay parameter error: ${error.response?.data?.message || 'Invalid parameters'}`,
+          `Payment details are invalid: ${apiMessage}`,
         );
       } else if (error.response?.status === 429) {
         // Rate limit exceeded
         this.logger.warn('WooShPay rate limit exceeded. Please wait 1 minute before retrying.');
         throw new BadRequestException(
-          'WooShPay rate limit exceeded. Please wait 1 minute before retrying. For higher limits, complete KYC at https://dashboard.wooshpay.com',
+          'Too many payment requests right now. Please wait a minute and try again.',
         );
       } else if (error.response?.status === 402) {
         // Payment required / Refunds not enabled / Account limitation
-        const apiMessage = error.response?.data?.message || error.response?.data?.error;
         const msg = apiMessage
-          ? `WooShPay: ${apiMessage}`
-          : 'Refunds are not available for this account. Complete KYC or check your WooShPay dashboard (https://dashboard.wooshpay.com) to enable refunds.';
+          ? `Payment cannot be processed: ${apiMessage}`
+          : 'Payment cannot be processed for this account. Please contact support.';
         throw new BadRequestException(msg);
+      } else if (error.response?.status >= 500) {
+        throw new InternalServerErrorException(
+          'Payment provider is temporarily unavailable. Please try again in a few minutes.',
+        );
       }
 
       throw new InternalServerErrorException(
-        `WooShPay API error: ${error.response?.data?.message || error.message}`,
+        `Payment processing failed: ${apiMessage}`,
       );
     }
   }
