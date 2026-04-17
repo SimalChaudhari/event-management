@@ -112,6 +112,37 @@ export class CartService {
         };
     }
 
+    async deleteMultipleCarts(cartIds: string[], userId: string) {
+        const uniqueIds = [...new Set((cartIds || []).filter(Boolean))];
+        if (!uniqueIds.length) {
+            throw new BadRequestException('cartIds is required and must contain at least one cart ID.');
+        }
+
+        const carts = await this.cartRepository.find({
+            where: { id: In(uniqueIds), userId },
+            select: ['id'],
+        });
+        const foundIds = carts.map((c) => c.id);
+        const foundSet = new Set(foundIds);
+        const notFoundIds = uniqueIds.filter((id) => !foundSet.has(id));
+
+        if (foundIds.length > 0) {
+            await this.cartRepository.delete({ id: In(foundIds), userId });
+        }
+
+        return {
+            success: true,
+            message:
+                foundIds.length > 0
+                    ? `Deleted ${foundIds.length} cart item(s).`
+                    : 'No matching cart items found to delete.',
+            deletedCount: foundIds.length,
+            deletedCartIds: foundIds,
+            notFoundCount: notFoundIds.length,
+            notFoundCartIds: notFoundIds,
+        };
+    }
+
 
     // Step 1: Get cart items WITH saved coupon (if any)
     async getCartItemsByIds(userId: string, cartIds: string[]) {

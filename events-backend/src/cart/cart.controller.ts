@@ -3,6 +3,7 @@ import { Controller, Post, Get, Put, Delete, Body, Param, Query, Res, UseGuards,
 import { Response } from 'express';
 import { CartService } from './cart.service';
 import { CartDto } from './cart.dto';
+import { DeleteMultipleCartsDto } from './cart.dto';
 import { JwtAuthGuard } from 'jwt/jwt-auth.guard';
 import { EventService } from 'event/event.service';
 import { CheckoutService } from 'checkout/checkout.service';
@@ -512,7 +513,18 @@ export class CartController {
             data: cart,
         });
     }
-    
+
+    @Delete()
+    async deleteMultipleCarts(
+        @Body() body: DeleteMultipleCartsDto,
+        @Request() req: any,
+        @Res() response: Response,
+    ) {
+        const userId = req.user.id;
+        const result = await this.cartService.deleteMultipleCarts(body.cartIds, userId);
+        return response.status(200).json(result);
+    }
+
     @Delete(':id')
     async deleteCart(@Param('id') id: string, @Request() req: any, @Res() response: Response) {
         const userId = req.user.id;

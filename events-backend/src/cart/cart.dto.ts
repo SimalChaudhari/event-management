@@ -112,3 +112,10 @@ export class SelectableCartItemDto {
     @IsNumber()
     selectionIndex?: number;
 }
+
+export class DeleteMultipleCartsDto {
+    @IsNotEmpty()
+    @IsArray()
+    @IsString({ each: true })
+    cartIds!: string[];
+}
