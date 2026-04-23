@@ -1,7 +1,7 @@
 // events-backend/src/order/order.service.ts
 import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Like, Repository } from 'typeorm';
+import { EntityManager, Like, Repository, In, Brackets } from 'typeorm';
 import { Order } from './order.entity';
 import { CreateEventOrderDto, CreateOrderWithItemsDto, OrderDto, OrderStatus, OrderListQueryDto } from './order.dto';
 import { UserEntity } from 'user/users.entity'; // Ensure this import is correct
@@ -340,7 +340,7 @@ export class OrderService {
         if (dateTo) {
             countQb.andWhere('order.createdAt <= :dateTo', { dateTo });
         }
-        const total = await countQb.getCount();
+        const ordersTotal = await countQb.getCount();
 
         const qb = this.orderRepository
             .createQueryBuilder('order')
@@ -372,14 +372,96 @@ export class OrderService {
         }
 
         qb.orderBy(`order.${sortBy}`, sortOrder);
-        const orders = await qb.skip((page - 1) * limit).take(limit).getMany();
+        const orders = await qb.getMany();
 
-        const totalPages = Math.ceil(total / limit) || 1;
-        const data = orders.map((order) => this.mapOrderToResponse(order));
-        for (let i = 0; i < data.length; i++) {
-            data[i].checkout = await this.getCheckoutForOrder(orders[i].id);
+        // Include failed/cancelled WooShPay attempts (no order created) for admin visibility.
+        let failedAttempts: any[] = [];
+        if (role === 'admin') {
+            const failedQb = this.checkoutRepository
+                .createQueryBuilder('checkout')
+                .leftJoinAndSelect('checkout.user', 'user')
+                .where('checkout.isDeleted = :isDeleted', { isDeleted: false })
+                .andWhere('checkout.orderId IS NULL')
+                .andWhere('checkout.status IN (:...statuses)', {
+                    statuses: ['Failed', 'Cancelled'],
+                });
+
+            if (filterUserId) {
+                failedQb.andWhere('user.id = :filterUserId', { filterUserId });
+            }
+            if (status) {
+                failedQb.andWhere('checkout.status = :status', { status });
+            }
+            if (dateFrom) {
+                failedQb.andWhere('checkout.createdAt >= :dateFrom', { dateFrom });
+            }
+            if (dateTo) {
+                failedQb.andWhere('checkout.createdAt <= :dateTo', { dateTo });
+            }
+            if (search) {
+                failedQb.andWhere(
+                    new Brackets((qb2) => {
+                        qb2
+                            .where('checkout.checkoutId ILIKE :search', { search: `%${search}%` })
+                            .orWhere('user.firstName ILIKE :search', { search: `%${search}%` })
+                            .orWhere('user.lastName ILIKE :search', { search: `%${search}%` })
+                            .orWhere('user.email ILIKE :search', { search: `%${search}%` });
+                    }),
+                );
+            }
+
+            const failedCheckouts = await failedQb.getMany();
+            failedAttempts = failedCheckouts.map((c) => ({
+                id: `checkout-${c.id}`,
+                sourceType: 'checkout_failed',
+                orderNo: c.checkoutId,
+                paymentMethod: c.paymentMethod || 'card',
+                price: Number(c.totalAmount || 0),
+                amountPaid: Number(c.totalAmount || 0),
+                status: c.status || 'Failed',
+                discount: Number(c.discount || 0),
+                originalPrice: Number(c.totalAmount || 0) + Number(c.discount || 0),
+                createdAt: c.createdAt,
+                failureReason: c.paymentNotes || 'Payment was not completed successfully.',
+                user: {
+                    id: c.user?.id,
+                    firstName: c.user?.firstName,
+                    lastName: c.user?.lastName,
+                    mobile: c.user?.mobile,
+                    email: c.user?.email,
+                },
+                orderItems: [],
+                checkout: {
+                    checkoutId: c.checkoutId,
+                    status: c.status,
+                    paymentGateway: c.paymentGateway,
+                    paymentMethod: c.paymentMethod,
+                    paymentNotes: c.paymentNotes,
+                    createdAt: c.createdAt,
+                    completedAt: c.completedAt,
+                },
+            }));
         }
-        return { data, total, page, limit, totalPages };
+
+        const orderRows = orders.map((order) => this.mapOrderToResponse(order));
+        for (let i = 0; i < orderRows.length; i++) {
+            orderRows[i].checkout = await this.getCheckoutForOrder(orders[i].id);
+            orderRows[i].sourceType = 'order';
+            orderRows[i].failureReason = orderRows[i].checkout?.paymentNotes || null;
+        }
+
+        const merged = [...orderRows, ...failedAttempts].sort((a, b) => {
+            const ta = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const tb = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return sortOrder === 'ASC' ? ta - tb : tb - ta;
+        });
+
+        const total = merged.length || ordersTotal;
+        const start = (page - 1) * limit;
+        const paginated = merged.slice(start, start + limit);
+        const totalPages = Math.ceil(total / limit) || 1;
+
+        return { data: paginated, total, page, limit, totalPages };
     }
 
     private mapOrderToResponse(order: Order): any {
@@ -388,6 +470,7 @@ export class OrderService {
         const priceBreakdown = this.buildOrderPriceBreakdown(order);
         return {
             id: order.id,
+            sourceType: 'order',
             orderNo: order.orderNo,
             paymentMethod: order.paymentMethod,
             price,
@@ -402,6 +485,7 @@ export class OrderService {
                 total: priceBreakdown.total,
             },
             createdAt: order.createdAt,
+            failureReason: null,
             user: {
                 id: order.user?.id,
                 firstName: order.user?.firstName,

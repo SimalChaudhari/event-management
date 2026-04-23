@@ -19,6 +19,7 @@ import { initializeServerSideDataTable } from '../../utils/dataTableServerSide';
 import axiosInstance from '../../configs/axiosInstance';
 import { ORDER_LOADING } from '../../store/constants/actionTypes';
 import { TRANSACTION_PATHS } from '../../utils/constants';
+import { toast } from 'react-toastify';
 
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
@@ -33,6 +34,20 @@ function getOrderStatusDisplay(status) {
     if (lower === 'failed') return { label: 'Failed', color: '#fd7e14', badgeClass: 'badge-light-danger' };
     if (lower === 'processing') return { label: 'Processing', color: '#17a2b8', badgeClass: 'badge-light-info' };
     return { label: s || 'N/A', color: '#6c757d', badgeClass: 'badge-light-secondary' };
+}
+
+function formatOrderCreatedDate(value) {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
 }
 
 function getOrderColumns() {
@@ -101,11 +116,31 @@ function getOrderColumns() {
             }
         },
         {
+            data: 'createdAt',
+            title: 'Order Created Date',
+            orderable: true,
+            render: function (data, type, row) {
+                if (type === 'sort' || type === 'type') {
+                    return row?.createdAt ? new Date(row.createdAt).getTime() : 0;
+                }
+                return formatOrderCreatedDate(row?.createdAt);
+            }
+        },
+        {
             data: null,
             title: 'Actions',
             orderable: false,
             render: function (data, type, row) {
                 const id = (row && row.id) ? row.id : '';
+                if (row?.sourceType === 'checkout_failed') {
+                    return `
+                    <div class="btn-group" role="group" aria-label="Actions">
+                        <button type="button" class="btn btn-secondary btn-circle btn-sm" title="No order created for failed payment"
+                            style="width: 40px; height: 40px; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center; cursor:not-allowed;" disabled>
+                            <i class="feather icon-alert-circle"></i>
+                        </button>
+                    </div>`;
+                }
                 return `
                     <div class="btn-group" role="group" aria-label="Actions">
                         <button type="button" class="btn btn-success btn-circle btn-sm view-btn mr-2" data-id="${id}" title="View"
@@ -164,11 +199,13 @@ const OrderView = () => {
         setIsDeleting(true);
         try {
             await dispatch(orderDelete(itemToDelete.id));
+            toast.success('Order deleted successfully.');
             setShowDeleteModal(false);
             setItemToDelete(null);
             if (tableRef.current) tableRef.current.ajax.reload();
         } catch (e) {
             console.error('Delete failed:', e);
+            toast.error(e?.response?.data?.message || 'Failed to delete order.');
         } finally {
             setIsDeleting(false);
         }
@@ -187,10 +224,12 @@ const OrderView = () => {
         setIsDeletingAll(true);
         try {
             await dispatch(orderDeleteAll());
+            toast.success('All orders deleted successfully.');
             setShowDeleteAllModal(false);
             if (tableRef.current) tableRef.current.ajax.reload();
         } catch (e) {
             console.error('Delete all failed:', e);
+            toast.error(e?.response?.data?.message || 'Failed to delete all orders.');
         } finally {
             setIsDeletingAll(false);
         }
@@ -491,6 +530,7 @@ const OrderView = () => {
                                         <th>Customer</th>
                                         <th>Events</th>
                                         <th>Status</th>
+                                        <th>Order Created Date</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>

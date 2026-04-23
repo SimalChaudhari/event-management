@@ -119,23 +119,62 @@ export class WooShPayService {
    * Get WooShPay configuration from environment
    */
   private getConfig(): WooShPayConfig {
+    const testMode = process.env.WOOSHPay_TEST_MODE === 'true';
     const baseUrl =
       process.env.WOOSHPay_BASE_URL?.trim() ||
-      (process.env.WOOSHPay_TEST_MODE === 'true' ? 'https://apitest.wooshpay.com' : 'https://api.wooshpay.com');
-    const config: WooShPayConfig = {
-      baseUrl,
-      secretKey: process.env.WOOSHPay_API_KEY || '',
-      testMode: process.env.WOOSHPay_TEST_MODE === 'true',
-      webhookSecret: process.env.WOOSHPay_WEBHOOK_SECRET,
-    };
+      (testMode ? 'https://apitest.wooshpay.com' : 'https://api.wooshpay.com');
+    const apiKey = process.env.WOOSHPay_API_KEY?.trim() || '';
+    const secretEnvKey = process.env.WOOSHPay_SECRET_KEY?.trim() || '';
+    let resolvedSecretKey = secretEnvKey || apiKey;
 
-
-    if (!config.secretKey) {
+    if (!resolvedSecretKey) {
       throw new BadRequestException(
-        'WooShPay API key not configured. Please set WOOSHPay_API_KEY in your .env file. ' +
-          'Get your API key from WooShPay dashboard.',
+        'WooShPay secret key is not configured. Set WOOSHPay_SECRET_KEY (recommended) or WOOSHPay_API_KEY with an sk_ key.',
       );
     }
+
+    if (resolvedSecretKey.startsWith('pk_')) {
+      throw new BadRequestException(
+        'WooShPay publishable key (pk_) cannot be used for server API calls. Please set WOOSHPay_SECRET_KEY (sk_) or set WOOSHPay_API_KEY to an sk_ key.',
+      );
+    }
+
+    if (apiKey.startsWith('pk_') && secretEnvKey.startsWith('sk_')) {
+      this.logger.warn(
+        'WOOSHPay_API_KEY is publishable (pk_) and WOOSHPay_SECRET_KEY is set. Using WOOSHPay_SECRET_KEY for server requests.',
+      );
+    }
+
+    const isTestSecret = resolvedSecretKey.startsWith('sk_test_');
+    const isLiveSecret = resolvedSecretKey.startsWith('sk_live_');
+    if (testMode && isLiveSecret) {
+      throw new BadRequestException(
+        'WooShPay config mismatch: WOOSHPay_TEST_MODE=true but secret key is live (sk_live_).',
+      );
+    }
+    if (!testMode && isTestSecret) {
+      throw new BadRequestException(
+        'WooShPay config mismatch: WOOSHPay_TEST_MODE=false but secret key is test (sk_test_).',
+      );
+    }
+
+    if (testMode && !baseUrl.includes('apitest.wooshpay.com')) {
+      this.logger.warn(
+        `WOOSHPay_TEST_MODE=true but base URL is "${baseUrl}". Expected test host apitest.wooshpay.com.`,
+      );
+    }
+    if (!testMode && baseUrl.includes('apitest.wooshpay.com')) {
+      this.logger.warn(
+        `WOOSHPay_TEST_MODE=false but base URL is "${baseUrl}". Expected live host api.wooshpay.com.`,
+      );
+    }
+
+    const config: WooShPayConfig = {
+      baseUrl,
+      secretKey: resolvedSecretKey,
+      testMode,
+      webhookSecret: process.env.WOOSHPay_WEBHOOK_SECRET,
+    };
 
     return config;
   }

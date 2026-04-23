@@ -120,6 +120,7 @@ const ViewOrderPage = () => {
     const user = orderData.user || {};
     const items = orderData.orderItems || [];
     const firstItemDate = items.length && items[0].createdAt ? formatTimestamp(items[0].createdAt) : 'N/A';
+    const failureReason = orderData.failureReason || checkout.paymentNotes || null;
 
     return (
         <>
@@ -205,6 +206,13 @@ const ViewOrderPage = () => {
                                     <InfoField label="Order No" value={orderData.orderNo} colSize={6} />
                                     <InfoField label="Status" value={<Badge bg={getStatusBadge(orderData.status)}>{orderData.status || 'N/A'}</Badge>} colSize={6} />
                                     <InfoField label="Amount paid" value={<span style={{ fontWeight: '600', color: '#28a745' }}>${Number(orderData.price ?? 0).toFixed(2)}</span>} colSize={6} />
+                                    {failureReason && (
+                                        <InfoField
+                                            label="Failure Reason"
+                                            value={<span style={{ color: '#dc3545', fontWeight: '500' }}>{failureReason}</span>}
+                                            colSize={12}
+                                        />
+                                    )}
                                     {orderData.discount != null && Number(orderData.discount) > 0 && (
                                         <InfoField label="Discount" value={`$${Number(orderData.discount).toFixed(2)}`} colSize={6} />
                                     )}

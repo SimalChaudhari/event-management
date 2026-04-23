@@ -27,6 +27,20 @@ import { EVENT_FILTER_LIST, UPCOMING_EVENT_LIST, EVENT_LOADING } from '../../../
 // @ts-ignore
 $.DataTable = require('datatables.net-bs');
 
+const escapeHtml = (value) =>
+    String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+const renderTruncatedText = (value, maxWidthPx = 220) => {
+    const text = value ? String(value) : 'N/A';
+    const safeText = escapeHtml(text);
+    return `<span title="${safeText}" style="display:inline-block; max-width:${maxWidthPx}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;">${safeText}</span>`;
+};
+
 function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, restoreTablePage, ajaxParams = {}, dispatch = null, handleImageClick = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -80,7 +94,7 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
                         </span>
                         <div class="d-inline-block">
                             <p class="m-b-0">
-                                <h6>${row.name}</h6>
+                                <h6>${renderTruncatedText(row?.name, 220)}</h6>
                                 <span class="badge ${badgeClass}">
                                     ${eventDate.getDate()} ${monthNames[eventDate.getMonth()]} ${eventDate.getFullYear()}
                                     <span class="ml-1">${statusText}</span>
@@ -124,11 +138,11 @@ function upcomingEventTable(handleAdd, handleEdit, handleDelete, handleView, res
             render: function (data, type, row) {
                 return `
                     <div class="d-inline-block align-middle">
-                        <h6 class="m-b-5">${row.location || 'N/A'}</h6>
+                        <h6 class="m-b-5">${renderTruncatedText(row?.location, 220)}</h6>
                         <p class="m-b-0">
                             <span class="badge badge-success">
                                 <i class="feather icon-map-pin mr-1"></i>
-                                ${row.venue || 'N/A'}, ${row.country || 'N/A'}
+                                ${renderTruncatedText(`${row?.venue || 'N/A'}, ${row?.country || 'N/A'}`, 240)}
                             </span>
                         </p>
                     </div>

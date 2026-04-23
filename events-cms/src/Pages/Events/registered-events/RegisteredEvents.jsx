@@ -39,6 +39,20 @@ const formatTime = (time) => {
     return `${hour12}:${minutes} ${ampm}`;
 };
 
+const escapeHtml = (value) =>
+    String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+const renderTruncatedText = (value, maxWidthPx = 220) => {
+    const text = value ? String(value) : 'N/A';
+    const safeText = escapeHtml(text);
+    return `<span title="${safeText}" style="display:inline-block; max-width:${maxWidthPx}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;">${safeText}</span>`;
+};
+
 function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRegisterEvent, restoreTablePage, ajaxParams = {}, dispatch = null) {
     let tableZero = '#data-table-zero';
     $.fn.dataTable.ext.errMode = 'throw';
@@ -133,7 +147,7 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
 
                     return `
                         <div class="d-inline-block align-middle">
-                            <h6 class="m-b-5">${row.event.name}</h6>
+                            <h6 class="m-b-5">${renderTruncatedText(row?.event?.name, 220)}</h6>
                             <p class="m-b-0">
                                 <span class="badge ${badgeClass}">${statusText}</span>
                     
@@ -149,11 +163,11 @@ function registeredEventsTable(handleView, handleEdit, handleDelete, handleAddRe
                 render: function (data, type, row) {
                     return `
                         <div class="d-inline-block align-middle">
-                            <h6 class="m-b-5">${row?.event?.location || 'N/A'}</h6>
+                            <h6 class="m-b-5">${renderTruncatedText(row?.event?.location, 220)}</h6>
                             <p class="m-b-0">
                                 <span class="badge badge-success">
                                     <i class="feather icon-map-pin mr-1"></i>
-                                    ${row?.event?.venue || 'N/A'}, ${row.event?.country || 'N/A'}
+                                    ${renderTruncatedText(`${row?.event?.venue || 'N/A'}, ${row?.event?.country || 'N/A'}`, 240)}
                                 </span>
                             </p>
                         </div>

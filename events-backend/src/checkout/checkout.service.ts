@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
@@ -64,6 +65,7 @@ const WEBHOOK_DEDUPE_MAX = 50000;
 export class CheckoutService {
   /** Processed webhook event keys (eventId or type+objectId) – skip if already seen (retries/duplicates). */
   private processedWebhookKeys = new Set<string>();
+  private readonly logger = new Logger(CheckoutService.name);
 
   constructor(
     @InjectRepository(Checkout)
@@ -258,6 +260,8 @@ export class CheckoutService {
         existingCheckout.couponCode = dto.couponCode ?? existingCheckout.couponCode;
         existingCheckout.discount = discount;
         existingCheckout.totalAmount = finalAmount;
+        if (!existingCheckout.paymentGateway) existingCheckout.paymentGateway = PaymentGateway.WooShPay;
+        if (!existingCheckout.paymentMethod) existingCheckout.paymentMethod = 'card';
         await this.checkoutRepository.save(existingCheckout);
       }
 
@@ -346,6 +350,8 @@ export class CheckoutService {
       couponCode: dto.couponCode,
       promoCode: dto.promoCode,
       status: CheckoutStatus.Pending,
+      paymentGateway: PaymentGateway.WooShPay,
+      paymentMethod: 'card',
       billingSameAsShipping: dto.billingSameAsShipping ?? false,
     });
 
@@ -936,6 +942,8 @@ export class CheckoutService {
     const sessionId = session?.id;
     // Do not store paymentUrl (sensitive); return URL only for one-time redirect
     if (sessionId) checkout.wooshpaySessionId = sessionId;
+    if (!checkout.paymentGateway) checkout.paymentGateway = PaymentGateway.WooShPay;
+    if (!checkout.paymentMethod) checkout.paymentMethod = 'card';
     await this.checkoutRepository.save(checkout);
 
     return { url, sessionId };
@@ -1389,7 +1397,9 @@ export class CheckoutService {
     const dedupeKey = eventId ? String(eventId) : (eventType && eventData?.id ? `${eventType}-${eventData.id}` : null);
     if (dedupeKey) {
       if (this.processedWebhookKeys.has(dedupeKey)) {
-        console.log('[WEBHOOK processPaymentCompletion] Already processed dedupeKey=', dedupeKey, '→ skipping (duplicate/retry)');
+        this.logger.log(
+          `[Payment Update] Same webhook received again, so it was skipped safely. Reference=${dedupeKey}`,
+        );
         return;
       }
       this.processedWebhookKeys.add(dedupeKey);
@@ -1399,32 +1409,43 @@ export class CheckoutService {
       }
     }
 
-    console.log('[WEBHOOK processPaymentCompletion] eventType=', eventType, '| objectId=', eventData?.id, '| status=', eventData?.status);
-    console.log('[WEBHOOK processPaymentCompletion] metadata=', eventData?.metadata, '| checkout_id=', eventData?.metadata?.checkout_id);
+    this.logger.log(
+      `[Payment Update] New payment event received. Type=${eventType ?? 'unknown'} | Status=${eventData?.status ?? 'n/a'} | Checkout=${eventData?.metadata?.checkout_id ?? 'n/a'}`,
+    );
     if (!eventType) {
-      console.error('[WEBHOOK processPaymentCompletion] No event type found. Payload keys:', Object.keys(webhookData || {}));
+      this.logger.error(
+        `[Payment Update] Could not read payment event type from webhook payload.`,
+      );
     }
 
     try {
       switch (eventType) {
         case 'checkout.session.completed':
-          console.log('[WEBHOOK] → completeCheckoutFromSession');
+          this.logger.log('[Payment Update] Session completed event is being processed.');
           await this.completeCheckoutFromSession(eventData);
           break;
         case 'checkout.session.expired':
         case 'checkout.session.canceled':
-          console.log('[WEBHOOK] → handleCheckoutSessionCanceledOrExpired (user refused or session expired)');
+          this.logger.log('[Payment Update] Session cancelled/expired event is being processed.');
           await this.handleCheckoutSessionCanceledOrExpired(eventData);
           break;
         case 'payment_link.paid':
-          console.log('[WEBHOOK] → completeCheckoutFromPaymentLink');
+          this.logger.log('[Payment Update] Payment link success event is being processed.');
           await this.completeCheckoutFromPaymentLink(eventData);
           break;
         case 'payment_link.failed':
           await this.handlePaymentLinkFailed(eventData);
           break;
+        case 'payment_intent.succeeded':
+          this.logger.log('[Payment Update] Payment success event is being processed.');
+          await this.handlePaymentIntentSucceeded(eventData);
+          break;
+        case 'payment_intent.payment_failed':
+          this.logger.log('[Payment Update] Payment failure event is being processed.');
+          await this.handlePaymentIntentFailed(eventData);
+          break;
         case 'charge.refund.updated':
-          console.log('[WEBHOOK] → handleRefundUpdated (real-time status update)');
+          this.logger.log('[Payment Update] Refund status update is being processed.');
           await this.handleRefundUpdated(eventData);
           break;
         case 'payout.paid':
@@ -1434,10 +1455,15 @@ export class CheckoutService {
           await this.handlePayoutFailed(eventData);
           break;
         default:
-          console.log('[WEBHOOK] Unhandled event type:', eventType, '| Full payload keys:', JSON.stringify(Object.keys(webhookData || {})));
+          this.logger.warn(
+            `[Payment Update] Event received but no matching handler yet. Type=${eventType ?? 'unknown'}`,
+          );
       }
     } catch (error: any) {
-      console.error('[WEBHOOK] Error in processPaymentCompletion:', eventType, error?.message, error?.stack);
+      this.logger.error(
+        `[Payment Update] Failed to process payment event. Type=${eventType ?? 'unknown'} | Reason=${error?.message ?? 'unknown'}`,
+        error?.stack,
+      );
       ErrorHandlerUtil.handleError(error, `Webhook processing failed for event: ${eventType}`);
     }
   }
@@ -1490,6 +1516,8 @@ export class CheckoutService {
       checkout.wooshpayPaymentIntentId = typeof paymentIntentId === 'string' ? paymentIntentId : paymentIntentId?.id ?? paymentIntentId;
       checkout.transactionId = checkout.wooshpayPaymentIntentId;
     }
+    if (!checkout.paymentGateway) checkout.paymentGateway = PaymentGateway.WooShPay;
+    if (!checkout.paymentMethod) checkout.paymentMethod = 'card';
 
     checkout.status = CheckoutStatus.Completed;
     checkout.isCompleted = true;
@@ -1549,6 +1577,8 @@ export class CheckoutService {
     checkout.status = CheckoutStatus.Completed;
     checkout.isCompleted = true;
     checkout.completedAt = new Date();
+    if (!checkout.paymentGateway) checkout.paymentGateway = PaymentGateway.WooShPay;
+    if (!checkout.paymentMethod) checkout.paymentMethod = 'card';
     checkout.paymentUrl = undefined; // clear any stored URL; sensitive and no longer needed
     await this.checkoutRepository.save(checkout);
 
@@ -1593,7 +1623,7 @@ export class CheckoutService {
 
     checkout.status = CheckoutStatus.Cancelled;
     checkout.paymentUrl = undefined; // clear sensitive URL; expire session immediately
-    checkout.paymentNotes = `Payment refused or cancelled. Session status: ${session?.status || 'unknown'}`;
+    checkout.paymentNotes = this.deriveFailureReasonFromSession(session);
     if (checkout.wooshpaySessionId) {
       try {
         await this.expireWooShPaySession(checkout.wooshpaySessionId);
@@ -1629,10 +1659,294 @@ export class CheckoutService {
 
     // Update checkout with payment link failure
     checkout.status = CheckoutStatus.Failed;
-    checkout.paymentNotes = `Payment link failed: ${paymentLink.status}`;
+    checkout.paymentNotes = this.deriveFailureReasonFromPaymentLink(paymentLink);
     await this.checkoutRepository.save(checkout);
 
     console.log(`❌ Payment link failed for checkout: ${checkoutId}`);
+  }
+
+  /**
+   * Handle payment intent succeeded (some WooShPay setups emit this instead of checkout.session.completed).
+   */
+  private async handlePaymentIntentSucceeded(paymentIntent: any): Promise<void> {
+    const paymentIntentId = String(paymentIntent?.id ?? '').trim();
+    if (!paymentIntentId) {
+      console.warn('[WEBHOOK handlePaymentIntentSucceeded] Missing payment_intent id');
+      return;
+    }
+
+    const checkoutId =
+      paymentIntent?.metadata?.checkout_id ??
+      paymentIntent?.checkout_id ??
+      paymentIntent?.metadata?.checkoutId;
+    const sessionId =
+      paymentIntent?.checkout_session ??
+      paymentIntent?.checkout_session_id ??
+      paymentIntent?.metadata?.checkout_session_id;
+
+    let checkout: Checkout | null = null;
+
+    if (checkoutId) {
+      checkout = await this.checkoutRepository.findOne({
+        where: { checkoutId },
+        relations: ['user', 'checkoutCartItems'],
+      });
+    }
+
+    if (!checkout) {
+      checkout = await this.checkoutRepository.findOne({
+        where: { wooshpayPaymentIntentId: paymentIntentId },
+        relations: ['user', 'checkoutCartItems'],
+      });
+    }
+
+    if (!checkout && sessionId) {
+      checkout = await this.checkoutRepository.findOne({
+        where: { wooshpaySessionId: sessionId },
+        relations: ['user', 'checkoutCartItems'],
+      });
+    }
+
+    // Fallback when webhook has no metadata/session id: resolve by scanning open checkouts
+    // and matching their WooShPay session's payment_intent to this paymentIntentId.
+    if (!checkout && paymentIntentId) {
+      checkout = await this.findCheckoutByPaymentIntentFromSessions(paymentIntentId);
+    }
+
+    if (!checkout) {
+      console.warn(
+        '[WEBHOOK handlePaymentIntentSucceeded] No checkout found for paymentIntentId=',
+        paymentIntentId,
+        '| checkoutId=',
+        checkoutId,
+        '| sessionId=',
+        sessionId,
+      );
+      return;
+    }
+
+    checkout.wooshpayPaymentIntentId = paymentIntentId;
+    checkout.transactionId = paymentIntentId;
+    if (!checkout.paymentGateway) checkout.paymentGateway = PaymentGateway.WooShPay;
+    if (!checkout.paymentMethod) checkout.paymentMethod = 'card';
+
+    if (checkout.orderId || checkout.status === CheckoutStatus.Completed) {
+      await this.checkoutRepository.save(checkout);
+      console.log(
+        '[WEBHOOK handlePaymentIntentSucceeded] Checkout already completed; paymentIntent linked for checkoutId=',
+        checkout.checkoutId,
+      );
+      return;
+    }
+
+    checkout.status = CheckoutStatus.Completed;
+    checkout.isCompleted = true;
+    checkout.completedAt = new Date();
+    checkout.paymentUrl = undefined;
+    await this.checkoutRepository.save(checkout);
+
+    await this.createOrderFromCheckout(checkout);
+
+    if (checkout.wooshpaySessionId) {
+      try {
+        await this.expireWooShPaySession(checkout.wooshpaySessionId);
+      } catch (e) {
+        console.warn(
+          '[WEBHOOK handlePaymentIntentSucceeded] Expire session failed (may already be expired):',
+          (e as Error)?.message,
+        );
+      }
+    }
+
+    this.logger.log(
+      `[Payment Success] Payment completed and order created successfully. Checkout=${checkout.checkoutId} | Order=${checkout.orderId ?? 'pending-link'}`,
+    );
+  }
+
+  /**
+   * Resolve checkout by paymentIntentId via stored wooshpaySessionId.
+   * Needed because some WooShPay payment_intent webhooks don't include checkout metadata.
+   */
+  private async findCheckoutByPaymentIntentFromSessions(
+    paymentIntentId: string,
+  ): Promise<Checkout | null> {
+    const candidates = await this.checkoutRepository.find({
+      where: { isCompleted: false },
+      relations: ['user', 'checkoutCartItems'],
+      order: { createdAt: 'DESC' },
+      take: 30,
+    });
+
+    for (const c of candidates) {
+      if (!c.wooshpaySessionId) continue;
+      try {
+        const session = await this.wooShPayService.getCheckoutSession(c.wooshpaySessionId);
+        const sessionPi =
+          session?.payment_intent ??
+          session?.payment_intent_id ??
+          session?.payment_intent?.id;
+        const sessionPiId = typeof sessionPi === 'string' ? sessionPi : sessionPi?.id;
+        if (sessionPiId && String(sessionPiId) === String(paymentIntentId)) {
+          console.log(
+            '[WEBHOOK findCheckoutByPaymentIntentFromSessions] Matched checkoutId=',
+            c.checkoutId,
+            'for paymentIntentId=',
+            paymentIntentId,
+          );
+          return c;
+        }
+      } catch (error: any) {
+        console.warn(
+          '[WEBHOOK findCheckoutByPaymentIntentFromSessions] Session lookup failed for checkoutId=',
+          c.checkoutId,
+          '|',
+          error?.message,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Handle payment intent failed.
+   */
+  private async handlePaymentIntentFailed(paymentIntent: any): Promise<void> {
+    const paymentIntentId = String(paymentIntent?.id ?? '').trim();
+    const checkoutId =
+      paymentIntent?.metadata?.checkout_id ??
+      paymentIntent?.checkout_id ??
+      paymentIntent?.metadata?.checkoutId;
+
+    let checkout: Checkout | null = null;
+    if (checkoutId) {
+      checkout = await this.checkoutRepository.findOne({ where: { checkoutId } });
+    }
+    if (!checkout && paymentIntentId) {
+      checkout = await this.checkoutRepository.findOne({
+        where: { wooshpayPaymentIntentId: paymentIntentId },
+      });
+    }
+
+    if (!checkout) {
+      console.warn(
+        '[WEBHOOK handlePaymentIntentFailed] No checkout found for paymentIntentId=',
+        paymentIntentId,
+      );
+      return;
+    }
+
+    if (checkout.status === CheckoutStatus.Completed) {
+      return;
+    }
+
+    checkout.status = CheckoutStatus.Failed;
+    checkout.paymentNotes = this.deriveFailureReasonFromPaymentIntent(paymentIntent);
+    await this.checkoutRepository.save(checkout);
+    this.logger.warn(
+      `[Payment Failed] Payment was not successful. Checkout=${checkout.checkoutId} | PaymentIntent=${paymentIntentId || 'n/a'}`,
+    );
+  }
+
+  /**
+   * Build a professional human-readable payment failure reason for admin panel.
+   */
+  private formatFailureReason(category: string, details?: string): string {
+    if (!details || !String(details).trim()) return category;
+    return `${category}: ${String(details).trim()}`;
+  }
+
+  private deriveFailureReasonFromSession(session: any): string {
+    const status = String(session?.status ?? '').toLowerCase();
+    if (status === 'expired') {
+      return this.formatFailureReason(
+        'Payment Session Expired',
+        'Customer did not complete payment before the session timeout.',
+      );
+    }
+    if (status === 'canceled' || status === 'cancelled') {
+      return this.formatFailureReason(
+        'Payment Cancelled by Customer',
+        'Customer closed or cancelled the payment page.',
+      );
+    }
+    return this.formatFailureReason(
+      'Payment Not Completed',
+      `Session status reported as "${session?.status ?? 'unknown'}".`,
+    );
+  }
+
+  private deriveFailureReasonFromPaymentLink(paymentLink: any): string {
+    const rawStatus = paymentLink?.status ?? paymentLink?.payment_status ?? 'unknown';
+    const lower = String(rawStatus).toLowerCase();
+    if (lower.includes('expired')) {
+      return this.formatFailureReason(
+        'Payment Link Expired',
+        'The payment link expired before customer completed payment.',
+      );
+    }
+    if (lower.includes('cancel')) {
+      return this.formatFailureReason(
+        'Payment Cancelled by Customer',
+        'Customer cancelled payment from the payment link page.',
+      );
+    }
+    return this.formatFailureReason(
+      'Payment Link Failed',
+      `Provider reported status "${rawStatus}".`,
+    );
+  }
+
+  private deriveFailureReasonFromPaymentIntent(paymentIntent: any): string {
+    const lastError =
+      paymentIntent?.last_payment_error?.message ??
+      paymentIntent?.last_payment_error?.decline_code ??
+      paymentIntent?.last_payment_error?.code ??
+      paymentIntent?.failure_message ??
+      paymentIntent?.failure_reason ??
+      null;
+
+    const declineCode = String(
+      paymentIntent?.last_payment_error?.decline_code ??
+        paymentIntent?.last_payment_error?.code ??
+        '',
+    ).toLowerCase();
+
+    if (declineCode.includes('insufficient_funds')) {
+      return this.formatFailureReason(
+        'Payment Declined - Insufficient Funds',
+        lastError || 'Card does not have sufficient balance.',
+      );
+    }
+    if (declineCode.includes('authentication') || declineCode.includes('3d')) {
+      return this.formatFailureReason(
+        'Payment Authentication Failed',
+        lastError || '3D Secure / cardholder authentication failed.',
+      );
+    }
+    if (declineCode.includes('expired_card')) {
+      return this.formatFailureReason(
+        'Payment Declined - Expired Card',
+        lastError || 'Customer card is expired.',
+      );
+    }
+    if (declineCode.includes('incorrect_cvc') || declineCode.includes('invalid_cvc')) {
+      return this.formatFailureReason(
+        'Payment Declined - Invalid CVC',
+        lastError || 'Customer entered invalid card security code.',
+      );
+    }
+    if (declineCode.includes('do_not_honor') || declineCode.includes('generic_decline') || declineCode.includes('card_declined')) {
+      return this.formatFailureReason(
+        'Payment Declined by Issuer',
+        lastError || 'Card issuing bank declined the transaction.',
+      );
+    }
+
+    return this.formatFailureReason(
+      'Payment Failed',
+      lastError || `Provider reported status "${paymentIntent?.status ?? 'unknown'}".`,
+    );
   }
 
   /**

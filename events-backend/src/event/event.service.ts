@@ -168,6 +168,9 @@ export class EventService {
 
   async createEvent(eventDto: EventDto) {
     try {
+      // Normalize optional date fields so Postgres date columns never receive empty strings.
+      this.normalizeOptionalDateFields(eventDto);
+
       // Check if event name already exists
       const existingEvent = await this.eventRepository.findOne({
         where: { name: eventDto.name },
@@ -2103,6 +2106,27 @@ export class EventService {
 
   private validateCoordinates(eventDto: Partial<EventDto>) {
     EventValidationUtils.validateCoordinates(eventDto);
+  }
+
+  private normalizeOptionalDateFields(eventDto: Partial<EventDto>) {
+    const optionalDateFields = [
+      'publishStartDate',
+      'publishEndDate',
+      'earlyBirdStartDate',
+      'earlyBirdEndDate',
+    ] as const;
+
+    for (const field of optionalDateFields) {
+      const value = eventDto[field];
+      if (
+        value === '' ||
+        value === null ||
+        value === undefined ||
+        (typeof value === 'string' && value.trim() === '')
+      ) {
+        (eventDto as any)[field] = null;
+      }
+    }
   }
 
 
