@@ -28,6 +28,7 @@ import { PushNotification } from '../settings/setting.entity';
 import { NotificationUtil } from '../utils/notification.util';
 import { PushNotificationGateway } from './push-notification.gateway';
 import { FirebaseUtil } from '../utils/firebase.util';
+import { GeneralNotificationType } from '../types/notification.types';
 import {
   ScheduledPushNotificationDelivery,
   DeliveryStatus,
@@ -538,7 +539,7 @@ export class ScheduledPushNotificationService {
       const notificationData: any = {
         title: 'Notification',
         body: notification.message,
-        type: 'scheduled_push',
+        type: GeneralNotificationType.SCHEDULED_PUSH,
         notificationId: notification.id,
       };
 
@@ -570,7 +571,7 @@ export class ScheduledPushNotificationService {
         const notificationPayload: any = {
           title: 'Notification',
           description: notification.message,
-          type: 'general',
+          type: GeneralNotificationType.SCHEDULED_PUSH,
         };
 
         // Add redirect data to notification
@@ -942,7 +943,7 @@ export class ScheduledPushNotificationService {
     }
 
     const socketPayload = {
-      type: 'scheduled_push',
+      type: GeneralNotificationType.SCHEDULED_PUSH,
       notificationId: notification.id,
       deliveryId: delivery?.id,
       message: notification.message,

@@ -94,7 +94,7 @@ export class NotificationUtil {
               data: {
                 eventId,
                 notificationId: savedEventNotification.id,
-                type: type || 'general'
+                type: type || EventNotificationType.EVENT_UPDATE
               }
             });
 
@@ -179,7 +179,7 @@ export class NotificationUtil {
               data: {
                 eventId,
                 notificationId: savedEventNotification.id,
-                type: type || 'general'
+                type: type || EventNotificationType.EVENT_UPDATE
               }
             }).catch(pushError => {
               console.error(`Push notification failed for user ${user.id}:`, pushError);
@@ -253,7 +253,7 @@ export class NotificationUtil {
             body: description,
             data: {
               notificationId: `user_${Date.now()}`,
-              type: type || 'general'
+              type: type || GeneralNotificationType.GENERAL
             }
           });
 
@@ -262,7 +262,7 @@ export class NotificationUtil {
             id: `user_${Date.now()}`,
             title,
             description,
-            type: type || EventNotificationType.EVENT_UPDATE,
+            type: type || GeneralNotificationType.GENERAL,
             createdAt: new Date()
           }).catch(socketError => {
             console.error(`Socket notification failed for user ${userId}:`, socketError);
@@ -307,7 +307,7 @@ export class NotificationUtil {
             body: description,
             data: {
               notificationId: `broadcast_${Date.now()}`,
-              type: type || 'broadcast'
+              type: type || GeneralNotificationType.BROADCAST
             }
           });
 
@@ -443,7 +443,7 @@ export class NotificationUtil {
             body: this.extractTextFromContent(advertData.content),
             data: {
               advertId: advertData.id,
-              type: 'advert',
+              type: GeneralNotificationType.ADVERT,
               actionUrl: advertData.actionUrl,
               actionText: advertData.actionText,
             }
@@ -459,7 +459,7 @@ export class NotificationUtil {
             imageUrl: advertData.imageUrl,
             actionUrl: advertData.actionUrl,
             actionText: advertData.actionText,
-            type: 'advert',
+            type: GeneralNotificationType.ADVERT,
             createdAt: new Date()
           }).catch(socketError => {
             console.error(`Socket notification failed for user ${userId}:`, socketError);
