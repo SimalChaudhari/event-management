@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from '../user/users.entity';
 import { PushNotification } from '../settings/setting.entity';
 import { FirebaseUtil } from '../utils/firebase.util';
+import { GeneralNotificationType } from '../types/notification.types';
 
 @Injectable()
 export class ChatNotificationService {
@@ -65,7 +66,7 @@ export class ChatNotificationService {
             title: notificationTitle,
             body: notificationBody,
             data: {
-              type: 'chat',
+              type: GeneralNotificationType.CHAT,
               senderId: senderId,
               receiverId: receiverId,
               message: message,
@@ -149,7 +150,7 @@ export class ChatNotificationService {
               title: notificationTitle,
               body: notificationBody,
               data: {
-                type: 'group_chat',
+                type: GeneralNotificationType.GROUP_CHAT,
                 senderId: senderId,
                 receiverId: receiverId,
                 message: message,
@@ -278,7 +279,7 @@ export class ChatNotificationService {
               title: notificationTitle,
               body: '',
               data: {
-                type: 'typing',
+                type: GeneralNotificationType.TYPING,
                 senderId: senderId,
                 receiverId: receiverId,
                 isTyping: isTyping,
