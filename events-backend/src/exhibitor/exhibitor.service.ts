@@ -2386,8 +2386,10 @@ export class ExhibitorService {
 
       // Apply pagination if provided
       const hasPagination = filters?.page !== undefined || filters?.limit !== undefined;
-      const page = filters?.page || 1;
-      const limit = filters?.limit || 10;
+      const pageRaw = Number(filters?.page);
+      const limitRaw = Number(filters?.limit);
+      const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+      const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : 10;
       const sortBy = filters?.sortBy || 'exhibitor.companyName';
       const sortOrder = filters?.sortOrder || 'ASC';
 

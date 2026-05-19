@@ -136,6 +136,7 @@ function AddEventPage() {
 
     // Add loading state for form submission
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [priceError, setPriceError] = useState('');
 
     // Add loading state for speaker modal
     const [isSpeakerLoading, setIsSpeakerLoading] = useState(false);
@@ -656,6 +657,9 @@ function AddEventPage() {
                 }));
             }
         } else {
+            if (name === 'price' && priceError) {
+                setPriceError('');
+            }
             setFormData((prev) => ({
                 ...prev,
                 [name]: value
@@ -843,6 +847,23 @@ function AddEventPage() {
         }
         
         setIsSubmitting(true);
+
+        // Validate event price (required)
+        const priceRaw = formData.price;
+        if (priceRaw === '' || priceRaw === null || priceRaw === undefined) {
+            setPriceError('Event price is required');
+            toast.error('Please enter the event price');
+            setIsSubmitting(false);
+            return;
+        }
+        const priceNum = parseFloat(priceRaw);
+        if (Number.isNaN(priceNum) || priceNum < 0) {
+            setPriceError('Please enter a valid event price (0 or greater)');
+            toast.error('Please enter a valid event price');
+            setIsSubmitting(false);
+            return;
+        }
+        setPriceError('');
 
         // Validate document names before submission
         let hasValidationErrors = false;
@@ -1070,14 +1091,14 @@ function AddEventPage() {
                 // toast.success('Programme data saved successfully');
             } catch (error) {
                 console.error('Error saving programme data:', error);
-                // toast.error('Failed to save some programme data');
+                toast.error('Event was created but programme data could not be saved. Please add it from the edit event page.');
             }
         };
 
         try {
             const result = id ? await dispatch(editEvent(id, formDataToSend)) : await dispatch(createEvent(formDataToSend));
             if (result && result.success) {
-                const newEventId = result.data?.id || result.id || id;
+                const newEventId = result?.event?.id || result?.data?.id || id;
                 
                 // If creating new event and we have programme data, save it
                 if (!id && programmeDataRef.current) {
@@ -1587,13 +1608,14 @@ function AddEventPage() {
                                                         <div className="input-group" style={{ position: 'relative', zIndex: 1, marginTop: '8px' }}>
                                                             <input
                                                                 type="number"
-                                                                className="form-control"
+                                                                className={`form-control${priceError ? ' is-invalid' : ''}`}
                                                                 name="price"
                                                                 value={formData.price}
                                                                 onChange={handleChange}
                                                                 placeholder="0.00"
                                                                 step="0.01"
                                                                 min="0"
+                                                                required
                                                             />
                                                             <span
                                                                 className="input-group-text border-start-0"

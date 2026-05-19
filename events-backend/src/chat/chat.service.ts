@@ -171,7 +171,8 @@ export class ChatService {
           senderID,
           receiverID,
           dto.msg,
-          dto.msgType || MessageType.TEXT
+          dto.msgType || MessageType.TEXT,
+          dto.eventId
         );
       } catch (error) {
         console.error('❌ Error sending chat notification:', error);

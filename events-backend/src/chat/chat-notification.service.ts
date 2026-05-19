@@ -26,7 +26,8 @@ export class ChatNotificationService {
     senderId: string,
     receiverId: string,
     message: string,
-    messageType: string = 'text'
+    messageType: string = 'text',
+    eventId?: string
   ): Promise<void> {
     try {
       // Get sender information
@@ -69,6 +70,7 @@ export class ChatNotificationService {
               type: GeneralNotificationType.CHAT,
               senderId: senderId,
               receiverId: receiverId,
+              eventId: eventId || '',
               message: message,
               messageType: messageType,
               senderName: senderName,
