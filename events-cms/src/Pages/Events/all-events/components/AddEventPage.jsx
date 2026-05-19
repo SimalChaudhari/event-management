@@ -1255,7 +1255,11 @@ function AddEventPage() {
         }));
     };
 
-    const handleAddSpeaker = async () => {
+    const handleAddSpeaker = async (e) => {
+        if (e?.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         setIsSpeakerLoading(true);
         const formDataToSend = new FormData();
 
@@ -1291,7 +1295,11 @@ function AddEventPage() {
         }
     };
 
-    const handleAddCategory = async () => {
+    const handleAddCategory = async (e) => {
+        if (e?.preventDefault) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         try {
             const result = await dispatch(createCategory(newCategory));
             if (result && result.success) {
@@ -2038,6 +2046,7 @@ function AddEventPage() {
                                             </div>
                                             {!id && (
                                                 <Button
+                                                    type="button"
                                                     variant="primary"
                                                     style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
                                                     onClick={() => setShowSidebar(true)}
@@ -2046,29 +2055,6 @@ function AddEventPage() {
                                                 </Button>
                                             )}
                                         </div>
-
-                                        <SpeakerFormModal
-                                            show={showSidebar}
-                                            onClose={() => setShowSidebar(false)}
-                                            onChange={handleInputChange}
-                                            onSubmit={handleAddSpeaker}
-                                            formData={newSpeaker}
-                                            isLoading={isSpeakerLoading}
-                                        />
-
-                                        <CategoryFormModal
-                                            show={showCategoryModal}
-                                            onClose={() => setShowCategoryModal(false)}
-                                            onChange={(e) => {
-                                                const { name, value } = e.target;
-                                                setNewCategory((prev) => ({
-                                                    ...prev,
-                                                    [name]: value
-                                                }));
-                                            }}
-                                            onSubmit={handleAddCategory}
-                                            formData={newCategory}
-                                        />
                                     </Col>
                                     <Col sm={12}>
                                         <div className="form-group d-flex align-items-center">
@@ -2117,6 +2103,7 @@ function AddEventPage() {
                                             </div>
                                             {!id && (
                                                 <Button
+                                                    type="button"
                                                     variant="primary"
                                                     style={{ marginLeft: '10px', marginTop: '30px', height: '40px' }}
                                                     onClick={() => setShowCategoryModal(true)}
@@ -3361,6 +3348,29 @@ function AddEventPage() {
                     </div>
                 </div>
             </div>
+
+            <SpeakerFormModal
+                show={showSidebar}
+                onClose={() => setShowSidebar(false)}
+                onChange={handleInputChange}
+                onSubmit={handleAddSpeaker}
+                formData={newSpeaker}
+                isLoading={isSpeakerLoading}
+            />
+
+            <CategoryFormModal
+                show={showCategoryModal}
+                onClose={() => setShowCategoryModal(false)}
+                onChange={(e) => {
+                    const { name, value } = e.target;
+                    setNewCategory((prev) => ({
+                        ...prev,
+                        [name]: value
+                    }));
+                }}
+                onSubmit={handleAddCategory}
+                formData={newCategory}
+            />
 
             {/* Map Modal */}
             <MapLocationModal

@@ -1,0 +1,92 @@
+/* Right sidebar for programme track / form panels */
+.form-right-sidebar {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    pointer-events: none;
+}
+
+.form-right-sidebar--open {
+    pointer-events: auto;
+}
+
+.form-right-sidebar__overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.35);
+    animation: form-right-sidebar-fade-in 0.2s ease-out;
+}
+
+.form-right-sidebar__panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    max-width: 100vw;
+    background: #fff;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    animation: form-right-sidebar-slide-in 0.25s ease-out;
+}
+
+.form-right-sidebar__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+    background: #f8f9fa;
+}
+
+.form-right-sidebar__title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-right-sidebar__close:hover {
+    text-decoration: none;
+    color: #333 !important;
+}
+
+.form-right-sidebar__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+}
+
+.form-right-sidebar__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid #dee2e6;
+    flex-shrink: 0;
+    background: #fff;
+}
+
+@keyframes form-right-sidebar-slide-in {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes form-right-sidebar-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 576px) {
+    .form-right-sidebar__panel {
+        width: 100% !important;
+    }
+}
