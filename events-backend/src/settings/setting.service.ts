@@ -1548,8 +1548,10 @@ export class PushNotificationService {
       }
 
       // Pagination
-      const page = filters.page || 1;
-      const limit = filters.limit || 20;
+      const pageRaw = Number(filters.page);
+      const limitRaw = Number(filters.limit);
+      const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+      const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : 20;
       const skip = (page - 1) * limit;
 
       queryBuilder.skip(skip).take(limit);

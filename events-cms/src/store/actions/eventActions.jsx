@@ -169,7 +169,7 @@ export const createEvent = (data) => async (dispatch) => {
                     payload: createdEvent
                 });
                 
-                return { success: true, event: createdEvent };
+                return { success: true, event: createdEvent, data: createdEvent };
             }
             
             return { success: true };
