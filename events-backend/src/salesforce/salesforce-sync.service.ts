@@ -144,11 +144,6 @@ export class SalesforceSyncService implements OnModuleInit {
         return result;
       }
 
-      const defaultStart = new Date();
-      defaultStart.setFullYear(defaultStart.getFullYear() + 1);
-      const defaultEnd = new Date(defaultStart.getTime());
-      const defaultTime = '09:00';
-
       for (const item of items) {
         try {
           const eventCode = item.courseInstanceId;
@@ -168,16 +163,25 @@ export class SalesforceSyncService implements OnModuleInit {
             item.pricingOptions,
           );
 
+          const { startDate, endDate } = this.resolveEventDates(
+            item.courseStartDate,
+            item.courseEndDate,
+          );
+          const { startTime, endTime } = this.resolveEventTimes(
+            item.courseStartTime,
+            item.courseEndTime,
+          );
+
           const isPrivate = item.privateEvent === true;
           const eventData: Partial<Event> = {
             name,
             description: description ?? undefined,
             venue: venueName ?? undefined,
             location: venueName ?? undefined,
-            startDate: defaultStart,
-            startTime: defaultTime,
-            endDate: defaultEnd,
-            endTime: defaultTime,
+            startDate,
+            endDate,
+            ...(startTime ? { startTime } : {}),
+            ...(endTime ? { endTime } : {}),
             type: venueName && venueName.toLowerCase().includes('e-learning')
               ? EventType.Virtual
               : EventType.Physical,
@@ -224,6 +228,16 @@ export class SalesforceSyncService implements OnModuleInit {
               (event.description ?? '') !== (description ?? '') ||
               (event.venue ?? '') !== (venueName ?? '') ||
               (event.courseCode ?? '') !== (item.courseCode ?? '') ||
+              this.formatDateForCompare(event.startDate) !==
+                this.formatDateForCompare(startDate) ||
+              this.formatDateForCompare(event.endDate) !==
+                this.formatDateForCompare(endDate) ||
+              (startTime != null &&
+                this.formatTimeForCompare(event.startTime) !==
+                  this.formatTimeForCompare(startTime)) ||
+              (endTime != null &&
+                this.formatTimeForCompare(event.endTime) !==
+                  this.formatTimeForCompare(endTime)) ||
               Number(event.price ?? 0) !== Number(defaultPrice ?? 0) ||
               Boolean(event.isPrivate) !== isPrivate ||
               existingImagesJson !== incomingImagesJson ||
@@ -366,6 +380,107 @@ export class SalesforceSyncService implements OnModuleInit {
       this.logger.error(result.message, err?.stack);
       return result;
     }
+  }
+
+  /**
+   * Map Salesforce courseStartDate / courseEndDate (DD/MM/YYYY) to event start/end dates.
+   */
+  private resolveEventDates(
+    courseStartDate?: string | null,
+    courseEndDate?: string | null,
+  ): { startDate: Date; endDate: Date } {
+    const fallbackStart = new Date();
+    fallbackStart.setFullYear(fallbackStart.getFullYear() + 1);
+    const fallbackEnd = new Date(fallbackStart.getTime());
+
+    const parsedStart = this.parseSalesforceEventDate(courseStartDate);
+    const parsedEnd = this.parseSalesforceEventDate(courseEndDate);
+
+    const startDate = parsedStart ?? parsedEnd ?? fallbackStart;
+    const endDate = parsedEnd ?? parsedStart ?? fallbackEnd;
+
+    if (endDate.getTime() < startDate.getTime()) {
+      return { startDate, endDate: startDate };
+    }
+
+    return { startDate, endDate };
+  }
+
+  /** Parse Salesforce EventInfo date strings (DD/MM/YYYY). */
+  private parseSalesforceEventDate(
+    dateStr?: string | null,
+  ): Date | undefined {
+    if (!dateStr?.trim()) return undefined;
+
+    const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(dateStr.trim());
+    if (!match) return undefined;
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return undefined;
+    }
+
+    return date;
+  }
+
+  private formatDateForCompare(date: Date | string | undefined): string {
+    if (!date) return '';
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Map Salesforce courseStartTime / courseEndTime to event start/end times (HH:mm).
+   */
+  private resolveEventTimes(
+    courseStartTime?: string | null,
+    courseEndTime?: string | null,
+  ): { startTime?: string; endTime?: string } {
+    const parsedStart = this.parseSalesforceEventTime(courseStartTime);
+    const parsedEnd = this.parseSalesforceEventTime(courseEndTime);
+
+    return {
+      startTime: parsedStart ?? parsedEnd,
+      endTime: parsedEnd ?? parsedStart,
+    };
+  }
+
+  /** Parse Salesforce EventInfo time strings (e.g. "8:30 AM") to HH:mm. */
+  private parseSalesforceEventTime(timeStr?: string | null): string | undefined {
+    if (!timeStr?.trim()) return undefined;
+
+    const trimmed = timeStr.trim();
+    const h24 = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/i.exec(trimmed);
+    if (h24) {
+      return `${Number(h24[1]).toString().padStart(2, '0')}:${h24[2]}`;
+    }
+
+    const h12 = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(trimmed);
+    if (!h12) return undefined;
+
+    let hours = Number(h12[1]);
+    const minutes = h12[2];
+    const meridiem = h12[3].toUpperCase();
+
+    if (meridiem === 'PM' && hours !== 12) hours += 12;
+    else if (meridiem === 'AM' && hours === 12) hours = 0;
+
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  private formatTimeForCompare(time?: string | null): string {
+    if (!time) return '';
+    return this.parseSalesforceEventTime(time) ?? time.trim().slice(0, 5);
   }
 
   /**

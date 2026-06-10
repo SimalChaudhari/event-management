@@ -40,6 +40,14 @@ export interface SalesforceEventInfoItem {
   courseCode: string;
   courseName: string;
   courseDisplayName: string | null;
+  /** Event start date from Salesforce (DD/MM/YYYY). */
+  courseStartDate?: string | null;
+  /** Event end date from Salesforce (DD/MM/YYYY). */
+  courseEndDate?: string | null;
+  /** Event start time from Salesforce (e.g. "8:30 AM"). */
+  courseStartTime?: string | null;
+  /** Event end time from Salesforce (e.g. "6:00 PM"). */
+  courseEndTime?: string | null;
   description: string | null;
   outline: string | null;
   imageUrl: string | null;

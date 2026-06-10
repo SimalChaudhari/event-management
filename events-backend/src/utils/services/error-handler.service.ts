@@ -107,11 +107,23 @@ export class ErrorHandlerService {
 
     // Handle PostgreSQL unique constraint violations
     if (error.code === '23505') {
-      const match = error.message.match(/duplicate key value violates unique constraint "(.+)"/);
-      if (match) {
-        const constraintName = match[1];
-        throw new DuplicateResourceException('Resource');
+      const constraintMatch = error.message?.match(/duplicate key value violates unique constraint "(.+?)"/);
+      const detailMatch = error.detail?.match(/Key \((.+?)\)=\((.+?)\) already exists\./);
+      const rawConstraintName = constraintMatch?.[1] || 'unknown_constraint';
+
+      if (detailMatch) {
+        const field = detailMatch[1];
+        const value = detailMatch[2];
+        throw new DuplicateResourceException(`${field} "${value}"`);
       }
+
+      const cleanedConstraint = rawConstraintName
+        .replace(/^UQ_/, '')
+        .replace(/^IDX_/, '')
+        .replace(/_/g, ' ');
+      throw new ValidationException(
+        `Duplicate value violates unique constraint (${cleanedConstraint})`,
+      );
     }
 
     // Handle PostgreSQL check constraint violations
@@ -119,11 +131,37 @@ export class ErrorHandlerService {
       throw new ValidationException('Data validation failed');
     }
 
+    // Handle PostgreSQL invalid text representation (e.g. invalid UUID)
+    if (error.code === '22P02') {
+      const invalidUuid = error.message?.includes('uuid');
+      throw new ValidationException(
+        invalidUuid
+          ? 'Invalid ID format provided. Please use a valid UUID.'
+          : 'Invalid input format provided.',
+      );
+    }
+
+    // Handle PostgreSQL invalid datetime/date format
+    if (error.code === '22007') {
+      throw new ValidationException(
+        'Invalid date/time format provided. Please check date fields and try again.',
+      );
+    }
+
+    // Handle PostgreSQL not-null constraint violations
+    if (error.code === '23502') {
+      const column = error.column || 'required field';
+      throw new ValidationException(`Missing required value for ${column}.`);
+    }
+
     // Generic database error
     throw new DatabaseConstraintException(
-      'Database operation failed',
+      `Database operation failed during ${context}`,
       'UNKNOWN',
-      { originalError: error.message }
+      {
+        originalError: error.message,
+        databaseCode: error.code || 'UNKNOWN',
+      }
     );
   }
 
