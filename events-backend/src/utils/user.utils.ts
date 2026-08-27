@@ -434,7 +434,7 @@ export class UserUtils {
         : allSessions;
 
       // For user-facing APIs: Filter out inactive sessions only
-      // Don't filter by enableQna/enablePolling - show all active sessions with messages if features are disabled
+      // Don't filter by enableQna/enablePolling - show all active sessions; clients use those flags to hide features
       if (isUserFacing) {
         filteredSessions = filteredSessions.filter((session: any) => {
           // Must be active
@@ -478,9 +478,12 @@ export class UserUtils {
             pollsCount: 0,
             totalVotesCount: 0
           },
-          // For user-facing APIs: Show unavailable message if feature is disabled, otherwise show data
-          questions: (isUserFacing && session.enableQna !== true) ? 'Q&A unavailable' : (session.questions || []),
-          polling: (isUserFacing && session.enablePolling !== true) ? 'Polling unavailable' : (session.polling || null)
+          // questions: (isUserFacing && session.enableQna !== true) ? 'Q&A unavailable' : (session.questions || []),
+          // polling: (isUserFacing && session.enablePolling !== true) ? 'Polling unavailable' : (session.polling || null)
+          // Keep types stable for clients: questions is always an array, polling is always null or object.
+          // enableQna / enablePolling already indicate whether the feature is available.
+          questions: session.questions || [],
+          polling: session.polling || null
         })),
         sessionsCount: filteredSessions.length
       };
