@@ -2,7 +2,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { UserEntity } from 'user/users.entity';
 
 @Entity('chat_threads')
-@Index(['userID', 'receiverID'], { unique: true })
+// Uniqueness is enforced in DB via partial indexes:
+// - one thread per user-pair per eventId
+// - one global thread per user-pair when eventId IS NULL
+@Index(['userID', 'receiverID', 'eventId'])
 export class ChatThread {
   @PrimaryGeneratedColumn('uuid')
   threadID!: string;

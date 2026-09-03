@@ -26,74 +26,153 @@ export class ChatService {
     this.chatGateway = gateway;
   }
 
-  // Create or get thread between user and speaker
-  async createOrGetThread(userID: string, dto: CreateThreadDto): Promise<any> {
+  /** Find thread for a user pair scoped to one event (or global when eventId is null). */
+  private async findThreadForPairAndEvent(
+    userID: string,
+    receiverID: string,
+    eventId: string | null,
+  ): Promise<ChatThread | null> {
+    // Raw SQL avoids TypeORM OR + andWhere edge cases returning the wrong thread
+    const rows: Array<{ threadID: string }> = eventId
+      ? await this.threadRepo.query(
+          `SELECT "threadID" FROM chat_threads
+           WHERE (
+             ("userID" = $1 AND "receiverID" = $2)
+             OR ("userID" = $2 AND "receiverID" = $1)
+           )
+           AND "eventId" = $3
+           LIMIT 1`,
+          [userID, receiverID, eventId],
+        )
+      : await this.threadRepo.query(
+          `SELECT "threadID" FROM chat_threads
+           WHERE (
+             ("userID" = $1 AND "receiverID" = $2)
+             OR ("userID" = $2 AND "receiverID" = $1)
+           )
+           AND "eventId" IS NULL
+           LIMIT 1`,
+          [userID, receiverID],
+        );
 
-    // Validate input
-    if (!dto.receiverID ) {
-      throw new BadRequestException(' ReceiverID are required');
+    if (!rows?.length) {
+      return null;
+    }
+
+    return this.threadRepo.findOne({
+      where: { threadID: rows[0].threadID },
+      relations: ['user', 'receiver'],
+    });
+  }
+
+  // Create or get thread between two users.
+  // - With eventId: separate thread per event (Event1 chat ≠ Event3 chat). Both must be registered.
+  // - Without eventId: global thread (eventId IS NULL) only.
+  async createOrGetThread(userID: string, dto: CreateThreadDto): Promise<any> {
+    if (!dto.receiverID) {
+      throw new BadRequestException('ReceiverID are required');
     }
 
     if (userID === dto.receiverID) {
       throw new BadRequestException('Cannot create thread with yourself');
     }
 
-    // Check if receiver exists
     const receiver = await this.userRepo.findOne({ where: { id: dto.receiverID } });
     if (!receiver) {
       throw new NotFoundException('Receiver not found');
     }
 
-    // Check if thread already exists (bidirectional)
-    let thread = await this.threadRepo
-      .createQueryBuilder('thread')
-      .where(
-        '(thread.userID = :userID AND thread.receiverID = :receiverID) OR (thread.userID = :receiverID AND thread.receiverID = :userID)',
-        { userID, receiverID: dto.receiverID }
-      )
-      .leftJoinAndSelect('thread.user', 'user')
-      .leftJoinAndSelect('thread.receiver', 'receiver')
-      .getOne();
+    const eventId = dto.eventId?.trim() || null;
+
+    if (eventId) {
+      const senderRegistered =
+        await this.registerEventService.isUserRegisteredForEvent(eventId, userID);
+      const receiverRegistered =
+        await this.registerEventService.isUserRegisteredForEvent(
+          eventId,
+          dto.receiverID,
+        );
+      if (!senderRegistered || !receiverRegistered) {
+        throw new BadRequestException(
+          'Both users must be registered for this event to chat',
+        );
+      }
+    }
+
+    let thread = await this.findThreadForPairAndEvent(
+      userID,
+      dto.receiverID,
+      eventId,
+    );
 
     if (!thread) {
       try {
-        // Create new thread with explicit values (optional eventId for event chatroom)
-        const newThread = this.threadRepo.create({
-          userID: userID,
+        const insertResult = await this.threadRepo.insert({
+          userID,
           receiverID: dto.receiverID,
-          ...(dto.eventId && { eventId: dto.eventId }),
-        });
-        
-        thread = await this.threadRepo.save(newThread);
-
-        // Create participants
-        const participants = [
-          this.participantRepo.create({ threadID: thread.threadID, userID: userID }),
-          this.participantRepo.create({ threadID: thread.threadID, userID: dto.receiverID })
-        ];
-        
-        await this.participantRepo.save(participants);
-
-        // Reload with relations
-        thread = await this.threadRepo.findOne({
-          where: { threadID: thread.threadID },
-          relations: ['user', 'receiver']
+          ...(eventId ? { eventId } : { eventId: null as any }),
         });
 
-      } catch (error) {
-        throw new BadRequestException('Failed to create thread');
+        const newThreadId =
+          insertResult.identifiers?.[0]?.threadID ||
+          (insertResult as any).generatedMaps?.[0]?.threadID;
+
+        if (!newThreadId) {
+          // Fallback: re-query after insert
+          thread = await this.findThreadForPairAndEvent(
+            userID,
+            dto.receiverID,
+            eventId,
+          );
+        } else {
+          await this.participantRepo.insert([
+            { threadID: newThreadId, userID, unreadCount: 0 },
+            {
+              threadID: newThreadId,
+              userID: dto.receiverID,
+              unreadCount: 0,
+            },
+          ]);
+
+          thread = await this.threadRepo.findOne({
+            where: { threadID: newThreadId },
+            relations: ['user', 'receiver'],
+          });
+        }
+
+        if (!thread) {
+          throw new BadRequestException('Failed to create thread');
+        }
+      } catch (error: any) {
+        // Race: another request created the same pair+event thread — re-fetch
+        const existing = await this.findThreadForPairAndEvent(
+          userID,
+          dto.receiverID,
+          eventId,
+        );
+        if (!existing) {
+          throw new BadRequestException(
+            error?.message || 'Failed to create thread',
+          );
+        }
+        thread = existing;
       }
-    } else if (dto.eventId) {
-      // When sending from register/event chatroom: always tag thread with this eventId so last chat shows in that event's list
-      await this.threadRepo.update(thread!.threadID, { eventId: dto.eventId });
-      thread!.eventId = dto.eventId;
+    }
+
+    // Hard guard: never return a thread that belongs to a different event
+    const threadEventId = thread!.eventId || null;
+    if (threadEventId !== eventId) {
+      throw new BadRequestException(
+        `Thread event mismatch: requested ${eventId || 'global'}, got ${threadEventId || 'global'}`,
+      );
     }
 
     return {
       threadID: thread!.threadID,
       receiverID: dto.receiverID,
       receiverName: receiver.firstName || 'Unknown',
-      createdAt: thread!.createdAt
+      eventId: threadEventId,
+      createdAt: thread!.createdAt,
     };
   }
 
@@ -188,6 +267,7 @@ export class ChatService {
       const result = {
         msgID: savedMessage!.msgID,
         threadID: savedMessage!.threadID,
+        eventId: threadData.eventId || null,
         msg: savedMessage!.msg,
         msgType: savedMessage!.msgType,
         msgJson: savedMessage!.msgJson,
@@ -315,6 +395,7 @@ export class ChatService {
 
       return {
         threadID,
+        eventId: threadData.eventId || null,
         receiverID: dto.receiverID,
         receiverName: threadData.receiverName,
         lastSeen,
@@ -722,14 +803,14 @@ export class ChatService {
         return hasMessagesInDb && hasVisibleToUser;
       });
 
-      // When eventId provided: show threads where other user is event attendee; include if thread has this eventId OR no eventId yet (so send with eventId stores last chat here)
+      // Event chatroom: only threads for THIS event with other registered attendees.
+      // Event1 chat must not appear in Event3 (separate thread.eventId).
       if (eventAttendeeIds !== null) {
         threadsWithMessages = threadsWithMessages.filter(p => {
           const otherUser = p.thread!.userID === userID ? p.thread!.receiver : p.thread!.user;
           const otherIsAttendee = otherUser && eventAttendeeIds!.has(otherUser.id);
           const threadBelongsToEvent = p.thread!.eventId === dto.eventId;
-          const threadUntagged = !p.thread!.eventId;
-          return otherIsAttendee && (threadBelongsToEvent || threadUntagged);
+          return otherIsAttendee && threadBelongsToEvent;
         });
       }
 

@@ -144,7 +144,7 @@ export class GetChatListDto {
   @Transform(({ value }) => value?.trim())
   search?: string;
 
-  /** When provided, only return chat threads with other registered attendees of this event (event chatroom). */
+  /** When provided, only return chat threads belonging to this event (separate per-event rooms). */
   @IsOptional()
   @IsUUID(4, { message: 'EventID must be a valid UUID' })
   eventId?: string;

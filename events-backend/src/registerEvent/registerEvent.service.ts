@@ -932,6 +932,29 @@ export class RegisterEventService implements OnModuleInit {
   }
 
   /**
+   * Whether a user is actively registered for an event (for event chatroom rules).
+   */
+  async isUserRegisteredForEvent(eventId: string, userId: string): Promise<boolean> {
+    if (!eventId || !userId) {
+      return false;
+    }
+    try {
+      const count = await this.registerEventRepository
+        .createQueryBuilder('re')
+        .where('re.eventId = :eventId', { eventId })
+        .andWhere('re.userId = :userId', { userId })
+        .andWhere('(re.isRegister = :isRegister OR re.isRegister IS NULL)', {
+          isRegister: true,
+        })
+        .getCount();
+      return count > 0;
+    } catch (error) {
+      this.errorHandler.logError(error, 'Is User Registered For Event', eventId);
+      return false;
+    }
+  }
+
+  /**
    * Get other registered attendees for an event (for chatroom - one-to-one chat between registered users).
    * Excludes the current user. Returns basic user info for display in chat list.
    */
